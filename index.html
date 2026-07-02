@@ -62,7 +62,7 @@
   .lock .project.open .chev{transform:rotate(180deg);color:var(--red)}
   /* series drawer */
   .series{max-height:0;overflow:hidden;transition:max-height .38s cubic-bezier(.4,0,.2,1);background:var(--bg2);border-top:1px solid transparent}
-  .series.open{max-height:420px;border-top-color:var(--line)}
+  .series.open{max-height:600px;border-top-color:var(--line)}
   .series-in{max-width:1160px;margin:0 auto;padding:13px 15px 16px;display:flex;flex-direction:column;gap:11px}
   .series-cap{font-family:var(--f-mono);font-size:.66rem;letter-spacing:.22em;color:var(--muted);text-transform:uppercase;text-align:center}
   .plogo{position:relative;overflow:hidden;border-radius:12px;padding:22px 20px;min-height:104px;display:flex;flex-direction:column;justify-content:flex-end;gap:4px;cursor:pointer;isolation:isolate;transition:transform .12s}
@@ -79,6 +79,11 @@
   .p-neverland{background:linear-gradient(180deg,#1c1030 0%,#160a26 40%,#0b0416 72%,#050109 100%);border:1px solid rgba(212,175,55,.35)}
   .p-neverland .pname{font-family:'Uncial Antiqua',serif;font-weight:400;letter-spacing:.02em;font-size:1.55rem;background-image:linear-gradient(180deg,#fff0bf,#f0cf74 42%,#a9791a);filter:drop-shadow(0 0 15px rgba(212,175,55,.5))}
   .p-neverland .ptag{color:#dcc06e}
+  /* ASSIMILATION — Life on the Edge: digital grid / New-Liberty net */
+  .p-assimilation{background:linear-gradient(180deg,#1b1116 0%,#22131a 40%,#15090d 72%,#0a0406 100%);border:1px solid rgba(255,51,64,.35)}
+  .p-assimilation .pname{font-family:var(--f-disp);font-weight:700;letter-spacing:.12em;font-size:1.5rem;background-image:linear-gradient(180deg,#ffe3e5,#ff5763 44%,#c9202c);filter:drop-shadow(0 0 15px rgba(255,51,64,.5))}
+  .p-assimilation .pname i{font-style:normal}
+  .p-assimilation .ptag{color:#ff8088}
   .theme-toggle{order:1;position:relative;width:50px;height:27px;flex-shrink:0;cursor:pointer;padding:0;background:var(--bg2);border:1px solid var(--line2);border-radius:999px}
   .theme-toggle .knob{position:absolute;top:2px;left:2px;width:21px;height:21px;border-radius:50%;background:var(--red);display:flex;align-items:center;justify-content:center;transition:left .2s}
   [data-theme="light"] .theme-toggle .knob{left:25px}
@@ -112,8 +117,8 @@
 
   /* ---------- Main / views ---------- */
   main{max-width:1160px;margin:0 auto;padding:18px 15px calc(var(--botnav-h) + 30px);position:relative;z-index:2}
-  .view{display:none}
-  .view.active{display:block}
+  .view{position:absolute;top:0;left:0;width:100%;height:0;overflow:hidden;visibility:hidden;opacity:0;pointer-events:none}
+  .view.active{position:relative;height:auto;overflow:visible;visibility:visible;opacity:1;pointer-events:auto;z-index:1}
   @keyframes fade{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
 
   .masthead{margin-bottom:20px}
@@ -144,6 +149,7 @@
 
   .content-col{min-width:0}
   .cards{display:grid;grid-template-columns:1fr;gap:12px}
+  .players-list{display:block}
   .card{position:relative;background:var(--surface);border:1px solid var(--line);color:var(--dim);padding:16px;cursor:pointer;overflow:hidden;border-radius:12px;transition:transform .12s,border-color .15s,background .15s,color .15s}
   .card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--red);opacity:0;transition:.15s}
   .card:active{transform:scale(.99)}
@@ -176,6 +182,13 @@
 
   /* players */
   .players-bar{margin-bottom:16px}
+  .acct-bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;justify-content:space-between;background:var(--surface);border:1px solid var(--line2);border-radius:12px;padding:11px 14px;margin-bottom:12px}
+  .acct-bar .acct-who{font-family:var(--f-mono);font-size:.75rem;color:var(--dim);line-height:1.4}
+  .acct-bar .acct-who b{color:var(--txt)}
+  .acct-bar .acct-actions{display:flex;gap:8px}
+  .btn.sm{min-height:38px;padding:8px 15px;font-size:.76rem}
+  .pcard.mine{border-color:rgba(var(--accent-rgb),.55);box-shadow:0 0 0 1px rgba(var(--accent-rgb),.15) inset}
+  .pcard .plock.mine{color:var(--red)}
   .players-bar .btn{width:100%}
   .fab{position:fixed;right:16px;bottom:calc(var(--botnav-h) + 18px + env(safe-area-inset-bottom));z-index:65;width:56px;height:56px;border-radius:50%;border:none;background:var(--red);color:#0b0b0e;cursor:pointer;display:none;align-items:center;justify-content:center;box-shadow:0 8px 22px rgba(var(--accent-rgb),.45)}
   .fab.show{display:flex}
@@ -306,7 +319,7 @@
         <span class="project" id="projBtn" role="button" tabindex="0" aria-expanded="false" aria-controls="series" onclick="event.preventDefault();event.stopPropagation();toggleProjects();return false;">ASS<i>I</i>MILATION<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span>
       </span>
     </a>
-    <div class="search">
+    <div class="search" id="searchWrap">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
       <input id="search" type="search" placeholder="ПОИСК ПО NEW-LIBERTY" autocomplete="off">
     </div>
@@ -359,6 +372,52 @@
         <span class="pname">NEVERLAND</span>
         <span class="ptag">Call of the Ancients</span>
       </div>
+      <div class="plogo p-assimilation" role="button" tabindex="0" onclick="openProject('assimilation')">
+        <svg class="decor" viewBox="0 0 320 108" preserveAspectRatio="xMidYMax slice" fill="none">
+          <defs>
+            <radialGradient id="asGlow" cx="50%" cy="100%" r="80%"><stop offset="0%" stop-color="#ff5766" stop-opacity=".6"/><stop offset="45%" stop-color="#ff3340" stop-opacity=".22"/><stop offset="100%" stop-color="#ff3340" stop-opacity="0"/></radialGradient>
+            <linearGradient id="asRainR" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff3340" stop-opacity="0"/><stop offset="1" stop-color="#ff3340" stop-opacity=".6"/></linearGradient>
+            <linearGradient id="asRainC" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5ad0ff" stop-opacity="0"/><stop offset="1" stop-color="#5ad0ff" stop-opacity=".5"/></linearGradient>
+          </defs>
+          <ellipse cx="160" cy="116" rx="180" ry="62" fill="url(#asGlow)"/>
+          <!-- perspective grid floor -->
+          <g stroke="#ff3340" fill="none">
+            <g stroke-width=".7" opacity=".32"><path d="M-60 108 L160 66"/><path d="M-10 108 L160 66"/><path d="M40 108 L160 66"/><path d="M85 108 L160 66"/><path d="M125 108 L160 66"/><path d="M160 108 L160 66"/><path d="M195 108 L160 66"/><path d="M235 108 L160 66"/><path d="M280 108 L160 66"/><path d="M330 108 L160 66"/><path d="M380 108 L160 66"/></g>
+            <line x1="0" y1="107" x2="320" y2="107" stroke-width=".8" opacity=".5"/>
+            <line x1="0" y1="95" x2="320" y2="95" stroke-width=".8" opacity=".4"/>
+            <line x1="0" y1="86" x2="320" y2="86" stroke-width=".7" opacity=".3"/>
+            <line x1="0" y1="79" x2="320" y2="79" stroke-width=".7" opacity=".22"/>
+            <line x1="0" y1="74" x2="320" y2="74" stroke-width=".6" opacity=".16"/>
+            <line x1="0" y1="70" x2="320" y2="70" stroke-width=".6" opacity=".11"/>
+          </g>
+          <!-- data-city bars on the horizon -->
+          <g>
+            <rect x="22" y="54" width="9" height="12" fill="#160a10"/><rect x="22" y="54" width="9" height="1.4" fill="#ff3340" opacity=".75"/>
+            <rect x="40" y="50" width="7" height="16" fill="#160a10"/><rect x="40" y="50" width="7" height="1.4" fill="#5ad0ff" opacity=".6"/>
+            <rect x="122" y="46" width="11" height="20" fill="#160a10"/><rect x="122" y="46" width="11" height="1.6" fill="#ff3340" opacity=".8"/>
+            <rect x="138" y="52" width="8" height="14" fill="#160a10"/><rect x="138" y="52" width="8" height="1.4" fill="#ff3340" opacity=".6"/>
+            <rect x="208" y="49" width="9" height="17" fill="#160a10"/><rect x="208" y="49" width="9" height="1.4" fill="#5ad0ff" opacity=".55"/>
+            <rect x="264" y="44" width="12" height="22" fill="#160a10"/><rect x="264" y="44" width="12" height="1.6" fill="#ff3340" opacity=".8"/>
+            <rect x="282" y="52" width="7" height="14" fill="#160a10"/><rect x="282" y="52" width="7" height="1.4" fill="#ff3340" opacity=".6"/>
+          </g>
+          <!-- glowing horizon line -->
+          <line x1="0" y1="66" x2="320" y2="66" stroke="#ff3340" stroke-width="1.1" opacity=".55"/>
+          <!-- digital rain -->
+          <g>
+            <rect x="46" y="8" width="1.4" height="34" fill="url(#asRainR)"/>
+            <rect x="96" y="2" width="1.4" height="42" fill="url(#asRainC)"/>
+            <rect x="150" y="12" width="1.4" height="30" fill="url(#asRainR)"/>
+            <rect x="192" y="6" width="1.4" height="36" fill="url(#asRainC)"/>
+            <rect x="234" y="10" width="1.4" height="32" fill="url(#asRainR)"/>
+            <rect x="292" y="4" width="1.4" height="40" fill="url(#asRainR)"/>
+          </g>
+          <!-- circuit traces + nodes -->
+          <g stroke="#ff3340" fill="none" stroke-width="1" opacity=".5"><path d="M8 16 h24 v11 h16"/><path d="M312 12 h-28 v13 h-15"/></g>
+          <g fill="#ff5763"><circle cx="8" cy="16" r="1.6"/><circle cx="48" cy="27" r="1.6"/><circle cx="312" cy="12" r="1.6"/><circle cx="269" cy="25" r="1.6"/></g>
+        </svg>
+        <span class="pname">ASS<i>I</i>MILATION</span>
+        <span class="ptag">Life on the Edge</span>
+      </div>
     </div>
   </div>
 </header>
@@ -369,11 +428,7 @@
     <div class="masthead">
       <h1 style="color:var(--red)">New day in New-Liberty!</h1>
       <div class="rule"></div>
-      <p><span style="color:var(--red)">Легендами</span> не рождаются — легенд создаёт эпоха. Последняя глава ваших приключений по <span style="color:var(--red)">RISING OF DARKNESS</span> отправит Аморфеуса, Киану, Винни-пуха, Эхонию и остальных в город мечты <span style="white-space:nowrap">— <span style="color:var(--red)">New-Liberty</span>!</span> Сможете ли вы закончить начатое на <span style="color:var(--red)">луне</span>?</p>
-      <div class="meta">
-        <span><i class="sq"></i> <b id="statTotal">0</b>&nbsp;ЗАПИСЕЙ</span>
-        <span><i class="sq off"></i> <b id="statPend">0</b>&nbsp;НА МОДЕРАЦИИ</span>
-      </div>
+      <p><span style="color:var(--red)">Легендами</span> не рождаются — легенд создаёт эпоха. Последняя глава ваших приключений по <span style="color:var(--red)">RISING OF DARKNESS</span> отправит «героев» в город мечты <span style="white-space:nowrap">— <span style="color:var(--red)">New-Liberty</span>!</span> Сможете ли вы закончить начатое на <span style="color:var(--red)">луне</span>?</p>
     </div>
     <div class="grid">
       <aside class="cats"><h4>КАТЕГОРИИ</h4><div class="cat-wrap" id="cats"></div></aside>
@@ -435,18 +490,19 @@
       <p style="font-size:.95rem">Карточки персонажей кампании. Видны всем; редактировать свою карточку может только владелец — по личному коду доступа.</p>
     </div>
     <div class="players-bar">
-      <button class="btn primary" onclick="openNewPlayer()">
+      <div id="acctBar" class="acct-bar"></div>
+      <button class="btn primary" id="addCharBtn" onclick="openNewPlayer()">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
         Добавить персонажа
       </button>
     </div>
-    <div class="cards" id="players-list"></div>
+    <div class="players-list" id="players-list"></div>
   </section>
 </main>
 
 <footer>
   <p><b>КОМИК</b> — это творческое объединение энтузиастов, чья деятельность направлена на культурное просвещение и погружение массового потребителя в мир Dungeons &amp; Dragons. Мы не преследуем коммерческие цели, все материалы распространяются на бесплатной и безвозмездной основе. По всем вопросам и предложениям писать автору данного сайта <a href="https://t.me/HINOMA" target="_blank" rel="noopener" style="color:var(--red)">@HINOMA</a> в Telegram.</p>
-  <p class="ps">P.S. На техподдержку я посадил Тофу.</p>
+  <p class="ps">P.S. На техподдержку посадил Клода.</p>
 </footer>
 
 <nav class="botnav">
@@ -540,7 +596,7 @@ const SEED = [];
 const STORY = [];
 
 /* ====================== Хранилище (общее, с откатом в память) ====================== */
-const SHARED = true, KEY_ARCHIVE='comik:archive:v1', KEY_PENDING='comik:pending:v1', KEY_CHARS='comik:chars:v1';
+const SHARED = true, KEY_ARCHIVE='comik:archive:v1', KEY_PENDING='comik:pending:v1', KEY_CHARS='comik:chars:v1', KEY_USERS='comik:users:v1', KEY_SESSION='comik:session:v1';
 const hasLS = (()=>{ try{ const k='__comik_test__'; localStorage.setItem(k,'1'); localStorage.removeItem(k); return true; }catch(e){ return false; } })();
 const hasStore = (typeof window!=='undefined' && window.storage && typeof window.storage.get==='function');
 const mem = {};
@@ -556,7 +612,7 @@ async function sset(key,val, shared=SHARED){
 }
 
 /* ====================== Состояние ====================== */
-let ARCHIVE=[], PENDING=[], CHARS=[], activeCat='all', activeSub=null, query='', isMod=false;
+let ARCHIVE=[], PENDING=[], CHARS=[], USERS=[], SESSION=null, activeCat='all', activeSub=null, query='', isMod=false;
 const uid = ()=> Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 const esc = s => String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const mergeById = (stored, local) => { const ids=new Set((stored||[]).map(x=>x&&x.id)); return (stored||[]).concat((local||[]).filter(x=>x&&!ids.has(x.id))); };
@@ -568,16 +624,19 @@ async function boot(){
   ARCHIVE = mergeById(arc, ARCHIVE);
   PENDING = mergeById((await sget(KEY_PENDING)) || [], PENDING);
   CHARS = mergeById((await sget(KEY_CHARS)) || [], CHARS);
+  USERS = (await sget(KEY_USERS, false)) || [];
+  SESSION = (await sget(KEY_SESSION, false)) || null;
+  if(SESSION && !USERS.some(u=>normTag(u.tag)===normTag(SESSION))) SESSION=null;
   // форма: категории (без «Истории»)
   document.getElementById('in-cat').innerHTML = cardCats.map(c=>`<option value="${c.id}">${c.label}</option>`).join('');
   onCatChange();
   renderAll();
 }
-function renderAll(){ renderCats(); renderStats(); applyView(); renderMod(); renderPlayers(); }
+function renderAll(){ renderCats(); renderStats(); applyView(); renderMod(); renderAcct(); renderPlayers(); }
 
 function renderStats(){
-  document.getElementById('statTotal').textContent = ARCHIVE.length;
-  document.getElementById('statPend').textContent  = PENDING.length;
+  const st=document.getElementById('statTotal'); if(st) st.textContent = ARCHIVE.length;
+  const sp=document.getElementById('statPend'); if(sp) sp.textContent = PENDING.length;
   document.querySelectorAll('.pend-count').forEach(el=>{ el.textContent=PENDING.length; el.classList.toggle('on', PENDING.length>0); });
 }
 
@@ -755,6 +814,77 @@ async function reject(id){
   await sset(KEY_PENDING, PENDING); renderAll(); toast('Заявка отклонена');
 }
 
+/* ====================== Аккаунты (локальные, на устройстве) ====================== */
+function normTag(t){ return String(t||'').trim().replace(/^@+/,'').toLowerCase(); }
+function validTag(t){ return /^[a-z0-9_]{5,32}$/.test(normTag(t)); }
+function dispTag(t){ return '@'+normTag(t); }
+function currentTag(){ return SESSION ? normTag(SESSION) : null; }
+function isOwner(c){ return !!(SESSION && c && c.owner && normTag(c.owner)===currentTag()); }
+function canEdit(c){ return isOwner(c) || (!!c && !c.owner && !!c.codeHash); }
+function cyrb53(str, seed=0){
+  let h1=0xdeadbeef^seed, h2=0x41c6ce57^seed;
+  for(let i=0,ch;i<str.length;i++){ ch=str.charCodeAt(i); h1=Math.imul(h1^ch,2654435761); h2=Math.imul(h2^ch,1597334677); }
+  h1=Math.imul(h1^(h1>>>16),2246822507); h1^=Math.imul(h2^(h2>>>13),3266489909);
+  h2=Math.imul(h2^(h2>>>16),2246822507); h2^=Math.imul(h1^(h1>>>13),3266489909);
+  return 4294967296*(2097151&h2)+(h1>>>0);
+}
+function genSalt(){ return Math.random().toString(36).slice(2)+Date.now().toString(36)+Math.random().toString(36).slice(2); }
+function hashPass(pass, salt){
+  let acc = salt+'|'+pass;
+  for(let i=0;i<2000;i++){ acc = cyrb53(acc,i).toString(36)+'·'+cyrb53(salt+acc+pass,(i*7+1)).toString(36); }
+  return cyrb53(acc,99).toString(36)+cyrb53(acc,1234).toString(36);
+}
+function renderAcct(){
+  const el=document.getElementById('acctBar'); if(!el) return;
+  if(SESSION){
+    el.innerHTML = `<span class="acct-who">Вы вошли как <b>${esc(dispTag(SESSION))}</b></span><button class="btn ghost sm" onclick="logout()">Выйти</button>`;
+  } else {
+    el.innerHTML = `<span class="acct-who">Гость — войдите, чтобы вести своих персонажей</span><span class="acct-actions"><button class="btn primary sm" onclick="openAuth('login')">Войти</button><button class="btn ghost sm" onclick="openAuth('register')">Регистрация</button></span>`;
+  }
+}
+function openAuth(mode){
+  const reg = mode==='register';
+  document.getElementById('modal').innerHTML = `
+    <button class="x" onclick="closeModal()" aria-label="Закрыть">✕</button>
+    <div class="top">${rune('character',24)}<span class="clabel">${reg?'Регистрация':'Вход'}</span></div>
+    <h2>${reg?'Создать аккаунт':'Войти в аккаунт'}</h2>
+    <div class="field" id="au-f-tag"><label>Telegram-тег <span class="req">*</span></label>
+      <input id="au-tag" maxlength="34" placeholder="@username" autocapitalize="off" autocomplete="username" spellcheck="false"><div class="err">// тег: 5–32 символа — латиница, цифры или _</div></div>
+    <div class="field" id="au-f-pass"><label>Пароль <span class="req">*</span></label>
+      <input id="au-pass" type="password" maxlength="100" autocomplete="${reg?'new-password':'current-password'}" onkeydown="if(event.key==='Enter')${reg?'doRegister()':'doLogin()'}"><div class="err">// минимум 4 символа</div></div>
+    ${reg?`<div class="field" id="au-f-pass2"><label>Повторите пароль <span class="req">*</span></label>
+      <input id="au-pass2" type="password" maxlength="100" autocomplete="new-password" onkeydown="if(event.key==='Enter')doRegister()"><div class="err">// пароли не совпадают</div></div>`:''}
+    <div class="pacts">
+      <button class="btn primary" onclick="${reg?'doRegister()':'doLogin()'}">${reg?'Зарегистрироваться':'Войти'}</button>
+      <button class="btn ghost" onclick="openAuth('${reg?'login':'register'}')">${reg?'У меня есть аккаунт':'Создать аккаунт'}</button>
+    </div>
+    <p class="note">// аккаунт и пароль хранятся только на этом устройстве. Это не вход через настоящий Telegram и не защищённая авторизация — не используйте важный пароль.</p>`;
+  document.getElementById('scrim').classList.add('open');
+  setTimeout(()=>{ const t=pf('au-tag'); if(t) t.focus(); }, 60);
+}
+async function doRegister(){
+  const tag=normTag(pval('au-tag')), pass=(pf('au-pass')?.value||''), pass2=(pf('au-pass2')?.value||'');
+  let ok=true;
+  const badTag=!validTag(tag); pf('au-f-tag').classList.toggle('invalid', badTag); if(badTag) ok=false;
+  const shortP=pass.length<4; pf('au-f-pass').classList.toggle('invalid', shortP); if(shortP) ok=false;
+  const mism=pass!==pass2; if(pf('au-f-pass2')) pf('au-f-pass2').classList.toggle('invalid', mism); if(mism) ok=false;
+  if(!ok) return;
+  if(USERS.some(u=>normTag(u.tag)===tag)){ pf('au-f-tag').classList.add('invalid'); toast('Такой тег уже зарегистрирован'); return; }
+  const salt=genSalt();
+  USERS.push({ tag:'@'+tag, salt, passHash:hashPass(pass,salt), createdAt:Date.now() });
+  await sset(KEY_USERS, USERS, false);
+  SESSION='@'+tag; await sset(KEY_SESSION, SESSION, false);
+  closeModal(); renderAcct(); renderPlayers(); toast('Аккаунт создан — вы вошли');
+}
+async function doLogin(){
+  const tag=normTag(pval('au-tag')), pass=(pf('au-pass')?.value||'');
+  const u=USERS.find(x=>normTag(x.tag)===tag);
+  if(!u || u.passHash!==hashPass(pass,u.salt)){ toast('Неверный тег или пароль'); return; }
+  SESSION=u.tag; await sset(KEY_SESSION, SESSION, false);
+  closeModal(); renderAcct(); renderPlayers(); toast('Вы вошли как '+dispTag(u.tag));
+}
+async function logout(){ SESSION=null; await sset(KEY_SESSION, null, false); renderAcct(); renderPlayers(); toast('Вы вышли из аккаунта'); }
+
 /* ====================== Игроки / персонажи ====================== */
 // простой хэш кода доступа (FNV-1a) — чтобы не хранить код открытым в общем хранилище
 function hashCode(str){
@@ -766,27 +896,33 @@ const pf = id => document.getElementById(id);
 function pval(id){ const e=pf(id); return e? e.value.trim() : ''; }
 
 function renderPlayers(){
+  renderAcct();
   const el=document.getElementById('players-list'); if(!el) return;
-  if(!CHARS.length){ el.innerHTML=`<div class="empty">[ ПОКА НЕТ ПЕРСОНАЖЕЙ ]<br>нажмите кнопку <b style="color:var(--red)">+</b> или «Добавить персонажа», чтобы создать первого</div>`; return; }
+  if(!CHARS.length){ el.innerHTML=`<div class="empty">[ ПОКА НЕТ ПЕРСОНАЖЕЙ ]<br>войдите в аккаунт и нажмите <b style="color:var(--red)">+</b> или «Добавить персонажа», чтобы создать первого</div>`; return; }
   el.innerHTML = CHARS.slice().sort((a,b)=>(a.name||'').localeCompare(b.name||'','ru')).map(c=>{
     const sub=[c.role,c.origin,c.level?('ур. '+c.level):''].filter(Boolean).map(esc).join(' · ');
-    return `<div class="pcard" onclick="openPlayer('${c.id}')" style="display:block;min-height:60px;padding:15px 16px;margin-bottom:10px">
+    const foot = isOwner(c)
+      ? `<span class="plock mine">✎ ваш персонаж</span>`
+      : (c.owner ? `<span class="plock">🔒 владелец ${esc(dispTag(c.owner))}</span>`
+                 : `<span class="plock">🔒 под кодом</span>`);
+    return `<div class="pcard${isOwner(c)?' mine':''}" onclick="openPlayer('${c.id}')" style="display:block;min-height:60px;padding:15px 16px;margin-bottom:10px">
       <span class="pname">${esc(c.name)}</span>
       <span class="psub">Игрок: ${esc(c.player)}${sub?(' · '+sub):''}</span>
-      <span class="plock">🔒 под кодом</span>
+      ${foot}
     </div>`;
   }).join('');
+  try{ void el.offsetHeight; }catch(e){}
 }
 
 /* --- создание --- */
 function openNewPlayer(){
+  if(!SESSION){ toast('Сначала войдите в аккаунт'); openAuth('login'); return; }
   document.getElementById('modal').innerHTML = `
     <button class="x" onclick="closeModal()" aria-label="Закрыть">✕</button>
-    <div class="top">${rune('character',24)}<span class="clabel">Новый персонаж</span></div>
+    <div class="top">${rune('character',24)}<span class="clabel">Новый персонаж · ${esc(dispTag(SESSION))}</span></div>
     <h2>Создать персонажа</h2>
     <div class="field" id="np-f-name"><label>Имя персонажа <span class="req">*</span></label><input id="np-name" maxlength="60"><div class="err">// укажите имя персонажа</div></div>
-    <div class="field" id="np-f-player"><label>Игрок <span class="req">*</span></label><input id="np-player" maxlength="40"><div class="err">// укажите имя игрока</div></div>
-    <div class="field" id="np-f-code"><label>Код доступа <span class="req">*</span></label><input id="np-code" type="password" maxlength="60" autocomplete="new-password"><div class="err">// придумайте код</div></div>
+    <div class="field"><label>Игрок</label><input id="np-player" maxlength="40" value="${esc(dispTag(SESSION))}"></div>
     <div class="row">
       <div class="field"><label>Класс / роль</label><input id="np-role" maxlength="50"></div>
       <div class="field"><label>Происхождение</label><input id="np-origin" maxlength="50"></div>
@@ -795,22 +931,20 @@ function openNewPlayer(){
     <div class="field"><label>Предыстория / описание</label><textarea id="np-bio" maxlength="2000"></textarea></div>
     <div class="field"><label>Снаряжение и заметки</label><textarea id="np-gear" maxlength="2000"></textarea></div>
     <div class="pacts"><button class="btn primary" onclick="createPlayer()">Создать</button><button class="btn ghost" onclick="closeModal()">Отмена</button></div>
-    <p class="note">// код доступа знаете только вы — запомните его, восстановить нельзя, подсказок на сайте нет.</p>`;
+    <p class="note">// лист привязывается к вашему аккаунту ${esc(dispTag(SESSION))} — редактировать сможете только вы (пока вошли под этим тегом).</p>`;
   document.getElementById('scrim').classList.add('open');
 }
 async function createPlayer(){
-  const name=pval('np-name'), player=pval('np-player'), code=pval('np-code');
-  let ok=true;
-  pf('np-f-name').classList.toggle('invalid', !name); if(!name) ok=false;
-  pf('np-f-player').classList.toggle('invalid', !player); if(!player) ok=false;
-  pf('np-f-code').classList.toggle('invalid', !code); if(!code) ok=false;
-  if(!ok) return;
-  const ch={ id:uid(), name, player, codeHash:hashCode(code),
+  if(!SESSION){ toast('Сначала войдите в аккаунт'); openAuth('login'); return; }
+  const name=pval('np-name'); let player=pval('np-player');
+  pf('np-f-name').classList.toggle('invalid', !name); if(!name) return;
+  if(!player) player=dispTag(SESSION);
+  const ch={ id:uid(), name, player, owner:SESSION,
     role:pval('np-role'), origin:pval('np-origin'), level:pval('np-level'),
     bio:pval('np-bio'), gear:pval('np-gear'),
     fields:{}, createdAt:Date.now(), updatedAt:Date.now() };
   CHARS.push(ch); await sset(KEY_CHARS, CHARS);
-  ['np-name','np-player','np-code','np-role','np-origin','np-level','np-bio','np-gear'].forEach(i=>{ const e=pf(i); if(e) e.value=''; });
+  ['np-name','np-player','np-role','np-origin','np-level','np-bio','np-gear'].forEach(i=>{ const e=pf(i); if(e) e.value=''; });
   closeModal(); go('players'); toast('Персонаж создан');
 }
 
@@ -819,6 +953,17 @@ function kv(k,v){ return v ? `<div class="kv"><div class="k">${k}</div><div clas
 function openPlayer(id){
   const c=CHARS.find(x=>x.id===id); if(!c) return;
   const meta=[c.role?`<span class="subtag">${esc(c.role)}</span>`:'', c.origin?`<span class="tag">${esc(c.origin)}</span>`:'', c.level?`<span class="tag">ур. ${esc(c.level)}</span>`:''].join('');
+  let editBlock;
+  if(isOwner(c)){
+    editBlock = `<div class="unlock"><button class="btn primary" onclick="renderPlayerEditor('${c.id}')">Редактировать</button></div>`;
+  } else if(!c.owner && c.codeHash){
+    editBlock = `<div class="unlock">
+      <div class="field" style="margin-bottom:10px"><label>// код для редактирования</label>
+        <input id="pp-code" type="password" placeholder="КОД ДОСТУПА" autocomplete="off" onkeydown="if(event.key==='Enter')tryEditPlayer('${c.id}')"></div>
+      <button class="btn primary" onclick="tryEditPlayer('${c.id}')">Редактировать</button></div>`;
+  } else {
+    editBlock = `<p class="note">🔒 Лист принадлежит ${c.owner?esc(dispTag(c.owner)):'другому игроку'}. Редактировать может только владелец${SESSION?'':' — войдите под своим тегом'}.</p>`;
+  }
   document.getElementById('modal').innerHTML = `
     <button class="x" onclick="closeModal()" aria-label="Закрыть">✕</button>
     <div class="top">${rune('character',24)}<span class="clabel">Игрок: ${esc(c.player)}</span></div>
@@ -826,11 +971,7 @@ function openPlayer(id){
     ${meta?`<div class="pmeta">${meta}</div>`:''}
     ${kv('Предыстория / описание', c.bio)}
     ${kv('Снаряжение и заметки', c.gear)}
-    <div class="unlock">
-      <div class="field" style="margin-bottom:10px"><label>// код для редактирования</label>
-        <input id="pp-code" type="password" placeholder="КОД ДОСТУПА" autocomplete="off" onkeydown="if(event.key==='Enter')tryEditPlayer('${c.id}')"></div>
-      <button class="btn primary" onclick="tryEditPlayer('${c.id}')">Редактировать</button>
-    </div>`;
+    ${editBlock}`;
   document.getElementById('scrim').classList.add('open');
 }
 function tryEditPlayer(id){
@@ -843,6 +984,7 @@ function tryEditPlayer(id){
 /* --- живой редактор (после кода) --- */
 function renderPlayerEditor(id){
   const c=CHARS.find(x=>x.id===id); if(!c) return;
+  if(!canEdit(c)){ toast('Редактировать может только владелец'); return; }
   document.getElementById('modal').innerHTML = `
     <button class="x" onclick="closeModal()" aria-label="Закрыть">✕</button>
     <div class="top">${rune('character',24)}<span class="clabel">Редактирование</span></div>
@@ -863,6 +1005,8 @@ function renderPlayerEditor(id){
     </div>`;
 }
 async function savePlayer(id){
+  const c=CHARS.find(x=>x.id===id); if(!c) return;
+  if(!canEdit(c)){ toast('Нет прав на изменение'); return; }
   const name=pval('ep-name'); if(!name){ toast('Имя персонажа не может быть пустым'); return; }
   const i=CHARS.findIndex(x=>x.id===id); if(i<0) return;
   Object.assign(CHARS[i], { name, player:pval('ep-player'), role:pval('ep-role'),
@@ -878,6 +1022,7 @@ function confirmDeletePlayer(id){
     <button class="btn ghost" onclick="renderPlayerEditor('${id}')">Отмена</button>`;
 }
 async function deletePlayer(id){
+  const c=CHARS.find(x=>x.id===id); if(c && !canEdit(c)){ toast('Нет прав на удаление'); return; }
   CHARS=CHARS.filter(x=>x.id!==id);
   await sset(KEY_CHARS, CHARS); renderPlayers(); closeModal(); toast('Персонаж удалён');
 }
@@ -887,23 +1032,20 @@ function toggleLobby(e){ if(e) e.stopPropagation(); const m=document.getElementB
 function closeLobby(){ const m=document.getElementById('lobbyMenu'), s=document.getElementById('lobbyScrim'); if(m)m.classList.remove('open'); if(s)s.classList.remove('open'); }
 function toggleProjects(){ const s=document.getElementById('series'), b=document.getElementById('projBtn'); if(!s) return; const open=!s.classList.contains('open'); s.classList.toggle('open',open); s.setAttribute('aria-hidden', open?'false':'true'); if(b){ b.classList.toggle('open',open); b.setAttribute('aria-expanded', open?'true':'false'); } }
 function closeProjects(){ const s=document.getElementById('series'), b=document.getElementById('projBtn'); if(s){ s.classList.remove('open'); s.setAttribute('aria-hidden','true'); } if(b){ b.classList.remove('open'); b.setAttribute('aria-expanded','false'); } }
-function openProject(id){ toast(id==='legacy'?'LEGACY — скоро':'NEVERLAND — скоро'); }
+function openProject(id){ if(id==='assimilation'){ go('archive'); return; } toast(id==='legacy'?'LEGACY — скоро':'NEVERLAND — скоро'); }
 function go(view){
   ['archive','players','submit','moderate'].forEach(v=>{
     const el=document.getElementById('view-'+v); if(!el) return;
-    const on = v===view;
-    el.classList.toggle('active', on);
-    el.style.display = on ? 'block' : 'none';
+    el.classList.toggle('active', v===view);
   });
   document.querySelectorAll('[data-nav]').forEach(b=> b.classList.toggle('active', b.dataset.nav===view));
   const lobbyBtn=document.getElementById('lobbyBtn'); if(lobbyBtn) lobbyBtn.classList.toggle('active', view==='submit'||view==='moderate');
   closeLobby();
   closeProjects();
   const fab=document.getElementById('fab'); if(fab) fab.classList.toggle('show', view==='players');
+  const sw=document.getElementById('searchWrap'); if(sw) sw.style.display = view==='archive' ? '' : 'none';
   if(view==='players') renderPlayers();
-  // принудительный рефлоу показанного вида (WKWebView иногда не делает layout показанного поддерева)
-  const av=document.getElementById('view-'+view);
-  if(av){ av.style.display='none'; void av.offsetHeight; av.style.display='block'; }
+  const av=document.getElementById('view-'+view); if(av){ try{ void av.offsetHeight; }catch(e){} }
   try{ window.scrollTo(0,0); }catch(e){}
 }
 let toastT;
