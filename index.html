@@ -600,14 +600,16 @@ const SHARED = true, KEY_ARCHIVE='comik:archive:v1', KEY_PENDING='comik:pending:
 const hasLS = (()=>{ try{ const k='__comik_test__'; localStorage.setItem(k,'1'); localStorage.removeItem(k); return true; }catch(e){ return false; } })();
 const hasStore = (typeof window!=='undefined' && window.storage && typeof window.storage.get==='function');
 const mem = {};
+// страховка: если асинхронный мост хранилища зависнет, промис резолвится сам через таймаут
+const withTimeout = (p, ms=1500) => Promise.race([p, new Promise(res=>setTimeout(()=>res(undefined), ms))]);
 async function sget(key, shared=SHARED){
   if(hasLS){ try{ const v=localStorage.getItem(key); return v==null? null : JSON.parse(v); }catch(e){ return null; } }
-  if(hasStore){ try{ const r=await window.storage.get(key, shared); return r&&r.value? JSON.parse(r.value):null; }catch(e){ return null; } }
+  if(hasStore){ try{ const r=await withTimeout(window.storage.get(key, shared)); return r&&r.value? JSON.parse(r.value):null; }catch(e){ return null; } }
   return key in mem ? mem[key] : null;
 }
 async function sset(key,val, shared=SHARED){
   if(hasLS){ try{ localStorage.setItem(key, JSON.stringify(val)); return true; }catch(e){ return false; } }
-  if(hasStore){ try{ await window.storage.set(key, JSON.stringify(val), shared); return true; }catch(e){ return false; } }
+  if(hasStore){ try{ const r=await withTimeout(window.storage.set(key, JSON.stringify(val), shared)); return r!==undefined; }catch(e){ return false; } }
   mem[key]=val; return true;
 }
 
@@ -619,13 +621,16 @@ const mergeById = (stored, local) => { const ids=new Set((stored||[]).map(x=>x&&
 const cardCats = CATS.filter(c=>c.type==='cards');
 
 async function boot(){
-  let arc = await sget(KEY_ARCHIVE);
-  if(arc===null){ arc = SEED.slice(); await sset(KEY_ARCHIVE, arc); }
+  // все ключи читаются параллельно: быстрее и один таймаут не тянет за собой остальные
+  let [arc, pend, chars, users, sess] = await Promise.all([
+    sget(KEY_ARCHIVE), sget(KEY_PENDING), sget(KEY_CHARS), sget(KEY_USERS, false), sget(KEY_SESSION, false)
+  ]);
+  if(arc===null){ arc = SEED.slice(); sset(KEY_ARCHIVE, arc); }
   ARCHIVE = mergeById(arc, ARCHIVE);
-  PENDING = mergeById((await sget(KEY_PENDING)) || [], PENDING);
-  CHARS = mergeById((await sget(KEY_CHARS)) || [], CHARS);
-  USERS = (await sget(KEY_USERS, false)) || [];
-  SESSION = (await sget(KEY_SESSION, false)) || null;
+  PENDING = mergeById(pend || [], PENDING);
+  CHARS = mergeById(chars || [], CHARS);
+  USERS = users || [];
+  SESSION = sess || null;
   if(SESSION && !USERS.some(u=>normTag(u.tag)===normTag(SESSION))) SESSION=null;
   // форма: категории (без «Истории»)
   document.getElementById('in-cat').innerHTML = cardCats.map(c=>`<option value="${c.id}">${c.label}</option>`).join('');
@@ -911,7 +916,31 @@ function renderPlayers(){
       ${foot}
     </div>`;
   }).join('');
-  try{ void el.offsetHeight; }catch(e){}
+  kickLayout(el);
+}
+
+/* --- страховки отрисовки для WKWebView --- */
+// принудительный пересчёт лэйаута + композитинга (WKWebView иногда не перерисовывает вставленный контент)
+function kickLayout(el){
+  if(!el) return;
+  try{
+    void el.offsetHeight;
+    el.style.transform='translateZ(0)';
+    requestAnimationFrame(()=>{ try{ el.style.transform=''; void el.offsetHeight; }catch(e){} });
+  }catch(e){}
+}
+// если карточки есть в DOM, но визуально высота нулевая — перерисовать один раз
+function ensurePlayersVisible(){
+  const view=document.getElementById('view-players'), list=document.getElementById('players-list');
+  kickLayout(view); kickLayout(list);
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    try{
+      if(view && view.classList.contains('active') && list && list.children.length && list.offsetHeight===0){
+        const html=list.innerHTML; list.innerHTML=''; void list.offsetHeight; list.innerHTML=html;
+        kickLayout(view); kickLayout(list);
+      }
+    }catch(e){}
+  }));
 }
 
 /* --- создание --- */
@@ -943,9 +972,12 @@ async function createPlayer(){
     role:pval('np-role'), origin:pval('np-origin'), level:pval('np-level'),
     bio:pval('np-bio'), gear:pval('np-gear'),
     fields:{}, createdAt:Date.now(), updatedAt:Date.now() };
-  CHARS.push(ch); await sset(KEY_CHARS, CHARS);
+  CHARS.push(ch);
   ['np-name','np-player','np-role','np-origin','np-level','np-bio','np-gear'].forEach(i=>{ const e=pf(i); if(e) e.value=''; });
   closeModal(); go('players'); toast('Персонаж создан');
+  ensurePlayersVisible();
+  // сохранение — после отображения, чтобы сбой хранилища не блокировал UI
+  try{ const ok=await sset(KEY_CHARS, CHARS); if(!ok) toast('⚠ Не удалось сохранить — персонаж может исчезнуть после перезагрузки'); }catch(e){}
 }
 
 /* --- просмотр (всем доступен, только чтение) --- */
@@ -1012,8 +1044,8 @@ async function savePlayer(id){
   Object.assign(CHARS[i], { name, player:pval('ep-player'), role:pval('ep-role'),
     origin:pval('ep-origin'), level:pval('ep-level'), bio:pval('ep-bio'), gear:pval('ep-gear'),
     updatedAt:Date.now() });
-  await sset(KEY_CHARS, CHARS);
-  renderPlayers(); toast('Сохранено');
+  renderPlayers(); toast('Сохранено'); ensurePlayersVisible();
+  try{ const ok=await sset(KEY_CHARS, CHARS); if(!ok) toast('⚠ Не удалось сохранить изменения'); }catch(e){}
 }
 function confirmDeletePlayer(id){
   const el=document.querySelector('#modal .pacts');
@@ -1024,7 +1056,8 @@ function confirmDeletePlayer(id){
 async function deletePlayer(id){
   const c=CHARS.find(x=>x.id===id); if(c && !canEdit(c)){ toast('Нет прав на удаление'); return; }
   CHARS=CHARS.filter(x=>x.id!==id);
-  await sset(KEY_CHARS, CHARS); renderPlayers(); closeModal(); toast('Персонаж удалён');
+  renderPlayers(); closeModal(); toast('Персонаж удалён'); ensurePlayersVisible();
+  try{ await sset(KEY_CHARS, CHARS); }catch(e){}
 }
 
 /* ====================== Навигация / тосты ====================== */
@@ -1044,8 +1077,8 @@ function go(view){
   closeProjects();
   const fab=document.getElementById('fab'); if(fab) fab.classList.toggle('show', view==='players');
   const sw=document.getElementById('searchWrap'); if(sw) sw.style.display = view==='archive' ? '' : 'none';
-  if(view==='players') renderPlayers();
-  const av=document.getElementById('view-'+view); if(av){ try{ void av.offsetHeight; }catch(e){} }
+  if(view==='players'){ renderPlayers(); ensurePlayersVisible(); }
+  const av=document.getElementById('view-'+view); if(av) kickLayout(av);
   try{ window.scrollTo(0,0); }catch(e){}
 }
 let toastT;
