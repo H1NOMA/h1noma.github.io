@@ -105,6 +105,14 @@
   .p-assimilation .pname i{font-style:normal}
   .p-assimilation .ptag{color:#ff8088}
   .search{order:2;flex:1 0 100%;position:relative}
+  @media(max-width:879px){.search{display:none}}
+  .search-float{position:fixed;left:12px;right:12px;bottom:calc(10px + var(--botnav-h) + 10px + env(safe-area-inset-bottom));z-index:59;max-width:520px;margin:0 auto;display:none;align-items:center;background:var(--glass2);backdrop-filter:blur(28px) saturate(180%);-webkit-backdrop-filter:blur(28px) saturate(180%);border:var(--hair) solid var(--line2);border-radius:999px;box-shadow:0 10px 30px rgba(0,0,0,.45);padding:2px 4px}
+  .search-float.open{display:flex;animation:fade .18s}
+  .search-float svg{position:absolute;left:16px;stroke:var(--muted);pointer-events:none}
+  .search-float input{width:100%;padding:12px 16px 12px 42px;border:none;background:none;color:var(--txt);font-family:var(--f-mono);font-size:16px;letter-spacing:.02em}
+  .search-float input:focus{outline:none}
+  .search-float input::placeholder{color:var(--muted)}
+  @media(min-width:880px){.search-float{display:none !important}}
   .search input{width:100%;padding:12px 14px 12px 40px;border-radius:999px;background:var(--surface);border:var(--hair) solid var(--line);color:var(--txt);font-family:var(--f-mono);font-size:16px;letter-spacing:.02em;transition:border-color .15s,box-shadow .15s}
   .search input::placeholder{color:var(--muted)}
   .search input:focus{outline:none;border-color:var(--red);box-shadow:0 0 0 2px rgba(var(--accent-rgb),.18)}
@@ -112,8 +120,8 @@
   .topnav{display:none}
 
   /* ---------- Bottom nav (mobile) ---------- */
-  .botnav{position:fixed;left:0;right:0;bottom:0;z-index:60;display:flex;background:var(--glass);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border-top:var(--hair) solid var(--line2);padding-bottom:env(safe-area-inset-bottom)}
-  .botnav button{flex:1;background:none;border:none;cursor:pointer;color:var(--dim);display:flex;flex-direction:column;align-items:center;gap:3px;padding:9px 3px 8px;font-family:var(--f-mono);font-size:.57rem;letter-spacing:.04em;text-transform:uppercase;position:relative;transition:color .18s,opacity .12s;min-width:0}
+  .botnav{position:fixed;left:12px;right:12px;bottom:calc(10px + env(safe-area-inset-bottom));z-index:60;display:flex;background:var(--glass);backdrop-filter:blur(28px) saturate(180%);-webkit-backdrop-filter:blur(28px) saturate(180%);border:var(--hair) solid var(--line2);border-radius:26px;box-shadow:0 10px 34px rgba(0,0,0,.45),0 0 0 .5px rgba(255,255,255,.04) inset;max-width:520px;margin:0 auto;overflow:hidden}
+  .botnav button{flex:1;background:none;border:none;cursor:pointer;color:var(--dim);display:flex;flex-direction:column;align-items:center;gap:3px;padding:10px 3px 9px;font-family:var(--f-mono);font-size:.57rem;letter-spacing:.04em;text-transform:uppercase;position:relative;transition:color .18s,opacity .12s;min-width:0}
   .botnav button:active{opacity:var(--press)}
   .botnav button svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;transition:filter .18s}
   .botnav button span.lbl{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
@@ -121,7 +129,7 @@
   .botnav button.active svg{filter:drop-shadow(0 0 6px rgba(var(--accent-rgb),.7))}
 
   /* ---------- Main / views ---------- */
-  main{max-width:1160px;margin:0 auto;padding:18px 15px calc(var(--botnav-h) + 30px);position:relative;z-index:2}
+  main{max-width:1160px;margin:0 auto;padding:18px 15px calc(var(--botnav-h) + 44px);position:relative;z-index:2}
   .view{position:absolute;top:0;left:0;width:100%;height:0;overflow:hidden;visibility:hidden;opacity:0;pointer-events:none}
   .view.active{position:relative;height:auto;overflow:visible;visibility:visible;opacity:1;pointer-events:auto;z-index:1}
   @keyframes fade{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
@@ -252,7 +260,7 @@
     100%{opacity:0;transform:scale(1.12)}
   }
   @media (prefers-reduced-motion: reduce){.splash-die{animation:none;opacity:1}}
-  .dice-wrap{position:fixed;right:16px;bottom:calc(var(--botnav-h) + 18px + env(safe-area-inset-bottom));z-index:65;display:none;flex-direction:column;align-items:flex-end;gap:10px}
+  .dice-wrap{position:fixed;right:16px;bottom:calc(var(--botnav-h) + 32px + env(safe-area-inset-bottom));z-index:65;display:none;flex-direction:column;align-items:flex-end;gap:10px}
   .dice-wrap.show{display:flex}
   .dice-fab{width:56px;height:56px;border-radius:50%;border:none;background:var(--red);color:#0b0b0e;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 22px rgba(var(--accent-rgb),.45);transition:transform .25s var(--spring)}
   .dice-fab svg{width:28px;height:28px}
@@ -407,6 +415,10 @@
       <button data-nav="players" onclick="go('players')">Игроки</button>
       <button data-nav="chrono" onclick="go('chrono')">Хронология</button>
     </nav>
+<div class="search-float" id="searchFloat">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+  <input id="searchM" type="search" placeholder="ПОИСК ПО NEW-LIBERTY" autocomplete="off">
+</div>
   </div>
   <div class="series" id="series" aria-hidden="true">
     <div class="series-in">
@@ -579,6 +591,10 @@
   <button data-nav="chrono" onclick="go('chrono')">
     <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>
     <span class="lbl">Хронология</span>
+  </button>
+  <button id="botSearchBtn" onclick="toggleSearchBar(event)" aria-label="Поиск">
+    <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+    <span class="lbl">Поиск</span>
   </button>
 </nav>
 
@@ -775,11 +791,25 @@ function renderStory(){
 }
 
 /* ---------- Поиск ---------- */
-document.getElementById('search').addEventListener('input', e=>{
-  query=e.target.value;
+function toggleSearchBar(e){ if(e) e.stopPropagation();
+  const f=document.getElementById('searchFloat'), b=document.getElementById('botSearchBtn');
+  const open=!f.classList.contains('open');
+  f.classList.toggle('open', open); if(b) b.classList.toggle('active', open);
+  if(open){ const i=document.getElementById('searchM'); i.value=query; setTimeout(()=>i.focus(),50); }
+}
+function applyQuery(v){
+  query=v;
   if(query && activeCat!=='all' && catById(activeCat).type==='story'){ activeCat='all'; activeSub=null; renderCats(); applyView(); }
-  else if(!document.getElementById('story').hidden){ /* в лонгриде поиск не применяется */ }
   else renderCards();
+}
+document.getElementById('searchM').addEventListener('input', e=>{
+  const s1=document.getElementById('search'); if(s1) s1.value=e.target.value;
+  if(!document.getElementById('view-archive').classList.contains('active')) go('archive');
+  applyQuery(e.target.value);
+});
+document.getElementById('search').addEventListener('input', e=>{
+  const m=document.getElementById('searchM'); if(m) m.value=e.target.value;
+  applyQuery(e.target.value);
 });
 
 /* ====================== Модальное окно ====================== */
@@ -1090,6 +1120,8 @@ function go(view){
   });
   document.querySelectorAll('[data-nav]').forEach(b=> b.classList.toggle('active', b.dataset.nav===view));
   closeProjects();
+  const sf=document.getElementById('searchFloat');
+  if(sf && sf.classList.contains('open') && view!=='archive'){ sf.classList.remove('open'); const b=document.getElementById('botSearchBtn'); if(b) b.classList.remove('active'); }
   const dw=document.getElementById('diceWrap'); if(dw){ dw.classList.toggle('show', view==='players'); document.getElementById('diceMenu').classList.remove('open'); }
   const sw=document.getElementById('searchWrap'); if(sw) sw.style.display = view==='archive' ? '' : 'none';
   if(view==='players'){ renderPlayers(); ensurePlayersVisible(); }
