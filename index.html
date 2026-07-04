@@ -104,23 +104,10 @@
   .p-assimilation .pname{font-family:var(--f-disp);font-weight:700;letter-spacing:.12em;font-size:1.5rem;background-image:linear-gradient(180deg,#ffe3e5,#ff5763 44%,#c9202c);filter:drop-shadow(0 0 15px rgba(255,51,64,.5))}
   .p-assimilation .pname i{font-style:normal}
   .p-assimilation .ptag{color:#ff8088}
-  .search{order:2;flex:1 0 100%;position:relative}
-  @media(max-width:879px){.search{display:none}}
-  .search-float{position:fixed;left:12px;right:12px;bottom:calc(10px + var(--botnav-h) + 10px + env(safe-area-inset-bottom));z-index:59;max-width:520px;margin:0 auto;display:none;align-items:center;background:var(--glass2);backdrop-filter:blur(28px) saturate(180%);-webkit-backdrop-filter:blur(28px) saturate(180%);border:var(--hair) solid var(--line2);border-radius:999px;box-shadow:0 10px 30px rgba(0,0,0,.45);padding:2px 4px}
-  .search-float.open{display:flex;animation:fade .18s}
-  .search-float svg{position:absolute;left:16px;stroke:var(--muted);pointer-events:none}
-  .search-float input{width:100%;padding:12px 16px 12px 42px;border:none;background:none;color:var(--txt);font-family:var(--f-mono);font-size:16px;letter-spacing:.02em}
-  .search-float input:focus{outline:none}
-  .search-float input::placeholder{color:var(--muted)}
-  @media(min-width:880px){.search-float{display:none !important}}
-  .search input{width:100%;padding:12px 14px 12px 40px;border-radius:999px;background:var(--surface);border:var(--hair) solid var(--line);color:var(--txt);font-family:var(--f-mono);font-size:16px;letter-spacing:.02em;transition:border-color .15s,box-shadow .15s}
-  .search input::placeholder{color:var(--muted)}
-  .search input:focus{outline:none;border-color:var(--red);box-shadow:0 0 0 2px rgba(var(--accent-rgb),.18)}
-  .search svg{position:absolute;left:13px;top:50%;transform:translateY(-50%);stroke:var(--muted)}
   .topnav{display:none}
 
   /* ---------- Bottom nav (mobile) ---------- */
-  .botnav{position:fixed;left:12px;right:12px;bottom:calc(10px + env(safe-area-inset-bottom));z-index:60;display:flex;background:var(--glass);backdrop-filter:blur(28px) saturate(180%);-webkit-backdrop-filter:blur(28px) saturate(180%);border:var(--hair) solid var(--line2);border-radius:26px;box-shadow:0 10px 34px rgba(0,0,0,.45),0 0 0 .5px rgba(255,255,255,.04) inset;max-width:520px;margin:0 auto;overflow:hidden}
+  .botnav{position:fixed;left:12px;right:80px;bottom:calc(10px + env(safe-area-inset-bottom));z-index:60;display:flex;background:var(--glass);backdrop-filter:blur(28px) saturate(180%);-webkit-backdrop-filter:blur(28px) saturate(180%);border:var(--hair) solid var(--line2);border-radius:26px;box-shadow:0 10px 34px rgba(0,0,0,.45),0 0 0 .5px rgba(255,255,255,.04) inset;max-width:520px;margin:0 auto;overflow:hidden}
   .botnav button{flex:1;background:none;border:none;cursor:pointer;color:var(--dim);display:flex;flex-direction:column;align-items:center;gap:3px;padding:10px 3px 9px;font-family:var(--f-mono);font-size:.57rem;letter-spacing:.04em;text-transform:uppercase;position:relative;transition:color .18s,opacity .12s;min-width:0}
   .botnav button:active{opacity:var(--press)}
   .botnav button svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;transition:filter .18s}
@@ -260,12 +247,14 @@
     100%{opacity:0;transform:scale(1.12)}
   }
   @media (prefers-reduced-motion: reduce){.splash-die{animation:none;opacity:1}}
-  .dice-wrap{position:fixed;right:16px;bottom:calc(var(--botnav-h) + 32px + env(safe-area-inset-bottom));z-index:65;display:none;flex-direction:column;align-items:flex-end;gap:10px}
-  .dice-wrap.show{display:flex}
-  .dice-fab{width:56px;height:56px;border-radius:50%;border:none;background:var(--red);color:#0b0b0e;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 22px rgba(var(--accent-rgb),.45);transition:transform .25s var(--spring)}
-  .dice-fab svg{width:28px;height:28px}
-  .dice-fab:active{transform:scale(.9)}
-  .dice-menu{display:flex;flex-direction:column;gap:8px;align-items:flex-end;pointer-events:none}
+  .dice-circle{position:fixed;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:60;width:58px;height:58px;border-radius:50%;border:var(--hair) solid var(--line2);background:var(--glass);backdrop-filter:blur(28px) saturate(180%);-webkit-backdrop-filter:blur(28px) saturate(180%);color:var(--dim);display:flex;align-items:center;justify-content:center;box-shadow:0 10px 34px rgba(0,0,0,.45),0 0 0 .5px rgba(255,255,255,.04) inset;cursor:pointer;transition:color .18s,transform .2s var(--spring)}
+  .dice-circle svg{width:26px;height:26px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+  .dice-circle:active{transform:scale(.9)}
+  .dice-circle.active{color:var(--red)}
+  .dice-circle.active svg{filter:drop-shadow(0 0 7px rgba(var(--accent-rgb),.7))}
+  @media(min-width:880px){.dice-circle{display:none}}
+  .dice-menu{position:fixed;right:12px;bottom:calc(12px + 58px + 12px + env(safe-area-inset-bottom));z-index:65;display:flex;flex-direction:column;gap:8px;align-items:flex-end;pointer-events:none}
+  @media(min-width:880px){.dice-menu{display:none !important}}
   .dice-menu .dice-opt{opacity:0;transform:translateY(14px) scale(.85);transition:opacity .18s,transform .28s var(--spring)}
   .dice-menu.open{pointer-events:auto}
   .dice-menu.open .dice-opt{opacity:1;transform:none}
@@ -296,6 +285,11 @@
   body.shake{animation:bodyShake .5s steps(6) 1}
   @keyframes bodyShake{0%,100%{transform:translate(0)}20%{transform:translate(-4px,2px)}40%{transform:translate(4px,-2px)}60%{transform:translate(-3px,-2px)}80%{transform:translate(2px,3px)}}
   @media (prefers-reduced-motion: reduce){.glitch-overlay.on,.glitch-overlay.on::before,.dr-num.crit,body.shake{animation:none}}
+  .allowed{margin-top:26px;text-align:center}
+  .allowed-title{font-family:var(--f-disp);font-weight:700;font-size:.82rem;letter-spacing:.18em;text-transform:uppercase;color:var(--red-dim);text-shadow:0 0 10px rgba(var(--accent-rgb),.25);margin-bottom:14px}
+  .allowed-row{display:flex;align-items:center;justify-content:center;gap:26px}
+  .vpn-badge{font-family:-apple-system,'SF Pro Text','Helvetica Neue',sans-serif;font-weight:700;font-size:1.18rem;letter-spacing:.04em;color:#fff;border:2.5px solid #fff;border-radius:11px;padding:4px 12px;line-height:1.2;display:inline-flex;align-items:center}
+  .wl{font-family:var(--f-disp);font-weight:700;font-size:1.02rem;line-height:1.08;letter-spacing:.1em;color:#fff;text-align:left;text-transform:uppercase}
   .chrono-list{display:flex;flex-direction:column;gap:12px;max-width:680px}
   .chrono-list .plogo{min-height:112px}
   .chrono-branches{display:none;gap:10px;margin:-2px 0 4px}
@@ -364,8 +358,6 @@
     .brand .komik{height:30px}
     .brand .vr{height:30px}
     .lock .project{font-size:1.22rem;letter-spacing:.3em}
-      .search{order:2;flex:1;min-width:180px}
-    .search input{padding:10px 14px 10px 38px;font-size:.85rem}
     .topnav{display:flex;gap:2px;order:3}
     .topnav button{appearance:none;border:none;cursor:pointer;background:transparent;color:var(--dim);font-family:var(--f-mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;padding:10px 11px 8px;border-bottom:2px solid transparent;transition:.15s;display:flex;align-items:center;gap:7px}
     .topnav button:hover{color:var(--txt)}
@@ -406,19 +398,11 @@
         <span class="project" id="projBtn" role="button" tabindex="0" aria-expanded="false" aria-controls="series" onclick="event.preventDefault();event.stopPropagation();toggleProjects();return false;">ASS<i>I</i>MILATION<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span>
       </span>
     </a>
-    <div class="search" id="searchWrap">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
-      <input id="search" type="search" placeholder="ПОИСК ПО NEW-LIBERTY" autocomplete="off">
-    </div>
     <nav class="topnav">
       <button data-nav="archive" class="active" onclick="go('archive')">Архив</button>
       <button data-nav="players" onclick="go('players')">Игроки</button>
       <button data-nav="chrono" onclick="go('chrono')">Хронология</button>
     </nav>
-<div class="search-float" id="searchFloat">
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
-  <input id="searchM" type="search" placeholder="ПОИСК ПО NEW-LIBERTY" autocomplete="off">
-</div>
   </div>
   <div class="series" id="series" aria-hidden="true">
     <div class="series-in">
@@ -554,29 +538,19 @@
   </section>
 </main>
 
-<div class="dice-wrap" id="diceWrap">
-  <div class="dice-menu" id="diceMenu">
-    <button class="dice-opt" onclick="rollDice(100)">D100</button>
-    <button class="dice-opt" onclick="rollDice(20)">D20</button>
-    <button class="dice-opt" onclick="rollDice(12)">D12</button>
-    <button class="dice-opt" onclick="rollDice(10)">D10</button>
-    <button class="dice-opt" onclick="rollDice(8)">D8</button>
-    <button class="dice-opt" onclick="rollDice(6)">D6</button>
-    <button class="dice-opt" onclick="rollDice(4)">D4</button>
-  </div>
-  <button class="dice-fab" id="diceFab" onclick="toggleDice()" aria-label="Бросить куб">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round">
-      <path d="M12 2l8.7 5v10L12 22l-8.7-5V7L12 2z"/>
-      <path d="M12 2v4.6M3.3 7l8.7-.4 8.7.4M12 6.6L5.6 16.4h12.8L12 6.6M3.3 17l2.3-.6M20.7 17l-2.3-.6M12 22l-6.4-5.6M12 22l6.4-5.6"/>
-    </svg>
-  </button>
-</div>
 <div class="dice-result" id="diceResult" onclick="this.classList.remove('show')"></div>
 <div class="glitch-overlay" id="glitchOverlay" aria-hidden="true"></div>
 
 <footer>
   <p><b>КОМИК</b> — это творческое объединение энтузиастов, чья деятельность направлена на культурное просвещение и погружение массового потребителя в мир Dungeons &amp; Dragons. Мы не преследуем коммерческие цели, все материалы распространяются на бесплатной и безвозмездной основе. По всем вопросам и предложениям писать автору данного сайта <a href="https://t.me/HINOMA" target="_blank" rel="noopener" style="color:var(--red)">@HINOMA</a> в Telegram.</p>
   <p class="ps">P.S. На техподдержку посадил Клода.</p>
+  <div class="allowed">
+    <div class="allowed-title">Сайт доступен при:</div>
+    <div class="allowed-row">
+      <span class="vpn-badge">VPN</span>
+      <span class="wl">БЕЛЫЕ<br>СПИСКИ</span>
+    </div>
+  </div>
 </footer>
 
 <nav class="botnav">
@@ -592,11 +566,21 @@
     <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>
     <span class="lbl">Хронология</span>
   </button>
-  <button id="botSearchBtn" onclick="toggleSearchBar(event)" aria-label="Поиск">
-    <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-    <span class="lbl">Поиск</span>
-  </button>
 </nav>
+
+<button class="dice-circle" id="diceBtn" onclick="toggleDice(event)" aria-label="Бросить куб">
+  <svg viewBox="0 0 24 24"><path d="M12 2l8.7 5v10L12 22l-8.7-5V7L12 2z"/><path d="M12 2v4.6M3.3 7l8.7-.4 8.7.4M12 6.6L5.6 16.4h12.8L12 6.6M3.3 17l2.3-.6M20.7 17l-2.3-.6M12 22l-6.4-5.6M12 22l6.4-5.6"/></svg>
+</button>
+<div class="dice-menu" id="diceMenu">
+  <button class="dice-opt" onclick="rollDice(100)">D100</button>
+  <button class="dice-opt" onclick="rollDice(20)">D20</button>
+  <button class="dice-opt" onclick="rollDice(12)">D12</button>
+  <button class="dice-opt" onclick="rollDice(10)">D10</button>
+  <button class="dice-opt" onclick="rollDice(8)">D8</button>
+  <button class="dice-opt" onclick="rollDice(6)">D6</button>
+  <button class="dice-opt" onclick="rollDice(4)">D4</button>
+</div>
+
 
 
 <div class="scrim" id="scrim" onclick="if(event.target===this)closeModal()">
@@ -677,7 +661,7 @@ async function sset(key,val, shared=SHARED){
 }
 
 /* ====================== Состояние ====================== */
-let ARCHIVE=[], CHARS=[], USERS=[], SESSION=null, activeCat='all', activeSub=null, query='';
+let ARCHIVE=[], CHARS=[], USERS=[], SESSION=null, activeCat='all', activeSub=null;
 const uid = ()=> Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 const esc = s => String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const mergeById = (stored, local) => { const ids=new Set((stored||[]).map(x=>x&&x.id)); return (stored||[]).concat((local||[]).filter(x=>x&&!ids.has(x.id))); };
@@ -753,8 +737,8 @@ function setSub(catId, subId){
 function matches(e){
   if(activeCat!=='all' && e.cat!==activeCat) return false;
   if(activeSub && e.sub!==activeSub) return false;
-  if(!query) return true;
-  const q=query.toLowerCase();
+  return true;
+  const q='';
   const subL = subById(e.cat,e.sub)?.label || '';
   return (e.title+' '+e.body+' '+(e.tags||[]).join(' ')+' '+catById(e.cat).label+' '+subL).toLowerCase().includes(q);
 }
@@ -791,27 +775,6 @@ function renderStory(){
 }
 
 /* ---------- Поиск ---------- */
-function toggleSearchBar(e){ if(e) e.stopPropagation();
-  const f=document.getElementById('searchFloat'), b=document.getElementById('botSearchBtn');
-  const open=!f.classList.contains('open');
-  f.classList.toggle('open', open); if(b) b.classList.toggle('active', open);
-  if(open){ const i=document.getElementById('searchM'); i.value=query; setTimeout(()=>i.focus(),50); }
-}
-function applyQuery(v){
-  query=v;
-  if(query && activeCat!=='all' && catById(activeCat).type==='story'){ activeCat='all'; activeSub=null; renderCats(); applyView(); }
-  else renderCards();
-}
-document.getElementById('searchM').addEventListener('input', e=>{
-  const s1=document.getElementById('search'); if(s1) s1.value=e.target.value;
-  if(!document.getElementById('view-archive').classList.contains('active')) go('archive');
-  applyQuery(e.target.value);
-});
-document.getElementById('search').addEventListener('input', e=>{
-  const m=document.getElementById('searchM'); if(m) m.value=e.target.value;
-  applyQuery(e.target.value);
-});
-
 /* ====================== Модальное окно ====================== */
 function openModal(id){
   const e=ARCHIVE.find(x=>x.id===id); if(!e) return;
@@ -1120,15 +1083,16 @@ function go(view){
   });
   document.querySelectorAll('[data-nav]').forEach(b=> b.classList.toggle('active', b.dataset.nav===view));
   closeProjects();
-  const sf=document.getElementById('searchFloat');
-  if(sf && sf.classList.contains('open') && view!=='archive'){ sf.classList.remove('open'); const b=document.getElementById('botSearchBtn'); if(b) b.classList.remove('active'); }
-  const dw=document.getElementById('diceWrap'); if(dw){ dw.classList.toggle('show', view==='players'); document.getElementById('diceMenu').classList.remove('open'); }
-  const sw=document.getElementById('searchWrap'); if(sw) sw.style.display = view==='archive' ? '' : 'none';
+  const dm=document.getElementById('diceMenu'); if(dm){ dm.classList.remove('open'); const db=document.getElementById('diceBtn'); if(db) db.classList.remove('active'); }
   if(view==='players'){ renderPlayers(); ensurePlayersVisible(); }
   const av=document.getElementById('view-'+view); if(av) kickLayout(av);
   try{ window.scrollTo(0,0); }catch(e){}
 }
-function toggleDice(){ document.getElementById('diceMenu').classList.toggle('open'); }
+function toggleDice(e){ if(e) e.stopPropagation();
+  const m=document.getElementById('diceMenu'), b=document.getElementById('diceBtn');
+  const open=!m.classList.contains('open');
+  m.classList.toggle('open', open); if(b) b.classList.toggle('active', open);
+}
 let diceT;
 function rollDice(n){
   const v=1+Math.floor(Math.random()*n);
@@ -1136,7 +1100,8 @@ function rollDice(n){
   const r=document.getElementById('diceResult');
   r.innerHTML=`<div class="dr-card"><div class="dr-die">D${n}</div><div class="dr-num${crit?' crit':''}">${v}</div></div>`;
   r.classList.add('show');
-  document.getElementById('diceMenu').classList.remove('open');
+  toggleDice._x=document.getElementById('diceMenu').classList.remove('open');
+  const db=document.getElementById('diceBtn'); if(db) db.classList.remove('active');
   clearTimeout(diceT); diceT=setTimeout(()=>r.classList.remove('show'), crit?3000:2000);
   if(crit) triggerGlitch();
 }
