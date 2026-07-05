@@ -290,6 +290,19 @@
   .allowed-row{display:flex;align-items:center;justify-content:center;gap:26px}
   .vpn-badge{font-family:-apple-system,'SF Pro Text','Helvetica Neue',sans-serif;font-weight:700;font-size:1.18rem;letter-spacing:.04em;color:#fff;border:2.5px solid #fff;border-radius:11px;padding:4px 12px;line-height:1.2;display:inline-flex;align-items:center}
   .wl{font-family:var(--f-disp);font-weight:700;font-size:1.02rem;line-height:1.08;letter-spacing:.1em;color:#fff;text-align:left;text-transform:uppercase}
+  .adm-btn{margin-left:auto;flex:0 0 auto;width:34px;height:34px;border-radius:50%;border:var(--hair) solid var(--line2);background:var(--glass2);color:var(--muted);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;transition:color .15s,box-shadow .2s}
+  .adm-btn svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  .adm-btn.on{color:var(--red);border-color:rgba(var(--accent-rgb),.55);box-shadow:0 0 12px rgba(var(--accent-rgb),.35)}
+  @media(min-width:880px){.adm-btn{margin-left:12px;order:4}}
+  .chrono-body{color:var(--dim);font-size:.95rem;line-height:1.65;word-wrap:break-word}
+  .chrono-body img{display:block;width:calc(100% + 36px);max-width:none;margin:16px -18px;border-radius:0;
+    -webkit-mask-image:linear-gradient(180deg,transparent 0,#000 14%,#000 86%,transparent 100%);
+    mask-image:linear-gradient(180deg,transparent 0,#000 14%,#000 86%,transparent 100%)}
+  .chrono-body.editing img{width:100%;margin:12px 0;border-radius:12px;-webkit-mask-image:none;mask-image:none}
+  @media(min-width:880px){.chrono-body img{width:calc(100% + 60px);margin:18px -30px}}
+  .chrono-body.editing{min-height:140px;border:1px dashed var(--line2);border-radius:12px;padding:12px;outline:none;color:var(--txt);-webkit-user-modify:read-write-plaintext-only;-webkit-user-modify:read-write}
+  .chrono-tools{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
+  .chrono-tools .btn{flex:1 1 auto;min-width:110px}
   .chrono-list{display:flex;flex-direction:column;gap:12px;max-width:680px}
   .chrono-list .plogo{min-height:112px}
   .chrono-branches{display:none;gap:10px;margin:-2px 0 4px}
@@ -403,6 +416,9 @@
       <button data-nav="players" onclick="go('players')">Игроки</button>
       <button data-nav="chrono" onclick="go('chrono')">Хронология</button>
     </nav>
+    <button class="adm-btn" id="admBtn" onclick="admClick()" aria-label="Администратор" title="Администратор">
+      <svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2.5"/><path d="M8 11V7.5a4 4 0 0 1 8 0V11M12 14.5v2"/></svg>
+    </button>
   </div>
   <div class="series" id="series" aria-hidden="true">
     <div class="series-in">
@@ -589,6 +605,7 @@
 
 <div class="toast" id="toast"><span class="ic">▮</span><span id="toastMsg"></span></div>
 
+<script id="chrono-data" type="application/json">{}</script>
 <script>
 /* ====================== Категории и подкатегории ====================== */
 const CATS = [
@@ -669,9 +686,11 @@ const cardCats = CATS.filter(c=>c.type==='cards');
 
 async function boot(){
   // все ключи читаются параллельно: быстрее и один таймаут не тянет за собой остальные
-  let [arc, chars, users, sess] = await Promise.all([
-    sget(KEY_ARCHIVE), sget(KEY_CHARS, false), sget(KEY_USERS, false), sget(KEY_SESSION, false)
+  let [arc, chars, users, sess, chr] = await Promise.all([
+    sget(KEY_ARCHIVE), sget(KEY_CHARS, false), sget(KEY_USERS, false), sget(KEY_SESSION, false), sget(KEY_CHRONO, false)
   ]);
+  loadChronoEmbedded();
+  if(chr) CHRONO_DATA = Object.assign(CHRONO_DATA, chr);
   if(arc===null){ arc = SEED.slice(); sset(KEY_ARCHIVE, arc); }
   ARCHIVE = mergeById(arc, ARCHIVE);
   CHARS = mergeById(chars || [], CHARS);
@@ -814,13 +833,78 @@ function toggleChrono(id){
     el.classList.toggle('open', el.id==='chrono-br-'+id && !el.classList.contains('open'));
   });
 }
+/* ---------- Админ-режим ---------- */
+const KEY_CHRONO='comik:chrono:v1', ADM_PASS='Weeknd';
+let ADMIN=false, CHRONO_DATA={};
+function loadChronoEmbedded(){
+  try{ CHRONO_DATA = JSON.parse(document.getElementById('chrono-data').textContent) || {}; }
+  catch(e){ CHRONO_DATA = {}; }
+}
+function admClick(){
+  if(ADMIN){
+    ADMIN=false; document.getElementById('admBtn').classList.remove('on');
+    toast('Режим администратора выключен'); return;
+  }
+  const m=document.getElementById('modal');
+  m.innerHTML=`<button class="x" onclick="closeModal()">✕</button>
+    <h2 style="font-family:var(--f-disp);color:var(--txt);margin-bottom:14px">Администратор</h2>
+    <div class="field"><label>Пароль</label><input type="password" id="admPass" autocomplete="off"></div>
+    <button class="btn primary" style="width:100%;margin-top:14px" onclick="admLogin()">Войти</button>`;
+  document.getElementById('scrim').classList.add('open');
+  setTimeout(()=>{ const i=document.getElementById('admPass'); if(i){ i.focus(); i.onkeydown=e=>{ if(e.key==='Enter') admLogin(); }; } },60);
+}
+function admLogin(){
+  const i=document.getElementById('admPass');
+  if(i && i.value===ADM_PASS){
+    ADMIN=true; document.getElementById('admBtn').classList.add('on');
+    closeModal(); toast('Режим администратора включён');
+  } else toast('⚠ Неверный пароль');
+}
+
 function openChronoBranch(camp,branch){
+  const key=camp+':'+branch, html=CHRONO_DATA[key]||'';
   const m=document.getElementById('modal');
   m.innerHTML=`<button class="x" onclick="closeModal()">✕</button>
     <div class="kicker" style="margin-bottom:6px">${CHRONO_NAMES[camp]}</div>
     <h2 style="font-family:var(--f-disp);color:var(--txt);text-transform:uppercase;letter-spacing:.06em;margin-bottom:16px">${branch}</h2>
-    <div class="empty">Раздел в разработке. Материалы появятся позже.</div>`;
+    <div id="chronoBody" class="chrono-body${ADMIN?' editing':''}"${ADMIN?' contenteditable="true"':''}>${html}</div>
+    ${(!html && !ADMIN)?'<div class="empty">Раздел в разработке. Материалы появятся позже.</div>':''}
+    ${ADMIN?`<div class="chrono-tools">
+      <button class="btn ghost" onclick="chronoImg()">+ Фото</button>
+      <button class="btn primary" onclick="chronoSave('${camp}','${branch}')">Сохранить</button>
+      <button class="btn ghost" onclick="exportSite()">Скачать index.html</button>
+    </div>
+    <input type="file" id="chronoFile" accept="image/*" hidden onchange="chronoImgPick(this)">`:''}`;
   document.getElementById('scrim').classList.add('open');
+}
+function chronoImg(){ const f=document.getElementById('chronoFile'); if(f) f.click(); }
+function chronoImgPick(inp){
+  const f=inp.files && inp.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=()=>{ const b=document.getElementById('chronoBody'); if(b) b.insertAdjacentHTML('beforeend', `<img src="${r.result}" alt="">`); };
+  r.readAsDataURL(f); inp.value='';
+}
+function chronoSave(camp,branch){
+  const b=document.getElementById('chronoBody'); if(!b) return;
+  const html=b.innerHTML.trim();
+  if(html) CHRONO_DATA[camp+':'+branch]=html; else delete CHRONO_DATA[camp+':'+branch];
+  sset(KEY_CHRONO, CHRONO_DATA, false).catch(()=>{});
+  toast('Сохранено на этом устройстве');
+}
+async function exportSite(){
+  try{
+    const res=await fetch(location.pathname, {cache:'no-store'});
+    let src=await res.text();
+    const json=JSON.stringify(CHRONO_DATA).replace(/</g,'\\u003c');
+    src=src.replace(/<script id="chrono-data"[^>]*>[\s\S]*?<\/script>/, function(){
+      return '<script id="chrono-data" type="application/json">'+json+'<\/script>';
+    });
+    const blob=new Blob([src],{type:'text/html'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob); a.download='index.html';
+    document.body.appendChild(a); a.click(); a.remove();
+    toast('Файл готов — загрузи его на GitHub');
+  }catch(e){ toast('⚠ Экспорт не удался'); }
 }
 
 /* ====================== Аккаунты (локальные, на устройстве) ====================== */
