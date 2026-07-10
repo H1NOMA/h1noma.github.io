@@ -47,6 +47,7 @@
     --glass:rgba(28,23,11,.68); --glass2:rgba(37,30,15,.78);
   }
   *{box-sizing:border-box;margin:0;padding:0}
+  body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;background:repeating-linear-gradient(0deg,rgba(255,255,255,.014) 0 1px,transparent 1px 3px)}
   html{scroll-behavior:smooth}
   body{
     background:radial-gradient(700px 360px at 90% -6%, var(--glow), transparent 60%), var(--bg);
@@ -121,11 +122,12 @@
   .view.active{position:relative;height:auto;overflow:visible;visibility:visible;opacity:1;pointer-events:auto;z-index:1}
   @keyframes fade{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
 
-  .masthead{margin-bottom:20px}
+  .masthead{margin-bottom:20px;position:relative;padding-left:14px}
+  .masthead::before{content:"";position:absolute;left:0;top:2px;bottom:2px;width:3px;background:linear-gradient(180deg,var(--red),transparent);box-shadow:0 0 8px rgba(var(--accent-rgb),.5)}
   .kicker{font-family:var(--f-mono);font-size:.66rem;letter-spacing:.18em;color:var(--muted);margin-bottom:11px;line-height:1.6}
   .kicker i{font-style:normal;color:var(--red)}
   .masthead h1{font-family:var(--f-disp);font-weight:700;font-size:clamp(1.55rem,7vw,2.6rem);letter-spacing:.02em;line-height:1.07;text-transform:uppercase}
-  .masthead .rule{height:1px;width:54px;background:var(--red);margin:13px 0;box-shadow:0 0 10px rgba(var(--accent-rgb),.6)}
+  .masthead .rule{height:7px;width:150px;margin:13px 0;border:none;background:repeating-linear-gradient(-45deg,rgba(var(--accent-rgb),.55) 0 7px,transparent 7px 15px);-webkit-mask-image:linear-gradient(90deg,#000 55%,transparent);mask-image:linear-gradient(90deg,#000 55%,transparent)}
   .masthead p{font-family:var(--f-disp);color:var(--dim);max-width:560px;font-size:.96rem}
   .masthead .meta{margin-top:15px;display:flex;gap:18px;color:var(--muted);font-family:var(--f-mono);font-size:.72rem;letter-spacing:.06em;flex-wrap:wrap}
   .masthead .meta span{display:flex;align-items:center;gap:7px}
@@ -153,6 +155,8 @@
   .players-list{display:block}
   .card{position:relative;background:var(--surface);border:var(--hair) solid var(--line);color:var(--dim);padding:16px;cursor:pointer;overflow:hidden;border-radius:var(--r-md);box-shadow:inset 0 .5px 0 rgba(255,255,255,.06);transition:transform .2s var(--spring),border-color .15s,background .15s,color .15s}
   .card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--red);opacity:0;transition:.15s}
+  .card::after{content:"";position:absolute;top:-1px;right:-1px;width:18px;height:18px;pointer-events:none;background:linear-gradient(225deg,var(--bg) 0 49%,rgba(var(--accent-rgb),.55) 49% calc(49% + 1.5px),transparent calc(49% + 1.5px))}
+  .card.has-img::after{display:none}
   .card:active{transform:scale(.97)}
   .card:hover{border-color:var(--red-dim);background:var(--surface2);color:var(--red)}
   .card:hover::before{opacity:1}
@@ -263,9 +267,24 @@
   .dice-menu.open .dice-opt:nth-child(7){transition-delay:0s}.dice-menu.open .dice-opt:nth-child(6){transition-delay:.03s}.dice-menu.open .dice-opt:nth-child(5){transition-delay:.06s}.dice-menu.open .dice-opt:nth-child(4){transition-delay:.09s}.dice-menu.open .dice-opt:nth-child(3){transition-delay:.12s}.dice-menu.open .dice-opt:nth-child(2){transition-delay:.15s}.dice-menu.open .dice-opt:nth-child(1){transition-delay:.18s}
   .dice-result{position:fixed;inset:0;z-index:120;display:none;align-items:center;justify-content:center;pointer-events:none}
   .dice-result.show{display:flex}
-  .dice-result .dr-card{pointer-events:auto;background:var(--glass2);backdrop-filter:blur(28px) saturate(180%);-webkit-backdrop-filter:blur(28px) saturate(180%);border:var(--hair) solid var(--line2);border-radius:var(--r-lg);padding:26px 44px;text-align:center;animation:sheetUp .32s var(--spring);box-shadow:0 18px 50px rgba(0,0,0,.5)}
-  .dr-die{font-family:var(--f-mono);font-size:.72rem;letter-spacing:.24em;color:var(--muted);text-transform:uppercase;margin-bottom:6px}
-  .dr-num{font-family:var(--f-disp);font-weight:700;font-size:3.4rem;line-height:1;color:var(--red);text-shadow:0 0 22px rgba(var(--accent-rgb),.55)}
+  .dr-wrap{pointer-events:auto;position:relative;display:flex;flex-direction:column;align-items:center;gap:12px;animation:dieIn .55s steps(2) both}
+  .dr-box{position:relative;width:158px;height:158px;display:flex;align-items:center;justify-content:center}
+  .dr-svg{position:absolute;inset:0;width:100%;height:100%;fill:none;stroke:var(--red);stroke-width:1.1;stroke-linejoin:round;filter:drop-shadow(0 0 15px rgba(var(--accent-rgb),.65))}
+  .dr-num{position:relative;font-family:var(--f-disp);font-weight:700;font-size:2.6rem;line-height:1;color:var(--red);text-shadow:0 0 18px rgba(var(--accent-rgb),.7)}
+  .dr-box.d4 .dr-num{transform:translateY(16px)}
+  .dr-box.d100 .dr-num,.dr-box.d10 .dr-num{transform:translateY(4px)}
+  .dr-die{font-family:var(--f-mono);font-size:.72rem;letter-spacing:.28em;color:var(--muted);text-transform:uppercase}
+  @keyframes dieIn{
+    0%{opacity:0}
+    12%{opacity:1;transform:translate(-5px,2px)}
+    24%{opacity:.15}
+    38%{opacity:1;transform:translate(4px,-2px) skewX(-6deg)}
+    52%{opacity:.4}
+    66%{opacity:1;transform:translate(-2px,1px)}
+    100%{opacity:1;transform:none}
+  }
+  .dice-result.show{background:radial-gradient(circle at 50% 50%, rgba(0,0,0,.5), transparent 72%)}
+  @media (prefers-reduced-motion: reduce){.dr-wrap{animation:none}}
   .dr-num.crit{animation:glitchTxt .12s steps(2) 10}
   @keyframes glitchTxt{
     0%{transform:translate(0);text-shadow:0 0 22px rgba(var(--accent-rgb),.55)}
@@ -303,6 +322,61 @@
   .chrono-body.editing{min-height:140px;border:1px dashed var(--line2);border-radius:12px;padding:12px;outline:none;color:var(--txt);-webkit-user-modify:read-write-plaintext-only;-webkit-user-modify:read-write}
   .chrono-tools{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
   .chrono-tools .btn{flex:1 1 auto;min-width:110px}
+  /* --- досье-карточки --- */
+  .card.has-img{overflow:visible;padding-right:74px}
+  .card .cimg{position:absolute;top:-8px;right:-8px;width:62px;height:62px;border-radius:12px;overflow:hidden;border:1px solid var(--line2);box-shadow:0 8px 18px rgba(0,0,0,.45);transform:rotate(3deg);background:var(--bg2)}
+  .card .cimg img{width:100%;height:100%;object-fit:cover;display:block}
+  .dossier{position:relative;margin:10px 0 6px}
+  .dossier.has-img h2{padding-right:96px}
+  .dos-img{position:absolute;top:-4px;right:2px;width:104px;height:104px;z-index:2;transform:rotate(3deg);border-radius:12px;overflow:hidden;border:1px solid var(--line2);box-shadow:0 12px 26px rgba(0,0,0,.55);background:var(--bg2)}
+  .dos-img img{width:100%;height:100%;object-fit:cover;display:block}
+  .dos-sheet{background:rgba(255,255,255,.035);border:var(--hair) solid var(--line2);border-radius:14px;padding:16px;margin-top:32px;box-shadow:inset 0 .5px 0 rgba(255,255,255,.05)}
+  .dos-kick{font-family:var(--f-mono);font-size:.62rem;letter-spacing:.22em;text-transform:uppercase;color:var(--red);margin-bottom:6px}
+  .dos-rows{margin-top:12px}
+  .dos-row{display:flex;gap:12px;padding:7px 0;border-bottom:1px dashed var(--line)}
+  .dos-row:last-child{border-bottom:none}
+  .dos-row .k{flex:0 0 36%;font-family:var(--f-mono);font-size:.64rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);padding-top:3px}
+  .dos-row .v{flex:1;color:var(--txt);font-size:.9rem;line-height:1.45}
+  /* --- редактор карточки --- */
+  .ce-imgrow{display:flex;align-items:center;gap:10px}
+  .ce-imgrow .btn{flex:1;padding:11px 8px;font-size:.78rem}
+  .ce-thumb{width:52px;height:52px;border-radius:10px;overflow:hidden;border:1px dashed var(--line2);flex:0 0 auto;background:var(--bg2)}
+  .ce-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+  .ce-row{display:flex;gap:8px;margin-top:8px}
+  .ce-row input{flex:1;min-width:0}
+  .ce-row .ce-k{flex:0 0 38%}
+  .ce-x{flex:0 0 38px;border:none;border-radius:10px;background:rgba(255,255,255,.06);color:var(--dim);cursor:pointer;font-size:.8rem}
+  .opt{color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0}
+  /* --- подписи фото хронологии --- */
+  .chrono-body figure{margin:16px -18px}
+  .chrono-body figure img{width:100%;margin:0}
+  .chrono-body figcaption{text-align:center;text-transform:uppercase;font-weight:700;font-family:var(--f-disp);font-size:.78rem;letter-spacing:.16em;color:var(--txt);margin-top:2px;padding:0 18px}
+  .chrono-body.editing figure{margin:12px 0}
+  .chrono-body.editing figure img{width:100%;margin:0;border-radius:12px;-webkit-mask-image:none;mask-image:none}
+  @media(min-width:880px){.chrono-body figure{margin:18px -30px}}
+  /* --- поиск --- */
+  .search-float{position:fixed;left:12px;right:12px;bottom:calc(10px + var(--botnav-h) + 12px + env(safe-area-inset-bottom));z-index:64;max-width:520px;margin:0 auto;display:none;flex-direction:column;gap:8px}
+  .search-float.open{display:flex;animation:fade .18s}
+  .sf-results{display:none;max-height:44vh;overflow:auto;background:var(--glass2);backdrop-filter:blur(28px) saturate(180%);-webkit-backdrop-filter:blur(28px) saturate(180%);border:var(--hair) solid var(--line2);border-radius:18px;padding:6px;box-shadow:0 10px 30px rgba(0,0,0,.45)}
+  .sf-item{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:none;border:none;padding:11px 10px;border-radius:12px;color:var(--txt);font-size:.9rem;cursor:pointer}
+  .sf-item:active{background:rgba(255,255,255,.06)}
+  .sf-badge{flex:0 0 auto;font-family:var(--f-mono);font-size:.56rem;letter-spacing:.14em;text-transform:uppercase;color:var(--red);border:1px solid rgba(var(--accent-rgb),.4);border-radius:6px;padding:2px 6px}
+  .sf-badge.ch{color:#5ad0ff;border-color:rgba(90,208,255,.4)}
+  .sf-t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .sf-none{padding:14px;text-align:center;color:var(--muted);font-family:var(--f-mono);font-size:.72rem;letter-spacing:.1em}
+  .sf-row{display:flex;align-items:center;position:relative;background:var(--glass2);backdrop-filter:blur(28px) saturate(180%);-webkit-backdrop-filter:blur(28px) saturate(180%);border:var(--hair) solid var(--line2);border-radius:999px;box-shadow:0 10px 30px rgba(0,0,0,.45)}
+  .sf-row svg{position:absolute;left:16px;stroke:var(--muted);fill:none;stroke-width:2;width:16px;height:16px;pointer-events:none}
+  .sf-row input{width:100%;padding:13px 16px 13px 42px;border:none;background:none;color:var(--txt);font-family:var(--f-mono);font-size:16px;letter-spacing:.02em}
+  .sf-row input:focus{outline:none}
+  .sf-row input::placeholder{color:var(--muted)}
+  @media(min-width:880px){.search-float{display:none !important}}
+  /* HUD-скобки на листе досье */
+  .dos-sheet{position:relative}
+  .dos-sheet::before,.dos-sheet::after{content:"";position:absolute;width:14px;height:14px;border:2px solid rgba(var(--accent-rgb),.55);pointer-events:none}
+  .dos-sheet::before{top:-2px;left:-2px;border-right:none;border-bottom:none;border-top-left-radius:6px}
+  .dos-sheet::after{bottom:-2px;right:-2px;border-left:none;border-top:none;border-bottom-right-radius:6px}
+  /* срез угла у основной кнопки */
+  .btn.primary{clip-path:polygon(0 0,calc(100% - 13px) 0,100% 13px,100% 100%,0 100%);box-shadow:none;filter:drop-shadow(0 6px 14px rgba(var(--accent-rgb),.4))}
   .chrono-list{display:flex;flex-direction:column;gap:12px;max-width:680px}
   .chrono-list .plogo{min-height:112px}
   .chrono-branches{display:none;gap:10px;margin:-2px 0 4px}
@@ -526,6 +600,7 @@
     <div class="grid">
       <aside class="cats"><h4>КАТЕГОРИИ</h4><div class="cat-wrap" id="cats"></div></aside>
       <div class="content-col">
+        <div id="admCardBar" hidden style="margin-bottom:14px"><button class="btn primary" style="width:100%" onclick="openCardEditor()">+ Карточка</button></div>
         <div class="cards" id="cards"></div>
         <article class="story" id="story" hidden></article>
       </div>
@@ -582,11 +657,23 @@
     <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>
     <span class="lbl">Хронология</span>
   </button>
+  <button id="botSearchBtn" onclick="toggleSearchBar(event)" aria-label="Поиск">
+    <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+    <span class="lbl">Поиск</span>
+  </button>
 </nav>
 
 <button class="dice-circle" id="diceBtn" onclick="toggleDice(event)" aria-label="Бросить куб">
   <svg viewBox="0 0 24 24"><path d="M12 2l8.7 5v10L12 22l-8.7-5V7L12 2z"/><path d="M12 2v4.6M3.3 7l8.7-.4 8.7.4M12 6.6L5.6 16.4h12.8L12 6.6M3.3 17l2.3-.6M20.7 17l-2.3-.6M12 22l-6.4-5.6M12 22l6.4-5.6"/></svg>
 </button>
+<div class="search-float" id="searchFloat">
+  <div class="sf-results" id="sfResults"></div>
+  <div class="sf-row">
+    <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+    <input id="searchM" type="search" placeholder="ПИШИ ЗАЕБАЛ" autocomplete="off">
+  </div>
+</div>
+
 <div class="dice-menu" id="diceMenu">
   <button class="dice-opt" onclick="rollDice(100)">D100</button>
   <button class="dice-opt" onclick="rollDice(20)">D20</button>
@@ -606,6 +693,7 @@
 <div class="toast" id="toast"><span class="ic">▮</span><span id="toastMsg"></span></div>
 
 <script id="chrono-data" type="application/json">{}</script>
+<script id="archive-data" type="application/json">null</script>
 <script>
 /* ====================== Категории и подкатегории ====================== */
 const CATS = [
@@ -691,7 +779,9 @@ async function boot(){
   ]);
   loadChronoEmbedded();
   if(chr) CHRONO_DATA = Object.assign(CHRONO_DATA, chr);
-  if(arc===null){ arc = SEED.slice(); sset(KEY_ARCHIVE, arc); }
+  let embA=null; try{ embA=JSON.parse(document.getElementById('archive-data').textContent); }catch(e){}
+  if(arc===null){ arc = ((embA&&embA.length)?embA:SEED).slice(); sset(KEY_ARCHIVE, arc); }
+  else if(embA&&embA.length){ arc = mergeById(arc, embA); }
   ARCHIVE = mergeById(arc, ARCHIVE);
   CHARS = mergeById(chars || [], CHARS);
   USERS = users || [];
@@ -739,6 +829,7 @@ function renderCats(){
 /* ---------- Переключение вида ---------- */
 function applyView(){
   const isStory = activeCat!=='all' && catById(activeCat).type==='story';
+  const ab=document.getElementById('admCardBar'); if(ab) ab.hidden = !ADMIN || isStory;
   document.getElementById('cards').style.display = isStory ? 'none' : '';
   document.getElementById('story').hidden = !isStory;
   if(isStory) renderStory(); else renderCards();
@@ -770,7 +861,8 @@ function renderCards(){
     const badge = e.status==='official'?`<span class="badge official">Канон</span>`:`<span class="badge">Сообщество</span>`;
     const subChip = s?`<span class="subtag">${esc(s.label)}</span>`:'';
     const tags=(e.tags||[]).slice(0,2).map(t=>`<span class="tag">#${esc(t)}</span>`).join('');
-    return `<article class="card" tabindex="0" onclick="openModal('${e.id}')" onkeydown="if(event.key==='Enter')openModal('${e.id}')">
+    return `<article class="card${e.img?' has-img':''}" tabindex="0" onclick="openModal('${e.id}')" onkeydown="if(event.key==='Enter')openModal('${e.id}')">
+      ${e.img?`<span class="cimg"><img src="${e.img}" alt=""></span>`:''}
       <div class="top">${rune(e.cat,20)}<span class="clabel">${esc(c.label)}</span></div>
       <h3>${esc(e.title)}</h3>
       <div class="snip">${esc(e.body)}</div>
@@ -802,12 +894,25 @@ function openModal(id){
   const badge = e.status==='official'?`<span class="badge official">Канон</span>`:`<span class="badge">Сообщество</span>`;
   const tags=(e.tags||[]).map(t=>`<span class="tag">#${esc(t)}</span>`).join('');
   const who=e.author?`предложил(а): ${esc(e.author)} · `:'';
+  const rows=(e.dossier||[]).filter(r=>r.k||r.v).map(r=>`<div class="dos-row"><span class="k">${esc(r.k)}</span><span class="v">${esc(r.v)}</span></div>`).join('');
+  const isDossier = !!(e.img || e.kicker || rows);
   document.getElementById('modal').innerHTML = `
     <button class="x" onclick="closeModal()" aria-label="Закрыть">✕</button>
     <div class="top">${rune(e.cat,24)}<span class="clabel">${path}</span></div>
+    ${isDossier?`
+    <div class="dossier${e.img?' has-img':''}">
+      ${e.img?`<span class="dos-img"><img src="${e.img}" alt=""></span>`:''}
+      <div class="dos-sheet">
+        ${e.kicker?`<div class="dos-kick">${esc(e.kicker)}</div>`:''}
+        <h2>${esc(e.title)}</h2>
+        ${rows?`<div class="dos-rows">${rows}</div>`:''}
+        ${e.body?`<div class="body" style="margin-top:12px">${esc(e.body)}</div>`:''}
+      </div>
+    </div>`:`
     <h2>${esc(e.title)}</h2>
-    <div class="body">${esc(e.body)}</div>
-    <div class="foot">${badge}${tags}<span class="src">${who}${esc(e.src||'')}</span></div>`;
+    <div class="body">${esc(e.body)}</div>`}
+    <div class="foot">${badge}${tags}<span class="src">${who}${esc(e.src||'')}</span></div>
+    ${ADMIN?`<div class="chrono-tools"><button class="btn ghost" onclick="openCardEditor('${e.id}')">Редактировать</button></div>`:''}`;
   document.getElementById('scrim').classList.add('open');
 }
 function closeModal(){ document.getElementById('scrim').classList.remove('open'); }
@@ -833,6 +938,123 @@ function toggleChrono(id){
     el.classList.toggle('open', el.id==='chrono-br-'+id && !el.classList.contains('open'));
   });
 }
+/* ---------- Редактор карточек (админ) ---------- */
+let EDIT_IMG='';
+function onCatChangeEd(){
+  const c=catById(document.getElementById('ce-cat').value);
+  document.getElementById('ce-sub').innerHTML = '<option value="">—</option>' + (c?c.subs.map(x=>`<option value="${x.id}">${x.label}</option>`).join(''):'');
+}
+function openCardEditor(id){
+  const e = id ? ARCHIVE.find(x=>x.id===id) : null;
+  EDIT_IMG = (e&&e.img)||'';
+  const m=document.getElementById('modal');
+  m.innerHTML=`<button class="x" onclick="closeModal()">✕</button>
+    <h2 style="font-family:var(--f-disp);color:var(--txt);margin-bottom:14px">${e?'Карточка':'Новая карточка'}</h2>
+    <div class="field"><label>Категория</label><select id="ce-cat" onchange="onCatChangeEd()">${cardCats.map(c=>`<option value="${c.id}"${e&&e.cat===c.id?' selected':''}>${c.label}</option>`).join('')}</select></div>
+    <div class="field"><label>Подкатегория</label><select id="ce-sub"></select></div>
+    <div class="field"><label>Классификация <span class="opt">— надзаголовок, необязательно</span></label><input id="ce-kick" maxlength="48" placeholder="ДОСЬЕ · ДОПУСК 3" value="${e?esc(e.kicker||''):''}"></div>
+    <div class="field" id="ce-f-title"><label>Название <span class="req">*</span></label><input id="ce-title" maxlength="80" value="${e?esc(e.title):''}"><div class="err">Укажите название</div></div>
+    <div class="field"><label>Изображение</label>
+      <div class="ce-imgrow">
+        <span class="ce-thumb" id="ceThumb">${EDIT_IMG?`<img src="${EDIT_IMG}">`:''}</span>
+        <button class="btn ghost" onclick="document.getElementById('ceFile').click()">Выбрать</button>
+        <button class="btn ghost" onclick="ceImgClear()">Убрать</button>
+      </div>
+      <input type="file" id="ceFile" accept="image/*" hidden onchange="ceImgPick(this)">
+    </div>
+    <div class="field"><label>Описание</label><textarea id="ce-body" rows="5">${e?esc(e.body||''):''}</textarea></div>
+    <div class="field"><label>Досье <span class="opt">— строки панели</span></label>
+      <div id="ceRows"></div>
+      <button class="btn ghost" style="width:100%;margin-top:8px" onclick="ceAddRow()">+ Поле</button>
+    </div>
+    <div class="field"><label>Теги <span class="opt">— через запятую</span></label><input id="ce-tags" value="${e?esc((e.tags||[]).join(', ')):''}"></div>
+    <div class="chrono-tools">
+      <button class="btn primary" onclick="saveCard(${e?`'${e.id}'`:'null'})">Сохранить</button>
+      ${e?`<button class="btn danger" id="ceDel" onclick="delCard('${e.id}')">Удалить</button>`:''}
+    </div>`;
+  document.getElementById('scrim').classList.add('open');
+  onCatChangeEd();
+  if(e&&e.sub) document.getElementById('ce-sub').value=e.sub;
+  ((e&&e.dossier&&e.dossier.length)?e.dossier:[{k:'',v:''}]).forEach(r=>ceAddRow(r.k,r.v));
+}
+function ceAddRow(k,v){
+  const w=document.getElementById('ceRows'); if(!w) return;
+  const d=document.createElement('div'); d.className='ce-row';
+  d.innerHTML=`<input class="ce-k" placeholder="Поле" maxlength="30" value="${esc(k||'')}"><input class="ce-v" placeholder="Значение" maxlength="140" value="${esc(v||'')}"><button class="ce-x" onclick="this.parentNode.remove()">✕</button>`;
+  w.appendChild(d);
+}
+function ceImgPick(inp){
+  const f=inp.files&&inp.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=()=>{ EDIT_IMG=r.result; const t=document.getElementById('ceThumb'); if(t) t.innerHTML=`<img src="${EDIT_IMG}">`; };
+  r.readAsDataURL(f); inp.value='';
+}
+function ceImgClear(){ EDIT_IMG=''; const t=document.getElementById('ceThumb'); if(t) t.innerHTML=''; }
+function saveCard(id){
+  const title=document.getElementById('ce-title').value.trim();
+  document.getElementById('ce-f-title').classList.toggle('invalid', !title);
+  if(!title) return;
+  const entry={
+    id: id||('c'+Date.now().toString(36)),
+    cat: document.getElementById('ce-cat').value,
+    sub: document.getElementById('ce-sub').value||null,
+    kicker: document.getElementById('ce-kick').value.trim(),
+    title,
+    img: EDIT_IMG,
+    body: document.getElementById('ce-body').value.trim(),
+    dossier: [...document.querySelectorAll('#ceRows .ce-row')].map(r=>({k:r.querySelector('.ce-k').value.trim(), v:r.querySelector('.ce-v').value.trim()})).filter(r=>r.k||r.v),
+    tags: document.getElementById('ce-tags').value.split(',').map(t=>t.trim()).filter(Boolean).slice(0,6),
+    status:'official', src:'Редакция КОМИК'
+  };
+  const i=ARCHIVE.findIndex(x=>x.id===entry.id);
+  if(i>=0) ARCHIVE[i]=entry; else ARCHIVE.unshift(entry);
+  sset(KEY_ARCHIVE, ARCHIVE).catch(()=>{});
+  closeModal(); renderAll(); toast('Карточка сохранена');
+}
+function delCard(id){
+  const b=document.getElementById('ceDel');
+  if(b && !b.dataset.arm){ b.dataset.arm='1'; b.textContent='Точно удалить?'; return; }
+  ARCHIVE=ARCHIVE.filter(x=>x.id!==id);
+  sset(KEY_ARCHIVE, ARCHIVE).catch(()=>{});
+  closeModal(); renderAll(); toast('Карточка удалена');
+}
+
+/* ---------- Поиск (архив + хронология) ---------- */
+let SF_RES=[];
+function toggleSearchBar(e){ if(e) e.stopPropagation();
+  const f=document.getElementById('searchFloat'), b=document.getElementById('botSearchBtn');
+  const open=!f.classList.contains('open');
+  f.classList.toggle('open',open); if(b) b.classList.toggle('active',open);
+  if(open){ const i=document.getElementById('searchM'); i.value=''; runSearch(''); setTimeout(()=>i.focus(),60); }
+}
+function stripHtml(h){ const t=document.createElement('div'); t.innerHTML=h||''; return t.textContent||''; }
+function runSearch(q){
+  q=(q||'').trim().toLowerCase();
+  SF_RES=[];
+  if(q){
+    ARCHIVE.forEach(e=>{
+      const hay=(e.title+' '+(e.kicker||'')+' '+(e.body||'')+' '+(e.tags||[]).join(' ')+' '+((e.dossier||[]).map(r=>r.k+' '+r.v).join(' '))).toLowerCase();
+      if(hay.includes(q)) SF_RES.push({b:'Архив', ch:false, t:e.title, id:e.id});
+    });
+    ['legacy','neverland','assimilation'].forEach(camp=>['Мир','Путешествие','Гости'].forEach(br=>{
+      const hay=(CHRONO_NAMES[camp]+' '+br+' '+stripHtml(CHRONO_DATA[camp+':'+br])).toLowerCase();
+      if(hay.includes(q)) SF_RES.push({b:'Хронология', ch:true, t:CHRONO_NAMES[camp]+' — '+br, camp, br});
+    }));
+  }
+  const el=document.getElementById('sfResults');
+  if(!q){ el.innerHTML=''; el.style.display='none'; return; }
+  el.style.display='block';
+  el.innerHTML = SF_RES.length
+    ? SF_RES.slice(0,14).map((r,i)=>`<button class="sf-item" onclick="sfOpen(${i})"><span class="sf-badge${r.ch?' ch':''}">${r.b}</span><span class="sf-t">${esc(r.t)}</span></button>`).join('')
+    : '<div class="sf-none">Ничего не найдено</div>';
+}
+function sfOpen(i){
+  const r=SF_RES[i]; if(!r) return;
+  toggleSearchBar();
+  if(r.ch) openChronoBranch(r.camp, r.br); else openModal(r.id);
+}
+document.getElementById('searchM').addEventListener('input', e=>runSearch(e.target.value));
+
 /* ---------- Админ-режим ---------- */
 const KEY_CHRONO='comik:chrono:v1', ADM_PASS='Weeknd';
 let ADMIN=false, CHRONO_DATA={};
@@ -843,7 +1065,7 @@ function loadChronoEmbedded(){
 function admClick(){
   if(ADMIN){
     ADMIN=false; document.getElementById('admBtn').classList.remove('on');
-    toast('Режим администратора выключен'); return;
+    applyView(); toast('Режим администратора выключен'); return;
   }
   const m=document.getElementById('modal');
   m.innerHTML=`<button class="x" onclick="closeModal()">✕</button>
@@ -857,7 +1079,7 @@ function admLogin(){
   const i=document.getElementById('admPass');
   if(i && i.value===ADM_PASS){
     ADMIN=true; document.getElementById('admBtn').classList.add('on');
-    closeModal(); toast('Режим администратора включён');
+    closeModal(); applyView(); toast('Режим администратора включён');
   } else toast('⚠ Неверный пароль');
 }
 
@@ -881,12 +1103,14 @@ function chronoImg(){ const f=document.getElementById('chronoFile'); if(f) f.cli
 function chronoImgPick(inp){
   const f=inp.files && inp.files[0]; if(!f) return;
   const r=new FileReader();
-  r.onload=()=>{ const b=document.getElementById('chronoBody'); if(b) b.insertAdjacentHTML('beforeend', `<img src="${r.result}" alt="">`); };
+  r.onload=()=>{ const b=document.getElementById('chronoBody'); if(b) b.insertAdjacentHTML('beforeend', `<figure><img src="${r.result}" alt=""><figcaption>ПОДПИСЬ</figcaption></figure><p><br></p>`); };
   r.readAsDataURL(f); inp.value='';
 }
 function chronoSave(camp,branch){
   const b=document.getElementById('chronoBody'); if(!b) return;
-  const html=b.innerHTML.trim();
+  const clone=b.cloneNode(true);
+  clone.querySelectorAll('figcaption').forEach(fc=>{ const t=fc.textContent.trim(); if(!t || t==='ПОДПИСЬ') fc.remove(); });
+  const html=clone.innerHTML.trim();
   if(html) CHRONO_DATA[camp+':'+branch]=html; else delete CHRONO_DATA[camp+':'+branch];
   sset(KEY_CHRONO, CHRONO_DATA, false).catch(()=>{});
   toast('Сохранено на этом устройстве');
@@ -898,6 +1122,10 @@ async function exportSite(){
     const json=JSON.stringify(CHRONO_DATA).replace(/</g,'\\u003c');
     src=src.replace(/<script id="chrono-data"[^>]*>[\s\S]*?<\/script>/, function(){
       return '<script id="chrono-data" type="application/json">'+json+'<\/script>';
+    });
+    const jsonA=JSON.stringify(ARCHIVE).replace(/</g,'\\u003c');
+    src=src.replace(/<script id="archive-data"[^>]*>[\s\S]*?<\/script>/, function(){
+      return '<script id="archive-data" type="application/json">'+jsonA+'<\/script>';
     });
     const blob=new Blob([src],{type:'text/html'});
     const a=document.createElement('a');
@@ -1167,11 +1395,21 @@ function go(view){
   });
   document.querySelectorAll('[data-nav]').forEach(b=> b.classList.toggle('active', b.dataset.nav===view));
   closeProjects();
+  const sfl=document.getElementById('searchFloat'); if(sfl){ sfl.classList.remove('open'); const sb=document.getElementById('botSearchBtn'); if(sb) sb.classList.remove('active'); }
   const dm=document.getElementById('diceMenu'); if(dm){ dm.classList.remove('open'); const db=document.getElementById('diceBtn'); if(db) db.classList.remove('active'); }
   if(view==='players'){ renderPlayers(); ensurePlayersVisible(); }
   const av=document.getElementById('view-'+view); if(av) kickLayout(av);
   try{ window.scrollTo(0,0); }catch(e){}
 }
+const DICE_SHAPES={
+  4:'<path d="M12 2.5l9.5 17.5H2.5L12 2.5z"/><path d="M12 2.5v11M12 13.5L2.5 20M12 13.5L21.5 20"/>',
+  6:'<path d="M12 2l8.5 4.9v9.8L12 21.5l-8.5-4.8V6.9L12 2z"/><path d="M3.5 6.9L12 11.6l8.5-4.7M12 11.6v9.9"/>',
+  8:'<path d="M12 2l9 10-9 10L3 12l9-10z"/><path d="M3 12h18M12 2L7 12l5 10M12 2l5 10-5 10"/>',
+  10:'<path d="M12 2l9 10.2-9 9.8-9-9.8L12 2z"/><path d="M3 12.2l9 3.1 9-3.1M12 15.3V22M12 2v13.3"/>',
+  12:'<path d="M12 2l9.5 6.9-3.6 11.2H6.1L2.5 8.9 12 2z"/><path d="M12 6.6l4.9 3.6-1.9 5.8h-6l-1.9-5.8L12 6.6zM12 2v4.6M21.5 8.9l-4.6 1.3M17.9 20.1l-2.9-4.1M6.1 20.1l2.9-4.1M2.5 8.9l4.6 1.3"/>',
+  20:'<path d="M12 2l8.7 5v10L12 22l-8.7-5V7L12 2z"/><path d="M12 2v4.6M3.3 7l8.7-.4 8.7.4M12 6.6L5.6 16.4h12.8L12 6.6M3.3 17l2.3-.6M20.7 17l-2.3-.6M12 22l-6.4-5.6M12 22l6.4-5.6"/>',
+  100:'<path d="M12 2l9 10.2-9 9.8-9-9.8L12 2z"/><path d="M3 12.2l9 3.1 9-3.1M12 15.3V22M12 2v13.3"/>'
+};
 function toggleDice(e){ if(e) e.stopPropagation();
   const m=document.getElementById('diceMenu'), b=document.getElementById('diceBtn');
   const open=!m.classList.contains('open');
@@ -1182,7 +1420,10 @@ function rollDice(n){
   const v=1+Math.floor(Math.random()*n);
   const crit=(n===20&&(v===1||v===20));
   const r=document.getElementById('diceResult');
-  r.innerHTML=`<div class="dr-card"><div class="dr-die">D${n}</div><div class="dr-num${crit?' crit':''}">${v}</div></div>`;
+  r.innerHTML=`<div class="dr-wrap">
+    <div class="dr-box d${n}"><svg class="dr-svg" viewBox="0 0 24 24">${DICE_SHAPES[n]}</svg><span class="dr-num${crit?' crit':''}">${v}</span></div>
+    <span class="dr-die">D${n}</span>
+  </div>`;
   r.classList.add('show');
   toggleDice._x=document.getElementById('diceMenu').classList.remove('open');
   const db=document.getElementById('diceBtn'); if(db) db.classList.remove('active');
