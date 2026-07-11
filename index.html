@@ -15,7 +15,7 @@
 <meta name="apple-mobile-web-app-title" content="ASSIMILATION">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Cinzel+Decorative:wght@700;900&family=Inter:wght@400;500;600&family=Share+Tech+Mono&family=Uncial+Antiqua&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Cinzel+Decorative:wght@700;900&family=Inter:wght@400;500;600&family=Rajdhani:wght@500;600&family=Share+Tech+Mono&family=Uncial+Antiqua&display=swap" rel="stylesheet">
 <style>
   :root{
     --bg:#14151a; --bg2:#191b21; --surface:#1e2027; --surface2:#262933;
@@ -271,7 +271,7 @@
   .dice-circle.active{color:var(--red)}
   .dice-circle.active svg{filter:drop-shadow(0 0 7px rgba(var(--accent-rgb),.7))}
   @media(min-width:880px){.dice-circle{display:none}}
-  .dice-menu{position:fixed;right:12px;bottom:calc(12px + 58px + 12px + env(safe-area-inset-bottom));z-index:65;display:flex;flex-direction:column;gap:8px;align-items:flex-end;pointer-events:none}
+  .dice-menu{position:fixed;right:12px;bottom:calc(12px + 58px + 10px + 58px + 10px + env(safe-area-inset-bottom));z-index:65;display:flex;flex-direction:column;gap:8px;align-items:flex-end;pointer-events:none}
   @media(min-width:880px){.dice-menu{display:none !important}}
   .dice-menu .dice-opt{opacity:0;transform:translateY(14px) scale(.85);transition:opacity .18s,transform .28s var(--spring)}
   .dice-menu.open{pointer-events:auto}
@@ -323,6 +323,7 @@
   .wl{font-family:var(--f-disp);font-weight:700;font-size:1.02rem;line-height:1.08;letter-spacing:.1em;color:#fff;text-align:left;text-transform:uppercase}
   .adm-btn{margin-left:auto;flex:0 0 auto;width:34px;height:34px;border-radius:50%;border:var(--hair) solid var(--line2);background:var(--glass2);color:var(--muted);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;transition:color .15s,box-shadow .2s}
   .adm-btn svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  .adm-btn.on.dirty::after{content:"";position:absolute;top:-3px;right:-3px;width:11px;height:11px;border-radius:50%;background:var(--red);box-shadow:0 0 9px rgba(var(--accent-rgb),.9);border:2px solid var(--bg)}
   .adm-btn.on{color:var(--red);border-color:rgba(var(--accent-rgb),.55);box-shadow:0 0 12px rgba(var(--accent-rgb),.35)}
   @media(min-width:880px){.adm-btn{margin-left:12px;order:4}}
   .chrono-body{color:var(--dim);font-size:.95rem;line-height:1.65;word-wrap:break-word}
@@ -390,15 +391,36 @@
   /* срез угла у основной кнопки */
   .btn.primary{clip-path:polygon(0 0,calc(100% - 13px) 0,100% 13px,100% 100%,0 100%);box-shadow:none;filter:drop-shadow(0 6px 14px rgba(var(--accent-rgb),.4))}
   /* герой-блок архива */
-  #view-archive .masthead{background:
+  #view-news .masthead{background:
       repeating-linear-gradient(0deg,rgba(255,255,255,.015) 0 1px,transparent 1px 4px),
       linear-gradient(180deg,rgba(var(--accent-rgb),.08),rgba(var(--accent-rgb),.02) 55%,transparent),
       var(--surface);
     border:var(--hair) solid var(--line2);border-radius:16px;padding:20px 18px 16px 18px;overflow:hidden}
-  #view-archive .masthead::before{left:0;top:0;bottom:0;border-radius:0}
-  #view-archive .masthead::after{content:"";position:absolute;top:-1px;right:-1px;width:22px;height:22px;background:linear-gradient(225deg,var(--bg) 0 49%,rgba(var(--accent-rgb),.55) 49% calc(49% + 1.5px),transparent calc(49% + 1.5px))}
-  #view-archive .masthead h1{font-family:var(--f-disp);font-weight:700;text-transform:uppercase;letter-spacing:.04em;font-size:1.5rem;line-height:1.15;color:var(--red);text-shadow:0 0 20px rgba(var(--accent-rgb),.55),2px 0 0 rgba(90,208,255,.3),-2px 0 0 rgba(var(--accent-rgb),.35)}
-  #view-archive .masthead p{color:var(--dim);font-size:.94rem;line-height:1.68;background:rgba(0,0,0,.28);border:var(--hair) solid var(--line);border-left:2px solid rgba(var(--accent-rgb),.55);border-radius:10px;padding:12px 14px;margin-top:2px}
+  #view-news .masthead::before{left:0;top:0;bottom:0;border-radius:0}
+  #view-news .masthead::after{content:"";position:absolute;top:-1px;right:-1px;width:22px;height:22px;background:linear-gradient(225deg,var(--bg) 0 49%,rgba(var(--accent-rgb),.55) 49% calc(49% + 1.5px),transparent calc(49% + 1.5px))}
+  #view-news .masthead h1{font-family:var(--f-disp);font-weight:700;text-transform:uppercase;letter-spacing:.04em;font-size:1.5rem;line-height:1.15;color:var(--red);text-shadow:0 0 20px rgba(var(--accent-rgb),.55),2px 0 0 rgba(90,208,255,.3),-2px 0 0 rgba(var(--accent-rgb),.35)}
+  #view-news .masthead p{font-family:'Rajdhani',var(--f-disp),sans-serif;font-weight:500;color:var(--dim);font-size:1.04rem;line-height:1.6;letter-spacing:.02em;background:rgba(0,0,0,.28);border:var(--hair) solid var(--line);border-left:2px solid rgba(var(--accent-rgb),.55);border-radius:10px;padding:12px 14px;margin-top:2px}
+  /* лента новостей */
+  .news-feed{display:flex;flex-direction:column;gap:12px;margin-top:16px}
+  .news-card{background:var(--surface);border:var(--hair) solid var(--line);border-radius:16px;overflow:hidden;cursor:pointer;transition:transform .2s var(--spring)}
+  .news-card:active{transform:scale(.985)}
+  .news-card .nimg{aspect-ratio:16/9;overflow:hidden;background:var(--bg2)}
+  .news-card .nimg img{width:100%;height:100%;object-fit:cover;display:block}
+  .news-card .nbody{padding:13px 15px 12px}
+  .news-card h3{font-family:var(--f-disp);font-weight:600;font-size:1rem;line-height:1.3;color:var(--txt);margin:0 0 5px}
+  .news-card p{font-size:.86rem;line-height:1.5;color:var(--dim);margin:0 0 8px}
+  .news-card time{font-family:var(--f-mono);font-size:.62rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+  .news-full .nimg-full{margin:0 -18px 14px;overflow:hidden}
+  .news-full .nimg-full img{width:100%;display:block;
+    -webkit-mask-image:linear-gradient(180deg,transparent 0,#000 12%,#000 100%);
+    mask-image:linear-gradient(180deg,transparent 0,#000 12%,#000 100%)}
+  /* FAB кубов в игроках */
+  .dice-fab{position:fixed;right:12px;bottom:calc(12px + 58px + 10px + env(safe-area-inset-bottom));z-index:60;width:58px;height:58px;border-radius:50%;border:none;background:var(--red);color:#0b0b0e;display:none;align-items:center;justify-content:center;cursor:pointer;box-shadow:none;filter:drop-shadow(0 8px 18px rgba(var(--accent-rgb),.45));clip-path:none;transition:transform .2s var(--spring)}
+  .dice-fab svg{width:27px;height:27px;stroke:currentColor;fill:none;stroke-width:1.5;stroke-linejoin:round}
+  .dice-fab:active{transform:scale(.9)}
+  .dice-fab.show{display:flex}
+  .dice-fab.active svg{filter:drop-shadow(0 0 6px rgba(0,0,0,.4))}
+  @media(min-width:880px){.dice-fab{display:none !important}}
   .chrono-list{display:flex;flex-direction:column;gap:12px;max-width:680px}
   .chrono-list .plogo{min-height:112px}
   .chrono-branches{display:none;gap:10px;margin:-2px 0 4px}
@@ -503,7 +525,8 @@
       </span>
     </a>
     <nav class="topnav">
-      <button data-nav="archive" class="active" onclick="go('archive')">Архив</button>
+      <button data-nav="news" class="active" onclick="go('news')">Новости</button>
+      <button data-nav="archive" onclick="go('archive')">Архив</button>
       <button data-nav="players" onclick="go('players')">Игроки</button>
       <button data-nav="chrono" onclick="go('chrono')">Хронология</button>
     </nav>
@@ -608,14 +631,20 @@
 </div>
 
 <main>
-  <!-- ARCHIVE -->
-  <section id="view-archive" class="view active">
+  <!-- NEWS -->
+  <section id="view-news" class="view active">
     <div class="masthead">
       <h1 style="color:var(--red)">New day in New-Liberty!</h1>
       <div class="rule"></div>
       <p><span style="color:var(--red)">Легендами</span> не рождаются — легенд создаёт эпоха. Последняя глава ваших приключений по <span style="color:var(--red)">RISING OF DARKNESS</span> отправит «героев» в город мечты <span style="white-space:nowrap">— <span style="color:var(--red)">New-Liberty</span>!</span> Сможете ли вы закончить начатое на <span style="color:var(--red)">луне</span>?</p>
     </div>
-    <div class="grid">
+    <div id="admNewsBar" hidden style="margin:14px 0"><button class="btn primary" style="width:100%" onclick="openNewsEditor()">+ Новость</button></div>
+    <div class="news-feed" id="newsFeed"></div>
+  </section>
+
+  <!-- ARCHIVE -->
+  <section id="view-archive" class="view">
+        <div class="grid">
       <aside class="cats"><h4>КАТЕГОРИИ</h4><div class="cat-wrap" id="cats"></div></aside>
       <div class="content-col">
         <div id="admCardBar" hidden style="margin-bottom:14px"><button class="btn primary" style="width:100%" onclick="openCardEditor()">+ Карточка</button></div>
@@ -663,7 +692,11 @@
 </footer>
 
 <nav class="botnav">
-  <button data-nav="archive" class="active" onclick="go('archive')">
+  <button data-nav="news" class="active" onclick="go('news')">
+    <svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M7.5 9.5h9M7.5 13h9M7.5 16.5h5.5"/></svg>
+    <span class="lbl">Новости</span>
+  </button>
+  <button data-nav="archive" onclick="go('archive')">
     <svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>
     <span class="lbl">Архив</span>
   </button>
@@ -675,13 +708,13 @@
     <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>
     <span class="lbl">Хронология</span>
   </button>
-  <button id="botSearchBtn" onclick="toggleSearchBar(event)" aria-label="Поиск">
-    <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-    <span class="lbl">Поиск</span>
-  </button>
 </nav>
 
-<button class="dice-circle" id="diceBtn" onclick="toggleDice(event)" aria-label="Бросить куб">
+<button class="dice-circle" id="searchCircle" onclick="toggleSearchBar(event)" aria-label="Поиск">
+  <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+</button>
+
+<button class="dice-fab" id="diceBtn" onclick="toggleDice(event)" aria-label="Бросить куб">
   <svg viewBox="0 0 24 24"><path d="M12 2l8.7 5v10L12 22l-8.7-5V7L12 2z"/><path d="M12 2v4.6M3.3 7l8.7-.4 8.7.4M12 6.6L5.6 16.4h12.8L12 6.6M3.3 17l2.3-.6M20.7 17l-2.3-.6M12 22l-6.4-5.6M12 22l6.4-5.6"/></svg>
 </button>
 <div class="search-float" id="searchFloat">
@@ -712,6 +745,7 @@
 
 <script id="chrono-data" type="application/json">{}</script>
 <script id="archive-data" type="application/json">null</script>
+<script id="news-data" type="application/json">null</script>
 <script>
 /* ====================== Категории и подкатегории ====================== */
 const CATS = [
@@ -772,12 +806,62 @@ const hasStore = (typeof window!=='undefined' && window.storage && typeof window
 const mem = {};
 // страховка: если асинхронный мост хранилища зависнет, промис резолвится сам через таймаут
 const withTimeout = (p, ms=1500) => Promise.race([p, new Promise(res=>setTimeout(()=>res(undefined), ms))]);
+/* ====================== Supabase (заполни URL и KEY — и сайт переедет в облако) ====================== */
+const SUPA_URL = '';   // например: https://abcdefg.supabase.co
+const SUPA_KEY = '';   // anon public key из настроек проекта
+let supa = null;
+
+async function initSupa(){
+  if(!SUPA_URL || !SUPA_KEY) return false;
+  try{
+    await new Promise((res,rej)=>{
+      const sc=document.createElement('script');
+      sc.src='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
+      sc.onload=res; sc.onerror=rej;
+      document.head.appendChild(sc);
+    });
+    supa = window.supabase.createClient(SUPA_URL, SUPA_KEY);
+    return true;
+  }catch(e){ console.warn('Supabase недоступен, работаем локально', e); supa=null; return false; }
+}
+
+/* Облачные аналоги sget/sset: одна таблица kv (key text pk, value jsonb) */
+async function cloudGet(key){
+  const {data,error} = await supa.from('kv').select('value').eq('key',key).maybeSingle();
+  if(error) throw error;
+  return data ? data.value : null;
+}
+async function cloudSet(key,val){
+  const {error} = await supa.from('kv').upsert({key, value: val});
+  if(error) throw error;
+  return true;
+}
+
 async function sget(key, shared=SHARED){
+  if(supa){
+    try{
+      const v = await withTimeout(cloudGet(key), 4000);
+      if(v!==undefined) return v;  // undefined = таймаут, идём в локалку
+    }catch(e){ /* облако молчит — падаем на локалку */ }
+  }
+  return sgetLocal(key, shared);
+}
+async function sset(key,val, shared=SHARED){
+  let cloudOk=false;
+  if(supa){
+    try{ cloudOk = await withTimeout(cloudSet(key,val), 4000); }
+    catch(e){ toast('⚠ Облако недоступно — сохранено локально'); }
+  }
+  const localOk = await ssetLocal(key,val,shared);
+  return cloudOk || localOk;
+}
+
+async function sgetLocal(key, shared=SHARED){
   if(hasLS){ try{ const v=localStorage.getItem(key); return v==null? null : JSON.parse(v); }catch(e){ return null; } }
   if(hasStore){ try{ const r=await withTimeout(window.storage.get(key, shared)); return r&&r.value? JSON.parse(r.value):null; }catch(e){ return null; } }
   return key in mem ? mem[key] : null;
 }
-async function sset(key,val, shared=SHARED){
+async function ssetLocal(key,val, shared=SHARED){
   if(hasLS){ try{ localStorage.setItem(key, JSON.stringify(val)); return true; }catch(e){ return false; } }
   if(hasStore){ try{ const r=await withTimeout(window.storage.set(key, JSON.stringify(val), shared)); return r!==undefined; }catch(e){ return false; } }
   mem[key]=val; return true;
@@ -791,12 +875,16 @@ const mergeById = (stored, local) => { const ids=new Set((stored||[]).map(x=>x&&
 const cardCats = CATS.filter(c=>c.type==='cards');
 
 async function boot(){
+  await initSupa();
   // все ключи читаются параллельно: быстрее и один таймаут не тянет за собой остальные
-  let [arc, chars, users, sess, chr] = await Promise.all([
-    sget(KEY_ARCHIVE), sget(KEY_CHARS, false), sget(KEY_USERS, false), sget(KEY_SESSION, false), sget(KEY_CHRONO, false)
+  let [arc, chars, users, sess, chr, dirty, nws] = await Promise.all([
+    sget(KEY_ARCHIVE), sget(KEY_CHARS, false), sget(KEY_USERS, false), sget(KEY_SESSION, false), sget(KEY_CHRONO, false), sget(KEY_DIRTY, false), sget(KEY_NEWS, false)
   ]);
   loadChronoEmbedded();
   if(chr) CHRONO_DATA = Object.assign(CHRONO_DATA, chr);
+  DIRTY = !!dirty;
+  let embN=null; try{ embN=JSON.parse(document.getElementById('news-data').textContent); }catch(e){}
+  NEWS = mergeById(nws||[], embN||[]);
   let embA=null; try{ embA=JSON.parse(document.getElementById('archive-data').textContent); }catch(e){}
   if(arc===null){ arc = ((embA&&embA.length)?embA:SEED).slice(); sset(KEY_ARCHIVE, arc); }
   else if(embA&&embA.length){ arc = mergeById(arc, embA); }
@@ -808,7 +896,7 @@ async function boot(){
   initChrono();
   renderAll();
 }
-function renderAll(){ renderCats(); renderStats(); applyView(); renderAcct(); renderPlayers(); }
+function renderAll(){ renderCats(); renderStats(); applyView(); renderAcct(); renderPlayers(); renderNews(); }
 
 function renderStats(){
   const st=document.getElementById('statTotal'); if(st) st.textContent = ARCHIVE.length;
@@ -1003,9 +1091,10 @@ function ceAddRow(k,v){
 }
 function ceImgPick(inp){
   const f=inp.files&&inp.files[0]; if(!f) return;
-  const r=new FileReader();
-  r.onload=()=>{ EDIT_IMG=r.result; const t=document.getElementById('ceThumb'); if(t) t.innerHTML=`<img src="${EDIT_IMG}">`; };
-  r.readAsDataURL(f); inp.value='';
+  compressImage(f, 900, 0.8).then(src=>{
+    EDIT_IMG=src; const t=document.getElementById('ceThumb'); if(t) t.innerHTML=`<img src="${EDIT_IMG}">`;
+  }).catch(()=>toast('⚠ Не удалось обработать фото'));
+  inp.value='';
 }
 function ceImgClear(){ EDIT_IMG=''; const t=document.getElementById('ceThumb'); if(t) t.innerHTML=''; }
 function saveCard(id){
@@ -1027,6 +1116,7 @@ function saveCard(id){
   const i=ARCHIVE.findIndex(x=>x.id===entry.id);
   if(i>=0) ARCHIVE[i]=entry; else ARCHIVE.unshift(entry);
   sset(KEY_ARCHIVE, ARCHIVE).catch(()=>{});
+  markDirty();
   closeModal(); renderAll(); toast('Карточка сохранена');
 }
 function delCard(id){
@@ -1034,13 +1124,14 @@ function delCard(id){
   if(b && !b.dataset.arm){ b.dataset.arm='1'; b.textContent='Точно удалить?'; return; }
   ARCHIVE=ARCHIVE.filter(x=>x.id!==id);
   sset(KEY_ARCHIVE, ARCHIVE).catch(()=>{});
+  markDirty();
   closeModal(); renderAll(); toast('Карточка удалена');
 }
 
 /* ---------- Поиск (архив + хронология) ---------- */
 let SF_RES=[];
 function toggleSearchBar(e){ if(e) e.stopPropagation();
-  const f=document.getElementById('searchFloat'), b=document.getElementById('botSearchBtn');
+  const f=document.getElementById('searchFloat'), b=document.getElementById('searchCircle');
   const open=!f.classList.contains('open');
   f.classList.toggle('open',open); if(b) b.classList.toggle('active',open);
   if(open){ const i=document.getElementById('searchM'); i.value=''; runSearch(''); setTimeout(()=>i.focus(),60); }
@@ -1073,9 +1164,101 @@ function sfOpen(i){
 }
 document.getElementById('searchM').addEventListener('input', e=>runSearch(e.target.value));
 
+/* ---------- Новости ---------- */
+function fmtDate(iso){
+  try{ return new Date(iso).toLocaleDateString('ru-RU',{day:'numeric',month:'long',year:'numeric'}); }
+  catch(e){ return ''; }
+}
+function renderNews(){
+  const w=document.getElementById('newsFeed'); if(!w) return;
+  const ab=document.getElementById('admNewsBar'); if(ab) ab.hidden=!ADMIN;
+  if(!NEWS.length){ w.innerHTML='<div class="empty">Новостей пока нет — но New-Liberty никогда не спит.</div>'; return; }
+  w.innerHTML=NEWS.map(n=>`
+    <article class="news-card" onclick="openNews('${n.id}')">
+      ${n.img?`<div class="nimg"><img src="${n.img}" alt=""></div>`:''}
+      <div class="nbody">
+        <h3>${esc(n.title)}</h3>
+        ${n.body?`<p>${esc(n.body.length>150?n.body.slice(0,150)+'…':n.body)}</p>`:''}
+        <time>${fmtDate(n.date)}</time>
+      </div>
+    </article>`).join('');
+}
+function openNews(id){
+  const n=NEWS.find(x=>x.id===id); if(!n) return;
+  const m=document.getElementById('modal');
+  m.innerHTML=`<button class="x" onclick="closeModal()">✕</button>
+    <div class="news-full">
+      ${n.img?`<div class="nimg-full"><img src="${n.img}" alt=""></div>`:''}
+      <div class="kicker" style="margin-bottom:6px">${fmtDate(n.date)}</div>
+      <h2 style="font-family:var(--f-disp);color:var(--txt);line-height:1.25;margin-bottom:12px">${esc(n.title)}</h2>
+      <div class="body" style="white-space:pre-wrap">${esc(n.body||'')}</div>
+      ${ADMIN?`<div class="chrono-tools"><button class="btn ghost" onclick="openNewsEditor('${n.id}')">Редактировать</button></div>`:''}
+    </div>`;
+  document.getElementById('scrim').classList.add('open');
+}
+let NEWS_IMG='';
+function openNewsEditor(id){
+  const n=id?NEWS.find(x=>x.id===id):null;
+  NEWS_IMG=(n&&n.img)||'';
+  const m=document.getElementById('modal');
+  m.innerHTML=`<button class="x" onclick="closeModal()">✕</button>
+    <h2 style="font-family:var(--f-disp);color:var(--txt);margin-bottom:14px">${n?'Новость':'Новая новость'}</h2>
+    <div class="field" id="nw-f-title"><label>Заголовок <span class="req">*</span></label><input id="nw-title" maxlength="120" value="${n?esc(n.title):''}"><div class="err">Укажите заголовок</div></div>
+    <div class="field"><label>Фото</label>
+      <div class="ce-imgrow">
+        <span class="ce-thumb" id="nwThumb">${NEWS_IMG?`<img src="${NEWS_IMG}">`:''}</span>
+        <button class="btn ghost" onclick="document.getElementById('nwFile').click()">Выбрать</button>
+        <button class="btn ghost" onclick="nwImgClear()">Убрать</button>
+      </div>
+      <input type="file" id="nwFile" accept="image/*" hidden onchange="nwImgPick(this)">
+    </div>
+    <div class="field"><label>Текст</label><textarea id="nw-body" rows="7">${n?esc(n.body||''):''}</textarea></div>
+    <div class="chrono-tools">
+      <button class="btn primary" onclick="saveNews(${n?`'${n.id}'`:'null'})">Опубликовать</button>
+      ${n?`<button class="btn danger" id="nwDel" onclick="delNews('${n.id}')">Удалить</button>`:''}
+    </div>`;
+  document.getElementById('scrim').classList.add('open');
+}
+function nwImgPick(inp){
+  const f=inp.files&&inp.files[0]; if(!f) return;
+  compressImage(f, 1280, 0.82).then(src=>{
+    NEWS_IMG=src; const t=document.getElementById('nwThumb'); if(t) t.innerHTML=`<img src="${NEWS_IMG}">`;
+  }).catch(()=>toast('⚠ Не удалось обработать фото'));
+  inp.value='';
+}
+function nwImgClear(){ NEWS_IMG=''; const t=document.getElementById('nwThumb'); if(t) t.innerHTML=''; }
+function saveNews(id){
+  const title=document.getElementById('nw-title').value.trim();
+  document.getElementById('nw-f-title').classList.toggle('invalid', !title);
+  if(!title) return;
+  const old=id?NEWS.find(x=>x.id===id):null;
+  const n={ id:id||('n'+Date.now().toString(36)), title, body:document.getElementById('nw-body').value.trim(), img:NEWS_IMG, date:(old&&old.date)||new Date().toISOString() };
+  const i=NEWS.findIndex(x=>x.id===n.id);
+  if(i>=0) NEWS[i]=n; else NEWS.unshift(n);
+  sset(KEY_NEWS, NEWS, false).catch(()=>{});
+  markDirty();
+  closeModal(); renderNews(); toast('Новость опубликована');
+}
+function delNews(id){
+  const b=document.getElementById('nwDel');
+  if(b && !b.dataset.arm){ b.dataset.arm='1'; b.textContent='Точно удалить?'; return; }
+  NEWS=NEWS.filter(x=>x.id!==id);
+  sset(KEY_NEWS, NEWS, false).catch(()=>{});
+  markDirty();
+  closeModal(); renderNews(); toast('Новость удалена');
+}
+
 /* ---------- Админ-режим ---------- */
-const KEY_CHRONO='comik:chrono:v1', ADM_PASS='Weeknd';
-let ADMIN=false, CHRONO_DATA={};
+const KEY_CHRONO='comik:chrono:v1', KEY_DIRTY='comik:dirty:v1', KEY_NEWS='comik:news:v1';
+const ADM_HASH='e2195ce5f8cd174ca97a75f7df4d6fdcbdc04d985b427954cbd76281ba52c28a';
+async function sha256(str){
+  const b=await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('');
+}
+let ADMIN=false, CHRONO_DATA={}, DIRTY=false, NEWS=[];
+function markDirty(){ DIRTY=true; sset(KEY_DIRTY, true, false).catch(()=>{}); updateDirtyBadge(); }
+function clearDirty(){ DIRTY=false; sset(KEY_DIRTY, false, false).catch(()=>{}); updateDirtyBadge(); }
+function updateDirtyBadge(){ const b=document.getElementById('admBtn'); if(b) b.classList.toggle('dirty', ADMIN && DIRTY); }
 function loadChronoEmbedded(){
   try{ CHRONO_DATA = JSON.parse(document.getElementById('chrono-data').textContent) || {}; }
   catch(e){ CHRONO_DATA = {}; }
@@ -1083,7 +1266,7 @@ function loadChronoEmbedded(){
 function admClick(){
   if(ADMIN){
     ADMIN=false; document.getElementById('admBtn').classList.remove('on');
-    applyView(); toast('Режим администратора выключен'); return;
+    applyView(); renderNews(); updateDirtyBadge(); toast('Режим администратора выключен'); return;
   }
   const m=document.getElementById('modal');
   m.innerHTML=`<button class="x" onclick="closeModal()">✕</button>
@@ -1093,11 +1276,14 @@ function admClick(){
   document.getElementById('scrim').classList.add('open');
   setTimeout(()=>{ const i=document.getElementById('admPass'); if(i){ i.focus(); i.onkeydown=e=>{ if(e.key==='Enter') admLogin(); }; } },60);
 }
-function admLogin(){
-  const i=document.getElementById('admPass');
-  if(i && i.value===ADM_PASS){
+async function admLogin(){
+  const i=document.getElementById('admPass'); if(!i) return;
+  let ok=false;
+  try{ ok = (await sha256(i.value))===ADM_HASH; }catch(e){ toast('⚠ Нужен HTTPS для входа'); return; }
+  if(ok){
     ADMIN=true; document.getElementById('admBtn').classList.add('on');
-    closeModal(); applyView(); toast('Режим администратора включён');
+    closeModal(); applyView(); renderNews(); updateDirtyBadge();
+    toast(DIRTY ? '⚠ Есть неопубликованные изменения — скачай index.html' : 'Режим администратора включён');
   } else toast('⚠ Неверный пароль');
 }
 
@@ -1117,12 +1303,36 @@ function openChronoBranch(camp,branch){
     <input type="file" id="chronoFile" accept="image/*" hidden onchange="chronoImgPick(this)">`:''}`;
   document.getElementById('scrim').classList.add('open');
 }
+function compressImage(file, maxDim, q){
+  maxDim=maxDim||1280; q=q||0.82;
+  return new Promise((res,rej)=>{
+    const r=new FileReader();
+    r.onerror=rej;
+    r.onload=()=>{
+      const img=new Image();
+      img.onload=()=>{
+        try{
+          const k=Math.min(1, maxDim/Math.max(img.width,img.height));
+          const w=Math.max(1,Math.round(img.width*k)), h=Math.max(1,Math.round(img.height*k));
+          const c=document.createElement('canvas'); c.width=w; c.height=h;
+          c.getContext('2d').drawImage(img,0,0,w,h);
+          res(c.toDataURL('image/jpeg', q));
+        }catch(e){ res(r.result); }
+      };
+      img.onerror=()=>res(r.result);
+      img.src=r.result;
+    };
+    r.readAsDataURL(file);
+  });
+}
 function chronoImg(){ const f=document.getElementById('chronoFile'); if(f) f.click(); }
 function chronoImgPick(inp){
   const f=inp.files && inp.files[0]; if(!f) return;
-  const r=new FileReader();
-  r.onload=()=>{ const b=document.getElementById('chronoBody'); if(b) b.insertAdjacentHTML('beforeend', `<figure><img src="${r.result}" alt=""><figcaption>ПОДПИСЬ</figcaption></figure><p><br></p>`); };
-  r.readAsDataURL(f); inp.value='';
+  compressImage(f).then(src=>{
+    const b=document.getElementById('chronoBody');
+    if(b) b.insertAdjacentHTML('beforeend', `<figure><img src="${src}" alt=""><figcaption>ПОДПИСЬ</figcaption></figure><p><br></p>`);
+  }).catch(()=>toast('⚠ Не удалось обработать фото'));
+  inp.value='';
 }
 function chronoSave(camp,branch){
   const b=document.getElementById('chronoBody'); if(!b) return;
@@ -1131,6 +1341,7 @@ function chronoSave(camp,branch){
   const html=clone.innerHTML.trim();
   if(html) CHRONO_DATA[camp+':'+branch]=html; else delete CHRONO_DATA[camp+':'+branch];
   sset(KEY_CHRONO, CHRONO_DATA, false).catch(()=>{});
+  markDirty();
   toast('Сохранено на этом устройстве');
 }
 async function exportSite(){
@@ -1149,6 +1360,7 @@ async function exportSite(){
     const a=document.createElement('a');
     a.href=URL.createObjectURL(blob); a.download='index.html';
     document.body.appendChild(a); a.click(); a.remove();
+    clearDirty();
     toast('Файл готов — загрузи его на GitHub');
   }catch(e){ toast('⚠ Экспорт не удался'); }
 }
@@ -1407,13 +1619,14 @@ function setProject(id){
   closeProjects();
 }
 function go(view){
-  ['archive','players','chrono'].forEach(v=>{
+  ['news','archive','players','chrono'].forEach(v=>{
     const el=document.getElementById('view-'+v); if(!el) return;
     el.classList.toggle('active', v===view);
   });
   document.querySelectorAll('[data-nav]').forEach(b=> b.classList.toggle('active', b.dataset.nav===view));
   closeProjects();
-  const sfl=document.getElementById('searchFloat'); if(sfl){ sfl.classList.remove('open'); const sb=document.getElementById('botSearchBtn'); if(sb) sb.classList.remove('active'); }
+  const sfl=document.getElementById('searchFloat'); if(sfl){ sfl.classList.remove('open'); const sb=document.getElementById('searchCircle'); if(sb) sb.classList.remove('active'); }
+  const df=document.getElementById('diceBtn'); if(df) df.classList.toggle('show', view==='players');
   const dm=document.getElementById('diceMenu'); if(dm){ dm.classList.remove('open'); const db=document.getElementById('diceBtn'); if(db) db.classList.remove('active'); }
   if(view==='players'){ renderPlayers(); ensurePlayersVisible(); }
   const av=document.getElementById('view-'+view); if(av) kickLayout(av);
