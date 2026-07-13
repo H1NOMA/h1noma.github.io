@@ -16,7 +16,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Cinzel+Decorative:wght@700;900&family=Inter:wght@400;500;600&family=Rajdhani:wght@500;600&family=Share+Tech+Mono&family=Uncial+Antiqua&display=swap" rel="stylesheet">
-<syle>
+<style>
   :root{
     --bg:#14151a; --bg2:#191b21; --surface:#1e2027; --surface2:#262933;
     --line:rgba(255,255,255,.09); --line2:rgba(255,255,255,.17);
@@ -243,7 +243,9 @@
   .splash{position:fixed;inset:0;z-index:300;background:var(--bg);display:flex;align-items:center;justify-content:center;transition:opacity .5s ease}
   .splash::before{content:"";position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(var(--accent-rgb),.05) 0 2px,transparent 2px 5px)}
   .splash.hide{opacity:0;pointer-events:none}
-  .splash-logo{width:min(76vw,420px);height:auto;filter:drop-shadow(0 0 18px rgba(var(--accent-rgb),.4));animation:splashLogo 1.9s steps(1,end) both}
+  .splash-fx{position:absolute;inset:0;pointer-events:none}
+  .splash-cv{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+  .splash-logo{width:min(76vw,420px);height:auto;animation:splashLogo 2.3s steps(1,end) both}
   @keyframes splashLogo{
     0%{opacity:0}
     4%{opacity:1;transform:translate(-6px,2px) skewX(4deg);filter:drop-shadow(-5px 0 #5ad0ff) drop-shadow(5px 0 var(--red))}
@@ -252,7 +254,7 @@
     13%{opacity:1;transform:none;clip-path:inset(0)}
     16%{opacity:.3;transform:skewX(-9deg)}
     19%{opacity:1;transform:translate(-4px,0);clip-path:inset(56% 0 10% 0);filter:drop-shadow(-4px 0 #5ad0ff) drop-shadow(4px 0 var(--red))}
-    23%{opacity:1;transform:none;clip-path:inset(0);filter:drop-shadow(0 0 18px rgba(var(--accent-rgb),.4))}
+    23%{opacity:1;transform:none;clip-path:inset(0);filter:none}
     42%{opacity:1}
     45%{opacity:.55;transform:translate(3px,0);clip-path:inset(28% 0 44% 0)}
     48%{opacity:1;transform:none;clip-path:inset(0)}
@@ -266,46 +268,65 @@
   }
   @media (prefers-reduced-motion: reduce){.splash-logo{animation:none;opacity:1}}
   /* --- заставка LEGACY: из тумана и лунного света --- */
-  [data-project="legacy"] .splash{background:radial-gradient(circle at 50% 32%, rgba(207,211,255,.16), transparent 48%), var(--bg)}
+  [data-project="legacy"] .splash{background:radial-gradient(circle at 50% 30%, rgba(207,211,255,.2), transparent 50%), var(--bg)}
   [data-project="legacy"] .splash::before{display:none}
-  [data-project="legacy"] .splash-logo{animation:splashMoon 2s ease both;clip-path:none}
+  [data-project="legacy"] .splash-logo{animation:splashMoon 2.3s ease both;clip-path:none}
   @keyframes splashMoon{
-    0%{opacity:0;transform:scale(1.05);filter:blur(18px) brightness(.3) saturate(.5)}
-    40%{opacity:.8;filter:blur(7px) brightness(.65) saturate(.8) drop-shadow(0 0 20px rgba(160,143,247,.35))}
-    72%{opacity:1;transform:none;filter:blur(0) brightness(1) drop-shadow(0 0 26px rgba(160,143,247,.55))}
-    88%{opacity:1;filter:blur(0) brightness(1.08) drop-shadow(0 0 30px rgba(160,143,247,.6))}
-    100%{opacity:0;filter:blur(3px) brightness(1.15) drop-shadow(0 0 32px rgba(160,143,247,.6))}
+    0%{opacity:.3;transform:scale(1.03);filter:brightness(.75) saturate(.75)}
+    20%{opacity:.85;transform:scale(1.015);filter:brightness(.95) saturate(.9)}
+    38%{opacity:1;transform:none;filter:brightness(1.12) saturate(1)}
+    100%{opacity:1;transform:none;filter:brightness(1.12) saturate(1)}
+  }
+  [data-project="legacy"] .splash-fx{background:
+      radial-gradient(90% 34% at 22% 62%, rgba(200,205,255,.16), transparent 70%),
+      radial-gradient(80% 30% at 78% 42%, rgba(190,196,255,.13), transparent 70%),
+      linear-gradient(180deg, transparent 30%, rgba(190,196,255,.06) 55%, transparent 80%);
+    animation:moonFog 2.3s ease both}
+  @keyframes moonFog{
+    0%{opacity:1;transform:translateX(0) scale(1.06)}
+    45%{opacity:.7;transform:translateX(-3%)}
+    100%{opacity:0;transform:translateX(-7%) scale(1)}
   }
   /* --- заставка NEVERLAND: золото, вбитое в камень, разгорается --- */
-  [data-project="neverland"] .splash{background:radial-gradient(circle at 50% 118%, rgba(232,192,82,.13), transparent 55%), #0b0906}
+  [data-project="neverland"] .splash{background:radial-gradient(circle at 50% 115%, rgba(232,192,82,.16), transparent 55%), #0d0a06}
   [data-project="neverland"] .splash::before{display:none}
-  [data-project="neverland"] .splash-logo{animation:splashStone 2s ease both;clip-path:none}
+  [data-project="neverland"] .splash-logo{animation:splashStone 2.3s ease both;clip-path:none}
   @keyframes splashStone{
-    0%{opacity:0;filter:brightness(.12) sepia(1) saturate(1.8) hue-rotate(-18deg) contrast(1.3)}
-    18%{opacity:1;filter:brightness(.26) sepia(1) saturate(2) hue-rotate(-18deg) contrast(1.3)}
-    46%{filter:brightness(.55) sepia(.95) saturate(2.2) hue-rotate(-16deg) drop-shadow(0 0 12px rgba(232,192,82,.3))}
-    56%{filter:brightness(.42) sepia(.95) saturate(2.1) hue-rotate(-16deg) drop-shadow(0 0 8px rgba(232,192,82,.22))}
-    72%{filter:brightness(.8) sepia(.85) saturate(2.3) hue-rotate(-15deg) drop-shadow(0 0 20px rgba(232,192,82,.5))}
-    88%{opacity:1;filter:brightness(1) sepia(.75) saturate(2.4) hue-rotate(-14deg) drop-shadow(0 0 28px rgba(232,192,82,.65))}
-    100%{opacity:0;filter:brightness(1.1) sepia(.7) saturate(2.4) hue-rotate(-14deg) drop-shadow(0 0 30px rgba(232,192,82,.7))}
+    0%{opacity:1;filter:grayscale(1) sepia(1) saturate(2.2) hue-rotate(-10deg) brightness(.4) contrast(1.35)}
+    22%{opacity:1;filter:grayscale(1) sepia(1) saturate(2.3) hue-rotate(-10deg) brightness(.55) contrast(1.3)}
+    40%{opacity:1;filter:grayscale(1) sepia(1) saturate(2.5) hue-rotate(-9deg) brightness(1) contrast(1.15)}
+    50%{opacity:1;filter:grayscale(1) sepia(1) saturate(2.4) hue-rotate(-9deg) brightness(.85) contrast(1.18)}
+    62%{opacity:1;filter:grayscale(1) sepia(1) saturate(2.7) hue-rotate(-8deg) brightness(1.18) contrast(1.08)}
+    100%{opacity:1;filter:grayscale(1) sepia(1) saturate(2.9) hue-rotate(-8deg) brightness(1.24) contrast(1.05)}
+  }
+  [data-project="neverland"] .splash-fx{
+    background:linear-gradient(115deg, transparent 32%, rgba(255,236,170,.55) 47%, rgba(255,252,230,1) 50%, rgba(255,236,170,.55) 53%, transparent 68%);
+    background-size:280% 100%;
+    animation:goldSweep 2.3s ease both;
+    mix-blend-mode:screen;
+    -webkit-mask-image:var(--logo-url);mask-image:var(--logo-url);
+    -webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;
+    -webkit-mask-position:center;mask-position:center;
+    -webkit-mask-size:min(76vw,420px) auto;mask-size:min(76vw,420px) auto}
+  @keyframes goldSweep{
+    0%,38%{background-position:130% 0;opacity:0}
+    46%{opacity:1}
+    72%{background-position:-40% 0;opacity:1}
+    82%{opacity:0}
+    100%{background-position:-60% 0;opacity:0}
   }
   /* --- заставка TERRA: название выжигается на бумаге --- */
-  [data-project="terra"] .splash{background:linear-gradient(180deg,#17140d,#0d0b07)}
+  [data-project="terra"] .splash{background:
+      radial-gradient(circle at 50% 40%, rgba(216,208,191,.06), transparent 55%),
+      linear-gradient(180deg,#191509,#0e0c07)}
   [data-project="terra"] .splash::before{display:none}
-  [data-project="terra"] .splash-logo{animation:splashBurn 2s ease both;clip-path:none;
-    -webkit-mask-image:linear-gradient(100deg,#000 40%,rgba(0,0,0,.5) 50%,transparent 60%);
-    mask-image:linear-gradient(100deg,#000 40%,rgba(0,0,0,.5) 50%,transparent 60%);
-    -webkit-mask-size:300% 100%;mask-size:300% 100%;
-    -webkit-mask-repeat:no-repeat;mask-repeat:no-repeat}
-  @keyframes splashBurn{
-    0%{opacity:1;-webkit-mask-position:135% 0;mask-position:135% 0;filter:sepia(.85) saturate(1.3) brightness(.8)}
-    12%{filter:sepia(.8) saturate(1.5) brightness(.9) drop-shadow(0 0 14px rgba(255,128,30,.75))}
-    45%{filter:sepia(.7) saturate(1.5) brightness(.95) drop-shadow(0 0 16px rgba(255,138,36,.65))}
-    72%{-webkit-mask-position:-35% 0;mask-position:-35% 0;filter:sepia(.6) brightness(1) drop-shadow(0 0 14px rgba(255,140,40,.45))}
-    86%{opacity:1;filter:sepia(.5) brightness(1.02) drop-shadow(0 0 16px rgba(216,208,191,.5))}
-    100%{opacity:0;-webkit-mask-position:-35% 0;mask-position:-35% 0;filter:sepia(.5) brightness(1.12)}
+  [data-project="terra"] .splash-logo{animation:splashAsh 2.3s ease both;clip-path:none}
+  @keyframes splashAsh{
+    0%{opacity:0;filter:sepia(.35) saturate(1.15) brightness(.95)}
+    30%{opacity:1;filter:sepia(.32) saturate(1.15) brightness(1.05)}
+    100%{opacity:1;filter:sepia(.3) saturate(1.1) brightness(1.08)}
   }
-  .dice-circle{position:fixed;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:60;width:58px;height:58px;border-radius:50%;border:var(--hair) solid var(--line2);background:var(--glass);backdrop-filter:blur(28px) saturate(180%);-webkit-backdrop-filter:blur(28px) saturate(180%);color:var(--dim);display:flex;align-items:center;justify-content:center;box-shadow:0 10px 34px rgba(0,0,0,.45),0 0 0 .5px rgba(255,255,255,.04) inset;cursor:pointer;transition:color .18s,transform .2s var(--spring)}
+.dice-circle{position:fixed;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:60;width:58px;height:58px;border-radius:50%;border:var(--hair) solid var(--line2);background:var(--glass);backdrop-filter:blur(28px) saturate(180%);-webkit-backdrop-filter:blur(28px) saturate(180%);color:var(--dim);display:flex;align-items:center;justify-content:center;box-shadow:0 10px 34px rgba(0,0,0,.45),0 0 0 .5px rgba(255,255,255,.04) inset;cursor:pointer;transition:color .18s,transform .2s var(--spring)}
   .dice-circle svg{width:26px;height:26px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
   .dice-circle:active{transform:scale(.9)}
   .dice-circle.active{color:var(--red)}
@@ -679,361 +700,13 @@
     .toast{bottom:26px}
   }
   @media(prefers-reduced-motion:reduce){*{animation:none !important;transition:none !important}}
-/* =========================
-   COMIK SPLASH ENGINE
-========================= */
-
-.splash{
-    position:fixed;
-    inset:0;
-    z-index:9999;
-    overflow:hidden;
-    background:#050507;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-}
-
-
-.splash-world{
-    position:absolute;
-    inset:-20%;
-    opacity:.8;
-}
-
-
-.splash-logo{
-    position:relative;
-    z-index:5;
-    width:min(70vw,420px);
-    opacity:0;
-    transform:scale(.85);
-    animation:
-    logoAppear 2.8s ease forwards;
-}
-
-
-@keyframes logoAppear{
-
-0%{
-opacity:0;
-filter:blur(20px);
-transform:scale(.8);
-}
-
-
-45%{
-opacity:.8;
-filter:blur(3px);
-}
-
-
-100%{
-opacity:1;
-filter:blur(0);
-transform:scale(1);
-}
-
-}
-
-
-/* LEGACY */
-
-[data-project="legacy"] .splash-world{
-
-background:
-radial-gradient(
-circle,
-rgba(160,143,247,.35),
-transparent 40%
-),
-radial-gradient(
-circle,
-rgba(90,208,255,.18),
-transparent 60%
-);
-
-animation:
-moonMist 8s infinite alternate;
-
-}
-
-
-@keyframes moonMist{
-
-from{
-transform:translate(-3%,0);
-}
-
-to{
-transform:translate(3%,4%);
-}
-
-}
-
-
-/* NEVERLAND */
-
-[data-project="neverland"] .splash-world{
-
-background:
-radial-gradient(
-circle,
-rgba(232,192,82,.35),
-transparent 30%
-),
-linear-gradient(
-120deg,
-transparent,
-rgba(232,192,82,.12)
-);
-
-animation:
-ancientGlow 6s infinite;
-
-}
-
-
-@keyframes ancientGlow{
-
-50%{
-filter:
-brightness(1.5)
-sepia(1);
-}
-
-}
-
-
-/* ASSIMILATION */
-
-[data-project="assimilation"] .splash-world{
-
-background:
-linear-gradient(
-90deg,
-transparent,
-rgba(90,208,255,.25),
-transparent
-);
-
-animation:
-glitchWorld .25s infinite;
-
-}
-
-
-@keyframes glitchWorld{
-
-50%{
-transform:
-translate(4px,-2px);
-}
-
-}
-
-
-/* TERRA */
-
-[data-project="terra"] .splash-world{
-
-background:
-
-radial-gradient(
-circle at 50%,
-rgba(255,220,150,.18),
-transparent 35%
-),
-linear-gradient(
-#1b1510,
-#050505
-);
-
-animation:
-oldPaper 10s infinite;
-
-}
-
-
-@keyframes oldPaper{
-
-50%{
-
-filter:
-sepia(.7)
-brightness(1.2);
-
-}
-
-}
-/* =========================
- COMIK SPLASH PARTICLES
-========================= */
-
-.splash-particles{
-    position:absolute;
-    inset:0;
-    z-index:2;
-    pointer-events:none;
-    overflow:hidden;
-}
-
-
-.comik-particle{
-    position:absolute;
-    width:5px;
-    height:5px;
-    border-radius:50%;
-    opacity:.7;
-    animation:
-    particleFloat linear infinite;
-}
-
-
-@keyframes particleFloat{
-
-0%{
-transform:
-translateY(110vh)
-scale(.5);
-
-opacity:0;
-}
-
-
-20%{
-opacity:1;
-}
-
-
-80%{
-opacity:.8;
-}
-
-
-100%{
-transform:
-translateY(-20vh)
-scale(1.3);
-
-opacity:0;
-}
-
-}
-
-
-/* LEGACY */
-
-[data-project="legacy"] .comik-particle{
-
-background:
-#9fdcff;
-
-box-shadow:
-0 0 12px #9fdcff,
-0 0 25px #a08ff7;
-
-}
-
-
-/* NEVERLAND */
-
-[data-project="neverland"] .comik-particle{
-
-background:
-#e8c052;
-
-box-shadow:
-0 0 10px #e8c052,
-0 0 20px #fff0a0;
-
-}
-
-
-/* ASSIMILATION */
-
-[data-project="assimilation"] .comik-particle{
-
-background:
-#5ad0ff;
-
-box-shadow:
-0 0 8px #5ad0ff;
-
-}
-
-
-/* TERRA */
-
-[data-project="terra"] .comik-particle{
-
-background:
-#d8d0bf;
-
-box-shadow:
-0 0 8px #d8d0bf;
-
-}
   </style>
 </head>
 <body>
-<script>try{var __p=JSON.parse(localStorage.getItem('comik:ui:project')||'"assimilation"');if(__p&&__p!=='assimilation')document.documentElement.setAttribute('data-project',__p);}catch(e){}/* =========================
-   COMIK SPLASH FX ENGINE
-========================= */
-
-function startSplashFX(){
-
-const project =
-document.documentElement
-.getAttribute("data-project")
-||
-"assimilation";
-
-
-const splash =
-document.getElementById("splash");
-
-
-if(!splash)return;
-
-
-splash.classList.add(
-"fx-"+project
-);
-
-
-setTimeout(()=>{
-
-splash.style.opacity="0";
-
-setTimeout(()=>{
-
-splash.remove();
-
-},900);
-
-
-},4200);
-
-}
-
-function createSplashParticles(){
-...
-}
-
-window.addEventListener(
-"load",
-()=>{
-
-startSplashFX();
-createSplashParticles();
-
-});</script>
+<script>try{var __p=JSON.parse(localStorage.getItem('comik:ui:project')||'"assimilation"');if(__p&&__p!=='assimilation')document.documentElement.setAttribute('data-project',__p);}catch(e){}</script>
 <div class="splash" id="splash" aria-hidden="true">
-  <div class="splash-world" id="splashWorld"></div>
-  <div class="splash-runes"></div>
-  <div class="splash-particles"></div>
   <img class="splash-logo" id="splashLogo" alt="КОМИК">
+  <span class="splash-fx" aria-hidden="true"></span>
 </div>
 
 <header>
@@ -1056,71 +729,122 @@ createSplashParticles();
     </button>
   </div>
 </header>
-<script>(function(){var k=document.querySelector('.komik'),l=document.getElementById('splashLogo');if(k&&l)l.src=k.src;})();
-/* =========================
- COMIK PARTICLE ENGINE
-========================= */
+<script>(function(){var k=document.querySelector('.komik'),l=document.getElementById('splashLogo');if(k&&l){l.src=k.src;document.documentElement.style.setProperty('--logo-url','url("'+k.src+'")');}})();</script>
+<script>
+(function(){
+  if(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  var sp=document.getElementById('splash'), img=document.getElementById('splashLogo');
+  if(!sp||!img) return;
+  var mode=document.documentElement.getAttribute('data-project')||'assimilation';
+  var cv=document.createElement('canvas'); cv.className='splash-cv';
+  var ctx=null; try{ ctx=cv.getContext('2d'); }catch(e){}
+  if(!ctx) return;
+  sp.insertBefore(cv, img); // canvas под логотипом
+  var W,H,dpr=Math.min(2, window.devicePixelRatio||1);
+  function size(){ W=sp.clientWidth; H=sp.clientHeight; cv.width=W*dpr; cv.height=H*dpr; ctx.setTransform(dpr,0,0,dpr,0,0); }
+  size();
+  var t0=performance.now(), stop=false, parts=[];
+  window.__splashStop=function(){ stop=true; try{cv.remove();}catch(e){} };
+  var R=Math.random;
 
+  /* ---- ASSIMILATION: сборка из пикселей ---- */
+  var assembling=false;
+  if(mode==='assimilation'){
+    var build=function(){
+      try{
+        var r=img.getBoundingClientRect(), sr=sp.getBoundingClientRect();
+        if(r.width<10){ setTimeout(build,40); return; }
+        var ox=r.left-sr.left, oy=r.top-sr.top;
+        var oc=document.createElement('canvas'), g=oc.getContext('2d');
+        oc.width=Math.round(r.width); oc.height=Math.round(r.height);
+        g.drawImage(img,0,0,oc.width,oc.height);
+        var data=g.getImageData(0,0,oc.width,oc.height).data, step=Math.max(3,Math.round(oc.width/150));
+        for(var y=0;y<oc.height;y+=step)for(var x=0;x<oc.width;x+=step){
+          var i=(y*oc.width+x)*4; if(data[i+3]<120) continue;
+          var col='rgb('+data[i]+','+data[i+1]+','+data[i+2]+')';
+          var ang=R()*6.283, dist=140+R()*Math.max(W,H)*0.5;
+          parts.push({tx:ox+x,ty:oy+y,x:ox+x+Math.cos(ang)*dist,y:oy+y+Math.sin(ang)*dist,c:col,d:R()*.35,s:step*(.8+R()*.4)});
+        }
+        assembling=true;
+        img.style.opacity='0';
+        img.style.animation='splashLogo 1.25s steps(1,end) 1.05s both';
+      }catch(e){ /* canvas недоступен — обычная заставка */ }
+    };
+    if(img.complete && img.naturalWidth) build(); else img.onload=build;
+  }
 
-function createSplashParticles(){
+  /* ---- прочие режимы: атмосферные частицы ---- */
+  var RUNES='ᚠᚢᚦᚨᚱᚲᚷᚹᛁᛃᛇᛉᛋᛏᛒᛖᛗᛚᛜᛞᛟ';
+  function spawnAtmo(){
+    var n,i;
+    if(mode==='legacy'){
+      for(i=0;i<70;i++) parts.push({k:'mote',x:R()*W,y:R()*H,vx:(R()-.5)*.12,vy:-(.06+R()*.16),r:.6+R()*1.6,a:.15+R()*.5,tw:R()*6.28,c:'190,200,255'});
+    }else if(mode==='neverland'){
+      for(i=0;i<80;i++) parts.push({k:'mote',x:R()*W,y:H*.35+R()*H*.65,vx:(R()-.5)*.1,vy:-(.1+R()*.22),r:.5+R()*1.4,a:.2+R()*.5,tw:R()*6.28,c:'232,192,82'});
+      for(i=0;i<9;i++) parts.push({k:'rune',x:W*.08+R()*W*.84,y:H*.25+R()*H*.6,vy:-.06-R()*.06,g:RUNES[Math.floor(R()*RUNES.length)],fs:16+R()*18,ph:R()*2.2,a:0});
+    }else if(mode==='terra'){
+      for(i=0;i<130;i++){
+        var tone=R()<.75?'214,204,186':'168,158,140';
+        parts.push({k:'ash',x:R()*W,y:R()*H,vx:.14+R()*.34,vy:.2+R()*.5,r:.5+R()*1.8,a:.14+R()*.42,tw:R()*6.28,c:tone});
+      }
+    }
+  }
+  if(mode!=='assimilation') spawnAtmo();
 
-const box =
-document.querySelector(
-".splash-particles"
-);
-
-
-if(!box)return;
-
-
-box.innerHTML="";
-
-
-for(let i=0;i<70;i++){
-
-const p=
-document.createElement("span");
-
-
-p.className=
-"comik-particle";
-
-
-p.style.left =
-Math.random()*100+"%";
-
-
-p.style.animationDuration =
-(5+Math.random()*8)+"s";
-
-
-p.style.animationDelay =
-(Math.random()*5)+"s";
-
-
-const size =
-2+Math.random()*6;
-
-
-p.style.width=size+"px";
-p.style.height=size+"px";
-
-
-box.appendChild(p);
-
-}
-
-}
-
-
-
-window.addEventListener(
-"load",
-()=>{
-
-createSplashParticles();
-
-});
+  function frame(now){
+    if(stop) return;
+    var t=(now-t0)/1000;
+    ctx.clearRect(0,0,W,H);
+    var i,p,k;
+    if(mode==='assimilation'){
+      if(assembling){
+        var T=Math.min(1,(t-0.05)/1.05);
+        for(i=0;i<parts.length;i++){
+          p=parts[i];
+          var e=Math.max(0,Math.min(1,(T-p.d)/(1-p.d))); e=1-Math.pow(1-e,3);
+          var x=p.x+(p.tx-p.x)*e, y=p.y+(p.ty-p.y)*e;
+          ctx.globalAlpha=Math.min(1,.15+e);
+          ctx.fillStyle=(e<.25&&R()<.06)?(R()<.5?'#5ad0ff':'#ff3340'):p.c;
+          ctx.fillRect(x,y,p.s,p.s);
+        }
+        ctx.globalAlpha=1;
+        if(t>1.18){ cv.style.transition='opacity .25s'; cv.style.opacity='0'; assembling=false; }
+      }
+    }else{
+      for(i=0;i<parts.length;i++){
+        p=parts[i]; k=p.k;
+        if(k==='mote'){
+          p.x+=p.vx; p.y+=p.vy; if(p.y<-4){p.y=H+4;p.x=R()*W}
+          ctx.globalAlpha=p.a*(0.55+0.45*Math.sin(t*2+p.tw));
+          ctx.fillStyle='rgba('+p.c+',1)'; ctx.shadowColor='rgba('+p.c+',.9)'; ctx.shadowBlur=6;
+          ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,6.283); ctx.fill(); ctx.shadowBlur=0;
+        }else if(k==='rune'){
+          p.y+=p.vy;
+          var life=Math.sin(Math.min(3.14, Math.max(0,(t-p.ph))/2.2*3.14));
+          if(t-p.ph>2.2){ p.ph=t+R()*.6; p.x=W*.08+R()*W*.84; p.y=H*.3+R()*H*.55; }
+          ctx.globalAlpha=Math.max(0,life)*.5;
+          ctx.font=p.fs+'px serif'; ctx.fillStyle='#e8c052'; ctx.shadowColor='rgba(232,192,82,.95)'; ctx.shadowBlur=14;
+          ctx.fillText(p.g,p.x,p.y); ctx.shadowBlur=0;
+        }else if(k==='ash'){
+          p.x+=p.vx+Math.sin(t*1.4+p.tw)*.12; p.y+=p.vy;
+          if(p.y>H+4){p.y=-4;p.x=R()*W} if(p.x>W+4)p.x=-4;
+          ctx.globalAlpha=p.a; ctx.fillStyle='rgba('+p.c+',1)';
+          ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,6.283); ctx.fill();
+        }else if(k==='smoke'){
+          p.x+=p.vx; if(p.x-p.r>W)p.x=-p.r;
+          var gr=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,p.r);
+          gr.addColorStop(0,'rgba(216,208,191,'+(p.a*(0.75+0.25*Math.sin(t+p.ph)))+')');
+          gr.addColorStop(1,'rgba(216,208,191,0)');
+          ctx.globalAlpha=1; ctx.fillStyle=gr;
+          ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,6.283); ctx.fill();
+        }
+      }
+      ctx.globalAlpha=1;
+    }
+    if(t<2.8) requestAnimationFrame(frame); else window.__splashStop();
+  }
+  requestAnimationFrame(frame);
+})();
 </script>
 <div id="plogo-templates" hidden aria-hidden="true">
 <div class="plogo p-legacy" role="button" tabindex="0">
@@ -1498,7 +1222,20 @@ async function ssetLocal(key,val, shared=SHARED){
 }
 
 /* ====================== Состояние ====================== */
-let ARCHIVE=[], CHARS=[], USERS=[], SESSION=null, activeCat='all', activeSub=null;
+let ARCHIVE_ALL={legacy:[],neverland:[],assimilation:[],terra:[]};
+let CHARS_ALL={legacy:[],neverland:[],assimilation:[],terra:[]};
+let ARCHIVE=ARCHIVE_ALL.assimilation, CHARS=CHARS_ALL.assimilation, USERS=[], SESSION=null, activeCat='all', activeSub=null;
+/* старый формат (просто массив) считаем данными ASSIMILATION */
+function normGameMap(v){
+  const empty={legacy:[],neverland:[],assimilation:[],terra:[]};
+  if(!v) return empty;
+  if(Array.isArray(v)) return Object.assign(empty,{assimilation:v});
+  return Object.assign(empty, v);
+}
+function bindGameData(){
+  ARCHIVE = ARCHIVE_ALL[CUR_PROJECT] || (ARCHIVE_ALL[CUR_PROJECT]=[]);
+  CHARS   = CHARS_ALL[CUR_PROJECT]   || (CHARS_ALL[CUR_PROJECT]=[]);
+}
 const uid = ()=> Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 const esc = s => String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const mergeById = (stored, local) => { const ids=new Set((stored||[]).map(x=>x&&x.id)); return (stored||[]).concat((local||[]).filter(x=>x&&!ids.has(x.id))); };
@@ -1517,10 +1254,13 @@ async function boot(){
   let embN=null; try{ embN=JSON.parse(document.getElementById('news-data').textContent); }catch(e){}
   NEWS = mergeById(nws||[], embN||[]);
   let embA=null; try{ embA=JSON.parse(document.getElementById('archive-data').textContent); }catch(e){}
-  if(arc===null){ arc = ((embA&&embA.length)?embA:SEED).slice(); sset(KEY_ARCHIVE, arc); }
-  else if(embA&&embA.length){ arc = mergeById(arc, embA); }
-  ARCHIVE = mergeById(arc, ARCHIVE);
-  CHARS = mergeById(chars || [], CHARS);
+  const arcMap=normGameMap(arc), embMap=normGameMap(embA), chMap=normGameMap(chars);
+  ['legacy','neverland','assimilation','terra'].forEach(g=>{
+    ARCHIVE_ALL[g] = mergeById(mergeById(arcMap[g], embMap[g]), ARCHIVE_ALL[g]);
+    CHARS_ALL[g]   = mergeById(chMap[g], CHARS_ALL[g]);
+  });
+  if(arc===null) sset(KEY_ARCHIVE, ARCHIVE_ALL);
+  bindGameData();
   USERS = users || [];
   SESSION = sess || null;
   if(SESSION && !USERS.some(u=>normTag(u.tag)===normTag(SESSION))) SESSION=null;
@@ -1743,7 +1483,7 @@ function saveCard(id){
   };
   const i=ARCHIVE.findIndex(x=>x.id===entry.id);
   if(i>=0) ARCHIVE[i]=entry; else ARCHIVE.unshift(entry);
-  sset(KEY_ARCHIVE, ARCHIVE).catch(()=>{});
+  sset(KEY_ARCHIVE, ARCHIVE_ALL).catch(()=>{});
   markDirty();
   closeModal(); renderAll(); toast('Карточка сохранена');
 }
@@ -1751,7 +1491,8 @@ function delCard(id){
   const b=document.getElementById('ceDel');
   if(b && !b.dataset.arm){ b.dataset.arm='1'; b.textContent='Точно удалить?'; return; }
   ARCHIVE=ARCHIVE.filter(x=>x.id!==id);
-  sset(KEY_ARCHIVE, ARCHIVE).catch(()=>{});
+  ARCHIVE_ALL[CUR_PROJECT]=ARCHIVE;
+  sset(KEY_ARCHIVE, ARCHIVE_ALL).catch(()=>{});
   markDirty();
   closeModal(); renderAll(); toast('Карточка удалена');
 }
@@ -2084,7 +1825,7 @@ async function exportSite(){
     src=src.replace(/<script id="news-data"[^>]*>[\s\S]*?<\/script>/, function(){
       return '<script id="news-data" type="application/json">'+jsonN+'<\/script>';
     });
-    const jsonA=JSON.stringify(ARCHIVE).replace(/</g,'\\u003c');
+    const jsonA=JSON.stringify(ARCHIVE_ALL).replace(/</g,'\\u003c');
     src=src.replace(/<script id="archive-data"[^>]*>[\s\S]*?<\/script>/, function(){
       return '<script id="archive-data" type="application/json">'+jsonA+'<\/script>';
     });
@@ -2255,7 +1996,7 @@ async function createPlayer(){
   closeModal(); go('players'); toast('Персонаж создан');
   ensurePlayersVisible();
   // сохранение — после отображения, чтобы сбой хранилища не блокировал UI
-  try{ const ok=await sset(KEY_CHARS, CHARS, false); if(!ok) toast('⚠ Не удалось сохранить — персонаж может исчезнуть после перезагрузки'); }catch(e){}
+  try{ const ok=await sset(KEY_CHARS, CHARS_ALL, false); if(!ok) toast('⚠ Не удалось сохранить — персонаж может исчезнуть после перезагрузки'); }catch(e){}
 }
 
 /* --- просмотр (всем доступен, только чтение) --- */
@@ -2323,7 +2064,7 @@ async function savePlayer(id){
     origin:pval('ep-origin'), level:pval('ep-level'), bio:pval('ep-bio'), gear:pval('ep-gear'),
     updatedAt:Date.now() });
   renderPlayers(); toast('Сохранено'); ensurePlayersVisible();
-  try{ const ok=await sset(KEY_CHARS, CHARS, false); if(!ok) toast('⚠ Не удалось сохранить изменения'); }catch(e){}
+  try{ const ok=await sset(KEY_CHARS, CHARS_ALL, false); if(!ok) toast('⚠ Не удалось сохранить изменения'); }catch(e){}
 }
 function confirmDeletePlayer(id){
   const el=document.querySelector('#modal .pacts');
@@ -2334,8 +2075,9 @@ function confirmDeletePlayer(id){
 async function deletePlayer(id){
   const c=CHARS.find(x=>x.id===id); if(c && !canEdit(c)){ toast('Нет прав на удаление'); return; }
   CHARS=CHARS.filter(x=>x.id!==id);
+  CHARS_ALL[CUR_PROJECT]=CHARS;
   renderPlayers(); closeModal(); toast('Персонаж удалён'); ensurePlayersVisible();
-  try{ await sset(KEY_CHARS, CHARS, false); }catch(e){}
+  try{ await sset(KEY_CHARS, CHARS_ALL, false); }catch(e){}
 }
 
 /* ====================== Навигация / тосты ====================== */
@@ -2420,7 +2162,8 @@ function setProject(id, silent, dir){
   document.documentElement.setAttribute('data-project', id);
   renderProjInd();
   applyGameHero();
-  if(typeof renderNews==='function') renderNews();
+  if(typeof bindGameData==='function'){ bindGameData(); if(typeof renderAll==='function') renderAll(); }
+  else if(typeof renderNews==='function') renderNews();
 }
 function stepProject(delta){
   const i=PROJECT_ORDER.indexOf(CUR_PROJECT);
@@ -2531,8 +2274,9 @@ function toast(msg){
 
 (function(){
   const sp=document.getElementById('splash');
+  if(window.__splashStop) try{ window.__splashStop(); }catch(e){}
   if(!sp) return;
-  const t = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches ? 500 : 1950;
+  const t = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches ? 500 : 2350;
   setTimeout(()=>{ sp.classList.add('hide'); setTimeout(()=>sp.remove(), 550); }, t);
 })();
 applyGameHero();
