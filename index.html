@@ -42,8 +42,8 @@
   }
   [data-project="neverland"]{
     --bg:#161207; --bg2:#1c170b; --surface:#221c0f; --surface2:#2b2314;
-    --red:#f4cf5c; --red-dim:#d9b447; --red-soft:rgba(244,207,92,.15);
-    --glow:rgba(244,207,92,.1); --header:rgba(22,18,7,.92); --accent-rgb:244,207,92;
+    --red:#ffd970; --red-dim:#e8c157; --red-soft:rgba(255,217,112,.16);
+    --glow:rgba(255,217,112,.12); --header:rgba(22,18,7,.92); --accent-rgb:255,217,112;
     --glass:rgba(28,23,11,.68); --glass2:rgba(37,30,15,.78);
   }
   [data-project="terra"]{
@@ -110,8 +110,8 @@
   .topnav{display:none}
 
   /* ---------- Bottom nav (mobile) ---------- */
-  .botnav{position:fixed;left:12px;right:80px;bottom:calc(10px + env(safe-area-inset-bottom));z-index:60;display:flex;background:var(--glass);backdrop-filter:blur(28px) saturate(180%);-webkit-backdrop-filter:blur(28px) saturate(180%);border:var(--hair) solid var(--line2);border-radius:26px;box-shadow:0 10px 34px rgba(0,0,0,.45),0 0 0 .5px rgba(255,255,255,.04) inset;max-width:520px;margin:0 auto;overflow:hidden}
-  .botnav button{flex:1;background:none;border:none;cursor:pointer;color:var(--dim);display:flex;align-items:center;justify-content:center;padding:13px 3px;position:relative;transition:color .18s,opacity .12s;min-width:0}
+  .botnav{position:fixed;left:12px;right:82px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:60;height:58px;display:flex;align-items:center;background:var(--glass);backdrop-filter:blur(28px) saturate(180%);-webkit-backdrop-filter:blur(28px) saturate(180%);border:var(--hair) solid var(--line2);border-radius:26px;box-shadow:0 10px 34px rgba(0,0,0,.45),0 0 0 .5px rgba(255,255,255,.04) inset;max-width:520px;margin:0 auto;overflow:hidden}
+  .botnav button{flex:1;height:100%;background:none;border:none;cursor:pointer;color:var(--dim);display:flex;align-items:center;justify-content:center;padding:0 3px;position:relative;transition:color .18s,opacity .12s;min-width:0}
   .botnav button:active{opacity:var(--press)}
   .botnav button svg{width:26px;height:26px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;transition:filter .18s}
   .botnav button .lbl{display:none}
@@ -142,6 +142,12 @@
   .cats h4::before,.cats h4::after{content:"";height:1px;flex:1}
   .cats h4::before{background:linear-gradient(90deg,transparent,rgba(var(--accent-rgb),.45))}
   .cats h4::after{background:linear-gradient(90deg,rgba(var(--accent-rgb),.45),transparent)}
+  .chrono-head{padding-left:0}
+  .chrono-head::before{display:none}
+  .chrono-head h1{display:flex;align-items:center;gap:14px;justify-content:center;text-align:center;font-size:clamp(1.4rem,6vw,1.9rem);text-shadow:0 0 16px rgba(var(--accent-rgb),.4)}
+  .chrono-head h1::before,.chrono-head h1::after{content:"";height:1px;flex:1;max-width:120px}
+  .chrono-head h1::before{background:linear-gradient(90deg,transparent,rgba(var(--accent-rgb),.5))}
+  .chrono-head h1::after{background:linear-gradient(90deg,rgba(var(--accent-rgb),.5),transparent)}
   .cat-wrap{display:flex;flex-wrap:wrap;justify-content:center;gap:8px}
   .cat{width:calc((100% - 16px)/3)}
   .cat{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;aspect-ratio:1/1;cursor:pointer;color:var(--dim);background:var(--surface);border:var(--hair) solid var(--line);font-family:var(--f-mono);letter-spacing:.03em;padding:8px 5px;border-radius:16px;text-transform:uppercase;text-align:center;transition:transform .2s var(--spring),background .15s,color .15s,border-color .15s,box-shadow .2s}
@@ -300,16 +306,16 @@
     100%{opacity:0;transform:translateX(-7%) scale(1)}
   }
   /* --- заставка NEVERLAND: золото, вбитое в камень, разгорается --- */
-  [data-project="neverland"] .splash{background:radial-gradient(circle at 50% 115%, rgba(232,192,82,.16), transparent 55%), #0d0a06}
+  [data-project="neverland"] .splash{background:radial-gradient(circle at 50% 115%, rgba(255,217,112,.2), transparent 55%), #0f0b06}
   [data-project="neverland"] .splash::before{display:none}
   [data-project="neverland"] .splash-logo{animation:splashStone 2.3s ease both;clip-path:none}
   @keyframes splashStone{
-    0%{opacity:1;filter:grayscale(1) sepia(1) saturate(2.2) hue-rotate(-10deg) brightness(.4) contrast(1.35)}
-    22%{opacity:1;filter:grayscale(1) sepia(1) saturate(2.3) hue-rotate(-10deg) brightness(.55) contrast(1.3)}
-    40%{opacity:1;filter:grayscale(1) sepia(1) saturate(2.5) hue-rotate(-9deg) brightness(1) contrast(1.15)}
-    50%{opacity:1;filter:grayscale(1) sepia(1) saturate(2.4) hue-rotate(-9deg) brightness(.85) contrast(1.18)}
-    62%{opacity:1;filter:grayscale(1) sepia(1) saturate(2.7) hue-rotate(-8deg) brightness(1.18) contrast(1.08)}
-    100%{opacity:1;filter:grayscale(1) sepia(1) saturate(2.9) hue-rotate(-8deg) brightness(1.24) contrast(1.05)}
+    0%{opacity:1;filter:grayscale(1) sepia(1) saturate(1.7) hue-rotate(-14deg) brightness(.52) contrast(1.3)}
+    22%{opacity:1;filter:grayscale(1) sepia(1) saturate(1.9) hue-rotate(-14deg) brightness(.66) contrast(1.24)}
+    40%{opacity:1;filter:grayscale(1) sepia(1) saturate(2.1) hue-rotate(-13deg) brightness(1.12) contrast(1.08)}
+    50%{opacity:1;filter:grayscale(1) sepia(1) saturate(2) hue-rotate(-13deg) brightness(.98) contrast(1.1)}
+    62%{opacity:1;filter:grayscale(1) sepia(1) saturate(2.3) hue-rotate(-12deg) brightness(1.32) contrast(1.02)}
+    100%{opacity:1;filter:grayscale(1) sepia(1) saturate(2.4) hue-rotate(-12deg) brightness(1.38) contrast(1)}
   }
   [data-project="neverland"] .splash-fx{
     background:linear-gradient(115deg, transparent 32%, rgba(255,236,170,.55) 47%, rgba(255,252,230,1) 50%, rgba(255,236,170,.55) 53%, transparent 68%);
@@ -536,7 +542,7 @@
   /* логотип в шапке — в тон заставке игры */
   .komik{transition:filter .35s ease;transform:translateY(2px)}
   [data-project="legacy"] .komik{filter:grayscale(1) sepia(1) saturate(3) hue-rotate(208deg) brightness(1.22)}
-  [data-project="neverland"] .komik{filter:grayscale(1) sepia(1) saturate(2.9) hue-rotate(-8deg) brightness(1.24) contrast(1.05)}
+  [data-project="neverland"] .komik{filter:grayscale(1) sepia(1) saturate(2.4) hue-rotate(-12deg) brightness(1.42) contrast(1)}
   [data-project="terra"] .komik{filter:sepia(.75) saturate(.9) brightness(.95) contrast(1.12)}
   /* ===== оформления игр ===== */
   /* LEGACY — лунно-таинственный */
@@ -579,6 +585,98 @@
   .hero-edit[hidden]{display:none !important}
   .hero-edit{position:absolute;top:10px;right:10px;z-index:3;width:34px;height:34px;border-radius:50%;border:var(--hair) solid var(--line2);background:var(--glass2);color:var(--dim);font-size:.85rem;cursor:pointer;display:flex;align-items:center;justify-content:center}
   .hero-edit:active{color:var(--red)}
+  /* ==== приветствие: рамки в духе эпохи (кроме ASSIMILATION) ==== */
+  #view-news .masthead{position:relative;isolation:isolate}
+
+  /* --- LEGACY — лунная скрижаль из тёмного камня --- */
+  [data-project="legacy"] #view-news .masthead{
+    border:none;border-radius:16px;padding:30px 28px 28px;
+    background:
+      radial-gradient(120% 90% at 50% -20%, rgba(150,140,235,.14), transparent 60%),
+      linear-gradient(180deg,#181528 0%,#12101d 100%);
+    box-shadow:0 18px 40px rgba(0,0,0,.5), inset 0 1px 0 rgba(190,182,255,.14);}
+  /* гравированная двойная рамка + засечки-руны по углам */
+  [data-project="legacy"] #view-news .masthead::before{content:"";position:absolute;inset:9px;border:1px solid rgba(168,158,235,.28);border-radius:10px;
+    box-shadow:inset 0 0 0 4px rgba(0,0,0,.25), inset 0 0 22px rgba(120,110,200,.12);pointer-events:none;z-index:-1}
+  [data-project="legacy"] #view-news .masthead::after{content:"";position:absolute;inset:9px;pointer-events:none;z-index:-1;
+    background:
+      linear-gradient(rgba(190,182,255,.5),rgba(190,182,255,.5)) left 3px top -1px/16px 1px no-repeat,
+      linear-gradient(rgba(190,182,255,.5),rgba(190,182,255,.5)) left -1px top 3px/1px 16px no-repeat,
+      linear-gradient(rgba(190,182,255,.5),rgba(190,182,255,.5)) right 3px top -1px/16px 1px no-repeat,
+      linear-gradient(rgba(190,182,255,.5),rgba(190,182,255,.5)) right -1px top 3px/1px 16px no-repeat,
+      linear-gradient(rgba(190,182,255,.5),rgba(190,182,255,.5)) left 3px bottom -1px/16px 1px no-repeat,
+      linear-gradient(rgba(190,182,255,.5),rgba(190,182,255,.5)) left -1px bottom 3px/1px 16px no-repeat,
+      linear-gradient(rgba(190,182,255,.5),rgba(190,182,255,.5)) right 3px bottom -1px/16px 1px no-repeat,
+      linear-gradient(rgba(190,182,255,.5),rgba(190,182,255,.5)) right -1px bottom 3px/1px 16px no-repeat}
+  [data-project="legacy"] #view-news .masthead h1{color:#dcd8ff;text-shadow:0 0 18px rgba(150,140,235,.45)}
+  [data-project="legacy"] #view-news .masthead p{font-family:var(--f-body);color:#c7c3e0;background:none;border:none;padding:0;margin-top:4px}
+  [data-project="legacy"] #view-news .masthead .rule{height:1px;width:64%;margin:14px auto 12px;border:none;
+    background:linear-gradient(90deg,transparent,rgba(168,158,235,.8),transparent);box-shadow:0 0 12px rgba(150,140,235,.5);-webkit-mask-image:none;mask-image:none}
+
+  /* --- NEVERLAND — древний свиток пергамента --- */
+  [data-project="neverland"] #view-news .masthead{
+    border:none;border-radius:3px;padding:34px 30px;margin:16px 6px 0;overflow:visible;
+    background:
+      radial-gradient(120% 55% at 50% 0%, rgba(150,116,52,.4), transparent 60%),
+      radial-gradient(62% 100% at 0% 50%, rgba(96,72,30,.5), transparent 34%),
+      radial-gradient(62% 100% at 100% 50%, rgba(96,72,30,.5), transparent 34%),
+      linear-gradient(180deg,#3a2f18,#2c2211);
+    box-shadow:inset 0 0 60px rgba(0,0,0,.42), 0 16px 34px rgba(0,0,0,.5)}
+  [data-project="neverland"] #view-news .masthead>*{position:relative;z-index:1}
+  /* витые золотые стержни свитка сверху и снизу */
+  [data-project="neverland"] #view-news .masthead::before,
+  [data-project="neverland"] #view-news .masthead::after{content:"";position:absolute;left:-8px;right:-8px;height:20px;z-index:2;
+    background:linear-gradient(180deg,#ffe9a6 0%,#e0b452 44%,#a5761f 100%);
+    box-shadow:0 3px 9px rgba(0,0,0,.5), inset 0 2px 0 rgba(255,248,214,.85), inset 0 -3px 6px rgba(70,48,14,.55);
+    border-radius:11px/50%}
+  [data-project="neverland"] #view-news .masthead::before{top:-11px}
+  [data-project="neverland"] #view-news .masthead::after{bottom:-11px}
+  [data-project="neverland"] #view-news .masthead h1{color:#ffe6a0;text-shadow:0 1px 0 #000, 0 0 20px rgba(244,207,92,.45)}
+  [data-project="neverland"] #view-news .masthead p{font-family:var(--f-body);color:#e6d3a6;background:none;border:none;padding:0;margin-top:6px}
+  [data-project="neverland"] #view-news .masthead .rule{height:11px;width:66%;margin:14px auto;border:none;-webkit-mask-image:none;mask-image:none;
+    background:radial-gradient(circle at 50% 50%, rgba(255,220,120,.95) 0 2px, transparent 2.6px) 50%/15px 11px repeat-x,
+               linear-gradient(90deg,transparent,rgba(255,220,120,.6) 22% 78%,transparent) center/100% 1px no-repeat}
+
+  /* --- TERRA — письмо начала XX века --- */
+  [data-project="terra"] #view-news .masthead{
+    border:1px solid rgba(150,128,88,.4);border-radius:2px;padding:30px 30px 26px;
+    background:
+      repeating-linear-gradient(0deg, transparent 0 28px, rgba(150,128,88,.09) 28px 29px),
+      radial-gradient(circle at 100% 0%, rgba(20,13,5,.6), transparent 20%),
+      radial-gradient(circle at 0% 100%, rgba(20,13,5,.5), transparent 22%),
+      linear-gradient(180deg,#221d13,#1b160e);
+    box-shadow:0 12px 26px rgba(0,0,0,.45), inset 0 0 40px rgba(120,90,45,.06);}
+  /* обугленные углы */
+  [data-project="terra"] #view-news .masthead::before{content:"";position:absolute;top:-1px;right:-1px;width:46px;height:46px;pointer-events:none;z-index:2;
+    background:radial-gradient(circle at 100% 0%, rgba(10,6,2,.92), rgba(48,30,12,.5) 48%, transparent 70%)}
+  [data-project="terra"] #view-news .masthead::after{content:"";position:absolute;bottom:-1px;left:-1px;width:40px;height:40px;pointer-events:none;z-index:2;
+    background:radial-gradient(circle at 0% 100%, rgba(10,6,2,.88), rgba(48,30,12,.45) 48%, transparent 70%)}
+  [data-project="terra"] #view-news .masthead h1{color:#e6dcc4;text-shadow:0 1px 0 rgba(0,0,0,.5)}
+  [data-project="terra"] #view-news .masthead p{font-family:Georgia,'Times New Roman',serif;font-style:italic;color:#cabfa4;background:none;border:none;border-left:2px solid rgba(200,180,140,.45);padding:2px 0 2px 13px;margin-top:8px}
+  [data-project="terra"] #view-news .masthead .rule{height:1px;width:60%;margin:14px 0 4px;border:none;border-top:1px dashed rgba(200,180,140,.6);-webkit-mask-image:none;mask-image:none;background:none;opacity:.85}
+
+
+  [data-project="legacy"] #view-news .masthead h1,
+  [data-project="neverland"] #view-news .masthead h1,
+  [data-project="terra"] #view-news .masthead h1{text-align:center}
+  [data-project="legacy"] #view-news .masthead .rule,
+  [data-project="neverland"] #view-news .masthead .rule,
+  [data-project="terra"] #view-news .masthead .rule{margin-left:auto;margin-right:auto}
+  /* ---- лист персонажа D&D ---- */
+  .sheet-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:2px 0 14px}
+  .sheet-stats .stat{display:flex;flex-direction:column;align-items:center;gap:4px;background:var(--surface);border:var(--hair) solid var(--line2);border-radius:12px;padding:9px 4px}
+  .sheet-stats .stat label{font-family:var(--f-mono);font-size:.54rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);text-align:center;line-height:1.2}
+  .sheet-stats .stat input{width:100%;border:none;background:none;text-align:center;font-family:var(--f-disp);font-weight:700;font-size:1.15rem;color:var(--txt)}
+  .sheet-stats .stat input:focus{outline:none}
+  .sheet-stats.view .stat .sv{font-family:var(--f-disp);font-weight:700;font-size:1.15rem;color:var(--txt)}
+  .abil-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:6px}
+  .abil{position:relative;display:flex;flex-direction:column;align-items:center;gap:2px;background:var(--surface);border:var(--hair) solid var(--line2);border-radius:12px;padding:9px 4px 7px}
+  .abil-l{font-family:var(--f-mono);font-size:.56rem;letter-spacing:.12em;color:var(--muted)}
+  .abil-i{width:100%;border:none;background:none;text-align:center;font-family:var(--f-disp);font-weight:700;font-size:1.35rem;color:var(--txt)}
+  .abil-i:focus{outline:none}
+  .abil-v{font-family:var(--f-disp);font-weight:700;font-size:1.35rem;color:var(--txt);line-height:1.1}
+  .abil-m{font-family:var(--f-mono);font-size:.72rem;color:var(--red);min-height:1em}
+  .abil-grid.view .abil-m{color:var(--red)}
   /* лента новостей */
   .news-feed{display:flex;flex-direction:column;gap:12px;margin-top:16px}
   .news-card{background:var(--surface);border:var(--hair) solid var(--line);border-radius:16px;overflow:hidden;cursor:pointer;transition:transform .2s var(--spring)}
@@ -800,7 +898,7 @@
       var MAG=['176,148,255','120,200,255','255,150,225'];
       for(i=0;i<85;i++) parts.push({k:'mote',x:R()*W,y:R()*H,vx:(R()-.5)*.14,vy:-(.07+R()*.2),r:.6+R()*1.8,a:.25+R()*.55,tw:R()*6.28,c:MAG[Math.floor(R()*3)]});
     }else if(mode==='neverland'){
-      for(i=0;i<80;i++) parts.push({k:'mote',x:R()*W,y:H*.35+R()*H*.65,vx:(R()-.5)*.1,vy:-(.1+R()*.22),r:.5+R()*1.4,a:.2+R()*.5,tw:R()*6.28,c:'232,192,82'});
+      for(i=0;i<80;i++) parts.push({k:'mote',x:R()*W,y:H*.35+R()*H*.65,vx:(R()-.5)*.1,vy:-(.1+R()*.22),r:.5+R()*1.4,a:.28+R()*.55,tw:R()*6.28,c:'255,222,130'});
       for(i=0;i<9;i++) parts.push({k:'rune',x:W*.08+R()*W*.84,y:H*.25+R()*H*.6,vy:-.06-R()*.06,g:RUNES[Math.floor(R()*RUNES.length)],fs:16+R()*18,ph:R()*2.2,a:0});
     }else if(mode==='terra'){
       for(i=0;i<130;i++){
@@ -1042,9 +1140,8 @@
 
   <!-- CHRONO -->
   <section id="view-chrono" class="view">
-    <div class="masthead" style="margin-bottom:18px">
-      <h1 style="font-size:1.7rem">Хронология</h1>
-      <div class="rule"></div>
+    <div class="masthead chrono-head" style="margin-bottom:18px">
+      <h1>Хронология</h1>
     </div>
     <div class="chrono-list" id="chrono-list"></div>
   </section>
@@ -1107,7 +1204,7 @@
   <div class="sf-results" id="sfResults"></div>
   <div class="sf-row">
     <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
-    <input id="searchM" type="search" placeholder="ПИШИ ЗАЕБАЛ" autocomplete="off">
+    <input id="searchM" type="search" placeholder="" autocomplete="off">
   </div>
 </div>
 
@@ -1257,19 +1354,23 @@ const mem = {};
 // страховка: если асинхронный мост хранилища зависнет, промис резолвится сам через таймаут
 const withTimeout = (p, ms=1500) => Promise.race([p, new Promise(res=>setTimeout(()=>res(undefined), ms))]);
 /* ====================== Supabase (заполни URL и KEY — и сайт переедет в облако) ====================== */
-const SUPA_URL = '';   // например: https://abcdefg.supabase.co
-const SUPA_KEY = '';   // anon public key из настроек проекта
+const SUPA_URL = 'https://xstrdpoxwbkbumigspdv.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhzdHJkcG94d2JrYnVtaWdzcGR2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQwMjg1ODIsImV4cCI6MjA5OTYwNDU4Mn0.En-AP7WJh8AZkylbM44yhhJyNcFf0-ra6M3Yu8ZxAhs';
 let supa = null;
 
 async function initSupa(){
   if(!SUPA_URL || !SUPA_KEY) return false;
   try{
-    await new Promise((res,rej)=>{
-      const sc=document.createElement('script');
-      sc.src='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
-      sc.onload=res; sc.onerror=rej;
-      document.head.appendChild(sc);
-    });
+    await Promise.race([
+      new Promise((res,rej)=>{
+        const sc=document.createElement('script');
+        sc.src='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
+        sc.onload=res; sc.onerror=rej;
+        document.head.appendChild(sc);
+      }),
+      new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')), 5000))
+    ]);
+    if(!window.supabase) throw new Error('no lib');
     supa = window.supabase.createClient(SUPA_URL, SUPA_KEY);
     return true;
   }catch(e){ console.warn('Supabase недоступен, работаем локально', e); supa=null; return false; }
@@ -2060,37 +2161,94 @@ function ensurePlayersVisible(){
   }));
 }
 
+
+/* ---------- Конфиг листа персонажа по играм ---------- */
+const ABIL=[['str','СИЛ'],['dex','ЛОВ'],['con','ТЕЛ'],['int','ИНТ'],['wis','МДР'],['cha','ХАР']];
+const ABIL_ASSIM=[['str','МОЩ'],['dex','РЕФ'],['con','КОРП'],['int','ИНТЕЛ'],['wis','ВОСП'],['cha','ИМИДЖ']];
+function abilList(){ return CUR_PROJECT==='assimilation'?ABIL_ASSIM:ABIL; }
+const SHEET_L={
+  default:{ cls:'Класс', race:'Раса', bg:'Предыстория', align:'Мировоззрение',
+    hp:'Хиты', ac:'КБ', speed:'Скорость', init:'Инициатива', prof:'Бонус мастерства',
+    feats:'Умения и черты', spells:'Заклинания', gear:'Снаряжение', bio:'Предыстория и заметки' },
+  assimilation:{ cls:'Класс', race:'Модель/происхождение', bg:'Биография', align:'Репутация',
+    hp:'Хиты', ac:'Броня', speed:'Скорость', init:'Реакция', prof:'Бонус навыка',
+    feats:'Импланты и перки', spells:'Программы/взлом', gear:'Снаряжение и гир', bio:'Легенда и заметки' }
+};
+function sheetL(){ return SHEET_L[CUR_PROJECT==='assimilation'?'assimilation':'default']; }
+function mod(score){ const n=parseInt(score,10); if(isNaN(n)) return ''; const m=Math.floor((n-10)/2); return (m>=0?'+':'')+m; }
+
 /* --- создание --- */
 function openNewPlayer(){
   if(!SESSION){ toast('Сначала войдите в аккаунт'); openAuth('login'); return; }
+  const L=sheetL();
   document.getElementById('modal').innerHTML = `
     <button class="x" onclick="closeModal()" aria-label="Закрыть">✕</button>
-    <div class="top">${rune('character',24)}<span class="clabel">Новый персонаж · ${esc(dispTag(SESSION))}</span></div>
+    <div class="top">${rune('character',24)}<span class="clabel">Новый лист · ${esc(dispTag(SESSION))}</span></div>
     <h2>Создать персонажа</h2>
-    <div class="field" id="np-f-name"><label>Имя персонажа <span class="req">*</span></label><input id="np-name" maxlength="60"><div class="err">// укажите имя персонажа</div></div>
+    <div class="field" id="np-f-name"><label>Имя персонажа <span class="req">*</span></label><input id="np-name" maxlength="60"></div>
     <div class="field"><label>Игрок</label><input id="np-player" maxlength="40" value="${esc(dispTag(SESSION))}"></div>
     <div class="row">
-      <div class="field"><label>Класс / роль</label><input id="np-role" maxlength="50"></div>
-      <div class="field"><label>Происхождение</label><input id="np-origin" maxlength="50"></div>
+      <div class="field"><label>${L.cls}</label><input id="np-role" maxlength="50"></div>
+      <div class="field"><label>${L.race}</label><input id="np-origin" maxlength="50"></div>
     </div>
-    <div class="field"><label>Уровень</label><input id="np-level" maxlength="12" placeholder="напр. 1"></div>
-    <div class="field"><label>Предыстория / описание</label><textarea id="np-bio" maxlength="2000"></textarea></div>
-    <div class="field"><label>Снаряжение и заметки</label><textarea id="np-gear" maxlength="2000"></textarea></div>
+    <div class="row">
+      <div class="field"><label>${L.bg}</label><input id="np-bg" maxlength="50"></div>
+      <div class="field"><label>${L.align}</label><input id="np-align" maxlength="40"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label>Уровень</label><input id="np-level" maxlength="12" placeholder="1" inputmode="numeric"></div>
+      <div class="field"><label>${L.prof}</label><input id="np-prof" maxlength="8" placeholder="+2"></div>
+    </div>
+    ${sheetStatsBlock('np')}
+    ${sheetAbilBlock('np', {})}
+    <div class="field"><label>${L.feats}</label><textarea id="np-feats" maxlength="2000"></textarea></div>
+    ${CUR_PROJECT!=='terra'?`<div class="field"><label>${L.spells}</label><textarea id="np-spells" maxlength="2000"></textarea></div>`:''}
+    <div class="field"><label>${L.gear}</label><textarea id="np-gear" maxlength="2000"></textarea></div>
+    <div class="field"><label>${L.bio}</label><textarea id="np-bio" maxlength="2000"></textarea></div>
     <div class="pacts"><button class="btn primary" onclick="createPlayer()">Создать</button><button class="btn ghost" onclick="closeModal()">Отмена</button></div>
-    <p class="note">// лист привязывается к вашему аккаунту ${esc(dispTag(SESSION))} — редактировать сможете только вы (пока вошли под этим тегом).</p>`;
+    <p class="note">Лист привязывается к вашему аккаунту ${esc(dispTag(SESSION))} — редактировать сможете только вы.</p>`;
   document.getElementById('scrim').classList.add('open');
+  bindAbilMods('np');
 }
+function sheetStatsBlock(p, c){
+  c=c||{}; const L=sheetL();
+  return `<div class="sheet-stats">
+    <div class="stat"><label>${L.hp}</label><input id="${p}-hp" maxlength="9" value="${esc(c.hp||'')}"></div>
+    <div class="stat"><label>${L.ac}</label><input id="${p}-ac" maxlength="5" value="${esc(c.ac||'')}"></div>
+    <div class="stat"><label>${L.speed}</label><input id="${p}-speed" maxlength="8" value="${esc(c.speed||'')}"></div>
+    <div class="stat"><label>${L.init}</label><input id="${p}-init" maxlength="6" value="${esc(c.init||'')}"></div>
+  </div>`;
+}
+function sheetAbilBlock(p, ab){
+  ab=ab||{};
+  return `<div class="field"><label>Характеристики</label>
+    <div class="abil-grid">${abilList().map(([k,lbl])=>`
+      <div class="abil"><span class="abil-l">${lbl}</span>
+        <input id="${p}-ab-${k}" class="abil-i" maxlength="2" inputmode="numeric" value="${esc((ab[k]!=null?ab[k]:''))}">
+        <span class="abil-m" id="${p}-mod-${k}">${ab[k]!=null?mod(ab[k]):'—'}</span>
+      </div>`).join('')}</div>
+  </div>`;
+}
+function bindAbilMods(p){
+  abilList().forEach(([k])=>{ const inp=pf(p+'-ab-'+k), out=document.getElementById(p+'-mod-'+k);
+    if(inp&&out){ inp.addEventListener('input',()=>{ out.textContent=inp.value.trim()?mod(inp.value):'—'; }); }
+  });
+}
+function collectAbil(p){ const o={}; abilList().forEach(([k])=>{ const v=pval(p+'-ab-'+k); if(v) o[k]=v; }); return o; }
 async function createPlayer(){
   if(!SESSION){ toast('Сначала войдите в аккаунт'); openAuth('login'); return; }
   const name=pval('np-name'); let player=pval('np-player');
   pf('np-f-name').classList.toggle('invalid', !name); if(!name) return;
   if(!player) player=dispTag(SESSION);
   const ch={ id:uid(), name, player, owner:SESSION,
-    role:pval('np-role'), origin:pval('np-origin'), level:pval('np-level'),
+    role:pval('np-role'), origin:pval('np-origin'), bg:pval('np-bg'), align:pval('np-align'),
+    level:pval('np-level'), prof:pval('np-prof'),
+    hp:pval('np-hp'), ac:pval('np-ac'), speed:pval('np-speed'), init:pval('np-init'),
+    abil:collectAbil('np'), feats:pval('np-feats'), spells:pval('np-spells'),
     bio:pval('np-bio'), gear:pval('np-gear'),
     fields:{}, createdAt:Date.now(), updatedAt:Date.now() };
   CHARS.push(ch);
-  ['np-name','np-player','np-role','np-origin','np-level','np-bio','np-gear'].forEach(i=>{ const e=pf(i); if(e) e.value=''; });
+  
   closeModal(); go('players'); toast('Персонаж создан');
   ensurePlayersVisible();
   // сохранение — после отображения, чтобы сбой хранилища не блокировал UI
@@ -2101,7 +2259,13 @@ async function createPlayer(){
 function kv(k,v){ return v ? `<div class="kv"><div class="k">${k}</div><div class="v">${esc(v)}</div></div>` : ''; }
 function openPlayer(id){
   const c=CHARS.find(x=>x.id===id); if(!c) return;
-  const meta=[c.role?`<span class="subtag">${esc(c.role)}</span>`:'', c.origin?`<span class="tag">${esc(c.origin)}</span>`:'', c.level?`<span class="tag">ур. ${esc(c.level)}</span>`:''].join('');
+  const L=sheetL();
+  const meta=[c.role?`<span class="subtag">${esc(c.role)}</span>`:'', c.origin?`<span class="tag">${esc(c.origin)}</span>`:'', c.level?`<span class="tag">ур. ${esc(c.level)}</span>`:'', c.align?`<span class="tag">${esc(c.align)}</span>`:''].join('');
+  const stats=[[L.hp,c.hp],[L.ac,c.ac],[L.speed,c.speed],[L.init,c.init],[L.prof,c.prof]].filter(x=>x[1]);
+  const statsHtml = stats.length?`<div class="sheet-stats view">${stats.map(x=>`<div class="stat"><label>${x[0]}</label><div class="sv">${esc(x[1])}</div></div>`).join('')}</div>`:'';
+  const ab=c.abil||{};
+  const abilHtml = Object.keys(ab).length?`<div class="abil-grid view">${abilList().map(([k,lbl])=>`
+    <div class="abil"><span class="abil-l">${lbl}</span><span class="abil-v">${ab[k]!=null&&ab[k]!==''?esc(ab[k]):'—'}</span><span class="abil-m">${ab[k]?mod(ab[k]):''}</span></div>`).join('')}</div>`:'';
   let editBlock;
   if(isOwner(c)){
     editBlock = `<div class="unlock"><button class="btn primary" onclick="renderPlayerEditor('${c.id}')">Редактировать</button></div>`;
@@ -2118,8 +2282,13 @@ function openPlayer(id){
     <div class="top">${rune('character',24)}<span class="clabel">Игрок: ${esc(c.player)}</span></div>
     <h2>${esc(c.name)}</h2>
     ${meta?`<div class="pmeta">${meta}</div>`:''}
-    ${kv('Предыстория / описание', c.bio)}
-    ${kv('Снаряжение и заметки', c.gear)}
+    ${statsHtml}
+    ${abilHtml}
+    ${c.bg?kv(L.bg, c.bg):''}
+    ${kv(L.feats, c.feats)}
+    ${kv(L.spells, c.spells)}
+    ${kv(L.gear, c.gear)}
+    ${kv(L.bio, c.bio)}
     ${editBlock}`;
   document.getElementById('scrim').classList.add('open');
 }
@@ -2134,6 +2303,7 @@ function tryEditPlayer(id){
 function renderPlayerEditor(id){
   const c=CHARS.find(x=>x.id===id); if(!c) return;
   if(!canEdit(c)){ toast('Редактировать может только владелец'); return; }
+  const L=sheetL();
   document.getElementById('modal').innerHTML = `
     <button class="x" onclick="closeModal()" aria-label="Закрыть">✕</button>
     <div class="top">${rune('character',24)}<span class="clabel">Редактирование</span></div>
@@ -2141,17 +2311,29 @@ function renderPlayerEditor(id){
     <div class="field"><label>Имя персонажа</label><input id="ep-name" maxlength="60" value="${esc(c.name)}"></div>
     <div class="field"><label>Игрок</label><input id="ep-player" maxlength="40" value="${esc(c.player)}"></div>
     <div class="row">
-      <div class="field"><label>Класс / роль</label><input id="ep-role" maxlength="50" value="${esc(c.role||'')}"></div>
-      <div class="field"><label>Происхождение</label><input id="ep-origin" maxlength="50" value="${esc(c.origin||'')}"></div>
+      <div class="field"><label>${L.cls}</label><input id="ep-role" maxlength="50" value="${esc(c.role||'')}"></div>
+      <div class="field"><label>${L.race}</label><input id="ep-origin" maxlength="50" value="${esc(c.origin||'')}"></div>
     </div>
-    <div class="field"><label>Уровень</label><input id="ep-level" maxlength="12" value="${esc(c.level||'')}"></div>
-    <div class="field"><label>Предыстория / описание</label><textarea id="ep-bio" maxlength="2000">${esc(c.bio||'')}</textarea></div>
-    <div class="field"><label>Снаряжение и заметки</label><textarea id="ep-gear" maxlength="2000">${esc(c.gear||'')}</textarea></div>
+    <div class="row">
+      <div class="field"><label>${L.bg}</label><input id="ep-bg" maxlength="50" value="${esc(c.bg||'')}"></div>
+      <div class="field"><label>${L.align}</label><input id="ep-align" maxlength="40" value="${esc(c.align||'')}"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label>Уровень</label><input id="ep-level" maxlength="12" value="${esc(c.level||'')}" inputmode="numeric"></div>
+      <div class="field"><label>${L.prof}</label><input id="ep-prof" maxlength="8" value="${esc(c.prof||'')}"></div>
+    </div>
+    ${sheetStatsBlock('ep', c)}
+    ${sheetAbilBlock('ep', c.abil||{})}
+    <div class="field"><label>${L.feats}</label><textarea id="ep-feats" maxlength="2000">${esc(c.feats||'')}</textarea></div>
+    ${CUR_PROJECT!=='terra'?`<div class="field"><label>${L.spells}</label><textarea id="ep-spells" maxlength="2000">${esc(c.spells||'')}</textarea></div>`:''}
+    <div class="field"><label>${L.gear}</label><textarea id="ep-gear" maxlength="2000">${esc(c.gear||'')}</textarea></div>
+    <div class="field"><label>${L.bio}</label><textarea id="ep-bio" maxlength="2000">${esc(c.bio||'')}</textarea></div>
     <div class="pacts">
       <button class="btn primary" onclick="savePlayer('${c.id}')">Сохранить</button>
       <button class="btn ghost" onclick="openPlayer('${c.id}')">Назад</button>
       <button class="btn danger" onclick="confirmDeletePlayer('${c.id}')">Удалить</button>
     </div>`;
+  bindAbilMods('ep');
 }
 async function savePlayer(id){
   const c=CHARS.find(x=>x.id===id); if(!c) return;
@@ -2159,7 +2341,11 @@ async function savePlayer(id){
   const name=pval('ep-name'); if(!name){ toast('Имя персонажа не может быть пустым'); return; }
   const i=CHARS.findIndex(x=>x.id===id); if(i<0) return;
   Object.assign(CHARS[i], { name, player:pval('ep-player'), role:pval('ep-role'),
-    origin:pval('ep-origin'), level:pval('ep-level'), bio:pval('ep-bio'), gear:pval('ep-gear'),
+    origin:pval('ep-origin'), bg:pval('ep-bg'), align:pval('ep-align'),
+    level:pval('ep-level'), prof:pval('ep-prof'),
+    hp:pval('ep-hp'), ac:pval('ep-ac'), speed:pval('ep-speed'), init:pval('ep-init'),
+    abil:collectAbil('ep'), feats:pval('ep-feats'), spells:pval('ep-spells'),
+    bio:pval('ep-bio'), gear:pval('ep-gear'),
     updatedAt:Date.now() });
   renderPlayers(); toast('Сохранено'); ensurePlayersVisible();
   try{ const ok=await sset(KEY_CHARS, CHARS_ALL, false); if(!ok) toast('⚠ Не удалось сохранить изменения'); }catch(e){}
