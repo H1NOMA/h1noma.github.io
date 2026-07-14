@@ -353,7 +353,7 @@
   .dice-circle:active{transform:scale(.9)}
   .dice-circle.active{color:var(--red)}
   .dice-circle.active svg{filter:drop-shadow(0 0 7px rgba(var(--accent-rgb),.7))}
-  @media(min-width:880px){.dice-circle{display:none}}
+
   .dice-menu{position:fixed;right:12px;bottom:calc(12px + 58px + 10px + 58px + 10px + env(safe-area-inset-bottom));z-index:65;display:flex;flex-direction:column;gap:8px;align-items:flex-end;pointer-events:none}
   @media(min-width:880px){.dice-menu,.dice-calc{display:none !important}}
   .dice-menu .dice-opt{opacity:0;transform:translateY(14px) scale(.85);transition:opacity .18s,transform .28s var(--spring)}
@@ -428,7 +428,7 @@
   .adm-btn svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
   .adm-btn.on.dirty::after{content:"";position:absolute;top:-3px;right:-3px;width:11px;height:11px;border-radius:50%;background:var(--red);box-shadow:0 0 9px rgba(var(--accent-rgb),.9);border:2px solid var(--bg)}
   .adm-btn.on{color:var(--red);border-color:rgba(var(--accent-rgb),.55);box-shadow:0 0 12px rgba(var(--accent-rgb),.35)}
-  @media(min-width:880px){.adm-btn{margin-left:12px;order:4}}
+  @media(min-width:880px){.adm-btn{position:absolute;right:20px;top:50%;transform:translateY(-50%);order:0;width:48px;height:48px}}
   .chrono-body{color:var(--dim);font-size:.95rem;line-height:1.65;overflow-wrap:anywhere}
   .chrono-body img{display:block;width:calc(100% + 36px);max-width:none;margin:16px -18px;border-radius:0;
     -webkit-mask-image:linear-gradient(180deg,transparent 0,#000 14%,#000 86%,transparent 100%);
@@ -485,7 +485,7 @@
   .sf-row input{width:100%;padding:13px 16px 13px 42px;border:none;background:none;color:var(--txt);font-family:var(--f-mono);font-size:16px;letter-spacing:.02em}
   .sf-row input:focus{outline:none}
   .sf-row input::placeholder{color:var(--muted)}
-  @media(min-width:880px){.search-float{display:none !important}}
+
   /* HUD-скобки на листе досье */
   .dos-sheet{position:relative}
   .dos-sheet::before,.dos-sheet::after{content:"";position:absolute;width:14px;height:14px;border:2px solid rgba(var(--accent-rgb),.55);pointer-events:none}
@@ -544,6 +544,69 @@
   [data-project="legacy"] .komik{filter:grayscale(1) sepia(1) saturate(3) hue-rotate(208deg) brightness(1.22)}
   [data-project="neverland"] .komik{filter:grayscale(1) sepia(1) saturate(2.4) hue-rotate(-12deg) brightness(1.42) contrast(1)}
   [data-project="terra"] .komik{filter:sepia(.75) saturate(.9) brightness(.95) contrast(1.12)}
+  /* ======== ЧАТ ======== */
+  .chat-wrap{max-width:680px;margin:0 auto;display:flex;flex-direction:column;height:calc(100dvh - 210px);min-height:320px}
+  .chat-log{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding:4px 2px 14px}
+  .chat-empty{margin:auto;text-align:center;color:var(--muted);font-family:var(--f-mono);font-size:.76rem;letter-spacing:.05em;line-height:1.7}
+  .msg{max-width:82%;display:flex;flex-direction:column;gap:3px}
+  .msg.me{align-self:flex-end;align-items:flex-end}
+  .msg .who{font-family:var(--f-mono);font-size:.6rem;letter-spacing:.1em;color:var(--muted);padding:0 4px}
+  .msg .who b{color:var(--red);font-weight:600}
+  .bubble{background:var(--surface);border:var(--hair) solid var(--line2);border-radius:16px;padding:9px 13px;color:var(--txt);font-size:.94rem;line-height:1.5;word-wrap:break-word;overflow-wrap:anywhere;white-space:pre-wrap}
+  .msg.me .bubble{background:var(--red-soft);border-color:rgba(var(--accent-rgb),.4)}
+  .msg .bubble .mention{color:var(--red);font-weight:600}
+  .msg .bubble .mention.you{background:rgba(var(--accent-rgb),.18);border-radius:5px;padding:0 3px}
+  .msg .tm{font-family:var(--f-mono);font-size:.54rem;color:var(--muted);opacity:.7;padding:0 4px}
+  .chat-ref{display:flex;align-items:center;gap:8px;margin-top:7px;background:var(--bg2);border:var(--hair) solid var(--line2);border-left:2px solid var(--red);border-radius:9px;padding:7px 9px;cursor:pointer}
+  .chat-ref .rk{font-family:var(--f-mono);font-size:.54rem;letter-spacing:.12em;text-transform:uppercase;color:var(--red)}
+  .chat-ref .rt{font-size:.82rem;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .chat-ref svg{width:15px;height:15px;flex:0 0 auto;stroke:var(--red);fill:none;stroke-width:1.7}
+  .chat-gate{padding:14px;text-align:center;color:var(--muted);font-family:var(--f-mono);font-size:.74rem;letter-spacing:.03em}
+  .chat-gate .btn{margin-top:10px}
+  .chat-compose{position:relative;border-top:var(--hair) solid var(--line);padding-top:10px}
+  .chat-inrow{display:flex;align-items:flex-end;gap:8px}
+  .chat-inrow textarea{flex:1;resize:none;max-height:120px;background:var(--surface);border:var(--hair) solid var(--line2);border-radius:20px;color:var(--txt);font-family:var(--f-body);font-size:16px;line-height:1.4;padding:11px 15px}
+  .chat-inrow textarea:focus{outline:none;border-color:rgba(var(--accent-rgb),.5)}
+  .chat-clip,.chat-send{flex:0 0 auto;width:42px;height:42px;border-radius:50%;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center}
+  .chat-clip{background:var(--surface);border:var(--hair) solid var(--line2);color:var(--dim)}
+  .chat-clip svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  .chat-send{background:var(--red);color:#0b0b0e}
+  .chat-send svg{width:19px;height:19px;fill:currentColor}
+  .chat-send:active,.chat-clip:active{transform:scale(.9)}
+  .chat-suggest{position:absolute;left:0;right:0;bottom:calc(100% + 6px);background:var(--glass2);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:var(--hair) solid var(--line2);border-radius:14px;overflow:hidden;box-shadow:0 12px 30px rgba(0,0,0,.5);max-height:180px;overflow-y:auto;z-index:5}
+  .chat-suggest button{display:block;width:100%;text-align:left;background:none;border:none;padding:11px 14px;color:var(--txt);font-family:var(--f-mono);font-size:.82rem;cursor:pointer}
+  .chat-suggest button:active,.chat-suggest button.sel{background:var(--red-soft);color:var(--red)}
+  .chat-attach{display:flex;align-items:center;gap:9px;margin-bottom:9px;background:var(--bg2);border:var(--hair) solid var(--line2);border-left:2px solid var(--red);border-radius:9px;padding:8px 10px}
+  .chat-attach .rk{font-family:var(--f-mono);font-size:.54rem;letter-spacing:.12em;text-transform:uppercase;color:var(--red)}
+  .chat-attach .rt{flex:1;font-size:.84rem;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .chat-attach .rx{background:none;border:none;color:var(--muted);cursor:pointer;font-size:1rem;flex:0 0 auto}
+  @media(min-width:880px){ .chat-wrap{height:calc(100dvh - 210px)} }
+  .acc-tabs{display:flex;gap:6px;margin-bottom:16px;background:var(--bg2);border-radius:12px;padding:4px}
+  .acc-tab{flex:1;background:none;border:none;cursor:pointer;color:var(--muted);font-family:var(--f-mono);font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;padding:9px;border-radius:9px;transition:.15s}
+  .acc-tab.on{background:var(--surface);color:var(--red);box-shadow:inset 0 0 0 1px rgba(var(--accent-rgb),.3)}
+  .acc-me{text-align:center;padding:10px 0}
+  .acc-tag{font-family:var(--f-disp);font-weight:700;font-size:1.3rem;color:var(--red)}
+  .chat-rooms{max-width:680px;margin:0 auto}
+  .room-row{position:relative;display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:var(--surface);border:var(--hair) solid var(--line2);border-radius:14px;padding:15px 16px;margin-bottom:10px;cursor:pointer;transition:transform .15s var(--spring),border-color .15s}
+  .room-row:active{transform:scale(.99)}
+  .room-row.open{border-color:rgba(var(--accent-rgb),.3)}
+  .room-ic{flex:0 0 auto;width:22px;height:22px;color:var(--muted)}
+  .room-row.open .room-ic{color:var(--red)}
+  .room-ic svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+  .room-name{flex:1;color:var(--txt);font-family:var(--f-disp);font-weight:600;font-size:1rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .room-edit{flex:0 0 auto;color:var(--muted);font-size:1.05rem;padding:2px 6px;border-radius:6px}
+  .room-edit:active{color:var(--red)}
+  .room-arr{flex:0 0 auto;color:var(--muted);font-size:1.4rem;line-height:1}
+  .chat-room{max-width:680px;margin:0 auto;display:flex;flex-direction:column}
+  .chat-back{align-self:flex-start;display:flex;align-items:center;gap:6px;background:none;border:none;color:var(--dim);font-family:var(--f-mono);font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;padding:2px 2px 10px}
+  .chat-back svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .msg-del{color:var(--muted);opacity:.6;cursor:pointer;font-size:.55rem;margin-left:6px}
+  .msg-del:active{color:var(--red)}
+  .at-list{max-height:46vh;overflow-y:auto;display:flex;flex-direction:column;gap:6px}
+  .at-item{display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;text-align:left;background:var(--surface);border:var(--hair) solid var(--line2);border-radius:10px;padding:11px 13px;cursor:pointer}
+  .at-item:active{background:var(--red-soft)}
+  .at-item .at-t{color:var(--txt);font-size:.9rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .at-item .at-c{font-family:var(--f-mono);font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);flex:0 0 auto}
   /* ===== оформления игр ===== */
   /* LEGACY — лунно-таинственный */
   [data-project="legacy"] #view-news .masthead{background:
@@ -800,18 +863,29 @@
     .brand .komik{height:30px}
     .brand .vr{height:30px}
     .lock .project{font-size:1.22rem;letter-spacing:.3em}
-    .topnav{display:flex;gap:2px;order:3;margin-left:auto;margin-right:56px}
-    .lock{max-width:300px}
-    .topnav button{appearance:none;border:none;cursor:pointer;background:transparent;color:var(--dim);font-family:var(--f-mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;padding:10px 11px 8px;border-bottom:2px solid transparent;transition:.15s;display:flex;align-items:center;gap:7px}
-    .topnav button:hover{color:var(--txt)}
-    .topnav button.active{color:var(--red);border-bottom-color:var(--red)}
-    .botnav{display:none}
-    main{padding:30px 20px 70px}
-    footer{padding:30px 20px 50px}
+    .lock{max-width:340px}
+    /* текстовое меню в шапке скрыто — используем вертикальный правый бар */
+    .topnav{display:none}
+    /* вертикальный бар справа, закреплён под иконкой доступа */
+    .botnav{display:flex;flex-direction:column;align-items:center;justify-content:center;
+      left:auto;right:16px;top:84px;bottom:auto;width:56px;height:auto;
+      border-radius:28px;padding:8px 0;gap:4px;max-width:none;margin:0}
+    .botnav button{flex:0 0 auto;width:100%;height:50px;padding:0}
+    .botnav button svg{width:25px;height:25px}
+    .botnav button.active{color:var(--red)}
+    .botnav button.active::before{content:"";position:absolute;left:6px;top:50%;transform:translateY(-50%);width:3px;height:20px;border-radius:2px;background:var(--red);box-shadow:0 0 8px rgba(var(--accent-rgb),.6)}
+    /* поиск — кружком под баром */
+    .dice-circle{display:flex !important;left:auto;right:20px;top:auto;bottom:24px;width:48px;height:48px}
+    .search-float{display:flex !important;left:auto;right:84px;bottom:24px;width:340px;max-width:340px}
+    main{padding:30px 84px 70px 20px}
+    footer{padding:30px 84px 50px 20px}
     .masthead{margin-bottom:28px}
     .grid{display:grid;grid-template-columns:218px 1fr;gap:28px;align-items:start}
     .cats{position:sticky;top:92px;margin-bottom:0}
     .sub.active{border:none}
+    /* хронология: вертикальный столбец кампаний по центру */
+    #view-chrono{max-width:720px;margin:0 auto}
+    .chrono-list{max-width:none}
     .scrim{align-items:flex-start;padding:6vh 20px}
     .modal{max-width:620px;border-radius:14px;max-height:none;padding:30px}
     .toast{bottom:26px}
@@ -839,6 +913,7 @@
       <button data-nav="archive" onclick="go('archive')">Архив</button>
       <button data-nav="players" onclick="go('players')">Игроки</button>
       <button data-nav="chrono" onclick="go('chrono')">Хронология</button>
+      <button data-nav="chat" onclick="go('chat')">Чат</button>
     </nav>
     <button class="adm-btn" id="admBtn" onclick="admClick()" aria-label="Уровень доступа" title="Уровень доступа">
       <svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2.5"/><path d="M8 11V7.5a4 4 0 0 1 8 0V11M12 14.5v2"/></svg>
@@ -1157,6 +1232,33 @@
     </div>
     <div class="players-list" id="players-list"></div>
   </section>
+
+  <!-- CHAT -->
+  <section id="view-chat" class="view">
+    <div class="masthead chrono-head" id="chatHead" style="margin-bottom:14px"><h1>Чаты</h1></div>
+
+    <div class="chat-rooms" id="chatRooms">
+      <div id="chatRoomsAdm" hidden style="margin-bottom:12px"><button class="btn primary" style="width:100%" onclick="openRoomEditor()">+ Создать чат</button></div>
+      <div id="chatRoomsList"></div>
+    </div>
+
+    <div class="chat-room" id="chatRoom" hidden>
+      <button class="chat-back" onclick="backToRooms()"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg> Все чаты</button>
+      <div class="chat-wrap">
+        <div class="chat-log" id="chatLog"></div>
+        <div class="chat-gate" id="chatGate"></div>
+        <div class="chat-compose" id="chatCompose" hidden>
+          <div class="chat-attach" id="chatAttach" hidden></div>
+          <div class="chat-suggest" id="chatSuggest" hidden></div>
+          <div class="chat-inrow">
+            <button class="chat-clip" onclick="openAttachPicker()" aria-label="Прикрепить из архива"><svg viewBox="0 0 24 24"><path d="M21 11.5l-8.5 8.5a5 5 0 01-7-7l8.5-8.5a3.3 3.3 0 014.7 4.7l-8.5 8.5a1.6 1.6 0 01-2.3-2.3l7.8-7.8"/></svg></button>
+            <textarea id="chatInput" rows="1" maxlength="1200" placeholder="Сообщение… (@тег — упоминание)" oninput="onChatInput(this)" onkeydown="chatKey(event)"></textarea>
+            <button class="chat-send" onclick="sendChat()" aria-label="Отправить"><svg viewBox="0 0 24 24"><path d="M4 12l16-7-7 16-2.5-6.5L4 12z"/></svg></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
 </main>
 
 <div class="dice-result" id="diceResult" onclick="this.classList.remove('show')"></div>
@@ -1190,6 +1292,10 @@
   <button data-nav="chrono" onclick="go('chrono')">
     <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>
     <span class="lbl">Хронология</span>
+  </button>
+  <button data-nav="chat" onclick="go('chat')">
+    <svg viewBox="0 0 24 24"><path d="M4 5.5h16v10H9l-4 3.5v-3.5H4z"/></svg>
+    <span class="lbl">Чат</span>
   </button>
 </nav>
 
@@ -1347,7 +1453,7 @@ const SEED = [];
 const STORY = [];
 
 /* ====================== Хранилище (общее, с откатом в память) ====================== */
-const SHARED = true, KEY_ARCHIVE='comik:archive:v1', KEY_CHARS='comik:chars:v1', KEY_USERS='comik:users:v1', KEY_SESSION='comik:session:v1';
+const SHARED = true, KEY_ARCHIVE='comik:archive:v1', KEY_CHARS='comik:chars:v1', KEY_USERS='comik:users:v1', KEY_SESSION='comik:session:v1', KEY_CHAT='comik:chat:v1';
 const hasLS = (()=>{ try{ const k='__comik_test__'; localStorage.setItem(k,'1'); localStorage.removeItem(k); return true; }catch(e){ return false; } })();
 const hasStore = (typeof window!=='undefined' && window.storage && typeof window.storage.get==='function');
 const mem = {};
@@ -1389,22 +1495,24 @@ async function cloudSet(key,val){
 }
 
 async function sget(key, shared=SHARED){
-  if(supa){
+  // общие данные (архив, новости, аккаунты, персонажи) — из облака; личные (сессия, тема, доступы) — только локально
+  if(supa && shared){
     try{
       const v = await withTimeout(cloudGet(key), 4000);
-      if(v!==undefined) return v;  // undefined = таймаут, идём в локалку
-    }catch(e){ /* облако молчит — падаем на локалку */ }
+      if(v!==undefined) return v;  // undefined = таймаут → локальный кэш
+    }catch(e){ /* облако молчит — локальный кэш */ }
   }
   return sgetLocal(key, shared);
 }
 async function sset(key,val, shared=SHARED){
-  let cloudOk=false;
-  if(supa){
+  if(supa && shared){
+    let cloudOk=false;
     try{ cloudOk = await withTimeout(cloudSet(key,val), 4000); }
     catch(e){ toast('⚠ Облако недоступно — сохранено локально'); }
+    await ssetLocal(key,val,shared); // локальное зеркало для офлайна
+    return cloudOk;
   }
-  const localOk = await ssetLocal(key,val,shared);
-  return cloudOk || localOk;
+  return ssetLocal(key,val,shared); // личные данные не уходят в облако
 }
 
 async function sgetLocal(key, shared=SHARED){
@@ -1444,9 +1552,11 @@ async function boot(){
   await initSupa();
   // все ключи читаются параллельно: быстрее и один таймаут не тянет за собой остальные
   let [arc, chars, users, sess, chr, dirty, nws, acc, hero] = await Promise.all([
-    sget(KEY_ARCHIVE), sget(KEY_CHARS, false), sget(KEY_USERS, false), sget(KEY_SESSION, false), sget(KEY_CHRONO, false), sget(KEY_DIRTY, false), sget(KEY_NEWS, false), sget(KEY_ACCESS, false), sget(KEY_HERO, false)
+    sget(KEY_ARCHIVE, true), sget(KEY_CHARS, true), sget(KEY_USERS, true), sget(KEY_SESSION, false), sget(KEY_CHRONO, true), sget(KEY_DIRTY, false), sget(KEY_NEWS, true), sget(KEY_ACCESS, false), sget(KEY_HERO, true)
   ]);
   loadChronoEmbedded();
+  try{ const cr=await sget(KEY_CHATROOMS, true); if(cr && typeof cr==='object') CHATROOMS_ALL=Object.assign({legacy:[],neverland:[],assimilation:[],terra:[]}, cr); }catch(e){}
+  try{ const ca=await sget(KEY_CHATACCESS, false); if(ca && typeof ca==='object') CHAT_ACCESS=ca; }catch(e){}
   if(chr) CHRONO_DATA = Object.assign(CHRONO_DATA, chr);
   DIRTY = !!dirty;
   try{ const pj=await sget('comik:ui:project', false); if(pj && pj!=='assimilation') setProject(pj, true); }catch(e){}
@@ -1806,7 +1916,7 @@ function saveNews(id){
   const n={ id:id||('n'+Date.now().toString(36)), title, body:document.getElementById('nw-body').value.trim(), img:NEWS_IMG, date:(old&&old.date)||new Date().toISOString() };
   const i=NEWS.findIndex(x=>x.id===n.id);
   if(i>=0) NEWS[i]=n; else NEWS.unshift(n);
-  sset(KEY_NEWS, NEWS, false).catch(()=>{});
+  sset(KEY_NEWS, NEWS, true).catch(()=>{});
   markDirty();
   closeModal(); renderNews(); toast('Новость опубликована');
 }
@@ -1814,7 +1924,7 @@ function delNews(id){
   const b=document.getElementById('nwDel');
   if(b && !b.dataset.arm){ b.dataset.arm='1'; b.textContent='Точно удалить?'; return; }
   NEWS=NEWS.filter(x=>x.id!==id);
-  sset(KEY_NEWS, NEWS, false).catch(()=>{});
+  sset(KEY_NEWS, NEWS, true).catch(()=>{});
   markDirty();
   closeModal(); renderNews(); toast('Новость удалена');
 }
@@ -1918,19 +2028,58 @@ function admClick(){
   }
   openAccessModal();
 }
-function openAccessModal(hint){
+function openAccessModal(hint, tab){
+  tab = tab || 'access';
   const rows=['legacy','neverland','assimilation','terra'].map(c=>
     `<div class="acc-row${ACCESS[c]?' ok':''}"><span>${CHRONO_NAMES[c]}</span><span class="st">${ACCESS[c]?'ОТКРЫТО':'ЗАКРЫТО'}</span></div>`).join('');
+  const accessPane = `<div class="acc-list">${rows}</div>
+    <div class="field" style="margin-top:14px"><label>Пароль доступа</label><input type="password" id="admPass" autocomplete="off"></div>
+    <button class="btn primary" style="width:100%;margin-top:14px" onclick="admLogin()">Ввести</button>`;
+  let accountPane;
+  if(SESSION){
+    accountPane = `<div class="acc-me"><div class="kicker" style="margin-bottom:4px">Вы вошли как</div><div class="acc-tag">${esc(dispTag(SESSION))}</div></div>
+      <button class="btn ghost" style="width:100%;margin-top:14px" onclick="logout();closeModal()">Выйти из аккаунта</button>`;
+  } else {
+    accountPane = `<div class="field" id="au-f-tag"><label>Telegram-тег <span class="req">*</span></label>
+        <input id="au-tag" maxlength="34" placeholder="@username" autocapitalize="off" autocomplete="username" spellcheck="false"><div class="err">Тег: 5–32 символа — латиница, цифры или _</div></div>
+      <div class="field" id="au-f-pass"><label>Пароль <span class="req">*</span></label>
+        <input id="au-pass" type="password" maxlength="100" autocomplete="current-password" onkeydown="if(event.key==='Enter')authSubmit()"><div class="err">Минимум 4 символа</div></div>
+      <div class="field" id="au-f-pass2" hidden><label>Повторите пароль <span class="req">*</span></label>
+        <input id="au-pass2" type="password" maxlength="100" autocomplete="new-password" onkeydown="if(event.key==='Enter')authSubmit()"><div class="err">Пароли не совпадают</div></div>
+      <button class="btn primary" style="width:100%;margin-top:6px" id="auSubmit" onclick="authSubmit()">Войти</button>
+      <button class="btn ghost" style="width:100%;margin-top:8px" id="auToggle" onclick="toggleAuthMode()">Создать аккаунт</button>
+      <p class="note" style="margin-top:10px">Вход по тегу и паролю работает на любом устройстве. Тег не связан с настоящим Telegram — не используйте здесь важный пароль.</p>`;
+  }
   const m=document.getElementById('modal');
   m.innerHTML=`<button class="x" onclick="closeModal()">✕</button>
-    <h2 style="font-family:var(--f-disp);color:var(--txt);margin-bottom:6px">Уровень доступа</h2>
+    <div class="acc-tabs">
+      <button class="acc-tab${tab==='access'?' on':''}" onclick="switchAccTab('access')">Доступ</button>
+      <button class="acc-tab${tab==='account'?' on':''}" onclick="switchAccTab('account')">Аккаунт</button>
+    </div>
     ${hint?`<p class="note" style="margin-bottom:10px">${hint}</p>`:''}
-    <div class="acc-list">${rows}</div>
-    <div class="field" style="margin-top:14px"><label>Пароль</label><input type="password" id="admPass" autocomplete="off"></div>
-    <button class="btn primary" style="width:100%;margin-top:14px" onclick="admLogin()">Ввести</button>`;
+    <div id="accPane-access" ${tab==='access'?'':'hidden'}>${accessPane}</div>
+    <div id="accPane-account" ${tab==='account'?'':'hidden'}>${accountPane}</div>`;
   document.getElementById('scrim').classList.add('open');
-  setTimeout(()=>{ const i=document.getElementById('admPass'); if(i){ i.focus(); i.onkeydown=e=>{ if(e.key==='Enter') admLogin(); }; } },60);
+  AUTH_MODE='login';
+  setTimeout(()=>{
+    if(tab==='access'){ const i=document.getElementById('admPass'); if(i){ i.focus(); i.onkeydown=e=>{ if(e.key==='Enter') admLogin(); }; } }
+    else { const t=pf('au-tag'); if(t) t.focus(); }
+  },60);
 }
+function switchAccTab(tab){
+  ['access','account'].forEach(t=>{ const p=document.getElementById('accPane-'+t); if(p) p.hidden=(t!==tab); document.querySelectorAll('.acc-tab')[t==='access'?0:1]?.classList.toggle('on', t===tab); });
+  setTimeout(()=>{ const el=tab==='access'?document.getElementById('admPass'):pf('au-tag'); if(el) el.focus(); },30);
+}
+let AUTH_MODE='login';
+function toggleAuthMode(){
+  AUTH_MODE = AUTH_MODE==='login'?'register':'login';
+  const reg=AUTH_MODE==='register';
+  const p2=document.getElementById('au-f-pass2'); if(p2) p2.hidden=!reg;
+  const sb=document.getElementById('auSubmit'); if(sb) sb.textContent=reg?'Зарегистрироваться':'Войти';
+  const tg=document.getElementById('auToggle'); if(tg) tg.textContent=reg?'У меня есть аккаунт':'Создать аккаунт';
+  const pw=pf('au-pass'); if(pw) pw.setAttribute('autocomplete', reg?'new-password':'current-password');
+}
+function authSubmit(){ if(AUTH_MODE==='register') doRegister(); else doLogin(); }
 async function admLogin(){
   const i=document.getElementById('admPass'); if(!i) return;
   let h='';
@@ -2004,7 +2153,7 @@ function chronoSave(camp,branch){
   clone.querySelectorAll('figcaption').forEach(fc=>{ const t=fc.textContent.trim(); if(!t || t==='ПОДПИСЬ') fc.remove(); });
   const html=clone.innerHTML.trim();
   if(html) CHRONO_DATA[camp+':'+branch]=html; else delete CHRONO_DATA[camp+':'+branch];
-  sset(KEY_CHRONO, CHRONO_DATA, false).catch(()=>{});
+  sset(KEY_CHRONO, CHRONO_DATA, true).catch(()=>{});
   markDirty();
   toast('Сохранено на этом устройстве');
 }
@@ -2062,7 +2211,7 @@ function renderAcct(){
   if(SESSION){
     el.innerHTML = `<span class="acct-who">Вы вошли как <b>${esc(dispTag(SESSION))}</b></span><button class="btn ghost sm" onclick="logout()">Выйти</button>`;
   } else {
-    el.innerHTML = `<span class="acct-actions"><button class="btn primary sm" onclick="openAuth('login')">Войти</button><button class="btn ghost sm" onclick="openAuth('register')">Регистрация</button></span>`;
+    el.innerHTML = `<span class="acct-actions"><button class="btn primary sm" onclick="openAccessModal(null,'account')">Войти</button><button class="btn ghost sm" onclick="openAccessModal(null,'account');setTimeout(toggleAuthMode,80)">Регистрация</button></span>`;
   }
 }
 function openAuth(mode){
@@ -2081,7 +2230,7 @@ function openAuth(mode){
       <button class="btn primary" onclick="${reg?'doRegister()':'doLogin()'}">${reg?'Зарегистрироваться':'Войти'}</button>
       <button class="btn ghost" onclick="openAuth('${reg?'login':'register'}')">${reg?'У меня есть аккаунт':'Создать аккаунт'}</button>
     </div>
-    <p class="note">Аккаунт хранится только на этом устройстве и не связан с настоящим Telegram. Не используйте здесь важный пароль.</p>`;
+    <p class="note">Вход по тегу и паролю работает на любом устройстве. Тег не связан с настоящим Telegram — не используйте здесь важный пароль.</p>`;
   document.getElementById('scrim').classList.add('open');
   setTimeout(()=>{ const t=pf('au-tag'); if(t) t.focus(); }, 60);
 }
@@ -2095,20 +2244,39 @@ async function doRegister(){
   if(USERS.some(u=>normTag(u.tag)===tag)){ pf('au-f-tag').classList.add('invalid'); toast('Такой тег уже зарегистрирован'); return; }
   const salt=genSalt();
   USERS.push({ tag:'@'+tag, salt, passHash:hashPass(pass,salt), createdAt:Date.now() });
-  await sset(KEY_USERS, USERS, false);
+  await sset(KEY_USERS, USERS, true);
   SESSION='@'+tag; await sset(KEY_SESSION, SESSION, false);
-  closeModal(); renderAcct(); renderPlayers(); toast('Аккаунт создан — вы вошли');
+  closeModal(); renderAcct(); renderPlayers(); if(document.getElementById('view-chat').classList.contains('active')) renderChat(); toast('Аккаунт создан — вы вошли');
 }
 async function doLogin(){
   const tag=normTag(pval('au-tag')), pass=(pf('au-pass')?.value||'');
   const u=USERS.find(x=>normTag(x.tag)===tag);
   if(!u || u.passHash!==hashPass(pass,u.salt)){ toast('Неверный тег или пароль'); return; }
   SESSION=u.tag; await sset(KEY_SESSION, SESSION, false);
-  closeModal(); renderAcct(); renderPlayers(); toast('Вы вошли как '+dispTag(u.tag));
+  closeModal(); renderAcct(); renderPlayers(); if(document.getElementById('view-chat').classList.contains('active')) renderChat(); toast('Вы вошли как '+dispTag(u.tag));
 }
-async function logout(){ SESSION=null; await sset(KEY_SESSION, null, false); renderAcct(); renderPlayers(); toast('Вы вышли из аккаунта'); }
+async function logout(){ SESSION=null; await sset(KEY_SESSION, null, false); renderAcct(); renderPlayers(); if(document.getElementById('view-chat').classList.contains('active')) renderChat(); toast('Вы вышли из аккаунта'); }
 
 /* ====================== Игроки / персонажи ====================== */
+// сохранение персонажей с защитой от гонки: подтягиваем свежую облачную карту и сливаем по id
+async function persistChars(){
+  try{
+    if(supa){
+      let remote=null;
+      try{ remote=await withTimeout(cloudGet(KEY_CHARS), 4000); }catch(e){}
+      if(remote && typeof remote==='object' && remote!==undefined){
+        const rm=normGameMap(remote);
+        ['legacy','neverland','assimilation','terra'].forEach(g=>{
+          // локальные версии приоритетны (мы только что их правили), но чужие подхватываем
+          CHARS_ALL[g]=mergeById(CHARS_ALL[g], rm[g]);
+        });
+        bindGameData();
+      }
+    }
+    const ok=await sset(KEY_CHARS, CHARS_ALL, true);
+    if(!ok && supa) toast('⚠ Облако недоступно — сохранено локально');
+  }catch(e){}
+}
 // простой хэш кода доступа (FNV-1a) — чтобы не хранить код открытым в общем хранилище
 function hashCode(str){
   let h = 2166136261 >>> 0;
@@ -2252,7 +2420,7 @@ async function createPlayer(){
   closeModal(); go('players'); toast('Персонаж создан');
   ensurePlayersVisible();
   // сохранение — после отображения, чтобы сбой хранилища не блокировал UI
-  try{ const ok=await sset(KEY_CHARS, CHARS_ALL, false); if(!ok) toast('⚠ Не удалось сохранить — персонаж может исчезнуть после перезагрузки'); }catch(e){}
+  try{ const ok=await sset(KEY_CHARS, CHARS_ALL, true); if(!ok && supa) toast('⚠ Облако недоступно — сохранено локально'); }catch(e){}
 }
 
 /* --- просмотр (всем доступен, только чтение) --- */
@@ -2348,7 +2516,7 @@ async function savePlayer(id){
     bio:pval('ep-bio'), gear:pval('ep-gear'),
     updatedAt:Date.now() });
   renderPlayers(); toast('Сохранено'); ensurePlayersVisible();
-  try{ const ok=await sset(KEY_CHARS, CHARS_ALL, false); if(!ok) toast('⚠ Не удалось сохранить изменения'); }catch(e){}
+  await persistChars();
 }
 function confirmDeletePlayer(id){
   const el=document.querySelector('#modal .pacts');
@@ -2361,8 +2529,241 @@ async function deletePlayer(id){
   CHARS=CHARS.filter(x=>x.id!==id);
   CHARS_ALL[CUR_PROJECT]=CHARS;
   renderPlayers(); closeModal(); toast('Персонаж удалён'); ensurePlayersVisible();
-  try{ await sset(KEY_CHARS, CHARS_ALL, false); }catch(e){}
+  await persistChars();
 }
+
+
+/* ====================== ЧАТ (комнаты по играм) ====================== */
+const KEY_CHATROOMS='comik:chatrooms:v1', KEY_CHATACCESS='comik:chatacc:v1', KEY_CHATMSG='comik:chatmsg:';
+let CHATROOMS_ALL={legacy:[],neverland:[],assimilation:[],terra:[]};
+let CHAT_ACCESS={};           // локально: {roomId:true}
+let CUR_ROOM=null;            // id открытой комнаты
+let CHAT=[], CHAT_ATTACH=null, CHAT_POLL=null, CHAT_SUG=[], CHAT_SUG_I=-1;
+
+function rooms(){ return CHATROOMS_ALL[CUR_PROJECT] || (CHATROOMS_ALL[CUR_PROJECT]=[]); }
+function roomById(id){ return rooms().find(r=>r.id===id); }
+function hasRoomAccess(id){ return ADMIN || !!CHAT_ACCESS[id]; }
+function fmtTime(ts){ try{ return new Date(ts).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}); }catch(e){ return ''; } }
+function allTags(){ return (USERS||[]).map(u=>normTag(u.tag)).filter(Boolean); }
+
+/* ---- список комнат ---- */
+function renderChat(){
+  const list=document.getElementById('chatRoomsList');
+  const admBar=document.getElementById('chatRoomsAdm'); if(admBar) admBar.hidden=!ADMIN;
+  if(!list) return;
+  const rs=rooms();
+  if(!rs.length){
+    list.innerHTML=`<div class="chat-empty" style="padding:26px">В этой игре пока нет чатов.${ADMIN?'<br>Создайте первый кнопкой выше.':'<br>Их создаёт Game Master.'}</div>`;
+    return;
+  }
+  list.innerHTML = rs.map(r=>{
+    const open=hasRoomAccess(r.id);
+    return `<button class="room-row${open?' open':''}" onclick="enterRoom('${r.id}')">
+      <span class="room-ic">${open?'<svg viewBox="0 0 24 24"><path d="M4 5.5h16v10H9l-4 3.5v-3.5H4z"/></svg>':'<svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2.5"/><path d="M8 11V7.5a4 4 0 0 1 8 0V11"/></svg>'}</span>
+      <span class="room-name">${esc(r.name)}</span>
+      ${ADMIN?`<span class="room-edit" onclick="event.stopPropagation();openRoomEditor('${r.id}')" aria-label="Настроить">⚙</span>`:''}
+      <span class="room-arr">${open?'›':''}</span>
+    </button>`;
+  }).join('');
+}
+function enterRoom(id){
+  const r=roomById(id); if(!r) return;
+  if(!hasRoomAccess(id)){ askRoomPass(id); return; }
+  CUR_ROOM=id;
+  document.getElementById('chatRooms').hidden=true;
+  document.getElementById('chatRoom').hidden=false;
+  const h=document.querySelector('#chatHead h1'); if(h) h.textContent=r.name;
+  CHAT=[]; CHAT._seen=false; clearAttach();
+  renderRoom(); loadChat(false); startChatPoll();
+}
+function backToRooms(){
+  CUR_ROOM=null; stopChatPoll();
+  document.getElementById('chatRoom').hidden=true;
+  document.getElementById('chatRooms').hidden=false;
+  const h=document.querySelector('#chatHead h1'); if(h) h.textContent='Чаты';
+  renderChat();
+}
+function askRoomPass(id){
+  const r=roomById(id); if(!r) return;
+  const m=document.getElementById('modal');
+  m.innerHTML=`<button class="x" onclick="closeModal()">✕</button>
+    <div class="top"><span class="clabel">${esc(r.name)}</span></div>
+    <h2>Доступ к чату</h2>
+    <p class="note" style="margin-bottom:12px">Чат защищён паролем. Спросите его у Game Master.</p>
+    <div class="field"><label>Пароль</label><input type="password" id="rmPass" autocomplete="off" onkeydown="if(event.key==='Enter')tryRoomPass('${id}')"></div>
+    <button class="btn primary" style="width:100%;margin-top:12px" onclick="tryRoomPass('${id}')">Войти</button>`;
+  document.getElementById('scrim').classList.add('open');
+  setTimeout(()=>{ const i=document.getElementById('rmPass'); if(i) i.focus(); },60);
+}
+function tryRoomPass(id){
+  const r=roomById(id); if(!r) return;
+  const v=(pf('rmPass')?.value||'');
+  if(v && hashPass(v, r.salt)===r.passHash){
+    CHAT_ACCESS[id]=true; sset(KEY_CHATACCESS, CHAT_ACCESS, false).catch(()=>{});
+    closeModal(); toast('Доступ открыт'); enterRoom(id);
+  } else { if(pf('rmPass')) pf('rmPass').value=''; toast('Неверный пароль'); }
+}
+
+/* ---- управление комнатами (GM) ---- */
+function openRoomEditor(id){
+  if(!ADMIN){ toast('Только Game Master'); return; }
+  const r=id?roomById(id):null;
+  const m=document.getElementById('modal');
+  m.innerHTML=`<button class="x" onclick="closeModal()">✕</button>
+    <h2 style="font-family:var(--f-disp);color:var(--txt);margin-bottom:6px">${r?'Настройка чата':'Новый чат'}</h2>
+    <div class="kicker" style="margin-bottom:14px">${PROJECT_TITLES[CUR_PROJECT].replace(/<[^>]+>/g,'')}</div>
+    <div class="field" id="rm-f-name"><label>Название <span class="req">*</span></label><input id="rm-name" maxlength="48" value="${r?esc(r.name):''}"><div class="err">Укажите название</div></div>
+    <div class="field"><label>Пароль ${r?'<span class="opt">— оставьте пустым, чтобы не менять</span>':'<span class="req">*</span>'}</label><input id="rm-pass" type="text" maxlength="60" placeholder="${r?'без изменений':'пароль для игроков'}"></div>
+    <div class="chrono-tools">
+      <button class="btn primary" onclick="saveRoom(${r?`'${r.id}'`:'null'})">Сохранить</button>
+      ${r?`<button class="btn danger" id="rmDel" onclick="delRoom('${r.id}')">Удалить</button>`:''}
+    </div>`;
+  document.getElementById('scrim').classList.add('open');
+}
+function saveRoom(id){
+  const name=pval('rm-name');
+  pf('rm-f-name').classList.toggle('invalid', !name); if(!name) return;
+  const pass=(pf('rm-pass')?.value||'').trim();
+  let r=id?roomById(id):null;
+  if(r){
+    r.name=name;
+    if(pass){ r.salt=genSalt(); r.passHash=hashPass(pass,r.salt); }
+  } else {
+    if(!pass){ pf('rm-f-name'); toast('Задайте пароль для нового чата'); return; }
+    const salt=genSalt();
+    r={ id:uid(), name, salt, passHash:hashPass(pass,salt), createdAt:Date.now() };
+    rooms().push(r);
+    CHAT_ACCESS[r.id]=true; sset(KEY_CHATACCESS, CHAT_ACCESS, false).catch(()=>{}); // GM сразу с доступом
+  }
+  CHATROOMS_ALL[CUR_PROJECT]=rooms();
+  sset(KEY_CHATROOMS, CHATROOMS_ALL, true).catch(()=>{});
+  markDirty();
+  closeModal(); renderChat(); toast('Чат сохранён');
+}
+function delRoom(id){
+  const b=document.getElementById('rmDel');
+  if(b && !b.dataset.arm){ b.dataset.arm='1'; b.textContent='Точно удалить?'; return; }
+  CHATROOMS_ALL[CUR_PROJECT]=rooms().filter(r=>r.id!==id);
+  sset(KEY_CHATROOMS, CHATROOMS_ALL, true).catch(()=>{});
+  sset(KEY_CHATMSG+id, [], true).catch(()=>{}); // очистить сообщения
+  markDirty();
+  closeModal(); if(CUR_ROOM===id) backToRooms(); else renderChat();
+  toast('Чат удалён');
+}
+
+/* ---- сообщения комнаты ---- */
+function renderChatMsg(m){
+  const mine = SESSION && normTag(m.author)===currentTag();
+  const meTag = currentTag();
+  let body = esc(m.text||'').replace(/@([a-z0-9_]{2,32})/gi, (full,tag)=>{
+    const t=tag.toLowerCase(); const known=allTags().includes(t); const you=meTag && t===meTag;
+    return known ? `<span class="mention${you?' you':''}">@${esc(tag)}</span>` : full;
+  });
+  let ref='';
+  if(m.ref && m.ref.id){
+    ref = `<div class="chat-ref" onclick="openChatRef('${esc(m.ref.game||'')}','${esc(m.ref.id)}')">
+      <svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>
+      <div style="min-width:0"><div class="rk">Архив${m.ref.game?' · '+esc(PROJECT_TITLES[m.ref.game]||m.ref.game).replace(/<[^>]+>/g,''):''}</div><div class="rt">${esc(m.ref.title||'Карточка')}</div></div>
+    </div>`;
+  }
+  return `<div class="msg${mine?' me':''}">
+    <div class="who">${mine?'':'<b>'+esc(dispTag(m.author))+'</b> '}${ADMIN?`<span class="msg-del" onclick="delMsg('${m.id}')">удалить</span>`:''}</div>
+    <div class="bubble">${body}${ref}</div>
+    <div class="tm">${fmtTime(m.ts)}</div>
+  </div>`;
+}
+function renderRoom(){
+  const log=document.getElementById('chatLog'); if(!log) return;
+  const gate=document.getElementById('chatGate'), comp=document.getElementById('chatCompose');
+  if(!SESSION){
+    gate.innerHTML='Чтобы писать в чат, войдите в аккаунт.<br><button class="btn primary sm" onclick="openAccessModal(null,\'account\')">Войти / регистрация</button>';
+    gate.style.display=''; if(comp) comp.hidden=true;
+  } else { gate.style.display='none'; if(comp) comp.hidden=false; }
+  const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 60;
+  if(!CHAT.length){
+    log.innerHTML='<div class="chat-empty">Сообщений пока нет.<br>Упоминайте игроков через @тег и прикрепляйте карточки из архива.</div>';
+  } else {
+    log.innerHTML = CHAT.slice(-200).map(renderChatMsg).join('');
+  }
+  if(atBottom || !CHAT._seen){ log.scrollTop=log.scrollHeight; CHAT._seen=true; }
+}
+function openChatRef(game, id){
+  if(game && game!==CUR_PROJECT) setProject(game);
+  setTimeout(()=>openModal(id), game&&game!==CUR_PROJECT?120:0);
+}
+async function loadChat(silent){
+  if(!CUR_ROOM){ return; }
+  try{
+    const data = await sget(KEY_CHATMSG+CUR_ROOM, true);
+    if(Array.isArray(data)){ const was=CHAT.length; CHAT=data; if(!silent||data.length!==was) renderRoom(); }
+    else if(!silent) renderRoom();
+  }catch(e){ if(!silent) renderRoom(); }
+}
+function startChatPoll(){ stopChatPoll(); if(supa && CUR_ROOM) CHAT_POLL=setInterval(()=>loadChat(true), 4000); }
+function stopChatPoll(){ if(CHAT_POLL){ clearInterval(CHAT_POLL); CHAT_POLL=null; } }
+async function sendChat(){
+  if(!CUR_ROOM) return;
+  if(!SESSION){ toast('Сначала войдите в аккаунт'); openAccessModal(null,'account'); return; }
+  const inp=document.getElementById('chatInput'); if(!inp) return;
+  const text=inp.value.trim(); if(!text && !CHAT_ATTACH) return;
+  const msg={ id:uid(), author:SESSION, text, ts:Date.now() };
+  if(CHAT_ATTACH) msg.ref=CHAT_ATTACH;
+  try{ const remote=await sget(KEY_CHATMSG+CUR_ROOM, true); if(Array.isArray(remote)) CHAT=remote; }catch(e){}
+  CHAT.push(msg); if(CHAT.length>400) CHAT=CHAT.slice(-400);
+  inp.value=''; inp.style.height='auto'; clearAttach(); hideSuggest(); renderRoom();
+  const ok=await sset(KEY_CHATMSG+CUR_ROOM, CHAT, true);
+  if(!ok && supa) toast('⚠ Облако недоступно — сообщение сохранено локально');
+}
+async function delMsg(id){
+  if(!ADMIN || !CUR_ROOM) return;
+  try{ const remote=await sget(KEY_CHATMSG+CUR_ROOM, true); if(Array.isArray(remote)) CHAT=remote; }catch(e){}
+  CHAT=CHAT.filter(m=>m.id!==id); renderRoom();
+  await sset(KEY_CHATMSG+CUR_ROOM, CHAT, true);
+}
+function onChatInput(el){
+  el.style.height='auto'; el.style.height=Math.min(120, el.scrollHeight)+'px';
+  const v=el.value, pos=el.selectionStart, before=v.slice(0,pos), m=before.match(/@([a-z0-9_]*)$/i);
+  if(m){ const q=m[1].toLowerCase(); CHAT_SUG=allTags().filter(t=>t.startsWith(q)&&t!==currentTag()).slice(0,6); if(CHAT_SUG.length){ showSuggest(); return; } }
+  hideSuggest();
+}
+function showSuggest(){ const box=document.getElementById('chatSuggest'); if(!box) return; CHAT_SUG_I=-1;
+  box.innerHTML=CHAT_SUG.map((t,i)=>`<button onmousedown="event.preventDefault()" onclick="pickSuggest(${i})">@${esc(t)}</button>`).join(''); box.hidden=false; }
+function hideSuggest(){ const b=document.getElementById('chatSuggest'); if(b) b.hidden=true; CHAT_SUG=[]; CHAT_SUG_I=-1; }
+function pickSuggest(i){ const el=document.getElementById('chatInput'); if(!el||!CHAT_SUG[i]) return;
+  const pos=el.selectionStart, before=el.value.slice(0,pos), after=el.value.slice(pos);
+  const nb=before.replace(/@([a-z0-9_]*)$/i, '@'+CHAT_SUG[i]+' '); el.value=nb+after; const np=nb.length; el.focus(); el.setSelectionRange(np,np); hideSuggest(); onChatInput(el); }
+function chatKey(e){
+  const box=document.getElementById('chatSuggest');
+  if(box && !box.hidden && CHAT_SUG.length){
+    if(e.key==='ArrowDown'){ e.preventDefault(); CHAT_SUG_I=(CHAT_SUG_I+1)%CHAT_SUG.length; hlSuggest(); return; }
+    if(e.key==='ArrowUp'){ e.preventDefault(); CHAT_SUG_I=(CHAT_SUG_I-1+CHAT_SUG.length)%CHAT_SUG.length; hlSuggest(); return; }
+    if(e.key==='Enter' && CHAT_SUG_I>=0){ e.preventDefault(); pickSuggest(CHAT_SUG_I); return; }
+    if(e.key==='Escape'){ hideSuggest(); return; }
+  }
+  if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendChat(); }
+}
+function hlSuggest(){ document.querySelectorAll('#chatSuggest button').forEach((b,i)=>b.classList.toggle('sel', i===CHAT_SUG_I)); }
+function openAttachPicker(){
+  const cards=ARCHIVE.slice(0,200);
+  const m=document.getElementById('modal');
+  m.innerHTML=`<button class="x" onclick="closeModal()">✕</button>
+    <h2 style="font-family:var(--f-disp);color:var(--txt);margin-bottom:6px">Прикрепить из архива</h2>
+    <div class="kicker" style="margin-bottom:12px">${PROJECT_TITLES[CUR_PROJECT].replace(/<[^>]+>/g,'')} · ${cards.length} карточек</div>
+    <div class="field"><input id="atq" placeholder="Поиск по названию…" oninput="filterAttach(this.value)" autocomplete="off"></div>
+    <div id="atList" class="at-list"></div>`;
+  document.getElementById('scrim').classList.add('open'); filterAttach('');
+}
+function filterAttach(q){ q=(q||'').trim().toLowerCase();
+  const list=document.getElementById('atList'); if(!list) return;
+  const items=ARCHIVE.filter(e=>!q||(e.title||'').toLowerCase().includes(q)).slice(0,60);
+  list.innerHTML = items.length ? items.map(e=>`<button class="at-item" onclick="pickAttach('${e.id}')"><span class="at-t">${esc(e.title)}</span><span class="at-c">${esc((catById(e.cat)||{}).label||'')}</span></button>`).join('') : '<div class="chat-empty" style="padding:20px">Ничего не найдено</div>';
+}
+function pickAttach(id){ const e=ARCHIVE.find(x=>x.id===id); if(!e) return;
+  CHAT_ATTACH={ id:e.id, title:e.title, game:CUR_PROJECT };
+  const box=document.getElementById('chatAttach'); if(box){ box.hidden=false; box.innerHTML=`<span class="rk">Архив</span><span class="rt">${esc(e.title)}</span><button class="rx" onclick="clearAttach()">✕</button>`; }
+  closeModal(); const inp=document.getElementById('chatInput'); if(inp) inp.focus();
+}
+function clearAttach(){ CHAT_ATTACH=null; const b=document.getElementById('chatAttach'); if(b){ b.hidden=true; b.innerHTML=''; } }
 
 /* ====================== Навигация / тосты ====================== */
 const PROJECT_TITLES={legacy:'LEGACY',neverland:'NEVERLAND',assimilation:'ASS<i>I</i>MILATION',terra:'TERRA AETERNA'};
@@ -2417,13 +2818,13 @@ function saveHero(){
   document.getElementById('he-f-title').classList.toggle('invalid', !title);
   if(!title) return;
   HERO_EDITS[CUR_PROJECT]={ title, text: document.getElementById('he-text').value.trim() };
-  sset(KEY_HERO, HERO_EDITS, false).catch(()=>{});
+  sset(KEY_HERO, HERO_EDITS, true).catch(()=>{});
   markDirty();
   closeModal(); applyGameHero(); toast('Приветствие сохранено');
 }
 function resetHero(){
   delete HERO_EDITS[CUR_PROJECT];
-  sset(KEY_HERO, HERO_EDITS, false).catch(()=>{});
+  sset(KEY_HERO, HERO_EDITS, true).catch(()=>{});
   markDirty();
   closeModal(); applyGameHero(); toast('Возвращён стандартный текст');
 }
@@ -2442,6 +2843,7 @@ function setProject(id, silent, dir){
   document.documentElement.setAttribute('data-project', id);
   applyGameHero();
   if(typeof bindGameData==='function'){ bindGameData(); if(typeof renderAll==='function') renderAll(); }
+  if(typeof backToRooms==='function' && document.getElementById('view-chat')){ CUR_ROOM=null; stopChatPoll(); const cr=document.getElementById('chatRoom'); if(cr) cr.hidden=true; const cl=document.getElementById('chatRooms'); if(cl) cl.hidden=false; const hh=document.querySelector('#chatHead h1'); if(hh) hh.textContent='Чаты'; renderChat(); }
   else if(typeof renderNews==='function') renderNews();
 }
 function stepProject(delta){
@@ -2466,7 +2868,7 @@ function stepProject(delta){
   });
 })();
 function go(view){
-  ['news','archive','players','chrono'].forEach(v=>{
+  ['news','archive','players','chrono','chat'].forEach(v=>{
     const el=document.getElementById('view-'+v); if(!el) return;
     el.classList.toggle('active', v===view);
   });
@@ -2476,6 +2878,10 @@ function go(view){
   const dm=document.getElementById('diceMenu'); if(dm){ dm.classList.remove('open'); const db=document.getElementById('diceBtn'); if(db) db.classList.remove('active'); }
   closeCalc();
   if(view==='players'){ renderPlayers(); ensurePlayersVisible(); }
+  if(view==='chat'){
+    if(CUR_ROOM && hasRoomAccess(CUR_ROOM)){ renderRoom(); loadChat(false); startChatPoll(); }
+    else { backToRooms(); }
+  } else { stopChatPoll(); }
   const av=document.getElementById('view-'+view); if(av) kickLayout(av);
   try{ window.scrollTo(0,0); }catch(e){}
 }
