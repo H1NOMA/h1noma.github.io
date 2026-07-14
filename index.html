@@ -545,7 +545,7 @@
   [data-project="neverland"] .komik{filter:grayscale(1) sepia(1) saturate(2.4) hue-rotate(-12deg) brightness(1.42) contrast(1)}
   [data-project="terra"] .komik{filter:sepia(.75) saturate(.9) brightness(.95) contrast(1.12)}
   /* ======== ЧАТ ======== */
-  .chat-wrap{max-width:680px;margin:0 auto;display:flex;flex-direction:column;height:calc(100dvh - 210px);min-height:320px}
+
   .chat-log{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding:4px 2px 14px}
   .chat-empty{margin:auto;text-align:center;color:var(--muted);font-family:var(--f-mono);font-size:.76rem;letter-spacing:.05em;line-height:1.7}
   .msg{max-width:82%;display:flex;flex-direction:column;gap:3px}
@@ -597,9 +597,15 @@
   .room-edit{flex:0 0 auto;color:var(--muted);font-size:1.05rem;padding:2px 6px;border-radius:6px}
   .room-edit:active{color:var(--red)}
   .room-arr{flex:0 0 auto;color:var(--muted);font-size:1.4rem;line-height:1}
-  .chat-room{max-width:680px;margin:0 auto;display:flex;flex-direction:column}
-  .chat-back{align-self:flex-start;display:flex;align-items:center;gap:6px;background:none;border:none;color:var(--dim);font-family:var(--f-mono);font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;padding:2px 2px 10px}
-  .chat-back svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .chat-room{position:relative;max-width:680px;margin:0 auto;height:calc(100dvh - 172px);min-height:340px;overflow:hidden}
+  .chat-room .chat-log{position:absolute;inset:0;height:auto;padding:4px 2px 88px;overflow-y:auto}
+  .chat-room .chat-gate{position:absolute;left:8px;right:8px;bottom:14px;z-index:4}
+  .chat-compose{position:absolute;left:6px;right:6px;bottom:12px;z-index:5;border:var(--hair) solid var(--line2);border-top:var(--hair) solid var(--line2);border-radius:24px;padding:8px;background:var(--glass2);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);box-shadow:0 10px 30px rgba(0,0,0,.45)}
+  @media(min-width:880px){ .chat-room{height:calc(100dvh - 220px)} }
+  .chat-hback{position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:2;width:34px;height:34px;border-radius:50%;border:var(--hair) solid var(--line2);background:var(--surface);color:var(--dim);display:flex;align-items:center;justify-content:center;cursor:pointer}
+  .chat-hback svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .chat-hback:active{color:var(--red)}
+  #chatHead{position:relative}
   .msg-del{color:var(--muted);opacity:.6;cursor:pointer;font-size:.55rem;margin-left:6px}
   .msg-del:active{color:var(--red)}
   .at-list{max-height:46vh;overflow-y:auto;display:flex;flex-direction:column;gap:6px}
@@ -1235,7 +1241,10 @@
 
   <!-- CHAT -->
   <section id="view-chat" class="view">
-    <div class="masthead chrono-head" id="chatHead" style="margin-bottom:14px"><h1>Чаты</h1></div>
+    <div class="masthead chrono-head" id="chatHead" style="margin-bottom:14px">
+      <button class="chat-hback" id="chatHback" hidden onclick="backToRooms()" aria-label="К списку чатов"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <h1>Чаты</h1>
+    </div>
 
     <div class="chat-rooms" id="chatRooms">
       <div id="chatRoomsAdm" hidden style="margin-bottom:12px"><button class="btn primary" style="width:100%" onclick="openRoomEditor()">+ Создать чат</button></div>
@@ -1243,18 +1252,15 @@
     </div>
 
     <div class="chat-room" id="chatRoom" hidden>
-      <button class="chat-back" onclick="backToRooms()"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg> Все чаты</button>
-      <div class="chat-wrap">
-        <div class="chat-log" id="chatLog"></div>
-        <div class="chat-gate" id="chatGate"></div>
-        <div class="chat-compose" id="chatCompose" hidden>
-          <div class="chat-attach" id="chatAttach" hidden></div>
-          <div class="chat-suggest" id="chatSuggest" hidden></div>
-          <div class="chat-inrow">
-            <button class="chat-clip" onclick="openAttachPicker()" aria-label="Прикрепить из архива"><svg viewBox="0 0 24 24"><path d="M21 11.5l-8.5 8.5a5 5 0 01-7-7l8.5-8.5a3.3 3.3 0 014.7 4.7l-8.5 8.5a1.6 1.6 0 01-2.3-2.3l7.8-7.8"/></svg></button>
-            <textarea id="chatInput" rows="1" maxlength="1200" placeholder="Сообщение… (@тег — упоминание)" oninput="onChatInput(this)" onkeydown="chatKey(event)"></textarea>
-            <button class="chat-send" onclick="sendChat()" aria-label="Отправить"><svg viewBox="0 0 24 24"><path d="M4 12l16-7-7 16-2.5-6.5L4 12z"/></svg></button>
-          </div>
+      <div class="chat-log" id="chatLog"></div>
+      <div class="chat-gate" id="chatGate"></div>
+      <div class="chat-compose" id="chatCompose" hidden>
+        <div class="chat-attach" id="chatAttach" hidden></div>
+        <div class="chat-suggest" id="chatSuggest" hidden></div>
+        <div class="chat-inrow">
+          <button class="chat-clip" onclick="openAttachPicker()" aria-label="Прикрепить из архива"><svg viewBox="0 0 24 24"><path d="M21 11.5l-8.5 8.5a5 5 0 01-7-7l8.5-8.5a3.3 3.3 0 014.7 4.7l-8.5 8.5a1.6 1.6 0 01-2.3-2.3l7.8-7.8"/></svg></button>
+          <textarea id="chatInput" rows="1" maxlength="1200" placeholder="Сообщение… (@тег)" oninput="onChatInput(this)" onkeydown="chatKey(event)"></textarea>
+          <button class="chat-send" onclick="sendChat()" aria-label="Отправить"><svg viewBox="0 0 24 24"><path d="M4 12l16-7-7 16-2.5-6.5L4 12z"/></svg></button>
         </div>
       </div>
     </div>
@@ -2572,6 +2578,7 @@ function enterRoom(id){
   CUR_ROOM=id;
   document.getElementById('chatRooms').hidden=true;
   document.getElementById('chatRoom').hidden=false;
+  const hb=document.getElementById('chatHback'); if(hb) hb.hidden=false;
   const h=document.querySelector('#chatHead h1'); if(h) h.textContent=r.name;
   CHAT=[]; CHAT._seen=false; clearAttach();
   renderRoom(); loadChat(false); startChatPoll();
@@ -2580,6 +2587,7 @@ function backToRooms(){
   CUR_ROOM=null; stopChatPoll();
   document.getElementById('chatRoom').hidden=true;
   document.getElementById('chatRooms').hidden=false;
+  const hb=document.getElementById('chatHback'); if(hb) hb.hidden=true;
   const h=document.querySelector('#chatHead h1'); if(h) h.textContent='Чаты';
   renderChat();
 }
@@ -2693,11 +2701,13 @@ function openChatRef(game, id){
 }
 async function loadChat(silent){
   if(!CUR_ROOM){ return; }
+  const room=CUR_ROOM;
   try{
-    const data = await sget(KEY_CHATMSG+CUR_ROOM, true);
+    const data = await sget(KEY_CHATMSG+room, true);
+    if(room!==CUR_ROOM) return;            // переключились на другую комнату — игнорируем
     if(Array.isArray(data)){ const was=CHAT.length; CHAT=data; if(!silent||data.length!==was) renderRoom(); }
     else if(!silent) renderRoom();
-  }catch(e){ if(!silent) renderRoom(); }
+  }catch(e){ if(room===CUR_ROOM && !silent) renderRoom(); }
 }
 function startChatPoll(){ stopChatPoll(); if(supa && CUR_ROOM) CHAT_POLL=setInterval(()=>loadChat(true), 4000); }
 function stopChatPoll(){ if(CHAT_POLL){ clearInterval(CHAT_POLL); CHAT_POLL=null; } }
@@ -2706,12 +2716,13 @@ async function sendChat(){
   if(!SESSION){ toast('Сначала войдите в аккаунт'); openAccessModal(null,'account'); return; }
   const inp=document.getElementById('chatInput'); if(!inp) return;
   const text=inp.value.trim(); if(!text && !CHAT_ATTACH) return;
+  const room=CUR_ROOM;
   const msg={ id:uid(), author:SESSION, text, ts:Date.now() };
   if(CHAT_ATTACH) msg.ref=CHAT_ATTACH;
-  try{ const remote=await sget(KEY_CHATMSG+CUR_ROOM, true); if(Array.isArray(remote)) CHAT=remote; }catch(e){}
+  try{ const remote=await sget(KEY_CHATMSG+room, true); if(Array.isArray(remote) && room===CUR_ROOM) CHAT=remote; }catch(e){}
   CHAT.push(msg); if(CHAT.length>400) CHAT=CHAT.slice(-400);
-  inp.value=''; inp.style.height='auto'; clearAttach(); hideSuggest(); renderRoom();
-  const ok=await sset(KEY_CHATMSG+CUR_ROOM, CHAT, true);
+  inp.value=''; inp.style.height='auto'; clearAttach(); hideSuggest(); if(room===CUR_ROOM) renderRoom();
+  const ok=await sset(KEY_CHATMSG+room, CHAT, true);
   if(!ok && supa) toast('⚠ Облако недоступно — сообщение сохранено локально');
 }
 async function delMsg(id){
@@ -2764,6 +2775,23 @@ function pickAttach(id){ const e=ARCHIVE.find(x=>x.id===id); if(!e) return;
   closeModal(); const inp=document.getElementById('chatInput'); if(inp) inp.focus();
 }
 function clearAttach(){ CHAT_ATTACH=null; const b=document.getElementById('chatAttach'); if(b){ b.hidden=true; b.innerHTML=''; } }
+/* свайп вправо в комнате -> назад к списку чатов (мобильный) */
+(function(){
+  const room=document.getElementById('chatRoom'); if(!room) return;
+  let x0=null,y0=null,fromEdge=false;
+  room.addEventListener('touchstart', e=>{ const t=e.touches[0]; x0=t.clientX; y0=t.clientY; fromEdge=t.clientX<60; }, {passive:true});
+  room.addEventListener('touchend', e=>{
+    if(x0===null) return;
+    const t=e.changedTouches[0], dx=t.clientX-x0, dy=t.clientY-y0;
+    x0=null;
+    // свайп вправо, преимущественно горизонтальный, не в поле ввода
+    if(dx>60 && Math.abs(dx)>Math.abs(dy)*1.6 && CUR_ROOM){
+      const tgt=e.target;
+      if(tgt && tgt.closest && tgt.closest('.chat-compose')) return;
+      backToRooms();
+    }
+  }, {passive:true});
+})();
 
 /* ====================== Навигация / тосты ====================== */
 const PROJECT_TITLES={legacy:'LEGACY',neverland:'NEVERLAND',assimilation:'ASS<i>I</i>MILATION',terra:'TERRA AETERNA'};
@@ -2843,7 +2871,7 @@ function setProject(id, silent, dir){
   document.documentElement.setAttribute('data-project', id);
   applyGameHero();
   if(typeof bindGameData==='function'){ bindGameData(); if(typeof renderAll==='function') renderAll(); }
-  if(typeof backToRooms==='function' && document.getElementById('view-chat')){ CUR_ROOM=null; stopChatPoll(); const cr=document.getElementById('chatRoom'); if(cr) cr.hidden=true; const cl=document.getElementById('chatRooms'); if(cl) cl.hidden=false; const hh=document.querySelector('#chatHead h1'); if(hh) hh.textContent='Чаты'; renderChat(); }
+  if(typeof backToRooms==='function' && document.getElementById('view-chat')){ CUR_ROOM=null; stopChatPoll(); const cr=document.getElementById('chatRoom'); if(cr) cr.hidden=true; const cl=document.getElementById('chatRooms'); if(cl) cl.hidden=false; const hb=document.getElementById('chatHback'); if(hb) hb.hidden=true; const hh=document.querySelector('#chatHead h1'); if(hh) hh.textContent='Чаты'; renderChat(); }
   else if(typeof renderNews==='function') renderNews();
 }
 function stepProject(delta){
