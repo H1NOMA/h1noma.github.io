@@ -1349,7 +1349,7 @@ const ASSIM_CATS = [
   ]},
 ];
 
-const DND_CATS = (withPaths)=>{
+const DND_CATS = (withPaths, extra)=>{
   const c=[{id:'history', label:'История', type:'story', subs:[]}];
   if(withPaths) c.push({id:'paths', label:'Пути', type:'cards', subs:[]});
   return c.concat([
@@ -1390,13 +1390,19 @@ const DND_CATS = (withPaths)=>{
       {id:'deities',   label:'Божества'},
       {id:'bestiary',  label:'Бестиарий'},
     ]},
-  ]);
+  ]).concat(extra||[]);
 };
+
+/* особые разделы игр */
+const CAT_ABYSS = {id:'abyss', label:'Бездна', type:'cards', subs:[]};
+const CAT_WILL  = {id:'will',  label:'Воля', type:'cards', subs:[]};
+const CAT_QUILL = {id:'quill', label:'Перо дьявола', type:'cards', subs:[]};
+const CAT_AETHER= {id:'aether', label:'Эфир', type:'cards', subs:[]};
 const CATS_ALL={
-  assimilation: ASSIM_CATS,
-  legacy:    DND_CATS(true),
-  neverland: DND_CATS(false),
-  terra:     DND_CATS(false),
+  assimilation: ASSIM_CATS.concat([CAT_AETHER]),
+  legacy:    DND_CATS(true,  [CAT_ABYSS]),
+  neverland: DND_CATS(false, [CAT_ABYSS]),
+  terra:     DND_CATS(false, [CAT_WILL, CAT_QUILL]),
 };
 let CATS = ASSIM_CATS;
 let cardCats = CATS.filter(c=>c.type==='cards');
@@ -1416,6 +1422,10 @@ function rune(catId, size){
     character:`<circle cx="12" cy="8" r="3.2"/><path d="M5.5 19a6.5 6.5 0 0113 0"/>`,
     items:`<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.6l8 4.4 8-4.4M12 12v9"/>`,
     world:`<circle cx="12" cy="12" r="8"/><path d="M4 12h16M12 4c2.6 2.4 2.6 13.6 0 16M12 4c-2.6 2.4-2.6 13.6 0 16"/>`,
+    abyss:`<circle cx="12" cy="12" r="9"/><path d="M12 21c-3-3-4.5-6-4.5-9S9 6 12 3c3 3 4.5 6 4.5 9S15 18 12 21z"/><circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none"/>`,
+    will:`<path d="M12 21c-4-2.5-6-5.5-6-9V6l6-3 6 3v6c0 3.5-2 6.5-6 9z"/><path d="M12 8.5c1.6 1.7 2.4 3 2.4 4.2A2.4 2.4 0 0 1 12 15a2.4 2.4 0 0 1-2.4-2.3c0-1.2.8-2.5 2.4-4.2z"/>`,
+    quill:`<path d="M17.5 3.5l3 3L9 18l-4 1 1-4 11.5-11.5z"/><path d="M6 6C5 4.5 5 3.5 5.5 2.5 7 3.5 7.6 4.6 7.6 6"/><path d="M3.4 8.6C2 8 1.4 7.2 1.2 6 3 6 4 6.5 4.7 7.6"/>`,
+    aether:`<path d="M3 12c2.5-3 5-3 7.5 0S16 15 18.5 12 21 9 21 9"/><path d="M3 17c2.5-3 5-3 7.5 0s5.5 3 8-.5"/><circle cx="12" cy="4.5" r="1.6"/>`,
     spells:`<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3z"/><path d="M6 19l1 2 2 1-2 1-1 2-1-2-2-1 2-1 1-2z"/>`,
     paths:`<path d="M5 20c5-2 3-7 8-9 4-1.6 5-4 5-7"/><path d="M14.5 4H18v3.5"/><circle cx="5" cy="20" r="1.1"/>`,
     mechanics:`<circle cx="12" cy="12" r="3"/><path d="M12 3.5v3M12 17.5v3M3.5 12h3M17.5 12h3M5.8 5.8l2.1 2.1M16.1 16.1l2.1 2.1M18.2 5.8l-2.1 2.1M7.9 16.1l-2.1 2.1"/>`,
