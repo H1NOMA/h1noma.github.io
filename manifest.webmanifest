@@ -1,7 +1,7 @@
 {
-  "name": "КОМИК — кодекс D&D",
-  "short_name": "КОМИК",
-  "description": "Кодекс игр LEGACY, NEVERLAND, TERRA AETERNA и ASSIMILATION: архив правил, персонажи, записи на игры.",
+  "name": "KOMIK — кодекс D&D",
+  "short_name": "KOMIK",
+  "description": "Кодекс игр LEGACY, NEVERLAND, TERRA AETERNA: архив правил, персонажи, записи на игры.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
