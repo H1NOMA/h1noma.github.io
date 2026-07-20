@@ -1,5 +1,5 @@
 /* КОМИК: офлайн-кэш. Сеть в приоритете (свежая версия сайта), кэш — запасной путь без связи. */
-const CACHE = 'comik-v2';
+const CACHE = 'comik-v3';
 const CORE_FILES = ['./', 'manifest.webmanifest', 'fonts.css', 'supabase.js', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
