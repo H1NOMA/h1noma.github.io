@@ -1,10 +1,14 @@
-/* КОМИК: офлайн-кэш. Сеть в приоритете (свежая версия сайта), кэш — запасной путь без связи. */
-const CACHE = 'comik-v5';
-const CORE_FILES = ['./', 'manifest.webmanifest', 'fonts.css', 'supabase.js', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'];
+/* КОМИК: офлайн-кэш + быстрые повторные заходы.
+   Стратегия stale-while-revalidate: отдаём страницу из кэша мгновенно,
+   а в фоне тихо перекачиваем свежую — она подхватится на следующем заходе.
+   Так первый экран открывается сразу, без ожидания сети, и остаётся актуальным. */
+const CACHE = 'comik-v6';
+// мелкие статические файлы прогреваем сразу при установке
+const PRECACHE = ['manifest.webmanifest', 'fonts.css', 'supabase.js', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
   self.skipWaiting();
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(CORE_FILES)).catch(() => {}));
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(PRECACHE)).catch(() => {}));
 });
 
 self.addEventListener('activate', e => {
@@ -17,17 +21,21 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
-  // облако (Supabase) и прочие внешние запросы не кэшируем
+  // кэшируем только свои GET; облако (Supabase) и внешние запросы — мимо
   if (e.request.method !== 'GET' || url.origin !== self.location.origin) return;
   e.respondWith(
-    fetch(e.request)
-      .then(res => {
-        const copy = res.clone();
-        caches.open(CACHE).then(c => c.put(e.request, copy)).catch(() => {});
-        return res;
+    caches.open(CACHE).then(cache =>
+      cache.match(e.request).then(cached => {
+        // сеть: обновляет кэш в фоне; при отсутствии связи откатываемся на кэш
+        const network = fetch(e.request)
+          .then(res => {
+            if (res && res.ok) cache.put(e.request, res.clone()).catch(() => {});
+            return res;
+          })
+          .catch(() => cached || (e.request.mode === 'navigation' ? cache.match('/') : undefined));
+        // есть в кэше — отдаём мгновенно, сеть догоняет в фоне; иначе ждём сеть
+        return cached || network;
       })
-      .catch(() =>
-        caches.match(e.request).then(r => r || caches.match('./'))
-      )
+    )
   );
 });
