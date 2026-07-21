@@ -175,6 +175,13 @@
 
   .content-col{min-width:0}
   .cards{display:grid;grid-template-columns:1fr;gap:12px}
+  /* ── ПЛАНШЕТНАЯ ВЕРСИЯ ─── только сенсорные планшеты (pointer:coarse) от 700px.
+     Телефоны (<700px) и десктоп (мышь, pointer:fine) под правило НЕ подпадают — их вёрстка не меняется. */
+  @media (pointer: coarse) and (min-width: 700px){
+    .cards{grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px}
+    #players-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+    #players-list .pcard{margin-bottom:0}
+  }
   .players-list{display:block}
   .card{position:relative;background:var(--surface);border:var(--hair) solid var(--line);color:var(--dim);padding:16px;cursor:pointer;overflow:hidden;border-radius:var(--r-md);box-shadow:inset 0 .5px 0 rgba(255,255,255,.06);transition:transform .2s var(--spring),border-color .15s,background .15s,color .15s;content-visibility:auto;contain-intrinsic-size:auto 140px}
   .card::before{content:"";position:absolute;left:0;top:10px;bottom:10px;width:3px;border-radius:2px;background:var(--red);opacity:0;transition:.15s}
