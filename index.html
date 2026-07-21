@@ -822,6 +822,8 @@
   .ed-panel.on{display:block;animation:edFade .25s ease}
   @keyframes edFade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
   .ed-sub{font-family:var(--f-mono);font-size:.66rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:16px 0 8px}
+  .ck-line{display:flex;align-items:center;gap:8px;font-family:var(--f-body);font-size:.9rem;color:var(--txt);cursor:pointer;padding:9px 0}
+  .ck-line input{width:18px;height:18px;accent-color:var(--red);cursor:pointer;flex:none}
   .prof-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:7px}
   .prof-grid.skills{grid-template-columns:1fr}
   .prof-cell{display:flex;align-items:center;gap:10px;background:var(--surface);border:var(--hair) solid var(--line2);border-radius:11px;padding:9px 12px;transition:background .14s,border-color .14s}
@@ -3682,12 +3684,58 @@ function bindProfAuto(p){
 /* --- оружие: строки с графами название / бонус-СЛ / урон / заметки --- */
 function wpnRowHtml(w){ w=w||{};
   return `<div class="wpn-row">
-    <input class="w-n" placeholder="Название" maxlength="40" value="${esc(w.n||'')}">
+    <input class="w-n" placeholder="Название" maxlength="40" value="${esc(w.n||'')}" list="dl-weapons" oninput="wpnPick(this)">
     <input class="w-b" placeholder="+5 / СЛ 13" maxlength="10" value="${esc(w.b||'')}">
     <input class="w-d" placeholder="1d6+3 колющий" maxlength="30" value="${esc(w.d||'')}">
     <input class="w-x" placeholder="Заметки" maxlength="60" value="${esc(w.x||'')}">
     <button type="button" class="ce-x" onclick="this.parentNode.remove()" aria-label="Убрать">✕</button>
   </div>`;
+}
+/* выбор оружия/брони из архива (datalist) + расчёт КД по правилам 5e */
+function ensureItemDatalists(){
+  const mk=(id,filter)=>{
+    let dl=document.getElementById(id);
+    if(!dl){ dl=document.createElement('datalist'); dl.id=id; document.body.appendChild(dl); }
+    const items=(typeof ARCHIVE!=='undefined'?ARCHIVE:[]).filter(filter).sort((a,b)=>a.title.localeCompare(b.title,'ru'));
+    dl.innerHTML=items.map(x=>`<option value="${esc(x.title)}">`).join('');
+  };
+  mk('dl-weapons', x=>x.sub==='weapons');
+  mk('dl-armor', x=>x.sub==='armor' && !/щит/i.test(x.kicker||''));
+}
+function wpnPick(inp){
+  const row=inp.closest('.wpn-row'); if(!row) return;
+  const t=inp.value.trim().toLowerCase();
+  const w=(ARCHIVE||[]).find(x=>x.sub==='weapons' && x.title.toLowerCase()===t);
+  if(!w) return;
+  const dmg=row.querySelector('.w-d');
+  if(dmg && !dmg.value.trim()){ const dos={}; (w.dossier||[]).forEach(r=>dos[r.k]=r.v); if(dos['Урон']) dmg.value=String(dos['Урон']).slice(0,30); }
+}
+function armorInfo(title){
+  if(!title) return null;
+  const t=String(title).trim().toLowerCase();
+  const a=(ARCHIVE||[]).find(x=>x.sub==='armor' && x.title.toLowerCase()===t);
+  if(!a) return null;
+  const dos={}; (a.dossier||[]).forEach(r=>dos[r.k]=r.v);
+  const acStr=dos['Класс Доспеха']||dos['Класс доспеха']||dos['КД']||'';
+  const base=parseInt((String(acStr).match(/\d+/)||['10'])[0],10);
+  const kick=(a.kicker||'').toLowerCase();
+  const type=/тяж/.test(kick)?'heavy':/средн/.test(kick)?'medium':/щит/.test(kick)?'shield':'light';
+  return {base, type, title:a.title, id:a.id};
+}
+/* КД считается сам только когда выбран доспех (из архива) и/или щит — иначе ручной ввод не трогаем */
+function edCalcAC(p){
+  const armVal=pval(p+'-armor');
+  const sh=document.getElementById(p+'-shield'); const hasShield=!!(sh&&sh.checked);
+  const arm=armVal?armorInfo(armVal):null;
+  if(!arm && !(hasShield && !armVal)) return;   // не распознанный доспех или ручной КД — не трогаем
+  const dex=abilModNum(pval(p+'-ab-dex'));
+  let ac;
+  if(!arm) ac=10+dex;                                   // только щит
+  else if(arm.type==='heavy') ac=arm.base;
+  else if(arm.type==='medium') ac=arm.base+Math.min(dex,2);
+  else ac=arm.base+dex;                                  // лёгкий/по умолчанию
+  if(hasShield) ac+=2;
+  const el=document.getElementById(p+'-ac'); if(el) el.value=String(ac);
 }
 function sheetWpnBlock(p, list){
   const L=sheetL();
@@ -4211,7 +4259,7 @@ function openNewPlayer(){
     <div class="pacts"><button class="btn primary" onclick="createPlayer()">Создать</button><button class="btn ghost" onclick="closeModal()">Отмена</button></div>
     <p class="note">Лист привязывается к вашему аккаунту ${esc(dispTag(SESSION))} — редактировать сможете только вы.</p>`;
   document.getElementById('scrim').classList.add('open');
-  bindAbilMods('np'); bindProfAuto('np'); edRecalcProf('np');
+  ensureItemDatalists(); bindAbilMods('np'); bindProfAuto('np'); edRecalcProf('np'); edCalcAC('np');
   if(sheetHasMagic()) renderSpellUI();
 }
 /* аватар персонажа: сжимается до 240px и хранится data-URI в листе */
@@ -4321,7 +4369,7 @@ function sheetAbilBlock(p, ab){
 }
 function bindAbilMods(p){
   abilList().forEach(([k])=>{ const inp=pf(p+'-ab-'+k), out=document.getElementById(p+'-mod-'+k);
-    if(inp&&out){ inp.addEventListener('input',()=>{ out.textContent=inp.value.trim()?mod(inp.value):'—'; edRecalcProf(p); }); }
+    if(inp&&out){ inp.addEventListener('input',()=>{ out.textContent=inp.value.trim()?mod(inp.value):'—'; edRecalcProf(p); if(k==='dex') edCalcAC(p); }); }
   });
 }
 function collectAbil(p){ const o={}; abilList().forEach(([k])=>{ const v=pval(p+'-ab-'+k); if(v) o[k]=v; }); return o; }
@@ -4409,6 +4457,10 @@ function sheetEditorBody(p, c, game){
       ${sheetSkillsBlock(p, c)}`},
     {k:'combat', t:'Бой', html:`
       ${sheetStatsBlock(p, c)}
+      <div class="row">
+        <div class="field"><label>Доспех <span class="opt">— из архива, КД сам</span></label><input id="${p}-armor" list="dl-armor" maxlength="40" value="${esc(c.armor||'')}" oninput="edCalcAC('${p}')" placeholder="начни вводить…"></div>
+        <div class="field"><label>Щит</label><label class="ck-line"><input type="checkbox" id="${p}-shield" ${c.shield?'checked':''} onchange="edCalcAC('${p}')"> +2 к КД</label></div>
+      </div>
       <div class="field"><label>Кости хитов <span class="opt">— напр. 5к8</span></label><input id="${p}-hd" maxlength="20" value="${esc(c.hd||'')}"></div>
       ${sheetWpnBlock(p, c.weapons||[])}`}
   ];
@@ -4441,6 +4493,7 @@ async function createPlayer(){
     role:pval('np-role'), subcls:pval('np-subcls'), origin:pval('np-origin'), bg:pval('np-bg'), align:pval('np-align'),
     level:pval('np-level'), prof:pval('np-prof'), xp:pval('np-xp'),
     hp:pval('np-hp'), ac:pval('np-ac'), speed:pval('np-speed'), init:pval('np-init'), hd:pval('np-hd'),
+    armor:pval('np-armor'), shield:(document.getElementById('np-shield')&&document.getElementById('np-shield').checked)?1:0,
     will:sheetHasWill()?pval('np-will'):'',
     hum:sheetHasHum()?(pval('np-hum')||humDefault(collectAbil('np'))):'',
     coins:collectCoins('np', CUR_PROJECT), ava:AVA_TMP,
@@ -4522,6 +4575,10 @@ function openPlayer(id){
       const nm=wc?`<button type="button" class="sp-link" onclick="openModal('${wc.id}',true)" title="Открыть карточку оружия">${esc(w.n)}</button>`:esc(w.n||'—');
       return `<div class="wpn-vr"><span>${nm}</span><span>${esc(w.b||'—')}</span><span>${esc(w.d||'—')}</span><span>${esc(w.x||'')}</span></div>`;
     }).join('')}</div></div></div>`:'';
+  // доспех (ссылкой, всплывает поверх) + щит
+  const armC=c.armor?ARCHIVE.find(x=>x.sub==='armor' && x.title.toLowerCase()===String(c.armor).trim().toLowerCase()):null;
+  const armLink=c.armor?(armC?`<button type="button" class="sp-link" onclick="openModal('${armC.id}',true)" title="Открыть карточку доспеха">${esc(c.armor)}</button>`:esc(c.armor)):'';
+  const armHtml=(c.armor||c.shield)?`<div class="kv"><div class="k">Доспех</div><div class="v">${armLink}${c.shield?(c.armor?' · щит (+2)':'Щит (+2)'):''}</div></div>`:'';
   let editBlock;
   if(isOwner(c)){
     editBlock = `<div class="unlock"><button class="btn primary" onclick="renderPlayerEditor('${c.id}')">Редактировать</button>
@@ -4548,6 +4605,7 @@ function openPlayer(id){
     ${kv('Кости хитов', c.hd)}
     ${c.bg?kv(L.bg, c.bg):''}
     ${kv(L.profs, c.profs)}
+    ${armHtml}
     ${wpnHtml}
     ${kv(L.cfeats, c.cfeats||c.feats)}
     ${kv(L.rfeats, c.rfeats)}
@@ -4688,7 +4746,7 @@ function renderPlayerEditor(id){
       <button class="btn ghost" onclick="openPlayer('${c.id}')">Назад</button>
       <button class="btn danger" onclick="confirmDeletePlayer('${c.id}')">Удалить</button>
     </div>`;
-  bindAbilMods('ep'); bindProfAuto('ep'); edRecalcProf('ep');
+  ensureItemDatalists(); bindAbilMods('ep'); bindProfAuto('ep'); edRecalcProf('ep'); edCalcAC('ep');
   if(sheetHasMagic()) renderSpellUI();
 }
 async function savePlayer(id){
@@ -4700,6 +4758,7 @@ async function savePlayer(id){
     origin:pval('ep-origin'), bg:pval('ep-bg'), align:pval('ep-align'),
     level:pval('ep-level'), prof:pval('ep-prof'), xp:pval('ep-xp'),
     hp:pval('ep-hp'), ac:pval('ep-ac'), speed:pval('ep-speed'), init:pval('ep-init'), hd:pval('ep-hd'),
+    armor:pval('ep-armor'), shield:(document.getElementById('ep-shield')&&document.getElementById('ep-shield').checked)?1:0,
     will:sheetHasWill()?pval('ep-will'):(CHARS[i].will||''),
     hum:sheetHasHum()?(pval('ep-hum')||humDefault(collectAbil('ep'))):(CHARS[i].hum||''),
     coins:collectCoins('ep', charGame(CHARS[i])), ava:AVA_TMP,
@@ -4989,7 +5048,7 @@ function sanitizeImportedChar(s){
     name:str(s.name,60), player:str(s.player,40),
     role:str(s.role,50), subcls:str(s.subcls,50), origin:str(s.origin,50), bg:str(s.bg,50), align:str(s.align,40),
     level:str(s.level,12), prof:str(s.prof,8), xp:str(s.xp,12),
-    hp:str(s.hp,9), ac:str(s.ac,5), speed:str(s.speed,8), init:str(s.init,6), hd:str(s.hd,20),
+    hp:str(s.hp,9), ac:str(s.ac,5), speed:str(s.speed,8), init:str(s.init,6), hd:str(s.hd,20), armor:str(s.armor,40), shield:s.shield?1:0,
     will:str(s.will,9), hum:str(s.hum,9), cond:str(s.cond,4), exh:str(s.exh,4), insp:s.insp?1:0,
     profs:str(s.profs,1000), cfeats:str(s.cfeats||s.feats,2000), rfeats:str(s.rfeats,2000), tfeats:str(s.tfeats,2000),
     traits:str(s.traits,1000), ideals:str(s.ideals,1000), bonds:str(s.bonds,1000), flaws:str(s.flaws,1000),
