@@ -1,0 +1,62 @@
+name: Бэкап базы (Supabase kv)
+
+# Раз в сутки выгружает всю таблицу kv из Supabase и складывает
+# сжатый снапшот в отдельную ветку `backups` (main не трогается, сайт не пересобирается).
+# Можно запустить вручную: вкладка Actions → этот workflow → Run workflow.
+
+on:
+  schedule:
+    - cron: '17 3 * * *'   # ежедневно ~03:17 UTC
+  workflow_dispatch:
+
+concurrency:
+  group: backup-kv
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Дамп таблицы kv и коммит в ветку backups
+        env:
+          # Публичный anon-ключ (только чтение; запись закрыта RLS) — тот же, что в index.html
+          SUPA_URL: https://xstrdpoxwbkbumigspdv.supabase.co
+          SUPA_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhzdHJkcG94d2JrYnVtaWdzcGR2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQwMjg1ODIsImV4cCI6MjA5OTYwNDU4Mn0.En-AP7WJh8AZkylbM44yhhJyNcFf0-ra6M3Yu8ZxAhs
+        run: |
+          set -euo pipefail
+          DATE=$(date -u +%Y-%m-%d)
+          SNAP="/tmp/kv-$DATE.json.gz"
+
+          echo "Выгружаю таблицу kv…"
+          curl -sS --fail --max-time 180 \
+            "$SUPA_URL/rest/v1/kv?select=*" \
+            -H "apikey: $SUPA_KEY" -H "Authorization: Bearer $SUPA_KEY" \
+            | gzip -9 > "$SNAP"
+          echo "Снапшот: $(du -h "$SNAP" | cut -f1)"
+
+          # переключаемся на ветку backups (создаём при первом запуске)
+          git fetch origin backups:backups 2>/dev/null || true
+          if git show-ref --verify --quiet refs/heads/backups; then
+            git checkout backups
+          else
+            git checkout --orphan backups
+            git rm -rf . --quiet 2>/dev/null || true
+            printf '# Резервные копии базы KOMIK\n\nАвтоснапшоты таблицы Supabase `kv` (gzip). Хранятся последние 30.\n' > README.md
+          fi
+
+          mkdir -p backups
+          cp "$SNAP" backups/
+          # оставляем последние 30 снапшотов
+          ls -1t backups/kv-*.json.gz 2>/dev/null | tail -n +31 | xargs -r rm -f
+
+          git config user.name  "komik-backup-bot"
+          git config user.email "backup@users.noreply.github.com"
+          git add backups README.md 2>/dev/null || git add backups
+          git commit -q -m "Бэкап kv $DATE" || { echo "Изменений нет — пропуск."; exit 0; }
+          git push origin backups
+          echo "Готово: backups/kv-$DATE.json.gz"
