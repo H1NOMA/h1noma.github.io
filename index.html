@@ -911,6 +911,7 @@
 
   /* modal — bottom sheet on mobile */
   .scrim{position:fixed;inset:0;z-index:70;background:rgba(0,0,0,.5);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);display:none;align-items:flex-end;justify-content:center;overflow:auto}
+  #scrim2{z-index:90;background:rgba(0,0,0,.62)}
   .scrim.open{display:flex;animation:scrimIn .25s ease}
   @keyframes scrimIn{from{opacity:0}to{opacity:1}}
   .modal{width:100%;max-height:92vh;overflow:auto;background:var(--glass2);backdrop-filter:blur(32px) saturate(180%);-webkit-backdrop-filter:blur(32px) saturate(180%);border:var(--hair) solid var(--line2);border-bottom:none;border-radius:var(--r-sheet) var(--r-sheet) 0 0;padding:30px 18px calc(24px + env(safe-area-inset-bottom));position:relative;color:var(--red)}
@@ -1699,6 +1700,9 @@
 <div class="scrim" id="scrim" onclick="if(event.target===this)closeModal()">
   <div class="modal" id="modal" role="dialog" aria-modal="true"></div>
 </div>
+<div class="scrim" id="scrim2" onclick="if(event.target===this)closeOverlay()">
+  <div class="modal" id="modal2" role="dialog" aria-modal="true"></div>
+</div>
 
 <div class="toast" id="toast"><span class="ic">▮</span><span id="toastMsg"></span></div>
 
@@ -2379,7 +2383,7 @@ function storySave(){
 /* ====================== Модальное окно ====================== */
 let CUR_ARCH={};
 function pickArch(id,i){ CUR_ARCH[id]=i; openModal(id); }
-function openModal(id){
+function openModal(id, overlay){
   if(assimArchLocked()) return;
   const e=ARCHIVE.find(x=>x.id===id); if(!e) return;
   const c=catById(e.cat), s=subById(e.cat,e.sub);
@@ -2425,8 +2429,8 @@ function openModal(id){
     ? baseSecs.map(x=>mkSec(x)).join('') + archSecs.map(x=>mkSec(x, A.name)).join('')
     : baseSecs.map(x=>`<div class="sec"><h4>${esc(x.h)}</h4><p>${esc(x.t)}</p></div>`).join('');
   const epi = e.epigraph ? `<blockquote class="epi">${esc(e.epigraph)}</blockquote>` : '';
-  document.getElementById('modal').innerHTML = `
-    <button class="x" onclick="closeModal()" aria-label="Закрыть">✕</button>
+  document.getElementById(overlay?'modal2':'modal').innerHTML = `
+    <button class="x" onclick="${overlay?'closeOverlay()':'closeModal()'}" aria-label="Закрыть">✕</button>
     <button class="bm-btn${isBookmarked(e.id)?' on':''}" id="bmCardBtn" onclick="toggleBookmark('${e.id}')" aria-label="В закладки" title="В закладки">${BM_SVG}</button>
     <div class="top">${cardIcon(e,24)}<span class="clabel">${path}</span></div>
     ${isDossier?`
@@ -2448,9 +2452,10 @@ function openModal(id){
     ${tbl}
     ${secs?`<div class="secs">${secs}</div>`:''}
     <div class="foot">${badge}${tags}<span class="src">${who}${srcChip(e)}${esc(e.src||'')}</span></div>
-    ${ADMIN?`<div class="chrono-tools"><button class="btn ghost" onclick="openCardEditor('${e.id}')">Редактировать</button></div>`:''}`;
-  document.getElementById('scrim').classList.add('open');
+    ${(ADMIN && !overlay)?`<div class="chrono-tools"><button class="btn ghost" onclick="openCardEditor('${e.id}')">Редактировать</button></div>`:''}`;
+  document.getElementById(overlay?'scrim2':'scrim').classList.add('open');
 }
+function closeOverlay(){ document.getElementById('scrim2').classList.remove('open'); }
 
 /* ---------- Статблок божества (заполняет Game Master) ---------- */
 const DEITY_STAT_FIELDS=[
@@ -2608,7 +2613,7 @@ function openPolicy(){
     </div>`;
   document.getElementById('scrim').classList.add('open');
 }
-document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeModal(); });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ const s2=document.getElementById('scrim2'); if(s2 && s2.classList.contains('open')) closeOverlay(); else closeModal(); } });
 
 /* ====================== Хронология ====================== */
 const CHRONO_NAMES={legacy:'LEGACY',neverland:'NEVERLAND',assimilation:'ASSIMILATION',terra:'TERRA AETERNA'};
@@ -3642,12 +3647,12 @@ const SHEET_L={
     hp:'Хиты', ac:'КБ', speed:'Скорость', init:'Инициатива', will:'Воля', money:'Золото', prof:'Бонус мастерства',
     cfeats:'Классовые умения', rfeats:'Умения от расы', tfeats:'Черты',
     profs:'Владения', wpn:'Оружие',
-    feats:'Умения и черты', spells:'Заклинания', gear:'Снаряжение', bio:'Предыстория и заметки' },
+    feats:'Умения и черты', spells:'Заклинания', gear:'Снаряжение', bio:'Предыстория', notes:'Заметки' },
   assimilation:{ cls:'Класс', subcls:'Специализация', race:'Модель/происхождение', bg:'Биография', align:'Репутация',
     hp:'Хиты', ac:'Броня', speed:'Скорость', init:'Реакция', will:'Воля', hum:'Человечность', money:'Эдди (€$)', prof:'Бонус навыка',
     cfeats:'Импланты и перки', rfeats:'Особенности модели', tfeats:'Перки',
     profs:'Владения и допуски', wpn:'Оружие',
-    feats:'Импланты и перки', spells:'Программы/взлом', gear:'Снаряжение и гир', bio:'Легенда и заметки' }
+    feats:'Импланты и перки', spells:'Программы/взлом', gear:'Снаряжение и гир', bio:'Легенда', notes:'Заметки' }
 };
 function sheetL(game){ return SHEET_L[(game||CUR_PROJECT)==='assimilation'?'assimilation':'default']; }
 function charGame(c){ for(const g of Object.keys(CHARS_ALL)){ if((CHARS_ALL[g]||[]).some(x=>x&&x.id===c.id)) return g; } return CUR_PROJECT; }
@@ -3914,7 +3919,7 @@ function spellbookViewHtml(c, game){
       const star = l==0 ? '<span class="sp-prep on" title="Заговор">◆</span>'
         : (own?`<button type="button" class="sp-prep${prep?' on':''}" onclick="spViewPrep('${c.id}','${e.id}')" title="Подготовлено">★</button>`
               :`<span class="sp-prep${prep?' on':''}">★</span>`);
-      return `<div class="sp-known">${star}<button type="button" class="sp-t sp-link" onclick="openModal('${e.id}')" title="Открыть карточку заклинания">${esc(e.title)}</button></div>`;
+      return `<div class="sp-known">${star}<button type="button" class="sp-t sp-link" onclick="openModal('${e.id}',true)" title="Открыть карточку заклинания">${esc(e.title)}</button></div>`;
     }).join('')}</div>`).join('');
   return `<div class="kv"><div class="k">Книга заклинаний · ${esc((sc.cls||[]).join(' + '))}</div><div class="v">
     ${lim.prepMax?`<div class="sp-lim-line total">Подготовлено: <b>${(sc.prep||[]).length}</b> / ${lim.prepMax}${own?' · отмечай ★ после отдыха':''}</div>`:''}
@@ -4420,7 +4425,8 @@ function sheetEditorBody(p, c, game){
       <div class="field"><label>Идеалы</label><textarea id="${p}-ideals" maxlength="1000">${esc(c.ideals||'')}</textarea></div>
       <div class="field"><label>Привязанности</label><textarea id="${p}-bonds" maxlength="1000">${esc(c.bonds||'')}</textarea></div>
       <div class="field"><label>Слабости</label><textarea id="${p}-flaws" maxlength="1000">${esc(c.flaws||'')}</textarea></div>
-      <div class="field"><label>${L.bio}</label><textarea id="${p}-bio" maxlength="2000">${esc(c.bio||'')}</textarea></div>`});
+      <div class="field"><label>${L.bio}</label><textarea id="${p}-bio" maxlength="2000">${esc(c.bio||'')}</textarea></div>
+      <div class="field"><label>${L.notes||'Заметки'} <span class="opt">— личные пометки игрока</span></label><textarea id="${p}-notes" maxlength="2000">${esc(c.notes||'')}</textarea></div>`});
   return `<div class="ed-wrap">
     <div class="ed-tabs" role="tablist">${tabs.map((t,i)=>`<button type="button" class="ed-tab${i===0?' on':''}" onclick="edTab(this,'${p}-panel-${t.k}')">${t.t}</button>`).join('')}</div>
     ${tabs.map((t,i)=>`<div class="ed-panel${i===0?' on':''}" id="${p}-panel-${t.k}">${t.html}</div>`).join('')}
@@ -4445,7 +4451,7 @@ async function createPlayer(){
     spells:pval('np-spells'),
     spellcasting:sheetHasMagic()?collectSpellcasting():null,
     slots:sheetHasMagic()?collectSlots(null):{},
-    bio:pval('np-bio'), gear:pval('np-gear'),
+    bio:pval('np-bio'), notes:pval('np-notes'), gear:pval('np-gear'),
     fields:{}, createdAt:Date.now(), updatedAt:Date.now() };
   CHARS.push(ch);
   
@@ -4513,7 +4519,7 @@ function openPlayer(id){
     <div class="wpn-view"><div class="wpn-vh"><span>Название</span><span>Бонус/СЛ</span><span>Урон</span><span>Заметки</span></div>
     ${wpns.map(w=>{
       const wc=w.n?ARCHIVE.find(x=>x.sub==='weapons' && x.title.toLowerCase()===String(w.n).trim().toLowerCase()):null;
-      const nm=wc?`<button type="button" class="sp-link" onclick="openModal('${wc.id}')" title="Открыть карточку оружия">${esc(w.n)}</button>`:esc(w.n||'—');
+      const nm=wc?`<button type="button" class="sp-link" onclick="openModal('${wc.id}',true)" title="Открыть карточку оружия">${esc(w.n)}</button>`:esc(w.n||'—');
       return `<div class="wpn-vr"><span>${nm}</span><span>${esc(w.b||'—')}</span><span>${esc(w.d||'—')}</span><span>${esc(w.x||'')}</span></div>`;
     }).join('')}</div></div></div>`:'';
   let editBlock;
@@ -4554,6 +4560,7 @@ function openPlayer(id){
     ${kv(L.gear, c.gear)}
     ${c.xp?kv('Опыт (XP)', c.xp):''}
     ${kv(L.bio, c.bio)}
+    ${kv(L.notes||'Заметки', c.notes)}
     <div class="row" style="margin:4px 0 10px">
       <button class="btn ghost" onclick="printSheet('${c.id}')">🖨 PDF</button>
       <button class="btn ghost" onclick="exportChar('${c.id}')">⬇ Лист JSON</button>
@@ -4703,7 +4710,7 @@ async function savePlayer(id){
     spells:CUR_PROJECT==='assimilation'?pval('ep-spells'):(CHARS[i].spells||''),
     spellcasting:sheetHasMagic()?collectSpellcasting():(CHARS[i].spellcasting||null),
     slots:sheetHasMagic()?collectSlots(CHARS[i].slots):(CHARS[i].slots||{}),
-    bio:pval('ep-bio'), gear:pval('ep-gear'),
+    bio:pval('ep-bio'), notes:pval('ep-notes'), gear:pval('ep-gear'),
     updatedAt:Date.now() });
   renderPlayers(); toast('Сохранено'); ensurePlayersVisible();
   await persistChars();
@@ -4986,7 +4993,7 @@ function sanitizeImportedChar(s){
     will:str(s.will,9), hum:str(s.hum,9), cond:str(s.cond,4), exh:str(s.exh,4), insp:s.insp?1:0,
     profs:str(s.profs,1000), cfeats:str(s.cfeats||s.feats,2000), rfeats:str(s.rfeats,2000), tfeats:str(s.tfeats,2000),
     traits:str(s.traits,1000), ideals:str(s.ideals,1000), bonds:str(s.bonds,1000), flaws:str(s.flaws,1000),
-    spells:str(s.spells,2000), gear:str(s.gear,2000), bio:str(s.bio,2000),
+    spells:str(s.spells,2000), gear:str(s.gear,2000), bio:str(s.bio,2000), notes:str(s.notes,2000),
     ava:(typeof s.ava==='string' && s.ava.startsWith('data:image')) ? s.ava.slice(0,600000) : '',
     abil:{}, saves:{}, skills:{}, coins:{}, weapons:[], slots:{}, spellcasting:null, feats:'' };
   if(s.abil && typeof s.abil==='object') KEYS.forEach(k=>{ if(s.abil[k]!=null) out.abil[k]=str(s.abil[k],3); });
