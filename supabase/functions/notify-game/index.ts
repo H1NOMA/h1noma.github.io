@@ -39,21 +39,15 @@ Deno.serve(async (req) => {
   // Пользовательский токен приходит отдельным заголовком x-user-token — так шлюз
   // проверяет только анон-ключ в Authorization и не спотыкается о новые ключи проекта.
   const jwt = (req.headers.get("x-user-token") || "").replace(/^Bearer\s+/i, "");
-  const { data: u, error: uerr } = await supa.auth.getUser(jwt);
-  const email = u?.user?.email || "";
-  const login = email.split("@")[0].toLowerCase();
-  if (!DEV.includes(login)) {
-    // диагностика: видно, дошёл ли токен, какой распознан логин и что сказал auth
-    return new Response(
-      `forbidden — login="${login}" email="${email}" token=${jwt ? "yes" : "no"} authErr="${uerr?.message || ""}"`,
-      { status: 403, headers: cors },
-    );
-  }
+  const { data: u } = await supa.auth.getUser(jwt);
+  const login = (u?.user?.email || "").split("@")[0].toLowerCase();
+  if (!DEV.includes(login)) return new Response("forbidden", { status: 403, headers: cors });
 
   const body = await req.json().catch(() => ({}));
   const title = "Новая игра · " + (body.setting || "КОМИК");
   const msg = (body.game || "Открыта запись на игру") + (body.time ? " · " + body.time : "");
-  const payload = JSON.stringify({ title, body: msg, tag: "komik-game", url: "./" });
+  // gid уходит в data уведомления (в тексте не виден) → по тапу открываем именно эту игру
+  const payload = JSON.stringify({ title, body: msg, tag: "komik-game", gid: String(body.gid || "") });
 
   const { data: row } = await supa.from("kv").select("value").eq("key", "push:subs").maybeSingle();
   const subs: any[] = Array.isArray(row?.value) ? row!.value : [];

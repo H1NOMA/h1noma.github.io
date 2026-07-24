@@ -2,7 +2,7 @@
    Стратегия stale-while-revalidate: отдаём страницу из кэша мгновенно,
    а в фоне тихо перекачиваем свежую — она подхватится на следующем заходе.
    Так первый экран открывается сразу, без ожидания сети, и остаётся актуальным. */
-const CACHE = 'comik-v52';
+const CACHE = 'comik-v53';
 // мелкие статические файлы прогреваем сразу при установке
 const PRECACHE = ['manifest.webmanifest', 'fonts.css', 'supabase.js', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'];
 
@@ -24,21 +24,28 @@ self.addEventListener('push', e => {
   let d = {};
   try { d = e.data ? e.data.json() : {}; } catch (_) { d = { body: e.data && e.data.text() }; }
   const title = d.title || 'КОМИК';
+  const gid = d.gid || '';
+  // ссылка «фоном»: в тексте её нет, но по тапу откроется именно эта игра
+  const url = gid ? ('./?g=' + encodeURIComponent(gid)) : './';
   e.waitUntil(self.registration.showNotification(title, {
     body: d.body || 'Новая игра',
     icon: 'icon-192.png',
     badge: 'icon-192.png',
     tag: d.tag || 'komik-game',
-    data: { url: d.url || './' }
+    data: { url, gid }
   }));
 });
-// тап по уведомлению → открываем/фокусируем приложение
+// тап по уведомлению → открываем меню именно этой игры
 self.addEventListener('notificationclick', e => {
   e.notification.close();
-  const url = (e.notification.data && e.notification.data.url) || './';
+  const data = e.notification.data || {};
+  const url = data.url || './';
+  const gid = data.gid || '';
   e.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
-      for (const c of list) { if ('focus' in c) return c.focus(); }
+      for (const c of list) {
+        if ('focus' in c) { try { c.postMessage({ type: 'komik-open-game', gid }); } catch (_) {} return c.focus(); }
+      }
       if (self.clients.openWindow) return self.clients.openWindow(url);
     })
   );
