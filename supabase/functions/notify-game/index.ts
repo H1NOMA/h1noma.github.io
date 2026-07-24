@@ -13,7 +13,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-user-token",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
@@ -35,8 +35,10 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return new Response("method", { status: 405, headers: cors });
 
-  // авторизация: рассылать может только dev-аккаунт (hinoma / herr_teo)
-  const jwt = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
+  // авторизация: рассылать может только dev-аккаунт (hinoma / herr_teo).
+  // Пользовательский токен приходит отдельным заголовком x-user-token — так шлюз
+  // проверяет только анон-ключ в Authorization и не спотыкается о новые ключи проекта.
+  const jwt = (req.headers.get("x-user-token") || "").replace(/^Bearer\s+/i, "");
   const { data: u } = await supa.auth.getUser(jwt);
   const login = (u?.user?.email || "").split("@")[0].toLowerCase();
   if (!DEV.includes(login)) return new Response("forbidden", { status: 403, headers: cors });
