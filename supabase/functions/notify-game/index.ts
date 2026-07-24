@@ -17,8 +17,8 @@ const cors = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-// только этим аккаунтам разрешено рассылать
-const DEV = ["hinoma", "herr_teo"];
+// только этим аккаунтам разрешено рассылать (варианты написания herteo — на всякий случай)
+const DEV = ["hinoma", "herr_teo", "herteo", "herrteo", "herr_theo"];
 
 webpush.setVapidDetails(
   Deno.env.get("VAPID_SUBJECT") || "mailto:admin@komikdnd.ru",
