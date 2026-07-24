@@ -1,0 +1,7 @@
+project_id = "xstrdpoxwbkbumigspdv"
+
+# Проверку JWT на шлюзе выключаем: новые проекты Supabase подписывают токены
+# ключами, которые шлюз функций не проверяет (даёт 401 INVALID_CREDENTIALS).
+# Авторизацию делает сама функция (supa.auth.getUser + список dev-аккаунтов).
+[functions.notify-game]
+verify_jwt = false
