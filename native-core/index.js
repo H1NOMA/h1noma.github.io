@@ -6,3 +6,5 @@ export * from './spellcasting.js';
 export * from './deathSaves.js';
 export * from './settings.js';
 export * from './character.js';
+export * from './taxonomy.js';
+export * from './archive.js';
