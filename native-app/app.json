@@ -1,0 +1,24 @@
+{
+  "expo": {
+    "name": "КОМИК",
+    "slug": "komik",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "komik",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#0c110d"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "ru.komikdnd.app"
+    },
+    "android": {
+      "package": "ru.komikdnd.app"
+    },
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}
