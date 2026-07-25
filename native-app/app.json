@@ -7,6 +7,7 @@
     "scheme": "komik",
     "userInterfaceStyle": "dark",
     "splash": {
+      "image": "./assets/splash.png",
       "resizeMode": "contain",
       "backgroundColor": "#0c110d"
     },
@@ -15,7 +16,8 @@
       "bundleIdentifier": "ru.komikdnd.app",
       "associatedDomains": [
         "applinks:komikdnd.ru"
-      ]
+      ],
+      "buildNumber": "1"
     },
     "android": {
       "package": "ru.komikdnd.app",
@@ -34,7 +36,26 @@
             "DEFAULT"
           ]
         }
+      ],
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0c110d"
+      }
+    },
+    "icon": "./assets/icon.png",
+    "notification": {
+      "icon": "./assets/notification-icon.png",
+      "color": "#d3a84a"
+    },
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#d3a84a"
+        }
       ]
-    }
+    ]
   }
 }
