@@ -12,10 +12,29 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "ru.komikdnd.app"
+      "bundleIdentifier": "ru.komikdnd.app",
+      "associatedDomains": [
+        "applinks:komikdnd.ru"
+      ]
     },
     "android": {
-      "package": "ru.komikdnd.app"
+      "package": "ru.komikdnd.app",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "komikdnd.ru"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ]
     }
   }
 }

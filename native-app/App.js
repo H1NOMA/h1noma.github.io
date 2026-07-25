@@ -1,12 +1,14 @@
-// КОМИК · каркас приложения. Шапка с переключателем сеттинга (каждый — своим цветом),
-// нижние вкладки. Экраны считают всё через общее ядро native-core.
-import React, { useState } from 'react';
-import { View, Text, Pressable, Modal, StyleSheet } from 'react-native';
+// КОМИК · приложение. Шапка с переключателем сеттинга (каждый — своим цветом),
+// нижние вкладки, заставка входа, deep links (?g=… / komik://g/…).
+import React, { useEffect, useState } from 'react';
+import { View, Text, Pressable, Modal, StyleSheet, Linking } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { ThemeProvider, useTheme } from './src/theme.js';
 import { SessionProvider } from './src/session.js';
 import { themeFor } from '../native-core/index.js';
+import Splash from './src/Splash.js';
+import { deeplink, parseGameId } from './src/deeplink.js';
 import NewsScreen from './src/screens/NewsScreen.js';
 import ArchiveScreen from './src/screens/ArchiveScreen.js';
 import CharactersScreen from './src/screens/CharactersScreen.js';
@@ -24,15 +26,31 @@ const TABS = [
 ];
 
 function Shell() {
-  const { theme, setting, setSetting, settings, titles } = useTheme();
+  const { theme, setting, setSetting, settings, titles, ready } = useTheme();
   const [tab, setTab] = useState('news');
   const [menuOpen, setMenuOpen] = useState(false);
+  const [splash, setSplash] = useState(true);
   const Screen = (TABS.find(t => t.key === tab) || TABS[0]).screen;
   const s = styles(theme);
+
+  // deep links: холодный старт + ссылки в работающее приложение → вкладка «Игры»
+  useEffect(() => {
+    const handle = (url) => {
+      const id = parseGameId(url);
+      if (id) { deeplink.set(id); setTab('games'); }
+    };
+    Linking.getInitialURL().then(handle).catch(() => {});
+    const sub = Linking.addEventListener('url', e => handle(e.url));
+    return () => sub.remove();
+  }, []);
+
+  // пока сеттинг не восстановлен с устройства — держим пустой фон (заставка стартует в верной теме)
+  if (!ready) return <View style={{ flex: 1, backgroundColor: theme.bg }} />;
 
   return (
     <SafeAreaView style={s.root} edges={['top', 'bottom']}>
       <StatusBar style="light" />
+      {splash && <Splash setting={setting} onDone={() => setSplash(false)} />}
 
       {/* шапка: тап по названию сеттинга открывает список */}
       <View style={s.header}>

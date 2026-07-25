@@ -7,6 +7,7 @@ import { useTheme } from '../theme.js';
 import { useSession } from '../session.js';
 import { store } from '../store.js';
 import { loadMyChars } from '../chars.js';
+import { deeplink } from '../deeplink.js';
 
 const repo = gamesRepo(store);
 const uid = () => 'gm' + Date.now().toString(36);
@@ -17,6 +18,9 @@ export default function ScheduleScreen() {
   const [games, setGames] = useState([]);
   const [myChars, setMyChars] = useState([]);
   const [title, setTitle] = useState('');
+  const [hotId, setHotId] = useState(deeplink.peek());   // игра из deep link — подсветить
+
+  useEffect(() => deeplink.sub(id => setHotId(id)), []);
 
   const reload = useCallback(async () => {
     const all = await repo.list();
@@ -50,7 +54,7 @@ export default function ScheduleScreen() {
           const mine = isSignedUp(item, session);
           const manage = canManageGame(item, session);
           return (
-            <View style={s.card}>
+            <View style={[s.card, hotId === item.id && { borderColor: theme.accent, borderWidth: 1.5 }]}>
               <Text style={s.title}>{item.title || 'Сессия'}</Text>
               <Text style={s.meta}>Мест {free}/{item.seats || 0}{item.time ? ` · ${item.time}` : ''}</Text>
               {(item.players || []).length > 0 && (

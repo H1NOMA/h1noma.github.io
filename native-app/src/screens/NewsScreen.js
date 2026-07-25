@@ -5,6 +5,7 @@ import { KEYS, newsRepo } from '../../../native-core/data/index.js';
 import { SETTING_HERO } from '../../../native-core/index.js';
 import { useTheme } from '../theme.js';
 import { store } from '../store.js';
+import HeroFrame from '../HeroFrame.js';
 
 const repo = newsRepo(store);
 
@@ -35,10 +36,10 @@ export default function NewsScreen() {
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={reload} tintColor={theme.accent} />}
       contentContainerStyle={{ padding: 14, gap: 10, paddingBottom: 30 }}
       ListHeaderComponent={
-        <View style={s.hero}>
+        <HeroFrame setting={setting} theme={theme}>
           <Text style={s.heroTitle}>{hero.title}</Text>
           <Text style={s.heroText}>{hero.text}</Text>
-        </View>
+        </HeroFrame>
       }
       ListEmptyComponent={<Text style={s.empty}>{hero.empty}</Text>}
       renderItem={({ item }) => {
