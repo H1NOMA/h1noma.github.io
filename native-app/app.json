@@ -16,9 +16,6 @@
     },
     "android": {
       "package": "ru.komikdnd.app"
-    },
-    "web": {
-      "bundler": "metro"
     }
   }
 }

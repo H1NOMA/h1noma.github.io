@@ -7,15 +7,17 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { ThemeProvider, useTheme } from './src/theme.js';
 import { SessionProvider } from './src/session.js';
 import { themeFor } from '../native-core/index.js';
-import SheetScreen from './src/screens/SheetScreen.js';
+import NewsScreen from './src/screens/NewsScreen.js';
 import ArchiveScreen from './src/screens/ArchiveScreen.js';
+import CharactersScreen from './src/screens/CharactersScreen.js';
 import BoardScreen from './src/screens/BoardScreen.js';
 import ScheduleScreen from './src/screens/ScheduleScreen.js';
 import ProfileScreen from './src/screens/ProfileScreen.js';
 
 const TABS = [
-  { key: 'sheet', label: 'Лист', screen: SheetScreen },
+  { key: 'news', label: 'Новости', screen: NewsScreen },
   { key: 'archive', label: 'Архив', screen: ArchiveScreen },
+  { key: 'chars', label: 'Игроки', screen: CharactersScreen },
   { key: 'games', label: 'Игры', screen: ScheduleScreen },
   { key: 'board', label: 'Доска', screen: BoardScreen },
   { key: 'profile', label: 'Профиль', screen: ProfileScreen },
@@ -23,7 +25,7 @@ const TABS = [
 
 function Shell() {
   const { theme, setting, setSetting, settings, titles } = useTheme();
-  const [tab, setTab] = useState('sheet');
+  const [tab, setTab] = useState('news');
   const [menuOpen, setMenuOpen] = useState(false);
   const Screen = (TABS.find(t => t.key === tab) || TABS[0]).screen;
   const s = styles(theme);

@@ -12,7 +12,7 @@ import { dirname, join } from 'node:path';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SRC = process.argv[2] || join(HERE, '..', '..', 'index.html');
-const BLOCKS = ['core-data', 'archive-data', 'news-data', 'chrono-data', 'hero-img-data'];
+const BLOCKS = ['core-data', 'core-bestiary', 'archive-data', 'news-data', 'chrono-data', 'hero-img-data'];
 
 const html = readFileSync(SRC, 'utf8');
 

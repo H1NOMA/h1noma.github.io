@@ -6,6 +6,7 @@ import { gamesRepo, seatsLeft, isSignedUp, canManageGame } from '../../../native
 import { useTheme } from '../theme.js';
 import { useSession } from '../session.js';
 import { store } from '../store.js';
+import { loadMyChars } from '../chars.js';
 
 const repo = gamesRepo(store);
 const uid = () => 'gm' + Date.now().toString(36);
@@ -14,12 +15,14 @@ export default function ScheduleScreen() {
   const { theme, setting } = useTheme();
   const { session, tag, dev } = useSession();
   const [games, setGames] = useState([]);
+  const [myChars, setMyChars] = useState([]);
   const [title, setTitle] = useState('');
 
   const reload = useCallback(async () => {
     const all = await repo.list();
     setGames(all.filter(g => g && g.game === setting));
-  }, [setting]);
+    setMyChars(tag ? await loadMyChars(setting, tag) : []);
+  }, [setting, tag]);
 
   useEffect(() => { reload(); }, [reload]);
 
@@ -56,9 +59,13 @@ export default function ScheduleScreen() {
               <View style={s.actRow}>
                 {session && !mine && free > 0 && (
                   <Pressable style={s.btnPrimary} onPress={async () => {
-                    await repo.signup(item.id, session, { name: tag });
+                    // первый свой персонаж сеттинга прикрепляется к записи автоматически (как имя героя)
+                    const ch = myChars[0];
+                    await repo.signup(item.id, session, ch
+                      ? { name: ch.name, charId: ch.id, charName: ch.name }
+                      : { name: tag });
                     reload();
-                  }}><Text style={s.btnPrimaryTxt}>Записаться</Text></Pressable>
+                  }}><Text style={s.btnPrimaryTxt}>Записаться{myChars[0] ? ` (${myChars[0].name})` : ''}</Text></Pressable>
                 )}
                 {session && mine && (
                   <Pressable style={s.btnGhost} onPress={async () => {

@@ -7,16 +7,26 @@ import { boardRepo, activeBoardForPlayer, isFoeCard } from '../../../native-core
 import { useTheme } from '../theme.js';
 import { useSession } from '../session.js';
 import { store } from '../store.js';
+import { loadMyChars } from '../chars.js';
 
 const repo = boardRepo(store);
 const localKey = (setting) => 'app:board:local:' + setting;
 
 export default function BoardScreen() {
   const { theme, setting } = useTheme();
-  const { session, dev } = useSession();
+  const { session, tag, dev } = useSession();
   const [localList, setLocalList] = useState([]);
   const [shared, setShared] = useState({});
   const [name, setName] = useState('');
+  const [myCharIds, setMyCharIds] = useState(new Set());
+
+  // мои персонажи сеттинга — чтобы найти свою карточку на доске и править её ХП
+  useEffect(() => {
+    let alive = true;
+    if (!tag) { setMyCharIds(new Set()); return; }
+    loadMyChars(setting, tag).then(list => { if (alive) setMyCharIds(new Set(list.map(c => c.id))); });
+    return () => { alive = false; };
+  }, [setting, tag]);
 
   // локальный список ГМа для сеттинга
   useEffect(() => {
@@ -62,9 +72,9 @@ export default function BoardScreen() {
 
   const s = styles(theme);
 
-  // --- игрок: только активная доска сеттинга ---
+  // --- игрок: активная доска сеттинга; свою карточку можно лечить/ранить ---
   if (!dev) {
-    const key = activeBoardForPlayer(shared, setting, new Set());
+    const key = activeBoardForPlayer(shared, setting, myCharIds);
     const board = key ? shared[key] : null;
     return (
       <View style={s.wrap}>
@@ -75,14 +85,25 @@ export default function BoardScreen() {
             data={board.list || []}
             keyExtractor={(x, i) => String(i)}
             contentContainerStyle={{ padding: 12, gap: 8 }}
-            renderItem={({ item }) => (
-              <View style={s.card}>
-                <Text style={s.cardName}>{item.name}</Text>
-                <Text style={s.cardStats}>
-                  ИН {item.init ?? 0}{isFoeCard(item) ? '' : ` · ХП ${item.hp ?? '—'} · КД ${item.ac || '—'}`}
-                </Text>
-              </View>
-            )}
+            renderItem={({ item }) => {
+              const mineCard = item.charId && myCharIds.has(item.charId);
+              return (
+                <View style={[s.card, mineCard && { borderColor: theme.accent }]}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.cardName}>{item.name}{mineCard ? ' · мой' : ''}</Text>
+                    <Text style={s.cardStats}>
+                      ИН {item.init ?? 0}{isFoeCard(item) ? '' : ` · ХП ${item.hp ?? '—'} · КД ${item.ac || '—'}`}
+                    </Text>
+                  </View>
+                  {mineCard && (
+                    <>
+                      <Pressable style={s.hpBtn} onPress={() => repo.applyToCard(key, item.charId, c => { c.hp = Math.max(0, (parseInt(c.hp, 10) || 0) - 1); }, setShared)}><Text style={s.hpTxt}>−</Text></Pressable>
+                      <Pressable style={s.hpBtn} onPress={() => repo.applyToCard(key, item.charId, c => { c.hp = (parseInt(c.hp, 10) || 0) + 1; }, setShared)}><Text style={s.hpTxt}>+</Text></Pressable>
+                    </>
+                  )}
+                </View>
+              );
+            }}
           />
         )}
       </View>
