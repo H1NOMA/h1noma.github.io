@@ -34,6 +34,31 @@
 | `data/loadArchive.js` | адаптер источника карточек: нормализация + единый `loadArchive(source)` |
 | `index.js` | общий вход: `import { ... } from './native-core'` |
 
+### Слой данных (`data/`)
+
+Единая абстракция хранилища — веб и приложение работают через один интерфейс, логика от бэкенда независима.
+
+| Модуль | Что даёт |
+|---|---|
+| `data/keys.js` | ключи хранилища (те же, что в вебе) + разделение общее/личное |
+| `data/session.js` | теги, разработчики, права (`isDev`, `canManageGame`, `seatsLeft`, `assimVisible`) |
+| `data/sync.js` | `mergeById`, `mergeByFreshness` (надгробия), `optimisticApply` (идемпотентная запись в стол) |
+| `data/store.js` | `createMemoryStore`, `createLayeredStore` (облако+локаль с таймаутом), `supabaseKvStore(client)` + Realtime |
+| `data/board.js` | ключи досок (`boardKey`), слияние карточек стола, активная доска игрока |
+| `data/repositories.js` | репозитории: персонажи, игры (запись/кик/права), новости, «стол» (публикация/подписка) |
+
+Supabase-клиент **внедряется снаружи** — в ядре нет зависимости от `@supabase/supabase-js`:
+
+```js
+import { createClient } from '@supabase/supabase-js';
+import { supabaseKvStore, createLayeredStore, createMemoryStore, gamesRepo } from './native-core/data';
+
+const cloud = supabaseKvStore(createClient(url, anonKey));
+const store = createLayeredStore({ cloud, local: createMemoryStore() });   // в RN local → обёртка над AsyncStorage
+const games = gamesRepo(store);
+await games.signup('g1', session, { name: 'Боб' });
+```
+
 ### Про данные архива (важно про лицензии)
 
 Сам **контент карточек в ядро не копируется**. Часть описаний основана на не-SRD источниках,
@@ -76,8 +101,8 @@ node native-core/__tests__/core.test.mjs
 
 - [x] **Ядро правил** — характеристики, кубы, заклинания, спасброски от смерти, лист.
 - [x] **Слой архива** — DOM-free фильтры/фасеты/поиск/сортировка, ядро под сеттинг, адаптер данных.
-- [ ] **Слой данных** — обёртка над Supabase (аккаунты, персонажи, расписание, живой «стол»/трекер),
-  переиспользуемая и вебом, и приложением.
+- [x] **Слой данных** — абстракция хранилища (память / слоёное облако+локаль / Supabase-адаптер),
+  стратегии слияния, права/сессия, ключи досок, репозитории (персонажи/игры/новости/«стол»).
 - [ ] **UI на React Native** — экраны (лист → архив → трекер → новости/расписание → ГМ),
   анимации/заставки на `react-native-skia`/Reanimated, стеклянные эффекты, рамки сеттингов.
 - [ ] **Платформенное** — нативные пуши (APNs/FCM), deep links для `?g=…`, удаление аккаунта,
