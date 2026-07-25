@@ -5,13 +5,20 @@ import { View, Text, Pressable, Modal, StyleSheet } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { ThemeProvider, useTheme } from './src/theme.js';
+import { SessionProvider } from './src/session.js';
 import { themeFor } from '../native-core/index.js';
 import SheetScreen from './src/screens/SheetScreen.js';
 import ArchiveScreen from './src/screens/ArchiveScreen.js';
+import BoardScreen from './src/screens/BoardScreen.js';
+import ScheduleScreen from './src/screens/ScheduleScreen.js';
+import ProfileScreen from './src/screens/ProfileScreen.js';
 
 const TABS = [
   { key: 'sheet', label: 'Лист', screen: SheetScreen },
   { key: 'archive', label: 'Архив', screen: ArchiveScreen },
+  { key: 'games', label: 'Игры', screen: ScheduleScreen },
+  { key: 'board', label: 'Доска', screen: BoardScreen },
+  { key: 'profile', label: 'Профиль', screen: ProfileScreen },
 ];
 
 function Shell() {
@@ -71,7 +78,9 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <ThemeProvider>
-        <Shell />
+        <SessionProvider>
+          <Shell />
+        </SessionProvider>
       </ThemeProvider>
     </SafeAreaProvider>
   );
