@@ -2,7 +2,7 @@
    Стратегия stale-while-revalidate: отдаём страницу из кэша мгновенно,
    а в фоне тихо перекачиваем свежую — она подхватится на следующем заходе.
    Так первый экран открывается сразу, без ожидания сети, и остаётся актуальным. */
-const CACHE = 'comik-v148';
+const CACHE = 'comik-v149';
 // мелкие статические файлы прогреваем сразу при установке
 const PRECACHE = ['manifest.webmanifest', 'fonts.css', 'supabase.js', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'];
 
@@ -55,19 +55,24 @@ self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
   // кэшируем только свои GET; облако (Supabase) и внешние запросы — мимо
   if (e.request.method !== 'GET' || url.origin !== self.location.origin) return;
+  const isNav = e.request.mode === 'navigation';
   e.respondWith(
-    caches.open(CACHE).then(cache =>
-      cache.match(e.request).then(cached => {
-        // сеть: обновляет кэш в фоне; при отсутствии связи откатываемся на кэш
+    caches.open(CACHE).then(cache => {
+      // Навигация (сама страница index.html) — NETWORK-FIRST: онлайн всегда отдаём свежий код,
+      // кэш служит лишь офлайн-фолбэком. Иначе SW отдавал старый index.html из кэша и правки
+      // «не доезжали» до пользователя до второй перезагрузки — казалось, что ничего не изменилось.
+      if (isNav) {
+        return fetch(e.request)
+          .then(res => { if (res && res.ok) cache.put(e.request, res.clone()).catch(() => {}); return res; })
+          .catch(() => cache.match(e.request).then(c => c || cache.match('/') || cache.match('index.html')));
+      }
+      // Прочие статические ресурсы — stale-while-revalidate: мгновенно из кэша, свежее в фоне.
+      return cache.match(e.request).then(cached => {
         const network = fetch(e.request)
-          .then(res => {
-            if (res && res.ok) cache.put(e.request, res.clone()).catch(() => {});
-            return res;
-          })
-          .catch(() => cached || (e.request.mode === 'navigation' ? cache.match('/') : undefined));
-        // есть в кэше — отдаём мгновенно, сеть догоняет в фоне; иначе ждём сеть
+          .then(res => { if (res && res.ok) cache.put(e.request, res.clone()).catch(() => {}); return res; })
+          .catch(() => cached);
         return cached || network;
-      })
-    )
+      });
+    })
   );
 });
