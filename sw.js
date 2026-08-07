@@ -2,9 +2,13 @@
    Стратегия stale-while-revalidate: отдаём страницу из кэша мгновенно,
    а в фоне тихо перекачиваем свежую — она подхватится на следующем заходе.
    Так первый экран открывается сразу, без ожидания сети, и остаётся актуальным. */
-const CACHE = 'comik-v206';
+const CACHE = 'comik-v207';
 // мелкие статические файлы прогреваем сразу при установке
 const PRECACHE = ['manifest.webmanifest', 'fonts.css', 'supabase.js', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'];
+// сколько ждём сеть для самой страницы, прежде чем отдать копию из кэша.
+// В регионах, где канал до хостинга душат, ожидание сети — это и есть «сайт не открывается»:
+// повторный заход обязан открыться мгновенно из кэша, а свежая версия догрузится фоном.
+const NAV_TIMEOUT = 3500;
 
 self.addEventListener('install', e => {
   self.skipWaiting();
@@ -62,9 +66,15 @@ self.addEventListener('fetch', e => {
       // кэш служит лишь офлайн-фолбэком. Иначе SW отдавал старый index.html из кэша и правки
       // «не доезжали» до пользователя до второй перезагрузки — казалось, что ничего не изменилось.
       if (isNav) {
-        return fetch(e.request)
-          .then(res => { if (res && res.ok) cache.put(e.request, res.clone()).catch(() => {}); return res; })
-          .catch(() => cache.match(e.request).then(c => c || cache.match('/') || cache.match('index.html')));
+        const fromCache = () => cache.match(e.request).then(c => c || cache.match('/') || cache.match('index.html'));
+        const network = fetch(e.request)
+          .then(res => { if (res && res.ok) cache.put(e.request, res.clone()).catch(() => {}); return res; });
+        // Гонка: кто быстрее — сеть или таймаут. По таймауту отдаём кэш, а закачка продолжается
+        // в фоне и обновит кэш к следующему заходу. Если кэша ещё нет — честно ждём сеть.
+        return Promise.race([
+          network.catch(() => fromCache().then(c => c || Promise.reject(new Error('offline')))),
+          new Promise(res => setTimeout(() => res(fromCache().then(c => c || network)), NAV_TIMEOUT)),
+        ]).catch(() => fromCache());
       }
       // Прочие статические ресурсы — stale-while-revalidate: мгновенно из кэша, свежее в фоне.
       return cache.match(e.request).then(cached => {
