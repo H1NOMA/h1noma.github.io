@@ -2814,7 +2814,7 @@ html.dr-open body{overscroll-behavior:none}
   #searchCircle{display:none !important}
 
   /* панель поиска открывается из-под шапки — там, где теперь её кнопка */
-  .search-float{top:calc(var(--hdr-h,56px) + 8px + env(safe-area-inset-top,0px));bottom:auto}
+  .search-float{top:calc(var(--hdr-h,62px) + 8px + env(safe-area-inset-top,0px));bottom:auto}
 }
 /* «Музыка» в верхнем меню появляется только у ГМ */
 .topnav button[hidden]{display:none !important}
@@ -3049,10 +3049,12 @@ addEventListener('beforeinstallprompt', function(e){ e.preventDefault(); DEFERRE
    изменении — поворот экрана, длинное название кампании, перенос строки. */
 (function(){
   var bar=document.querySelector('header .bar'); if(!bar) return;
-  var last=0, set=function(){
+  // запись откладываем в кадр: иначе ResizeObserver ругается на цикл,
+  // а измерение из его же колбэка стоит принудительного пересчёта
+  var last=0, raf=0, write=function(){ raf=0;
     var v=Math.round(bar.getBoundingClientRect().height);
     if(v && v!==last){ last=v; document.documentElement.style.setProperty('--hdr-h', v+'px'); }
-  };
+  }, set=function(){ if(!raf) raf=requestAnimationFrame(write); };
   set();
   if(window.ResizeObserver){ try{ new ResizeObserver(set).observe(bar); }catch(e){} }
   addEventListener('orientationchange', function(){ setTimeout(set,260); });
@@ -4655,16 +4657,20 @@ function deityStatHtml(e){
   return `<div class="deity-stat" data-ds="${esc(e.id)}">
     <div class="dstat-head">${isBeast?'Статблок':'Статблок аватара'}</div>
     <div class="dstat-grid">${cells}</div>
-    ${(typeof isDev==='function'&&isDev())?`<button class="btn primary sm" style="margin-top:10px" onclick="saveDeityStat('${e.id}')">Сохранить статблок</button>`:''}
+    ${(typeof isDev==='function'&&isDev())?`<button class="btn primary sm" style="margin-top:10px" onclick="saveDeityStat('${e.id}',this)">Сохранить статблок</button>`:''}
   </div>`;
 }
-function saveDeityStat(id){
+function saveDeityStat(id, btn){
   if(!(typeof isDev==='function' && isDev())) return;
   const e=ARCHIVE.find(x=>x.id===id); if(!e || !ADMIN) return;
   const stat={};
   // читаем поля ИМЕННО той карточки, из которой нажали «Сохранить»:
   // на экране может быть открыта вторая карточка поверх первой
-  const host=[...document.querySelectorAll('.deity-stat[data-ds]')].find(x=>x.dataset.ds===id);
+  // берём статблок именно из того слоя, где нажали кнопку: одна и та же тварь
+  // может быть открыта и в панели-читальне, и оверлеем поверх листа персонажа,
+  // а querySelectorAll отдал бы первую по документу — то есть читальню
+  const host=(btn && btn.closest && btn.closest('.deity-stat'))
+    || [...document.querySelectorAll('.deity-stat[data-ds]')].find(x=>x.dataset.ds===id);
   if(!host){ toast('Статблок не найден'); return; }
   DEITY_STAT_FIELDS.forEach(([k])=>{ const el=host.querySelector('[data-dsk="'+k+'"]');
     const v=((el&&el.value)||'').trim(); if(v) stat[k]=v; });
@@ -4681,7 +4687,9 @@ function saveDeityStat(id){
   }
   bindGameData(); markDirty();
   toast('Статблок сохранён');
-  openModal(id);
+  // перерисовываем ТОТ слой, из которого сохраняли: карточка могла быть открыта
+  // вторым уровнем поверх другой, и тогда обычный openModal схлопнул бы её
+  openModal(id, !!(btn && btn.closest && btn.closest('#modal2')));
 }
 
 /* ====================== Закладки (личные, на устройстве) ====================== */
@@ -11607,6 +11615,10 @@ boot();
     return false;
   }
   function down(e,fromEdge){
+    // от 880 шторка не ездит: до 1180 её нет вовсе, дальше она закреплена рейлом.
+    // Без этой проверки палец на сенсорном ноутбуке утаскивал бы полотно вбок,
+    // открывая пустоту — панель-то никуда не едет.
+    if(innerWidth>=880) return;
     var t=e.touches?e.touches[0]:e;
     // поверх открытого слоя жест принадлежит «назад»: сначала закрываем карточку
     if(prog<0.5 && drLayerOpen()) return;
@@ -12165,6 +12177,351 @@ function openInstallHelp(){
   MQR.addEventListener('change', onResize);
   addEventListener('load', function(){ setTimeout(function(){ rdSync(); deskDir(); drawCrumb(); }, 300); });
   setTimeout(function(){ rdSync(); deskDir(); drawCrumb(); }, 1200);
+})();
+</script>
+<style id="shelf-css">
+/* ═══════════════════════════════════════════════════════════════════════
+   ПОЛКА СОСТОЯНИЯ и БОКОВОЙ КАРМАН — только десктоп (>=1180px).
+   Полка внизу экрана держит перед глазами раунд, чей ход, последнее
+   действие и музыку; карман справа — компактную инициативу. Оба читают
+   те же TRK / TRK_SHARED, что и «Доска ходов», и ничего в них не рисуют:
+   renderTracker() не вызывается, узлы доски не переносятся.
+   ═══════════════════════════════════════════════════════════════════════ */
+#shelf,#dock{display:none}
+
+@media(min-width:1180px){
+  :root{--shelf-h:40px;--dock-w:324px}
+
+  /* ── полка ── */
+  html.shelf-on #shelf{display:flex}
+  #shelf{position:fixed;left:var(--rail-w);right:0;bottom:0;height:var(--shelf-h);z-index:62;
+    align-items:center;gap:0;padding:0 14px 0 4px;
+    background:var(--bg2);border-top:var(--hair) solid var(--line2);
+    font-family:var(--f-mono);font-size:.72rem;letter-spacing:.04em;color:var(--dim);
+    box-shadow:0 -6px 20px rgba(0,0,0,.3)}
+  html.dock-on #shelf{right:var(--dock-w)}
+  #shelf > *{flex:none}
+  #shelf .sh-sep{width:1px;height:18px;background:var(--line2);margin:0 12px;flex:none}
+  #shelf button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;
+    border-radius:8px;padding:6px 10px;transition:background .15s,color .15s}
+  #shelf button:hover{background:var(--surface2);color:var(--txt)}
+  #shelf button:active{opacity:var(--press,.7)}
+  .sh-round{display:flex;align-items:baseline;gap:6px}
+  .sh-round b{font-family:var(--f-disp);font-size:1.02rem;color:var(--red);font-weight:700;line-height:1}
+  .sh-turn{display:flex;align-items:baseline;gap:8px;min-width:0}
+  .sh-turn .cap{color:var(--muted);text-transform:uppercase;font-size:.64rem;letter-spacing:.16em}
+  .sh-turn .who{color:var(--txt);font-family:var(--f-disp);font-size:.92rem;letter-spacing:.02em;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:22ch}
+  .sh-step{color:var(--red) !important}
+  .sh-log{flex:1 1 auto !important;min-width:0;color:var(--muted);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 14px;text-align:right}
+  .sh-mus{display:flex;align-items:center;gap:2px;max-width:270px;min-width:0}
+  .sh-mus .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:170px;
+    color:var(--dim);cursor:pointer;padding:6px 8px;border-radius:8px}
+  .sh-mus .nm:hover{background:var(--surface2);color:var(--txt)}
+  #shelf svg{width:15px;height:15px;display:block;fill:currentColor}
+  .sh-dock.on{color:var(--red)}
+  /* На самой «Доске ходов» полка не поднимается вовсе (класс shelf-on там не
+     ставится) — раунд, ход и журнал там и так перед глазами, а музыкальная
+     плашка остаётся своя. */
+  /* плавающие кнопки, тосты и подвал уступают полке её полосу */
+  html.shelf-on .dice-fab,html.shelf-on .dice-menu,html.shelf-on #musicToggle,html.shelf-on .fab-side{
+    bottom:calc(var(--edge) + var(--fabLift,0px) + var(--shelf-h))}
+  html.shelf-on .toast{bottom:calc(26px + var(--shelf-h))}
+  /* читальня прилипает к экрану: без поправки её нижний край уезжал под полку */
+  html.shelf-on #reader{max-height:calc(100vh - 104px - var(--shelf-h))}
+  html.shelf-on footer{padding-bottom:calc(54px + var(--shelf-h))}
+  /* музыкальная плашка дублировала бы полку — её роль берёт полка */
+  html.shelf-on .music-bar{display:none}
+
+  /* ── боковой карман ── */
+  html.dock-on #dock{display:flex}
+  #dock{position:fixed;top:0;right:0;bottom:0;width:var(--dock-w);z-index:61;
+    flex-direction:column;background:var(--bg2);border-left:var(--hair) solid var(--line2);
+    box-shadow:-10px 0 30px rgba(0,0,0,.32)}
+  html.dock-on #appPane{margin-right:var(--dock-w)}
+  html.dock-on .dice-fab,html.dock-on .dice-menu,html.dock-on #musicToggle,html.dock-on .fab-side{
+    right:calc(var(--edge) + var(--dock-w))}
+  html.dock-on .search-float{right:calc(var(--edge) + 40px + 10px + var(--dock-w))}
+  html.dock-on #profBtn.prof-btn{right:calc(var(--edge) + var(--dock-w))}
+  html.dock-on #bmBtn.bm-circle{right:calc(var(--edge) + 40px + 10px + var(--search-w) + 8px + var(--dock-w))}
+  .dk-head{display:flex;align-items:center;gap:10px;padding:14px 14px 12px;
+    border-bottom:var(--hair) solid var(--line);flex:none}
+  .dk-head h5{margin:0;font-family:var(--f-mono);font-size:.68rem;letter-spacing:.2em;
+    text-transform:uppercase;color:var(--muted);font-weight:400;flex:1}
+  .dk-head button{width:30px;height:30px;flex:none;display:grid;place-items:center;border:0;
+    background:none;color:var(--dim);cursor:pointer;border-radius:8px}
+  .dk-head button:hover{background:var(--surface2);color:var(--txt)}
+  .dk-list{flex:1;overflow-y:auto;overscroll-behavior:contain;padding:10px;display:flex;
+    flex-direction:column;gap:6px}
+  .dk-foot{flex:none;padding:10px 12px calc(12px + var(--shelf-h));border-top:var(--hair) solid var(--line)}
+  html:not(.shelf-on) .dk-foot{padding-bottom:12px}
+  .dk-foot .btn{width:100%}
+  .dk-row{display:grid;grid-template-columns:30px 1fr auto;align-items:center;gap:9px;
+    padding:9px 10px;border-radius:12px;background:var(--surface);
+    border:var(--hair) solid var(--line);cursor:default;position:relative;overflow:hidden}
+  .dk-row.can{cursor:pointer;transition:border-color .15s,background .15s}
+  .dk-row.can:hover{background:var(--surface2);border-color:var(--line2)}
+  .dk-row.on{border-color:rgba(var(--accent-rgb),.65);background:linear-gradient(160deg,rgba(var(--accent-rgb),.14),var(--surface))}
+  .dk-row.dead{opacity:.45}
+  .dk-ini{font-family:var(--f-mono);font-size:.86rem;color:var(--muted);text-align:center;
+    font-variant-numeric:tabular-nums}
+  .dk-row.on .dk-ini{color:var(--red)}
+  .dk-nm{min-width:0}
+  .dk-nm .n{display:block;font-size:.9rem;color:var(--txt);white-space:nowrap;overflow:hidden;
+    text-overflow:ellipsis}
+  .dk-bar{height:3px;border-radius:2px;background:var(--line);margin-top:5px;overflow:hidden}
+  .dk-bar i{display:block;height:100%;border-radius:2px}
+  .dk-hp{font-family:var(--f-mono);font-size:.7rem;color:var(--muted);text-align:right;
+    font-variant-numeric:tabular-nums;white-space:nowrap}
+  .dk-hpbtns{display:flex;gap:4px;margin-top:4px;justify-content:flex-end}
+  .dk-hpbtns button{width:22px;height:22px;border-radius:6px;border:var(--hair) solid var(--line2);
+    background:var(--surface2);color:var(--dim);cursor:pointer;font:inherit;font-size:.8rem;
+    line-height:1;display:grid;place-items:center;padding:0}
+  .dk-hpbtns button:hover{color:var(--txt)}
+  .dk-hpbtns .d:hover{color:#e0776d;border-color:rgba(224,119,109,.5)}
+  .dk-hpbtns .h:hover{color:#84c97a;border-color:rgba(132,201,122,.5)}
+  .dk-empty{padding:34px 16px;text-align:center;color:var(--muted);font-family:var(--f-mono);
+    font-size:.74rem;line-height:1.9}
+
+  /* ── выезжающие панели, которые считали края экрана своими ── */
+  /* мини-архив выезжал от left:0 и накрывал рейл — сдвигаем к краю полотна */
+  .ma-drawer{left:var(--rail-w)}
+  /* витрина и калькулятор выезжают справа — уступают открытому карману */
+  html.dock-on .vit-drawer{right:var(--dock-w)}
+  /* всплывашка центрируется по окну — при открытом кармане уводим её в полотно */
+  html.dock-on .toast{right:var(--dock-w)}
+}
+</style>
+<script>
+/* ═══ Полка состояния и боковой карман ═══
+   Читают то же состояние, что и «Доска ходов» (TRK у ГМа, TRK_SHARED[доска]
+   у игрока), и рисуют свою маленькую разметку. Доску не трогают: ни узлов
+   не переносят, ни renderTracker() не зовут — иначе на любом чужом разделе
+   пришлось бы держать живой #trkBox. Обновляются по подписи состояния: раз
+   в 700 мс сверяется короткая строка (раунд, чей ход, хиты, длина журнала,
+   трек) и перерисовка идёт только когда она изменилась. */
+(function(){
+  if(typeof document==='undefined') return;
+  var MQ=matchMedia('(min-width:1180px)');
+  var R=document.documentElement, sig='', tick=null;
+  var lastProj=null, pulled=false, caught=0;
+  var DOCK_KEY='comik:ui:dock';
+  var dockOpen=false; try{ dockOpen=localStorage.getItem(DOCK_KEY)==='1'; }catch(e){}
+
+  var ICO={
+    play:'<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>',
+    pause:'<svg viewBox="0 0 24 24"><path d="M6.5 5h4v14h-4zM13.5 5h4v14h-4z"/></svg>',
+    next:'<svg viewBox="0 0 24 24"><path d="M6 5l9 7-9 7zM16.5 5H19v14h-2.5z"/></svg>',
+    list:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>'
+  };
+
+  function E(s){ return (typeof esc==='function') ? esc(s) : String(s==null?'':s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  function gm(){ try{ return !!ADMIN; }catch(e){ return false; } }
+
+  /* Доска подтягивается только внутри renderToolsPage: до первого захода в
+     раздел у ГМа TRK пуст, а у игрока пуст TRK_SHARED. Полка обязана быть
+     честной сразу, поэтому берём то же самое сама — один раз и при смене
+     кампании (trkLoad просто перечитывает localStorage, писателей у него нет). */
+  function ensureLocal(){
+    try{
+      if(typeof trkLoad!=='function' || typeof CUR_PROJECT==='undefined') return;
+      if(lastProj===CUR_PROJECT) return;
+      lastProj=CUR_PROJECT; trkLoad();
+    }catch(e){}
+  }
+  function pullShared(force){
+    if(!MQ.matches || typeof trkFetchShared!=='function') return;
+    if(!force && pulled) return;
+    pulled=true;
+    try{ trkFetchShared().then(function(){ sig=''; paint(); }, function(){}); }catch(e){}
+  }
+
+  /* ── откуда брать состояние боя ──
+     ГМ смотрит свой стол, игрок — тот, что мастер сделал активным. */
+  function board(){
+    try{
+      if(gm()) return { list:TRK.list||[], round:TRK.round||1, activeKey:TRK.activeKey||'',
+                        proj:CUR_PROJECT, key:gmBoardKey(), gm:true };
+      var vp=trkActiveForPlayer(); if(!vp) return null;
+      var s=TRK_SHARED[vp]||{};
+      return { list:s.list||[], round:s.round||1, activeKey:s.activeKey||'',
+               proj:boardProj(vp), key:vp, gm:false };
+    }catch(e){ return null; }
+  }
+  function lastLog(){
+    try{
+      var bk=trkLogBoardKey(); if(!bk) return null;
+      var s=TRK_SHARED[bk]; if(!s||!Array.isArray(s.log)||!s.log.length) return null;
+      return s.log[s.log.length-1];
+    }catch(e){ return null; }
+  }
+  function music(){
+    try{ return (typeof musCur!=='undefined' && musCur)
+      ? { name:musCur.name||'', paused:musPaused() } : null; }catch(e){ return null; }
+  }
+
+  /* подпись состояния: перерисовываем только когда она сменилась */
+  function stamp(){
+    var b=board(), l=lastLog(), m=music();
+    var hp=0; if(b) for(var i=0;i<b.list.length;i++) hp+=parseInt(b.list[i].hp,10)||0;
+    /* className несёт и текущий раздел (view-*), и режим ГМ (is-gm):
+       смена любого из них меняет то, что показывает полка */
+    return [b?b.key:'', b?b.round:'', b?b.activeKey:'', b?b.list.length:'', hp,
+            l?l.at:'', m?m.name:'', m?m.paused:'', dockOpen?1:0, R.className].join('|');
+  }
+
+  /* ── узлы ── */
+  function shelfEl(){
+    var el=document.getElementById('shelf');
+    if(!el){ el=document.createElement('div'); el.id='shelf'; el.setAttribute('role','status');
+      document.body.appendChild(el); }
+    return el;
+  }
+  function dockEl(){
+    var el=document.getElementById('dock');
+    if(!el){
+      el=document.createElement('aside'); el.id='dock'; el.setAttribute('aria-label','Инициатива');
+      el.innerHTML='<div class="dk-head"><h5>Инициатива</h5>'+
+        '<button type="button" onclick="shelfDock(false)" aria-label="Закрыть">&#10005;</button></div>'+
+        '<div class="dk-list" id="dkList"></div>'+
+        '<div class="dk-foot"><button class="btn ghost" type="button" onclick="go(\'combat\')">Открыть доску ходов</button></div>';
+      document.body.appendChild(el);
+    }
+    return el;
+  }
+
+  /* ── отрисовка полки ── */
+  function drawShelf(){
+    var b=board(), m=music(), l=lastLog();
+    var live = !!(b && b.list.length);
+    /* на самой «Доске ходов» полка не нужна: там та же строка боя уже стоит
+       наверху раздела, и своя музыкальная плашка тоже на месте */
+    var on = MQ.matches && (live || !!m) && !R.classList.contains('view-combat');
+    R.classList.toggle('shelf-on', on);
+    /* полку не только прячем, но и опустошаем: иначе в документе остаётся
+       кнопка «Ход» от прошлого состояния — невидимая, но живая для поиска
+       по DOM и для чтения с экрана */
+    if(!on){ var old=document.getElementById('shelf'); if(old) old.innerHTML=''; return; }
+    var el=shelfEl(), h='';
+    if(live){
+      var order=trkOrder(b.list);
+      var who=order.filter(function(x){ return trkCardKey(x)===b.activeKey; })[0]||order[0];
+      h+='<button class="sh-round" type="button" onclick="shelfDock()" title="Инициатива">'+
+         '<b>'+b.round+'</b><span>раунд</span></button>';
+      h+='<div class="sh-sep"></div>';
+      h+='<div class="sh-turn"><span class="cap">Ходит</span>'+
+         '<span class="who">'+E((who&&who.name)||'—')+'</span></div>';
+      if(b.gm) h+='<button class="sh-step" type="button" onclick="trkStep(1)">Ход &#9656;</button>';
+      h+='<div class="sh-sep"></div>';
+      h+='<button class="sh-dock'+(dockOpen?' on':'')+'" type="button" onclick="shelfDock()" '+
+         'aria-label="Инициатива" title="Список инициативы">'+ICO.list+'</button>';
+      h+='<div class="sh-log">'+(l?E(l.t):'')+'</div>';
+    } else {
+      h+='<div class="sh-log" style="text-align:left">Бой не идёт</div>';
+    }
+    if(m){
+      h+='<div class="sh-sep"></div><div class="sh-mus">'+
+         '<button type="button" onclick="musToggle()" aria-label="Пауза или играть">'+
+           (m.paused?ICO.play:ICO.pause)+'</button>'+
+         '<span class="nm" onclick="musOpenFull()" title="'+E(m.name)+'">'+E(m.name)+'</span>'+
+         '<button type="button" onclick="musNext()" aria-label="Следующий трек">'+ICO.next+'</button>'+
+         '</div>';
+    }
+    el.innerHTML=h;
+  }
+
+  /* ── отрисовка кармана ── */
+  function drawDock(){
+    var open = MQ.matches && dockOpen;
+    R.classList.toggle('dock-on', open);
+    if(!open){ var od=document.getElementById('dkList'); if(od) od.innerHTML=''; return; }
+    dockEl();
+    var b=board(), box=document.getElementById('dkList'); if(!box) return;
+    if(!b || !b.list.length){
+      box.innerHTML='<div class="dk-empty">Бой не идёт.<br>Собери участников на доске ходов.</div>';
+      return;
+    }
+    var order=trkOrder(b.list), h='';
+    for(var i=0;i<order.length;i++){
+      var x=order[i], key=trkCardKey(x);
+      var foe=isFoeCard(x), max=trkMaxHp(x,b.proj), hp=parseInt(x.hp,10)||0;
+      var dead = foe ? hp<=0 : !!(x.ds && (x.ds.f||0)>=3);
+      var pct = max ? Math.max(0,Math.min(100,Math.round(hp/max*100))) : (hp>0?100:0);
+      var idx = b.gm ? TRK.list.indexOf(x) : -1;
+      var cls='dk-row'+(key===b.activeKey?' on':'')+(dead?' dead':'')+(b.gm?' can':'');
+      h+='<div class="'+cls+'"'+(b.gm?' onclick="shelfSetTurn(\''+E(key)+'\')"':'')+'>'+
+         '<span class="dk-ini">'+E(String(x.init==null?0:x.init))+'</span>'+
+         '<span class="dk-nm"><span class="n">'+E(x.name||'—')+'</span>'+
+           (max?'<span class="dk-bar"><i style="width:'+pct+'%;background:'+trkHpColor(pct/100)+'"></i></span>':'')+
+         '</span>'+
+         '<span class="dk-hp">'+(max?(hp+' / '+max):(hp?String(hp):'—'))+
+           (b.gm && idx>=0 ? '<span class="dk-hpbtns">'+
+             '<button class="d" type="button" onclick="event.stopPropagation();trkHpQuick('+idx+',\'dmg\')" aria-label="Урон">&#8722;</button>'+
+             '<button class="h" type="button" onclick="event.stopPropagation();trkHpQuick('+idx+',\'heal\')" aria-label="Лечение">+</button>'+
+           '</span>' : '')+
+         '</span>'+
+         '</div>';
+    }
+    box.innerHTML=h;
+  }
+
+  /* ── публичное ── */
+  window.shelfDock=function(want){
+    dockOpen = (want===undefined) ? !dockOpen : !!want;
+    try{ localStorage.setItem(DOCK_KEY, dockOpen?'1':'0'); }catch(e){}
+    sig=''; paint();
+  };
+  window.shelfSetTurn=function(key){
+    if(!gm()) return;
+    try{
+      TRK.activeKey=key;
+      trkPublishTurn();
+      var o=trkOrder(TRK.list), w=o.filter(function(x){ return trkCardKey(x)===key; })[0];
+      if(w) trkLog('turn','Ход: '+(w.name||''));
+      renderTracker();          // если доска открыта — обновится, иначе выйдет сразу
+    }catch(e){}
+    sig=''; paint();
+  };
+  function paint(){
+    if(!MQ.matches){ R.classList.remove('shelf-on','dock-on'); return; }
+    drawShelf(); drawDock();
+  }
+  window.shelfSync=function(){ sig=''; paint(); };
+
+  function beat(){
+    ensureLocal();
+    var s=stamp();
+    if(s!==sig){ sig=s; paint(); }
+  }
+  function start(){
+    if(tick) clearInterval(tick);
+    tick=setInterval(beat, 700);
+    ensureLocal(); pullShared(false); beat();
+  }
+  /* Запасной опрос доски (trkLiveStart) заперт условием «раздел combat активен
+     и есть #trkBox», то есть вне доски не работает. Живым остаётся вебсокет, но
+     то, что он пропустил на скрытой вкладке, никто не догоняет. Один запрос при
+     возврате на вкладку, не чаще раза в 15 секунд и только когда полка на виду. */
+  document.addEventListener('visibilitychange', function(){
+    if(document.hidden || !MQ.matches) return;
+    sig=''; paint();
+    if(gm() || !R.classList.contains('shelf-on')) return;
+    var t=Date.now(); if(t-caught<15000) return; caught=t;
+    pullShared(true);
+  });
+  MQ.addEventListener('change', function(){ sig=''; paint(); });
+  /* Escape ловим на перехвате: общий обработчик страницы (он же закрывает
+     карточку) висит выше по списку и иначе успел бы сработать раньше — одно
+     нажатие закрывало бы и карман, и статью в читальне разом. */
+  addEventListener('keydown', function(e){
+    if(e.key!=='Escape' || !dockOpen || !MQ.matches) return;
+    if(document.querySelector('.scrim.open')) return;   // поверх модалки Escape принадлежит ей
+    e.stopPropagation(); window.shelfDock(false);
+  }, true);
+  if(document.readyState==='complete') setTimeout(start,600);
+  else addEventListener('load', function(){ setTimeout(start,600); });
 })();
 </script>
 <!-- ══ /ДЕСКТОП v2 ══ -->
