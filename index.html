@@ -11915,7 +11915,15 @@ function openInstallHelp(){
 
   /* ── ШАГ 1 · ширина ───────────────────────────────────────────────── */
   main{max-width:none;margin:0;padding:26px var(--gut) 74px}
-  #view-news{max-width:1560px}
+  /* лента больше не упирается в потолок посреди экрана: приветствие
+     прижато к левому краю полотна, новости идут до правого */
+  #view-news{max-width:none;margin:0}
+  /* Boosty, Telegram и Discord — столбиком под приветствием, во всю ширину
+     его колонки, а не парами вполовину */
+  #view-news .news-socials{grid-template-columns:1fr}
+  /* у Discord была своя доводка под две колонки — половина ширины по центру;
+     в столбике она превращала кнопку в огрызок вдвое уже соседних */
+  #view-news .news-socials .soc-pill.discord{justify-self:stretch;width:auto}
   #view-players{max-width:1560px}
   #view-combat{max-width:1680px}
   #view-settings{max-width:1120px;margin:0 auto}
@@ -11951,9 +11959,13 @@ function openInstallHelp(){
   /* категории — не пять огромных квадратов на пол-экрана, а строка-указатель:
      список карточек начинается на ~200 px выше и виден без прокрутки */
   #view-world .cat-wrap{grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
-  #view-world .cat{aspect-ratio:auto;flex-direction:row;justify-content:flex-start;
-    gap:11px;padding:14px 15px;border-radius:14px;text-align:left}
-  #view-world .cat .rune{width:24px;height:24px;flex:none}
+  /* Название стоит по центру кнопки, а руна вынесена к левому краю
+     абсолютом: иначе центрировалась бы пара «руна + подпись», и текст
+     всё равно сидел бы правее середины на пол-иконки. */
+  #view-world .cat{aspect-ratio:auto;position:relative;justify-content:center;
+    padding:14px 32px;border-radius:14px;text-align:center}
+  #view-world .cat .rune{width:20px;height:20px;flex:none;
+    position:absolute;left:11px;top:50%;transform:translateY(-50%)}
   #view-world .cat .clab{font-size:.76rem;letter-spacing:.06em;line-height:1.2}
   #view-world .cats h4{margin-bottom:10px}
   #view-world .subwrap{margin-top:10px}
@@ -12010,12 +12022,15 @@ function openInstallHelp(){
   /* ── поля и кнопки держат свой размер, а не ширину страницы ──
      На узком экране «во всю ширину» — правильно: палец бьёт куда угодно.
      На широком та же кнопка превращается в полосу метровой длины. */
-  #view-world .sec-q-bar{max-width:680px}
+  /* Поиск тянется по колонке, а не стоит фиксированным огрызком: когда
+     справа раскрывается читальня, колонка сужается — и строка вместе с ней.
+     Потолок оставлен, чтобы на 2K она не превратилась в двухметровую полосу. */
+  #view-world .sec-q-bar{max-width:1040px}
   /* «+ Карточка» больше не полоса во всю страницу и не занимает отдельную
      полосу: встаёт справа от поиска, на ту же строку. Ряд категорий и
      оглавление поднимаются на её высоту. */
-  #view-world .content-col{display:grid;grid-template-columns:auto auto minmax(0,1fr);
-    column-gap:12px;align-items:start}
+  #view-world .content-col{display:grid;grid-template-columns:minmax(0,1fr) auto;
+    column-gap:16px;align-items:start}
   /* обоим — явная первая строка: при обычной раскладке курсор сетки уже
      ушёл вниз на полноширинный ряд категорий и назад не возвращается */
   #view-world #secFilter{grid-column:1;grid-row:1;min-width:0}
@@ -12046,12 +12061,8 @@ function openInstallHelp(){
 /* узкие экраны: ни читальни, ни крошки быть не должно — оба узла живут в DOM,
    но принадлежат только широкой раскладке */
 @media(max-width:1439px){ #reader{display:none !important} }
-/* лента новостей на очень широком экране — в две колонки, а не одной простынёй */
-@media(min-width:1620px){
-  #view-news .news-feed{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start;
-    grid-auto-rows:max-content}
-  #view-news .news-card .nimg{height:300px}
-}
+/* Лента идёт одной колонкой во всю оставшуюся ширину: разбивка на две
+   оставляла одинокую новость висеть половиной экрана. */
 </style>
 <script>
 /* ═══ КОМИК · десктоп v2 — обвязка. Только то, что нельзя выразить стилями. ═══ */
