@@ -11927,7 +11927,7 @@ function openInstallHelp(){
   #drScrim{display:none !important}
   #sideDrawer{display:flex !important;visibility:visible !important;opacity:1 !important;
     transform:none !important;width:var(--rail-w);z-index:41;
-    padding:18px 0 16px;background:var(--bg2);border-right:var(--hair) solid var(--line)}
+    padding:18px 0 16px;background:var(--bg2);border-right:0}
   #appPane{margin-left:var(--rail-w)}
   .topnav{display:none}
   .dr-top{padding:2px 20px 20px}
@@ -11939,22 +11939,11 @@ function openInstallHelp(){
   .dr-it.active::before{content:"";position:absolute;left:-12px;top:8px;bottom:8px;width:3px;
     border-radius:0 3px 3px 0;background:var(--red);box-shadow:0 0 10px rgba(var(--accent-rgb),.6)}
 
-  /* шапка: кампания у левого края, следом крошка «где я», поиск справа */
-  header .bar{padding:0 var(--gut)}
-  header .lock{order:2;margin-right:0}
-  header .hdr-search{order:9}
-  /* Крошка равняется не по своей строке, а по тексту плашки кампании: у той
-     дисплейный шрифт и несимметричные поля, из-за которых буквы сидят ниже
-     середины строки. Отсюда padding-top — он сдвигает содержимое ровно на
-     столько же вниз. */
-  #deskCrumb{order:3;margin-right:auto;display:inline-flex;align-items:center;
-    height:34px;padding:4px 0 0 17px;margin-left:11px;min-width:0;
-    font-family:var(--f-mono);font-size:.78rem;font-weight:700;letter-spacing:.13em;
-    text-transform:uppercase;line-height:1;color:var(--dim);
-    border-left:var(--hair) solid var(--line2)}
-  #deskCrumb .ct{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  #deskCrumb b{color:var(--txt);font-weight:700}
-  #deskCrumb i{font-style:normal;color:var(--muted);font-weight:400;padding:0 .45em}
+  /* Шапка на десктопе — только кампания и поиск. Где ты находишься, говорит
+     подсвеченный пункт рейла, дублировать это надписью незачем. Отступ слева
+     остаётся авторским (--edge), а не полем страницы: плашка прижимается
+     к рейлу, а не выравнивается по контенту. */
+  header .lock{order:2;margin-right:auto}
 
   /* ── ШАГ 3 · архив ────────────────────────────────────────────────── */
   #view-world .grid{display:grid;grid-template-columns:minmax(0,1fr);gap:26px;align-items:start}
@@ -12057,7 +12046,6 @@ function openInstallHelp(){
 /* узкие экраны: ни читальни, ни крошки быть не должно — оба узла живут в DOM,
    но принадлежат только широкой раскладке */
 @media(max-width:1439px){ #reader{display:none !important} }
-@media(max-width:1179px){ #deskCrumb{display:none !important} }
 /* лента новостей на очень широком экране — в две колонки, а не одной простынёй */
 @media(min-width:1620px){
   #view-news .news-feed{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start;
@@ -12072,35 +12060,6 @@ function openInstallHelp(){
   var MQR = matchMedia('(min-width:1440px)');   // читальня: ей нужна своя колонка
   function wide(){ return MQ.matches; }
   function rdWide(){ return MQR.matches; }
-
-  /* ── хлебная крошка в шапке: раздел, а в архиве ещё и категория ── */
-  var crumb=null;
-  function ensureCrumb(){
-    if(crumb && crumb.isConnected) return crumb;
-    var bar=document.querySelector('header .bar'); if(!bar) return null;
-    crumb=document.createElement('span'); crumb.id='deskCrumb';
-    var nav=bar.querySelector('.topnav');
-    bar.insertBefore(crumb, nav||bar.lastElementChild);
-    return crumb;
-  }
-  function drawCrumb(){
-    var c=ensureCrumb(); if(!c) return;
-    var a=document.querySelector('#drList .dr-it.active');
-    var name=a? (a.querySelector('span')||{}).textContent||'' : '';
-    var tail='';
-    try{
-      if(document.documentElement.classList.contains('view-world') &&
-         typeof activeCat!=='undefined' && activeCat && activeCat!=='all'){
-        var cd=catById(activeCat); if(cd) tail=cd.label;
-        if(typeof activeSub!=='undefined' && activeSub){
-          var sd=subById(activeCat,activeSub); if(sd) tail+=' / '+sd.label;
-        }
-      }
-    }catch(e){}
-    c.innerHTML = name
-      ? '<span class="ct"><b>'+name+'</b>'+(tail? '<i>·</i>'+tail : '')+'</span>'
-      : '';
-  }
 
   /* ── читальня ── */
   var RD_ID=null;
@@ -12196,13 +12155,13 @@ function openInstallHelp(){
   };
   window.renderCardList=function(){
     var out=_render.apply(this, arguments);
-    rdSync(); deskDir(); drawCrumb();
+    rdSync(); deskDir();
     return out;
   };
 
   /* смена раздела: обновить крошку и решить, нужна ли читальня */
   var _go=window.go;
-  window.go=function(){ var out=_go.apply(this, arguments); setTimeout(function(){ rdSync(); deskDir(); drawCrumb(); },0); return out; };
+  window.go=function(){ var out=_go.apply(this, arguments); setTimeout(function(){ rdSync(); deskDir(); },0); return out; };
 
   /* ── стрелками вверх/вниз идём по списку, статья справа меняется на лету ── */
   addEventListener('keydown', function(e){
@@ -12223,12 +12182,12 @@ function openInstallHelp(){
 
   function onResize(){
     var v=document.getElementById('view-world'); if(v && !rdWide()) v.classList.remove('rd-on');
-    rdSync(); deskDir(); drawCrumb();
+    rdSync(); deskDir();
   }
   MQ.addEventListener('change', onResize);
   MQR.addEventListener('change', onResize);
-  addEventListener('load', function(){ setTimeout(function(){ rdSync(); deskDir(); drawCrumb(); }, 300); });
-  setTimeout(function(){ rdSync(); deskDir(); drawCrumb(); }, 1200);
+  addEventListener('load', function(){ setTimeout(function(){ rdSync(); deskDir(); }, 300); });
+  setTimeout(function(){ rdSync(); deskDir(); }, 1200);
 })();
 </script>
 <style id="shelf-css">
