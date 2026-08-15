@@ -11943,11 +11943,18 @@ function openInstallHelp(){
   header .bar{padding:0 var(--gut)}
   header .lock{order:2;margin-right:0}
   header .hdr-search{order:9}
-  #deskCrumb{order:3;margin-right:auto;
-    font-family:var(--f-mono);font-size:.74rem;letter-spacing:.16em;text-transform:uppercase;
-    color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-    border-left:var(--hair) solid var(--line2);padding-left:16px;margin-left:6px}
-  #deskCrumb b{color:var(--dim);font-weight:400}
+  /* Крошка равняется не по своей строке, а по тексту плашки кампании: у той
+     дисплейный шрифт и несимметричные поля, из-за которых буквы сидят ниже
+     середины строки. Отсюда padding-top — он сдвигает содержимое ровно на
+     столько же вниз. */
+  #deskCrumb{order:3;margin-right:auto;display:inline-flex;align-items:center;
+    height:34px;padding:4px 0 0 17px;margin-left:11px;min-width:0;
+    font-family:var(--f-mono);font-size:.78rem;font-weight:700;letter-spacing:.13em;
+    text-transform:uppercase;line-height:1;color:var(--dim);
+    border-left:var(--hair) solid var(--line2)}
+  #deskCrumb .ct{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #deskCrumb b{color:var(--txt);font-weight:700}
+  #deskCrumb i{font-style:normal;color:var(--muted);font-weight:400;padding:0 .45em}
 
   /* ── ШАГ 3 · архив ────────────────────────────────────────────────── */
   #view-world .grid{display:grid;grid-template-columns:minmax(0,1fr);gap:26px;align-items:start}
@@ -12047,7 +12054,9 @@ function openInstallHelp(){
         }
       }
     }catch(e){}
-    c.innerHTML = name ? (tail? '<b>'+name+'</b> · '+tail : '<b>'+name+'</b>') : '';
+    c.innerHTML = name
+      ? '<span class="ct"><b>'+name+'</b>'+(tail? '<i>·</i>'+tail : '')+'</span>'
+      : '';
   }
 
   /* ── читальня ── */
