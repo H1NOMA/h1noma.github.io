@@ -11998,6 +11998,13 @@ function openInstallHelp(){
     color:var(--txt);text-transform:uppercase;margin:26px 0 14px;display:flex;align-items:center;gap:12px}
   #deskDir .dd-h::before,#deskDir .dd-h::after{content:"";height:1px;flex:1;background:var(--line2)}
   #deskDir .dd-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(196px,1fr));gap:14px;align-items:start}
+  /* Сеткой пять карточек вставали в ряд, и под четырьмя короткими зияла
+     пустота высотой с «Заклинания». Колонки браузер балансирует по высоте
+     сам — карточки просто раскладываются ровнее, ширина у них своя. */
+  @media(min-width:1400px){
+    #deskDir .dd-grid{display:block;columns:4;column-gap:14px}
+    #deskDir .dd-col{break-inside:avoid;-webkit-column-break-inside:avoid;margin:0 0 14px}
+  }
   #deskDir .dd-col{background:var(--surface);border:var(--hair) solid var(--line);border-radius:16px;padding:14px 8px 10px}
   #deskDir .dd-col h5{font-family:var(--f-mono);font-size:.66rem;letter-spacing:.18em;color:var(--muted);
     text-transform:uppercase;margin:0 0 8px;padding:0 9px;font-weight:400}
@@ -12010,6 +12017,42 @@ function openInstallHelp(){
   /* ── мелочи, которые всплывают на широком экране ──────────────────── */
   #view-players .players-bar .add-row{max-width:460px}
   #players-list{grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}
+
+  /* ── поля и кнопки держат свой размер, а не ширину страницы ──
+     На узком экране «во всю ширину» — правильно: палец бьёт куда угодно.
+     На широком та же кнопка превращается в полосу метровой длины. */
+  #view-world .sec-q-bar{max-width:680px}
+  /* «+ Карточка» больше не полоса во всю страницу и не занимает отдельную
+     полосу: встаёт справа от поиска, на ту же строку. Ряд категорий и
+     оглавление поднимаются на её высоту. */
+  #view-world .content-col{display:grid;grid-template-columns:auto auto minmax(0,1fr);
+    column-gap:12px;align-items:start}
+  /* обоим — явная первая строка: при обычной раскладке курсор сетки уже
+     ушёл вниз на полноширинный ряд категорий и назад не возвращается */
+  #view-world #secFilter{grid-column:1;grid-row:1;min-width:0}
+  #view-world #admCardBar{grid-column:2;grid-row:1;display:flex;margin:0 !important;
+    align-self:start}
+  #view-world .cats,#view-world #cards,#view-world .story,#view-world #deskDir{grid-column:1/-1}
+  #view-world #admCardBar .btn{width:auto !important;padding:0 28px;white-space:nowrap}
+  #trkBox .field select,#trkBox .field input{max-width:520px}
+  /* .row — сетка из двух равных колонок. Если кнопка в ряду одна, обрезка
+     ряда пополам ужимала её вдвое и ломала надпись на две строки: такому
+     ряду отдаём ширину по содержимому. */
+  #trkBox .row{max-width:520px}
+  #trkBox .row:has(> *:only-child){display:flex;max-width:none}
+  #trkBox .row:has(> *:only-child) > .btn{width:auto !important;padding:0 26px}
+  #view-news .signup-bar .btn,#view-news #admNewsBar .btn{max-width:100%}
+}
+
+/* ── настройки: одна колонка 560 px посреди полутора тысяч выглядела
+   потерянной. Раскладываем те же группы в две колонки — сами строки
+   остаются прежней ширины, растягивать их нечем. ── */
+@media(min-width:1400px){
+  #view-settings{max-width:1180px}
+  .set-page{max-width:1156px;columns:2;column-gap:36px}
+  .set-page > *{break-inside:avoid;-webkit-column-break-inside:avoid}
+  .set-page > .set-gt{break-after:avoid;-webkit-column-break-after:avoid}
+  .set-page > .set-prof{margin-top:0}
 }
 /* узкие экраны: ни читальни, ни крошки быть не должно — оба узла живут в DOM,
    но принадлежат только широкой раскладке */
@@ -12294,8 +12337,12 @@ function openInstallHelp(){
     font-size:.74rem;line-height:1.9}
 
   /* ── выезжающие панели, которые считали края экрана своими ── */
-  /* мини-архив выезжал от left:0 и накрывал рейл — сдвигаем к краю полотна */
-  .ma-drawer{left:var(--rail-w)}
+  /* Мини-архив выезжал от left:0 и накрывал рейл — сдвигаем к краю полотна.
+     Вместе с левым краем обязан уехать и закрытый вид: смещение в его
+     transform считалось от нуля, и панель торчала на рейле призраком
+     («непонятное окно» поверх списка разделов). */
+  .ma-drawer{left:var(--rail-w);transform:translateX(calc(-100% - var(--rail-w) - 90px))}
+  .ma-drawer.open{transform:translateX(0)}
   /* витрина и калькулятор выезжают справа — уступают открытому карману */
   html.dock-on .vit-drawer{right:var(--dock-w)}
   /* всплывашка центрируется по окну — при открытом кармане уводим её в полотно */
