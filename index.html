@@ -3041,6 +3041,24 @@ addEventListener('beforeinstallprompt', function(e){ e.preventDefault(); DEFERRE
   </div>
   <div class="proj-menu" id="projMenu" role="menu" aria-hidden="true"></div>
 </header>
+<script>
+/* --hdr-h: высоту шапки читает плавающая строка поиска. Раньше переменная нигде
+   не задавалась и работала на запасном значении 56px при настоящих 63 — зазор
+   в один пиксель держался на совпадении. Меряем .bar (строку шапки БЕЗ отступа
+   под чёлку: его .search-float прибавляет отдельно) и обновляем при любом
+   изменении — поворот экрана, длинное название кампании, перенос строки. */
+(function(){
+  var bar=document.querySelector('header .bar'); if(!bar) return;
+  var last=0, set=function(){
+    var v=Math.round(bar.getBoundingClientRect().height);
+    if(v && v!==last){ last=v; document.documentElement.style.setProperty('--hdr-h', v+'px'); }
+  };
+  set();
+  if(window.ResizeObserver){ try{ new ResizeObserver(set).observe(bar); }catch(e){} }
+  addEventListener('orientationchange', function(){ setTimeout(set,260); });
+  addEventListener('load', set);
+})();
+</script>
 <script>(function(){try{var d=document.documentElement;var sc=localStorage.getItem('comik:a11y:scheme');if(sc&&sc!=='default')d.setAttribute('data-a11y',sc);
 /* зеркальный интерфейс убран из настроек — снимаем и у тех, у кого он был включён,
    иначе выключить его стало бы нечем */
@@ -4564,7 +4582,7 @@ function openModal(id, overlay){
   const epi = e.epigraph ? `<blockquote class="epi">${esc(e.epigraph)}</blockquote>` : '';
   document.getElementById(overlay?'modal2':'modal').innerHTML = `
     <button class="x" onclick="${overlay?'closeOverlay()':'closeModal()'}" aria-label="Закрыть">✕</button>
-    <button class="bm-btn${isBookmarked(e.id)?' on':''}" id="bmCardBtn" onclick="toggleBookmark('${e.id}')" aria-label="В закладки" title="В закладки">${BM_SVG}</button>
+    <button class="bm-btn${isBookmarked(e.id)?' on':''}" data-bm="${e.id}" onclick="toggleBookmark('${e.id}')" aria-label="В закладки" title="В закладки">${BM_SVG}</button>
     <div class="top">${cardIcon(e,24)}<span class="clabel">${path}</span></div>
     ${isDossier?`
     <div class="dossier${e.img?' has-img':''}">
@@ -4627,14 +4645,14 @@ function deityStatHtml(e){
   const filled=DEITY_STAT_FIELDS.some(([k])=>st[k]);
   if(!filled && !ADMIN) return '';
   const cells=DEITY_STAT_FIELDS.map(([k,lbl])=>{
-    if(ADMIN) return `<div class="dstat"><label>${lbl}</label><input id="ds-${k}" maxlength="80" value="${esc(st[k]||'')}"></div>`;
+    if(ADMIN) return `<div class="dstat"><label>${lbl}</label><input data-dsk="${k}" maxlength="80" value="${esc(st[k]||'')}"></div>`;
     if(STAT_ABIL.indexOf(k)>=0){
       const sc=st[k], mn=sc!=null&&sc!==''?statMod(sc):null;
       return `<div class="dstat abil"><label>${lbl}</label><div class="dsv">${sc!=null&&sc!==''?esc(String(sc)):'—'}${mn!=null?` <span class="dsmod">${fmtBonus(mn)}</span>`:''}</div></div>`;
     }
     return `<div class="dstat"><label>${lbl}</label><div class="dsv">${st[k]?esc(st[k]):'—'}</div></div>`;
   }).join('');
-  return `<div class="deity-stat">
+  return `<div class="deity-stat" data-ds="${esc(e.id)}">
     <div class="dstat-head">${isBeast?'Статблок':'Статблок аватара'}</div>
     <div class="dstat-grid">${cells}</div>
     ${(typeof isDev==='function'&&isDev())?`<button class="btn primary sm" style="margin-top:10px" onclick="saveDeityStat('${e.id}')">Сохранить статблок</button>`:''}
@@ -4644,7 +4662,12 @@ function saveDeityStat(id){
   if(!(typeof isDev==='function' && isDev())) return;
   const e=ARCHIVE.find(x=>x.id===id); if(!e || !ADMIN) return;
   const stat={};
-  DEITY_STAT_FIELDS.forEach(([k])=>{ const v=(pf('ds-'+k)?.value||'').trim(); if(v) stat[k]=v; });
+  // читаем поля ИМЕННО той карточки, из которой нажали «Сохранить»:
+  // на экране может быть открыта вторая карточка поверх первой
+  const host=[...document.querySelectorAll('.deity-stat[data-ds]')].find(x=>x.dataset.ds===id);
+  if(!host){ toast('Статблок не найден'); return; }
+  DEITY_STAT_FIELDS.forEach(([k])=>{ const el=host.querySelector('[data-dsk="'+k+'"]');
+    const v=((el&&el.value)||'').trim(); if(v) stat[k]=v; });
   const upd=Object.assign({}, e, {stat, updatedAt:Date.now()});
   if(isCore(id)){
     CORE_OVER[id]=upd;
@@ -4678,7 +4701,9 @@ function toggleBookmark(id){
   }
   sset(KEY_BM, BMARKS, false).catch(()=>{});
   if(SESSION && supa) sset('comik:bm:'+currentTag(), BMARKS, true).catch(()=>{});
-  const b=document.getElementById('bmCardBtn'); if(b) b.classList.toggle('on', isBookmarked(id));
+  // красим ВСЕ копии этой карточки на экране: лист, оверлей поверх него, панель-читальня
+  document.querySelectorAll('[data-bm="'+String(id).replace(/"/g,'\\"')+'"]')
+    .forEach(b=>b.classList.toggle('on', isBookmarked(id)));
   const bb=document.getElementById('bmBtn'); if(bb) bb.classList.toggle('has', BMARKS.length>0);
 }
 /* закладки в аккаунте: при входе объединяем локальные с облачными профиля */
@@ -11862,5 +11887,286 @@ function openInstallHelp(){
   var g=document.getElementById('iapGo'); if(g && DEFERRED_INSTALL) g.hidden=false;
 }
 </script>
+<!-- ══ ДЕСКТОП v2 ══ -->
+<style id="desk2-css">
+/* ═══════════════════════════════════════════════════════════════════════
+   КОМИК · десктоп v2 — предложение. Всё живёт от 1180 px: ниже (планшеты,
+   маленькие ноутбуки) макет остаётся ровно таким, каким был.
+   ═══════════════════════════════════════════════════════════════════════ */
+@media(min-width:1180px){
+  :root{
+    --gut:clamp(30px,3vw,64px);      /* поля страницы вместо мёртвых полей по бокам */
+    --rail-w:252px;                  /* постоянный рейл разделов */
+    --read-w:clamp(400px,27vw,548px);/* колонка-читальня в архиве */
+    --fr:var(--gut);                 /* плавающие кнопки считались от --shell и уезжали к центру */
+  }
+
+  /* ── ШАГ 1 · ширина ───────────────────────────────────────────────── */
+  main{max-width:none;margin:0;padding:26px var(--gut) 74px}
+  #view-news{max-width:1560px}
+  #view-players{max-width:1560px}
+  #view-combat{max-width:1680px}
+  #view-settings{max-width:1120px;margin:0 auto}
+  #view-music{max-width:1360px;margin:0 auto}
+  #view-chrono{max-width:780px}
+
+  /* ── ШАГ 2 · рейл разделов ────────────────────────────────────────── */
+  .nav-burger-top{display:none !important}
+  #drScrim{display:none !important}
+  #sideDrawer{display:flex !important;visibility:visible !important;opacity:1 !important;
+    transform:none !important;width:var(--rail-w);z-index:41;
+    padding:18px 0 16px;background:var(--bg2);border-right:var(--hair) solid var(--line)}
+  #appPane{margin-left:var(--rail-w)}
+  .topnav{display:none}
+  .dr-top{padding:2px 20px 20px}
+  .dr-list{gap:3px}
+  .dr-it{font-size:.94rem;padding:10px 13px}
+  .dr-sep{margin:12px 4px 10px}
+  /* активный раздел в рейле — отчёркнут полосой слева, а не только цветом */
+  .dr-it.active{position:relative}
+  .dr-it.active::before{content:"";position:absolute;left:-12px;top:8px;bottom:8px;width:3px;
+    border-radius:0 3px 3px 0;background:var(--red);box-shadow:0 0 10px rgba(var(--accent-rgb),.6)}
+
+  /* шапка: кампания у левого края, следом крошка «где я», поиск справа */
+  header .bar{padding:0 var(--gut)}
+  header .lock{order:2;margin-right:0}
+  header .hdr-search{order:9}
+  #deskCrumb{order:3;margin-right:auto;
+    font-family:var(--f-mono);font-size:.74rem;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    border-left:var(--hair) solid var(--line2);padding-left:16px;margin-left:6px}
+  #deskCrumb b{color:var(--dim);font-weight:400}
+
+  /* ── ШАГ 3 · архив ────────────────────────────────────────────────── */
+  #view-world .grid{display:grid;grid-template-columns:minmax(0,1fr);gap:26px;align-items:start}
+  #chronoEntry{width:auto !important;max-width:300px}
+  /* категории — не пять огромных квадратов на пол-экрана, а строка-указатель:
+     список карточек начинается на ~200 px выше и виден без прокрутки */
+  #view-world .cat-wrap{grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+  #view-world .cat{aspect-ratio:auto;flex-direction:row;justify-content:flex-start;
+    gap:11px;padding:14px 15px;border-radius:14px;text-align:left}
+  #view-world .cat .rune{width:24px;height:24px;flex:none}
+  #view-world .cat .clab{font-size:.76rem;letter-spacing:.06em;line-height:1.2}
+  #view-world .cats h4{margin-bottom:10px}
+  #view-world .subwrap{margin-top:10px}
+  #view-world .cards{grid-template-columns:repeat(auto-fill,minmax(226px,1fr));gap:12px}
+  .card.rd-sel{border-color:rgba(var(--accent-rgb),.7) !important;
+    box-shadow:0 0 0 1px rgba(var(--accent-rgb),.3), 0 8px 22px rgba(0,0,0,.35)}
+}
+/* ═══ ШАГ 4 · читальня. Отдельный порог 1440: на 1366 панель забрала бы у
+   списка треть ширины и оставила две колонки карточек вместо четырёх. ═══ */
+@media(min-width:1440px){
+  #view-world.rd-on .grid{grid-template-columns:minmax(0,1fr) var(--read-w)}
+  #view-world:not(.rd-on) #reader{display:none}
+  #reader{position:sticky;top:80px;max-height:calc(100vh - 104px);overflow:auto;overscroll-behavior:contain;
+    border:var(--hair) solid var(--line2);border-radius:18px;background:var(--surface);
+    box-shadow:0 14px 40px rgba(0,0,0,.28)}
+  /* содержимое — та же вёрстка карточки, что и в модалке: стили .modal работают как были */
+  #reader .modal{width:100%;max-height:none;overflow:visible;border:0;border-radius:18px;
+    background:none;backdrop-filter:none;-webkit-backdrop-filter:none;
+    padding:24px 22px 28px}
+  #reader .modal .x{display:none}                    /* закрывать нечего: панель постоянная */
+  #reader .modal::before{display:none}                /* «ручка» шторки — примета мобильного листа */
+  #reader .modal .bm-btn{top:16px;right:16px}
+  #reader .rd-empty{padding:60px 26px;text-align:center;color:var(--muted);
+    font-family:var(--f-mono);font-size:.78rem;letter-spacing:.06em;line-height:1.9}
+  #reader .rd-empty span{display:block;font-size:1.5rem;margin-bottom:12px;opacity:.5}
+}
+@media(min-width:1180px){
+  /* витрина архива на десктопе была пустым экраном: поиск, пять плиток — и всё.
+     Место занимает оглавление: все подразделы всех категорий с числом записей. */
+  #deskDir .dd-h{font-family:var(--f-disp);font-weight:700;font-size:.82rem;letter-spacing:.3em;
+    color:var(--txt);text-transform:uppercase;margin:26px 0 14px;display:flex;align-items:center;gap:12px}
+  #deskDir .dd-h::before,#deskDir .dd-h::after{content:"";height:1px;flex:1;background:var(--line2)}
+  #deskDir .dd-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(196px,1fr));gap:14px;align-items:start}
+  #deskDir .dd-col{background:var(--surface);border:var(--hair) solid var(--line);border-radius:16px;padding:14px 8px 10px}
+  #deskDir .dd-col h5{font-family:var(--f-mono);font-size:.66rem;letter-spacing:.18em;color:var(--muted);
+    text-transform:uppercase;margin:0 0 8px;padding:0 9px;font-weight:400}
+  #deskDir .dd-it{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;
+    padding:8px 10px;border:0;background:none;border-radius:10px;cursor:pointer;color:var(--dim);
+    font:inherit;font-size:.87rem;text-align:left;transition:background .15s,color .15s}
+  #deskDir .dd-it:hover{background:var(--surface2);color:var(--txt)}
+  #deskDir .dd-it i{font-style:normal;font-family:var(--f-mono);font-size:.7rem;color:var(--muted);flex:none}
+
+  /* ── мелочи, которые всплывают на широком экране ──────────────────── */
+  #view-players .players-bar .add-row{max-width:460px}
+  #players-list{grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}
+}
+/* узкие экраны: ни читальни, ни крошки быть не должно — оба узла живут в DOM,
+   но принадлежат только широкой раскладке */
+@media(max-width:1439px){ #reader{display:none !important} }
+@media(max-width:1179px){ #deskCrumb{display:none !important} }
+/* лента новостей на очень широком экране — в две колонки, а не одной простынёй */
+@media(min-width:1620px){
+  #view-news .news-feed{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start;
+    grid-auto-rows:max-content}
+  #view-news .news-card .nimg{height:300px}
+}
+</style>
+<script>
+/* ═══ КОМИК · десктоп v2 — обвязка. Только то, что нельзя выразить стилями. ═══ */
+(function(){
+  var MQ  = matchMedia('(min-width:1180px)');   // рейл, крошка, ширина, оглавление
+  var MQR = matchMedia('(min-width:1440px)');   // читальня: ей нужна своя колонка
+  function wide(){ return MQ.matches; }
+  function rdWide(){ return MQR.matches; }
+
+  /* ── хлебная крошка в шапке: раздел, а в архиве ещё и категория ── */
+  var crumb=null;
+  function ensureCrumb(){
+    if(crumb && crumb.isConnected) return crumb;
+    var bar=document.querySelector('header .bar'); if(!bar) return null;
+    crumb=document.createElement('span'); crumb.id='deskCrumb';
+    var nav=bar.querySelector('.topnav');
+    bar.insertBefore(crumb, nav||bar.lastElementChild);
+    return crumb;
+  }
+  function drawCrumb(){
+    var c=ensureCrumb(); if(!c) return;
+    var a=document.querySelector('#drList .dr-it.active');
+    var name=a? (a.querySelector('span')||{}).textContent||'' : '';
+    var tail='';
+    try{
+      if(document.documentElement.classList.contains('view-world') &&
+         typeof activeCat!=='undefined' && activeCat && activeCat!=='all'){
+        var cd=catById(activeCat); if(cd) tail=cd.label;
+        if(typeof activeSub!=='undefined' && activeSub){
+          var sd=subById(activeCat,activeSub); if(sd) tail+=' / '+sd.label;
+        }
+      }
+    }catch(e){}
+    c.innerHTML = name ? (tail? '<b>'+name+'</b> · '+tail : '<b>'+name+'</b>') : '';
+  }
+
+  /* ── читальня ── */
+  var RD_ID=null;
+  function readerEl(){
+    var r=document.getElementById('reader'); if(r) return r;
+    var g=document.querySelector('#view-world .grid'); if(!g) return null;
+    r=document.createElement('aside'); r.id='reader';
+    r.innerHTML='<div class="modal" id="readerBody"></div>';
+    g.appendChild(r);
+    return r;
+  }
+  function rdEmpty(){
+    var r=readerEl(); if(!r) return;
+    document.getElementById('readerBody').innerHTML=
+      '<div class="rd-empty"><span>&#9634;</span>Выбери карточку слева —<br>она откроется здесь, а список останется на месте.</div>';
+    RD_ID=null;
+  }
+  /* подсветка выбранной карточки. Панель НЕ гасим оттого, что карточки нет
+     в текущей выборке: её открывают и из закладок, и из глобального поиска,
+     когда список показывает совсем другое. Статья остаётся, гаснет подсветка. */
+  function rdMark(){
+    var list=document.getElementById('cards'); if(!list) return;
+    var cards=list.querySelectorAll('.card');
+    for(var i=0;i<cards.length;i++){
+      cards[i].classList.toggle('rd-sel',
+        !!RD_ID && (cards[i].getAttribute('onclick')||'').indexOf("'"+RD_ID+"'")>=0);
+    }
+  }
+  /* колонка-читальня нужна, когда есть что показывать: открытая статья
+     или непустой список. На голой витрине категорий она только сужала бы её. */
+  function rdSync(){
+    var v=document.getElementById('view-world'); if(!v) return;
+    var list=document.getElementById('cards');
+    var has = rdWide() && (!!RD_ID || (!!list && !!list.querySelector('.card')));
+    v.classList.toggle('rd-on', has);
+    if(has){ readerEl(); if(!RD_ID) rdEmpty(); rdMark(); }
+  }
+
+  /* ── оглавление на витрине архива ── */
+  function deskDir(){
+    var host=document.getElementById('deskDir');
+    var landing=false;
+    try{
+      landing = wide() && document.documentElement.classList.contains('view-world') &&
+                activeCat==='all' && !SEC_Q && !secFiltCount();
+    }catch(e){ landing=false; }
+    if(!landing){ if(host) host.remove(); return; }
+    var col=document.querySelector('#view-world .content-col'),
+        cards=document.getElementById('cards');
+    if(!col||!cards) return;
+    if(!host){ host=document.createElement('div'); host.id='deskDir'; col.insertBefore(host, cards.nextSibling); }
+    var cnt={};
+    ARCHIVE.forEach(function(e){ if(e.sub){ (cnt[e.cat]=cnt[e.cat]||{})[e.sub]=(cnt[e.cat][e.sub]||0)+1; } });
+    var html='';
+    CATS.forEach(function(c){
+      if(c.dev && !isDev()) return;
+      if(c.type==='story' || !c.subs || !c.subs.length) return;
+      var body='';
+      c.subs.forEach(function(s){
+        var n=(cnt[c.id]||{})[s.id]||0;
+        if(!n) return;
+        body+='<button class="dd-it" onclick="setSub(\''+c.id+'\',\''+s.id+'\')">'+
+              '<span>'+esc(s.label)+'</span><i>'+n+'</i></button>';
+      });
+      if(body) html+='<div class="dd-col"><h5>'+esc(c.label)+'</h5>'+body+'</div>';
+    });
+    host.innerHTML = html ? '<div class="dd-h">Оглавление</div><div class="dd-grid">'+html+'</div>' : '';
+  }
+
+  var _open=window.openModal, _close=window.closeModal, _render=window.renderCardList;
+
+  window.openModal=function(id, overlay){
+    if(!rdWide() || overlay || !document.documentElement.classList.contains('view-world'))
+      return _open.apply(this, arguments);
+    var r=readerEl(); if(!r) return _open.apply(this, arguments);
+    _open.call(window, id);
+    var sc=document.getElementById('scrim');
+    if(!sc.classList.contains('open')) return;     // карточка не открылась — ничего не подменяем
+    sc.classList.remove('open');
+    var m=document.getElementById('modal');
+    document.getElementById('readerBody').innerHTML=m.innerHTML;
+    /* и сразу опустошаем #modal: держать в документе вторую, невидимую копию
+       той же карточки незачем — она путает и поиск по DOM, и печать. */
+    m.innerHTML='';
+    RD_ID=id; rdMark();
+    var v=document.getElementById('view-world'); if(v) v.classList.add('rd-on');
+    r.scrollTop=0;
+  };
+  window.closeModal=function(){
+    var sc=document.getElementById('scrim');
+    if(rdWide() && sc && !sc.classList.contains('open') && RD_ID){ rdEmpty(); rdMark(); return; }
+    return _close.apply(this, arguments);
+  };
+  window.renderCardList=function(){
+    var out=_render.apply(this, arguments);
+    rdSync(); deskDir(); drawCrumb();
+    return out;
+  };
+
+  /* смена раздела: обновить крошку и решить, нужна ли читальня */
+  var _go=window.go;
+  window.go=function(){ var out=_go.apply(this, arguments); setTimeout(function(){ rdSync(); deskDir(); drawCrumb(); },0); return out; };
+
+  /* ── стрелками вверх/вниз идём по списку, статья справа меняется на лету ── */
+  addEventListener('keydown', function(e){
+    if(!rdWide() || !RD_ID) return;
+    if(e.key!=='ArrowDown' && e.key!=='ArrowUp') return;
+    var t=e.target;
+    if(t && (t.tagName==='INPUT'||t.tagName==='TEXTAREA'||t.tagName==='SELECT'||t.isContentEditable)) return;
+    if(document.querySelector('.scrim.open')) return;
+    var cards=[].slice.call(document.querySelectorAll('#cards .card'));
+    var i=cards.findIndex(function(c){ return c.classList.contains('rd-sel'); });
+    if(i<0) return;
+    var j=i+(e.key==='ArrowDown'?1:-1);
+    if(j<0||j>=cards.length) return;
+    e.preventDefault();
+    cards[j].click();
+    cards[j].scrollIntoView({block:'nearest'});
+  });
+
+  function onResize(){
+    var v=document.getElementById('view-world'); if(v && !rdWide()) v.classList.remove('rd-on');
+    rdSync(); deskDir(); drawCrumb();
+  }
+  MQ.addEventListener('change', onResize);
+  MQR.addEventListener('change', onResize);
+  addEventListener('load', function(){ setTimeout(function(){ rdSync(); deskDir(); drawCrumb(); }, 300); });
+  setTimeout(function(){ rdSync(); deskDir(); drawCrumb(); }, 1200);
+})();
+</script>
+<!-- ══ /ДЕСКТОП v2 ══ -->
 </body>
 </html>
