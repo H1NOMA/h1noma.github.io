@@ -138,6 +138,11 @@
     -webkit-font-smoothing:antialiased; -webkit-text-size-adjust:100%;
   }
   a{color:inherit;text-decoration:none}
+  /* Подсказка в поле. Правило было ровно одно — на строку поиска в шапке,
+     а полей с placeholder полсотни: остальные рисовались серым по умолчанию
+     браузера (3.92:1) и не следили ни за сеттингом, ни за режимом высокого
+     контраста. opacity:1 обязателен: Firefox гасит подсказку до .54. */
+  input::placeholder,textarea::placeholder{color:var(--muted);opacity:1}
   img{max-width:100%}
   ::selection{background:rgba(var(--accent-rgb),.3)}
   :root[data-a11y="contrast"]{
@@ -3812,12 +3817,24 @@ async function sget(key, shared=SHARED){
   }
   return sgetLocal(key, shared);
 }
+/* Порядок важен: сперва на устройство, потом в облако.
+   Раньше локальное зеркало писалось ПОСЛЕ облачной попытки, а у неё тайм-аут
+   15 секунд — при недоступной сети правка ложилась на устройство только через
+   эти пятнадцать секунд, и закрытая раньше вкладка теряла её совсем.
+   Возвращаем по-прежнему судьбу ОБЛАЧНОЙ записи: на устройстве к этому моменту
+   всё уже лежит. */
 async function sset(key,val, shared=SHARED){
   if(supa && shared){
+    await ssetLocal(key,val,shared);   // мгновенно и независимо от сети
     let cloudOk=false;
-    try{ cloudOk = await withTimeout(cloudSet(key,val), CLOUD_TMO); }
+    try{
+      const r = await withTimeout(cloudSet(key,val), CLOUD_TMO);
+      // withTimeout по тайм-ауту РЕЗОЛВИТСЯ значением undefined, а не падает,
+      // поэтому молчание сети сюда, в catch, не попадает — ловим отдельно
+      if(r===undefined) toast('⚠ Облако не ответило — сохранено на этом устройстве');
+      else cloudOk = r!==false;
+    }
     catch(e){ toast('⚠ Облако недоступно — сохранено локально'); }
-    await ssetLocal(key,val,shared); // локальное зеркало для офлайна
     return cloudOk;
   }
   return ssetLocal(key,val,shared); // личные данные не уходят в облако
@@ -3911,11 +3928,13 @@ function bindGameData(resetNav){
 }
 const uid = ()=> Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 // SRD-данные вынесены в отдельные файлы (быстрый старт): грузим фетчем, при сбое — из встроенного тега (пустой) или пустой массив
+let DATA_LOAD_FAILED = false;   // хоть один внешний файл так и не доехал
 async function loadDataFile(url, fallbackId){
   for(let i=0;i<3;i++){
     try{ const r=await fetch(url); if(r.ok){ const j=await r.json(); if(Array.isArray(j)) return j; } }catch(e){}
     await new Promise(res=>setTimeout(res, 400*(i+1)));
   }
+  DATA_LOAD_FAILED = true;   // три попытки впустую — дальше только встроенный запас
   try{ const el=document.getElementById(fallbackId); if(el && el.textContent.trim()){ const j=JSON.parse(el.textContent); if(Array.isArray(j)) return j; } }catch(e){}
   return null;
 }
@@ -4371,7 +4390,14 @@ function renderCardList(){
   list = list.slice().sort(byRar
     ? (a,b)=>{ const d=itemRarityInfo(a).ord-itemRarityInfo(b).ord; return d || a.title.localeCompare(b.title,'ru'); }
     : (a,b)=> a.title.localeCompare(b.title,'ru'));
-  if(!list.length){ el.innerHTML=`<div class="empty">[ ПУСТО ] ${SEC_Q||secFiltCount()?'Ничего не найдено по фильтру':'В этой категории пока нет записей'}</div>`; el.dataset.cardSig=''; return; }
+  if(!list.length){
+    // Пусто по фильтру — это одно, а «справочник не скачался» — совсем другое:
+    // раньше отказ сети выглядел как честно пустая категория, и ГМ за столом
+    // решал, что базы просто нет.
+    const why = (SEC_Q||secFiltCount()) ? '[ ПУСТО ] Ничего не найдено по фильтру'
+      : (DATA_LOAD_FAILED ? '[ НЕ ЗАГРУЗИЛОСЬ ] Справочник не скачался — проверь связь и обнови страницу'
+                          : '[ ПУСТО ] В этой категории пока нет записей');
+    el.innerHTML=`<div class="empty">${why}</div>`; el.dataset.cardSig=''; return; }
   const total=list.length;
   if(total>SEC_SHOWN) list=list.slice(0,SEC_SHOWN);
   // точечное обновление: тот же результат фильтра — не пересобираем сетку (картинки не мигают)
@@ -6340,12 +6366,14 @@ async function persistChars(){
       });
       const ok=await sset('comik:chars:'+tag, mine, true);
       if(!ok && supa) toast('⚠ Облако недоступно — сохранено локально');
+      return !!ok;
     } else {
       // не залогинен или без облака — сохраняем ТОЛЬКО локально;
       // легаси-блоб comik:chars:v1 в облако больше не пишем (ключ заморожен)
       await ssetLocal(KEY_CHARS, CHARS_ALL, true);
+      return true;          // без облака «сохранено» значит сохранено на устройстве
     }
-  }catch(e){}
+  }catch(e){ return false; }
 }
 /* живая синхронизация: раз в 40с подтягиваем персонажей и заявки, пока вкладка видима и модалки закрыты */
 setInterval(async ()=>{
@@ -8744,7 +8772,21 @@ function inlineAutosave(id){
     // «Сохранено» показываем только если запись действительно прошла. Раньше
     // строка стояла вне проверки, и при любом рассогласовании (лист от другого
     // сеттинга, пропавшие права) человек видел «Сохранено» на потерянных правках.
-    if(applyPlayerEdits(id, true)){ persistChars().catch(()=>{}); setInlineSaveState('saved'); }
+    // «Сохранено» ставим ПОСЛЕ того, как запись дошла: раньше галочка
+    // появлялась сразу, и при отказе облака человек видел зелёный значок
+    // рядом с тостом «облако недоступно» — значок и тост противоречили друг другу
+    if(applyPlayerEdits(id, true)){
+      setInlineSaveState('saving');
+      // На устройство запись ложится сразу, а облако ждёт своего тайм-аута до
+      // пятнадцати секунд. Крутить значок всё это время незачем: через четыре
+      // секунды данные заведомо целы — показываем «сохранено», а если облако
+      // в итоге откажет, значок переключится на ошибку.
+      const done = persistChars();
+      let settled = false;
+      done.then(ok => { settled = true; setInlineSaveState(ok === false ? 'error' : 'saved'); },
+                ()  => { settled = true; setInlineSaveState('error'); });
+      setTimeout(() => { if(!settled && INLINE_ID === id) setInlineSaveState('saved'); }, 4000);
+    }
     else { setInlineSaveState('error'); }
   }, 1200);
 }
@@ -8752,7 +8794,10 @@ function flushInlineSave(){
   if(!INLINE_ID) return;
   clearTimeout(INLINE_T);
   const id=INLINE_ID;
-  if(applyPlayerEdits(id, true)){ persistChars().catch(()=>{}); }
+  if(applyPlayerEdits(id, true)){
+    persistChars().then(ok => { if(ok === false) setInlineSaveState('error'); })
+                  .catch(() => setInlineSaveState('error'));
+  }
 }
 function openInlineSheet(id, tileEl, animate){
   const c=CHARS.find(x=>x.id===id); if(!c||c.deleted) return;
