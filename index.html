@@ -2769,6 +2769,23 @@ html.dr-anim #appPane,html.dr-anim #sideDrawer,html.dr-anim #drScrim{
    прокрутку касанием и колесом — по затемнению всё равно ничего не листают. */
 html.dr-open #appPane,html.dr-open #drScrim{touch-action:none}
 html.dr-open body{overscroll-behavior:none}
+/* Полотно уезжает вправо трансформом и высовывается за правый край документа.
+   Ширина страницы от этого растёт, и телефон отзумливает её, чтобы вместить, —
+   на скриншоте это выглядит как «шторка застряла, всё уехало и уменьшилось».
+   Нужен именно clip, а не hidden: hidden делает корень прокручиваемым и
+   отключает position:sticky у шапки — из-за этого его когда-то и сняли. */
+/* Зажим обязан стоять на BODY, а не только на корне: overflow корня по
+   правилам уходит вьюпорту, а сам <html> при этом остаётся visible и не
+   обрезает ничего — замер это подтвердил (733px и с clip, и с hidden на html).
+   Корню clip всё равно нужен: пока он visible, body отдаёт свой overflow
+   вьюпорту вместо того, чтобы обрезать самому. Вдвоём — 430px, как надо. */
+html.dr-live{overflow-x:clip}
+html.dr-live body{overflow-x:clip}
+@supports not (overflow-x:clip){
+  /* до Safari 16 clip не знали. hidden делает body прокручиваемым и на эти
+     420 мс подвешивает липкую шапку — терпимо, шапка и так наверху */
+  html.dr-live,html.dr-live body{overflow-x:hidden}
+}
 
 .dr-top{padding:2px 20px 16px}
 /* логотип берём из уже готовой переменной --logo-url — картинка не дублируется в файле */
