@@ -2752,9 +2752,12 @@
 #drEdge{display:none}
 #appPane{position:relative;z-index:2;background:var(--bg);min-height:100vh}
 html.dr-live #sideDrawer{visibility:visible}
+/* Только композитные свойства. border-radius из списка убран: он меняется
+   с 0 на 22px при открытии шторки, и все 420 мс браузер пересчитывал форму
+   отсечения ПОЛОТНА ЦЕЛИКОМ — а внутри него архив на пять тысяч карточек.
+   Скругление никуда не делось, оно просто встаёт сразу, а не доезжает. */
 html.dr-anim #appPane,html.dr-anim #sideDrawer,html.dr-anim #drScrim{
-  transition:transform .42s cubic-bezier(.32,.72,0,1),opacity .42s cubic-bezier(.32,.72,0,1),
-             border-radius .42s cubic-bezier(.32,.72,0,1)}
+  transition:transform .42s cubic-bezier(.32,.72,0,1),opacity .42s cubic-bezier(.32,.72,0,1)}
 @media (prefers-reduced-motion:reduce){html.dr-anim #appPane,html.dr-anim #sideDrawer,html.dr-anim #drScrim{transition-duration:.01ms}}
 /* Фон при открытой шторке не прокручивается, но запрет вешаем не на overflow:
    он отключает position:sticky, и шапка уезжала с полотна. Достаточно запретить
