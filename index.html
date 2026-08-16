@@ -146,10 +146,14 @@
     --txt:#ffffff; --dim:#f2f2f2; --muted:#d4d4d4;
     --red:#ffe400; --red-dim:#ffd000; --red-soft:rgba(255,228,0,.28);
     --glow:rgba(255,228,0,.22); --header:rgba(0,0,0,.94); --accent-rgb:255,228,0;
+    --red-ink:#ffe400;   /* 12.39 на #222 — осветлять нечего */
   }
   :root[data-a11y="cvd"]{
     --red:#4d9fff; --red-dim:#3d8ae6; --red-soft:rgba(77,159,255,.22);
     --glow:rgba(77,159,255,.16); --accent-rgb:77,159,255;
+    /* без своей строки акцентный текст остался бы от сеттинга — розовым при
+       синих заливках. Плюс сам синий даёт 3.91 на поверхностях, осветляем */
+    --red-ink:#66acff;
   }
   :root[data-a11y="cvd"] .tc-st.hp .v,:root[data-a11y="cvd"] .tc-st.hp input,:root[data-a11y="cvd"] .trk-hp{color:#ff9500}
   .mirror-ui .botnav{left:auto;right:12px;flex-direction:row-reverse}
@@ -228,7 +232,9 @@
   .pc-preset.more{border:var(--hair) dashed var(--line2);background:rgba(255,255,255,.02);color:var(--muted);font-size:1.4rem;font-weight:400}
   .pc-link{display:block;width:100%;text-align:center;margin-top:12px;background:none;border:none;cursor:pointer;font-family:var(--f-mono);font-size:.74rem;letter-spacing:.03em;color:var(--muted)}
   .pc-link span{border-bottom:1px dashed var(--line2);padding-bottom:2px}
-  @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+  @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}
+    /* scroll-behavior — не переход и не анимация, звёздочка выше его не гасит */
+    html{scroll-behavior:auto !important}}
 
   /* ---------- Header ---------- */
   header{position:sticky;top:0;z-index:40;background:var(--bg2);border-bottom:var(--hair) solid var(--line2);padding-top:env(safe-area-inset-top)}
@@ -388,6 +394,9 @@
   .sub{display:flex;align-items:center;gap:7px;cursor:pointer;color:var(--dim);background:var(--surface);border:1px solid var(--line2);font-family:var(--f-mono);font-size:.7rem;letter-spacing:.03em;text-transform:uppercase;padding:11px 15px;border-radius:var(--r-sm);transition:.15s}
   .sub.active{color:var(--red-ink);border-color:var(--red)}
   .sub .n{font-size:.66rem;color:var(--muted)}
+  /* у выбранного подраздела фон приподнят — счётчик той же краской на нём
+     не добирает до 4.5 (замер: 4.2 в терре), берём краску на ступень светлее */
+  .sub.active .n{color:var(--dim)}
 
   .content-col{min-width:0}
   .cards{display:grid;grid-template-columns:1fr;gap:12px}
@@ -2072,7 +2081,9 @@
     .cat .rune{width:48px;height:48px}
     .subwrap{grid-column:1/-1;justify-content:flex-start;gap:8px;margin-top:12px}
     .sub{font-size:.78rem;padding:12px 18px}
-    .sub.active{border:none}
+    /* правило снимало рамку, и выбранный подраздел отличался от соседей
+       только цветом — единственный сигнал, да ещё и цветовой */
+    .sub.active{border:none;background:var(--surface2)}
     /* хронология: вертикальный столбец кампаний по центру */
     #view-chrono{max-width:720px;margin:0 auto}
     .chrono-list{max-width:none}
@@ -2155,7 +2166,7 @@
   .sec-filter{margin-bottom:14px;display:flex;flex-direction:column;gap:8px}
   .sec-q-bar{display:flex;align-items:stretch;gap:8px}
   .sec-q-row{flex:1;min-width:0;display:flex;align-items:center;gap:9px;background:var(--surface2);border:var(--hair) solid var(--line2);border-radius:13px;padding:10px 13px;color:var(--muted)}
-  .sec-q-row input{flex:1;min-width:0;background:none;border:none;outline:none;color:var(--txt);font-size:.95rem;font-family:var(--f-text)}
+  .sec-q-row input{flex:1;min-width:0;background:none;border:none;outline:none;color:var(--txt);font-size:.95rem;font-family:var(--f-body)}
   /* кнопка фильтра справа от поиска + раскрывающаяся панель фасетов */
   .sec-filt-btn{position:relative;flex:0 0 auto;width:46px;border-radius:13px;border:var(--hair) solid var(--line2);background:var(--surface2);color:var(--muted);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s}
   .sec-filt-btn.open{color:var(--red-ink);border-color:rgba(var(--accent-rgb),.55)}
@@ -2223,7 +2234,7 @@
   /* черты: чипы + подсказки */
   .feat-chips{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:8px}
   .feat-chips .opt{padding:2px 0}
-  .feat-chip{display:inline-flex;align-items:center;gap:6px;background:var(--red-soft);border:var(--hair) solid rgba(var(--accent-rgb),.45);border-radius:999px;padding:6px 8px 6px 12px;font-family:var(--f-text);font-size:.82rem;color:var(--txt)}
+  .feat-chip{display:inline-flex;align-items:center;gap:6px;background:var(--red-soft);border:var(--hair) solid rgba(var(--accent-rgb),.45);border-radius:999px;padding:6px 8px 6px 12px;font-family:var(--f-body);font-size:.82rem;color:var(--txt)}
   .feat-chip .feat-lvl-w{display:inline-flex;align-items:center;gap:3px;font-family:var(--f-mono);font-size:.58rem;color:var(--muted);text-transform:uppercase}
   .feat-chip .feat-lvl{width:26px;background:rgba(0,0,0,.22);border:var(--hair) solid var(--line2);border-radius:6px;color:var(--txt);padding:3px 2px;text-align:center;font-family:var(--f-disp);font-size:.78rem}
   .feat-chip .feat-lvl:focus{outline:none;border-color:var(--red)}
@@ -2239,7 +2250,7 @@
   .hp-calc .hpc-rows{display:flex;flex-direction:column;gap:6px;background:var(--surface2);border:var(--hair) solid var(--line2);border-radius:12px;padding:10px}
   .hp-calc .hpc-row{display:flex;align-items:center;gap:10px}
   .hp-calc .hpc-lv{flex:0 0 52px;font-family:var(--f-mono);font-size:.66rem;color:var(--dim)}
-  .hp-calc .hpc-fix{flex:1;font-family:var(--f-text);font-size:.85rem;color:var(--txt)}
+  .hp-calc .hpc-fix{flex:1;font-family:var(--f-body);font-size:.85rem;color:var(--txt)}
   .hp-calc .hpc-in{flex:1;min-width:0;background:var(--bg2);border:var(--hair) solid var(--line);border-radius:9px;color:var(--txt);padding:7px 9px;text-align:center}
   .hp-calc .hpc-in:focus{outline:none;border-color:var(--red)}
   .hp-calc .hpc-con{flex:0 0 auto;font-family:var(--f-mono);font-size:.66rem;color:var(--muted)}
@@ -2531,7 +2542,7 @@
   .trk-me .tm-sp-list{display:flex;flex-direction:column;gap:9px}
   .trk-me .tm-sp-grp{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
   .trk-me .tm-sp-lh{flex:0 0 100%;font-family:var(--f-mono);font-size:.56rem;letter-spacing:.06em;color:var(--dim);text-transform:uppercase;margin-bottom:1px}
-  .trk-me .tm-sp{padding:6px 10px;border-radius:8px;background:rgba(255,255,255,.04);border:var(--hair) solid rgba(255,255,255,.1);color:var(--txt);font-family:var(--f-text);font-size:.82rem;cursor:pointer}
+  .trk-me .tm-sp{padding:6px 10px;border-radius:8px;background:rgba(255,255,255,.04);border:var(--hair) solid rgba(255,255,255,.1);color:var(--txt);font-family:var(--f-body);font-size:.82rem;cursor:pointer}
   .trk-me .tm-sp.prep{border-color:rgba(var(--accent-rgb),.6);color:var(--red-ink)}
   .trk-me .tm-sp:active{transform:scale(.96)}
   .trk-me .tm-rest{display:flex;gap:10px;margin-top:14px}
@@ -8320,7 +8331,7 @@ function openClassFeat(id, ai, encH){
       const s=d.querySelector('summary');
       return s && s.textContent.trim().toLowerCase().startsWith(want);
     });
-    if(el){ el.open=true; el.scrollIntoView({behavior:'smooth', block:'start'}); }
+    if(el){ el.open=true; el.scrollIntoView({behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block:'start'}); }
   }, 80);
 }
 /* лист приложен к заявке на игру? — только такие чужие листы открываются Мастеру */
@@ -12246,12 +12257,12 @@ function openInstallHelp(){
   #shelf button:hover{background:var(--surface2);color:var(--txt)}
   #shelf button:active{opacity:var(--press,.7)}
   .sh-round{display:flex;align-items:baseline;gap:6px}
-  .sh-round b{font-family:var(--f-disp);font-size:1.02rem;color:var(--red-ink);font-weight:700;line-height:1}
+  .sh-round b{font-family:var(--f-disp);font-size:1.02rem;color:var(--red);font-weight:700;line-height:1}
   .sh-turn{display:flex;align-items:baseline;gap:8px;min-width:0}
   .sh-turn .cap{color:var(--muted);text-transform:uppercase;font-size:.64rem;letter-spacing:.16em}
   .sh-turn .who{color:var(--txt);font-family:var(--f-disp);font-size:.92rem;letter-spacing:.02em;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:22ch}
-  .sh-step{color:var(--red-ink) !important}
+  .sh-step{color:var(--red) !important}
   .sh-log{flex:1 1 auto !important;min-width:0;color:var(--muted);
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 14px;text-align:right}
   .sh-mus{display:flex;align-items:center;gap:2px;max-width:270px;min-width:0}
@@ -12259,7 +12270,7 @@ function openInstallHelp(){
     color:var(--dim);cursor:pointer;padding:6px 8px;border-radius:8px}
   .sh-mus .nm:hover{background:var(--surface2);color:var(--txt)}
   #shelf svg{width:15px;height:15px;display:block;fill:currentColor}
-  .sh-dock.on{color:var(--red-ink)}
+  .sh-dock.on{color:var(--red)}
   /* На самой «Доске ходов» полка не поднимается вовсе (класс shelf-on там не
      ставится) — раунд, ход и журнал там и так перед глазами, а музыкальная
      плашка остаётся своя. */
@@ -12302,10 +12313,14 @@ function openInstallHelp(){
   .dk-row.can{cursor:pointer;transition:border-color .15s,background .15s}
   .dk-row.can:hover{background:var(--surface2);border-color:var(--line2)}
   .dk-row.on{border-color:rgba(var(--accent-rgb),.65);background:linear-gradient(160deg,rgba(var(--accent-rgb),.14),var(--surface))}
-  .dk-row.dead{opacity:.45}
+  /* opacity на всю строку роняло имя до 3.63 — «погашен» превращалось в
+     «нечитаемо». Гасим оформление, имя оставляем читаемым */
+  .dk-row.dead{background:none;border-style:dashed}
+  .dk-row.dead .n{color:var(--muted);text-decoration:line-through;text-decoration-thickness:1px}
+  .dk-row.dead .dk-ini,.dk-row.dead .dk-hp{opacity:.6}
   .dk-ini{font-family:var(--f-mono);font-size:.86rem;color:var(--muted);text-align:center;
     font-variant-numeric:tabular-nums}
-  .dk-row.on .dk-ini{color:var(--red-ink)}
+  .dk-row.on .dk-ini{color:var(--red)}
   .dk-nm{min-width:0}
   .dk-nm .n{display:block;font-size:.9rem;color:var(--txt);white-space:nowrap;overflow:hidden;
     text-overflow:ellipsis}
@@ -12335,6 +12350,21 @@ function openInstallHelp(){
   /* всплывашка центрируется по окну — при открытом кармане уводим её в полотно */
   html.dock-on .toast{right:var(--dock-w)}
 }
+
+/* ═══ Видимый фокус с клавиатуры ═══
+   В файле 25 объявлений outline:none и всего два правила :focus-visible —
+   человек, идущий табом, почти нигде не видел, где стоит. Правило намеренно
+   лежит последним: у точечных «outline:none» такая же специфичность, и спор
+   решает порядок. :focus-visible включается только при навигации клавишами,
+   мышь его не зажигает, поэтому обычные нажатия выглядят как раньше. */
+a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
+select:focus-visible,summary:focus-visible,[tabindex]:focus-visible,
+[contenteditable="true"]:focus-visible{
+  outline:2px solid var(--red-ink);outline-offset:2px;border-radius:inherit}
+/* поля, спрятанные внутри «таблетки», подсвечивают саму таблетку, а не себя */
+.sec-q-row:has(input:focus-visible),.search-float .sf-row:has(input:focus-visible){
+  outline:2px solid var(--red-ink);outline-offset:2px}
+.sec-q-row input:focus-visible,.search-float .sf-row input:focus-visible{outline:none}
 </style>
 <script>
 /* ═══ Полка состояния и боковой карман ═══
