@@ -10508,6 +10508,9 @@ function renderTracker(){
       <button class="btn primary" onclick="trkAddManual()">Добавить</button>
       <button class="btn ghost" onclick="trkClear()">Очистить</button>
     </div>
+    ${(TRK.lastBoard&&(TRK.lastBoard.list||[]).length)?`<div class="row" style="margin-top:8px">
+      <button class="btn ghost" style="width:100%" onclick="trkRestoreLast()">↩ Вернуть прошлый бой (${TRK.lastBoard.list.length})</button>
+    </div>`:''}
     <div class="row" style="margin-top:8px">
       <button class="btn ghost" style="width:100%" onclick="openNewNpc()">＋ Создать NPC-лист (с фото)</button>
     </div>`;
@@ -10812,13 +10815,41 @@ function trkActiveForPlayer(){
   }
   return best;
 }
+/* Возврат последнего боя: доска чистится сама при завершении игры, и без
+   этого шага случайное нажатие стоило бы ГМу всего состава. Снимок один —
+   предыдущий, дальше в глубину не храним. */
+function trkRestoreLast(){
+  if(!ADMIN) return;
+  const s=TRK.lastBoard; if(!s || !Array.isArray(s.list) || !s.list.length){ toast('Возвращать нечего'); return; }
+  TRK.list=s.list.slice(); TRK.round=s.round||1; TRK.activeKey=s.activeKey||'';
+  TRK.party=s.party||''; TRK.mapPos=s.mapPos||{};
+  TRK.lastBoard=null;
+  trkLog('combat','ГМ вернул прошлый бой');
+  trkSave(); renderTracker(); trkPublish();
+  toast('Прошлый бой возвращён');
+}
 function trkToggleActive(){
   if(!ADMIN) return;
   // доски независимы: переключаем активность только своего стола, чужие не трогаем
   const bk=gmBoardKey();
   const cur=!!(TRK_SHARED[bk]&&TRK_SHARED[bk].active);
-  trkLog('combat', cur?'Доска выключена для игроков':'Доска активна — бой начался');
+  /* Выключение доски = игра завершена. Дальше состав никому не нужен: у ГМа
+     он висел бы до следующей сессии, а игроки видели бы мёртвый бой. Поэтому
+     доска очищается сама — и у ГМа, и в общем столе. Снимок кладём в
+     TRK.lastBoard: рядом с «Очистить» появляется «Вернуть прошлый бой». */
+  const finish = cur;
+  if(finish){
+    TRK.lastBoard={ list:(TRK.list||[]).slice(), round:TRK.round||1, activeKey:TRK.activeKey||'',
+                    party:TRK.party||'', mapPos:TRK.mapPos||{}, at:Date.now() };
+    trkLog('combat','Игра завершена — доска очищена');
+    TRK.list=[]; TRK.round=1; TRK.activeKey=''; TRK.mapPos={};
+    trkSave();
+  } else {
+    trkLog('combat','Доска активна — бой начался');
+  }
   const build=(base)=>{ const prev=base||{}; const fm={}; (Array.isArray(prev.list)?prev.list:[]).forEach(p=>{ if(p) fm[trkCardKey(p)]=p; });
+    if(finish) return {list:[], party:'', at:Date.now(), active:false, owner:currentTag(), round:1, activeKey:'',
+      log:prev.log||[], mapPos:{}, mapBg:(prev.mapBg!=null?prev.mapBg:''), mapCols:prev.mapCols||TRK.mapCols||TRK_MAPCOLS};
     return {list:trkMergedList(fm), party:TRK.party, at:Date.now(), active:!cur, owner:currentTag(), round:TRK.round||1, activeKey:TRK.activeKey||'',
       log:prev.log||[], mapPos:prev.mapPos||{}, mapBg:(prev.mapBg!=null?prev.mapBg:''), mapCols:prev.mapCols||TRK.mapCols||TRK_MAPCOLS}; };
   // оптимистично показываем новое состояние сразу
@@ -12320,6 +12351,12 @@ function openInstallHelp(){
    вместо верхней кнопки в разделе «Игрок».
    ═══════════════════════════════════════════════════════════════════════ */
 
+/* Общие «выключатели» стоят ДО десктопного медиазапроса: у #projRow и
+   #addCharFab одинаковая специфичность с десктопными правилами, и спор
+   решает порядок — из конца файла они гасили сами себя на большом экране. */
+#addCharFab{display:none}
+#projRow{display:none}
+
 @media(min-width:1180px){
 
   /* ── АРХИВ: поиск от края до края ─────────────────────────────────────
@@ -12339,6 +12376,9 @@ function openInstallHelp(){
 
   /* ── ИГРОК: верхняя кнопка ушла в плавающую, карточки крупнее ──────── */
   #view-players .players-bar{display:none}
+  /* раздел центровался в 1560 px и оставлял слева воздух — карточки
+     должны начинаться у самой границы раздела */
+  #view-players{max-width:none;margin-left:0;margin-right:0}
   /* 200 px давали семь колонок под два листа — пять пустовали.
      268 крупнее, карточка читается с другого конца стола. */
   /* 200 px давали семь колонок под два листа — пять пустовали. Здесь
@@ -12365,6 +12405,23 @@ function openInstallHelp(){
   #addCharFab{right:calc(var(--edge) + 52px + 12px);display:none}
   html.view-players #addCharFab{display:flex}
   #addCharFab svg{stroke-width:2.2}
+
+  /* ── ШАПКА: все сеттинги в ряд ────────────────────────────────────────
+     Пилюля с выпадающим списком заменена открытым рядом: сеттинги видно
+     сразу, переключение — в одно нажатие. Оформление каждого берут те же
+     классы .pm-<id>, что и пункты бывшего списка. */
+  header #projSwipe{display:none}
+  #projRow{display:flex;align-items:center;gap:4px;flex:1 1 auto;min-width:0;
+    margin-left:-6px;overflow:hidden}
+  .hdr-proj{background:none;border:var(--hair) solid transparent;border-radius:999px;
+    padding:7px 13px;cursor:pointer;font-size:.82rem;line-height:1;white-space:nowrap;
+    opacity:.55;transition:opacity .16s,background .16s,border-color .16s}
+  .hdr-proj:hover{opacity:.9;background:var(--surface2)}
+  .hdr-proj.cur{opacity:1;background:var(--surface2);border-color:var(--line2)}
+  .hdr-proj i{font-style:normal}
+  /* поиск стоял на 50 px левее правого края — место под кнопку закладок,
+     которой на десктопе давно нет в шапке */
+  .search-float{right:calc(var(--edge) + 4px) !important}
 
   /* ── ДОСКА ХОДОВ: шапка в одну строку ─────────────────────────────────
      Было три этажа: раунд и вкладки сверху, «сейчас ходит» — отдельной
@@ -12401,30 +12458,21 @@ function openInstallHelp(){
   /* ── КАРТОЧКИ: крупнее, чтобы на карточке было что читать ──────────── */
   /* auto-fill плодил пустые колонки справа от трёх карточек; фиксируем
      разумный размер и ставим ряд по центру — растягивать карточки нельзя */
-  #trkBox .tb2.trk-grid{grid-template-columns:repeat(auto-fill,minmax(238px,296px));gap:16px;justify-content:center}
+  #trkBox .tb2.trk-grid{grid-template-columns:repeat(auto-fill,minmax(228px,272px));gap:16px;justify-content:start}
 
-  /* ── доска игрока занимает всю ширину: панель персонажа уехала в пульт ── */
-  html.pdock-on #trkBox .trk-pside{display:none}
-  /* …и всю высоту: раньше доска на трёх участниках была полоской вверху
-     экрана, под которой висело 600 px пустоты. Плита растягивается до
-     пульта, а содержимое стоит по центру — экран читается как боевой стол,
-     а не как обрубок страницы. */
-  html.pdock-on #toolsPage > .tool-block{min-height:calc(100vh - var(--hdr-h,62px) - var(--pdock-h) - 54px);
-    display:flex;flex-direction:column}
-  html.pdock-on #toolsPage > .tool-block > #trkBox{flex:1;display:flex;flex-direction:column;min-height:0}
-  /* align-items:start достался от гридовой раскладки: во флексе он ужимал
-     доску по содержимому, и строки выходили 842 px вместо 1519 */
-  html.pdock-on #trkBox .trk-pcols{display:flex;flex-direction:column;flex:1;min-height:0;align-items:stretch}
-  html.pdock-on #trkBox .trk-pboard{flex:1;display:flex;flex-direction:column;justify-content:center;min-height:0}
-  html.pdock-on #trkBox .trk-pboard > *{flex:none}
-
-  /* ── КАРТА БОЯ не должна уходить под сгиб ──
-     Во всю ширину полотна квадрат карты выезжал на 164 % высоты экрана.
-     Держим её в пределах видимого: ширина считается от свободной высоты. */
-  /* margin:auto по бокам во флекс-колонке съедает всю свободную ширину, и
-     карта схлопывалась в точку. Центруем через align-self, ширину задаём
-     явно — квадрат карты считается от свободной высоты. */
-  #trkBox .mp-wrap{width:min(100%, calc(100vh - 330px));max-width:none;align-self:center;margin:0}
+  /* ── доска игрока: список слева, карта постоянно справа ───────────────
+     Карту убрали из переключателя видов: она нужна всё время, а не по
+     вкладке. Переключение осталось между «Списком» и «Карточками».
+     Содержимое идёт сверху вниз и плита растёт вместе с ним — раньше она
+     распирала экран на всю высоту и ставила три строки по центру. */
+  html.pdock-on #trkBox .tb-view .tb-map-btn{display:none}
+  html.pdock-on #trkBox .trk-pcols{display:grid;
+    grid-template-columns:minmax(0,1fr) minmax(340px,420px);gap:20px;align-items:start}
+  html.pdock-on #trkBox .trk-pside{display:block;position:sticky;top:78px}
+  .pd-map{background:var(--surface);border:var(--hair) solid var(--line);border-radius:16px;padding:12px}
+  .pd-map-h{font-family:var(--f-mono);font-size:.66rem;letter-spacing:.18em;text-transform:uppercase;
+    color:var(--muted);margin-bottom:10px}
+  .pd-map .mp-wrap{width:100%;max-width:none;margin:0}
 
   /* ГМ-страница пользуется всей шириной монитора, а не 1620 px */
   #toolsPage:has(.tool-aside){max-width:1820px}
@@ -12457,7 +12505,9 @@ function openInstallHelp(){
   .pd-st b{font-family:var(--f-disp);font-size:1.05rem;color:var(--txt);letter-spacing:0}
   .pd-in{width:46px;background:var(--surface2);border:var(--hair) solid var(--line2);border-radius:9px;
     color:var(--txt);font-family:var(--f-disp);font-size:1rem;text-align:center;padding:5px 2px;outline:none}
-  .pd-hp{flex:1 1 auto;min-width:170px;display:flex;align-items:center;gap:9px}
+  /* растянутая на пол-экрана полоса ХП читалась хуже короткой: держим
+     её фиксированной, а свободное место отдаём корешкам разделов */
+  .pd-hp{flex:0 0 auto;width:268px;display:flex;align-items:center;gap:9px}
   .pd-bar-hp{position:relative;flex:1;height:22px;border-radius:8px;background:var(--surface2);
     border:var(--hair) solid var(--line2);overflow:hidden}
   .pd-bar-hp i{display:block;height:100%;border-radius:7px;transition:width .25s}
@@ -12483,11 +12533,22 @@ function openInstallHelp(){
     box-shadow:0 -14px 34px rgba(0,0,0,.45)}
   html.pdock-open .pd-panel{display:block}
   .pd-panel-in{max-height:min(46vh,430px);overflow-y:auto;overscroll-behavior:contain;padding:14px 18px 16px}
-  .pd-panel-in .trk-me{margin:0;background:none;border:0;padding:0}
+  .pd-panel-in .trk-me{margin:0;background:none;border:0;padding:0;
+    display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;align-items:start}
   .pd-panel-in .tm-sec{margin:0}
-  /* колонки внутри панели: атаки и ячейки узкие, заклинания и инвентарь широкие */
-  .pd-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;align-items:start}
-  .pd-grid.wide{grid-template-columns:1fr}
+  /* Корешок только показывает свою группу — узлы никуда не переносятся и
+     не пересобираются, поэтому переключение туда-сюда ничего не теряет. */
+  .pd-panel-in .trk-me > [data-pd]{display:none}
+  #pdock[data-tab="atk"]   .trk-me > [data-pd="atk"],
+  #pdock[data-tab="sp"]    .trk-me > [data-pd="sp"],
+  #pdock[data-tab="slots"] .trk-me > [data-pd="slots"],
+  #pdock[data-tab="inv"]   .trk-me > [data-pd="inv"],
+  #pdock[data-tab="rest"]  .trk-me > [data-pd="rest"],
+  #pdock[data-tab="cond"]  .trk-me > [data-pd="cond"],
+  #pdock[data-tab="death"] .trk-me > [data-pd="death"]{display:block}
+  /* заклинания, снаряжение и состояния занимают всю ширину панели */
+  #pdock[data-tab="sp"] .trk-me,#pdock[data-tab="inv"] .trk-me,
+  #pdock[data-tab="cond"] .trk-me,#pdock[data-tab="death"] .trk-me{grid-template-columns:1fr}
   /* состояния — своей вкладкой: игрок вешает их на себя сам */
   .pd-conds{display:flex;flex-wrap:wrap;gap:7px}
   .pd-conds .tbp-c{font-family:var(--f-mono);font-size:.7rem;letter-spacing:.04em;
@@ -12512,25 +12573,27 @@ function openInstallHelp(){
    остаётся под доской, а кнопка «Добавить персонажа» — сверху страницы.
    Правило вне медиазапроса: .fab-side задаёт display:flex, и без этого
    круглый «+» вылезал на телефоне вторым экземпляром той же кнопки. */
-#addCharFab{display:none}
-@media(max-width:1179px){ #pdock{display:none !important} #addCharFab{display:none !important} }
+@media(max-width:1179px){ #pdock{display:none !important} #addCharFab{display:none !important}
+  #projRow{display:none !important} }
 </style>
 <script>
 /* ═══════════════════════════════════════════════════════════════════════
-   ДЕСКТОП v3 — боевой пульт игрока, ГМ-колонка и плавающий «+».
+   ДЕСКТОП v3 — боевой пульт игрока, карта сбоку, сеттинги в шапке.
 
-   Ничего из существующих генераторов не переписано: панель персонажа как
-   строилась playerMePanel(), так и строится. Мы её ПЕРЕНОСИМ узлами в
-   нижний пульт и раскладываем по вкладкам — обработчики у неё встроенные
-   (onclick в разметке), поэтому переезд их не рвёт.
+   Панель персонажа как строилась playerMePanel(), так и строится. Мы
+   переносим её узел ЦЕЛИКОМ в нижний пульт и помечаем детей data-pd —
+   вкладка не пересобирает содержимое, а только показывает нужную группу.
+   Раньше узлы вынимались поштучно и при переключении вкладки гибли вместе
+   с innerHTML: после первого же переключения корешки пустели.
    ═══════════════════════════════════════════════════════════════════════ */
 (function(){
   var DESK  = function(){ return innerWidth >= 1180; };
   var onCombat = function(){ var v=document.getElementById('view-combat');
     return !!(v && v.classList.contains('active')); };
-  var PD_TAB = '';                 // какая вкладка пульта раскрыта
+  var isGM = function(){ return typeof ADMIN!=='undefined' && !!ADMIN; };
+  var PD_TAB = '';                 // какой корешок раскрыт
 
-  /* ═══ 2. Боевой пульт игрока ═══ */
+  /* ═══ 1. Боевой пульт игрока ═══ */
   function pdOff(){
     var d=document.getElementById('pdock'); if(d) d.remove();
     document.documentElement.classList.remove('pdock-on','pdock-open');
@@ -12543,26 +12606,23 @@ function openInstallHelp(){
     return d;
   }
 
-  /* Разбираем панель персонажа на вкладки. Ключ вкладки — по заголовку
-     секции, который рисует playerCharBlock(); что не опознали, кладём
-     в «Снаряжение» (там инвентарь и деньги). */
-  function collect(me){
-    var groups={atk:[], sp:[], slots:[], rest:[], inv:[], death:[]};
+  /* Метим детей панели: какой корешок какую группу показывает.
+     Ключ берём по заголовку секции, который рисует playerCharBlock(). */
+  function mark(me){
+    var have={};
     Array.prototype.slice.call(me.children).forEach(function(n){
-      if(n.classList.contains('tm-row') || n.classList.contains('tm-btns')) return; // дублируется полосой пульта
-      if(n.classList.contains('death-saves')){ groups.death.push(n); return; }
-      if(n.classList.contains('tm-rest')){ groups.rest.push(n); return; }
-      if(n.classList.contains('tm-sec')){
+      var k='inv';
+      if(n.classList.contains('tm-row') || n.classList.contains('tm-btns')) k='hide'; // дублируется полосой
+      else if(n.classList.contains('death-saves')) k='death';
+      else if(n.classList.contains('tm-rest')) k='rest';
+      else if(n.classList.contains('tm-sec')){
         var h=(n.querySelector('.tm-sec-h')||{}).textContent||'';
-        if(/атак/i.test(h)) groups.atk.push(n);
-        else if(/ячейк/i.test(h)) groups.slots.push(n);
-        else if(/заклин/i.test(h)) groups.sp.push(n);
-        else groups.inv.push(n);
-        return;
+        k = /атак/i.test(h) ? 'atk' : /ячейк/i.test(h) ? 'slots' : /заклин/i.test(h) ? 'sp' : 'inv';
       }
-      groups.inv.push(n);
+      n.setAttribute('data-pd', k);
+      if(k!=='hide') have[k]=true;
     });
-    return groups;
+    return have;
   }
 
   /* игрок вешает и снимает состояния на СВОЕГО персонажа сам:
@@ -12579,52 +12639,64 @@ function openInstallHelp(){
     try{ trkCloudCardPatch(vp, trkCardKey(my), {conds:my.conds}); }catch(e){}
   };
 
-  window.pdTab=function(key){
-    var R=document.documentElement;
-    if(PD_TAB===key && R.classList.contains('pdock-open')){ PD_TAB=''; R.classList.remove('pdock-open'); }
-    else { PD_TAB=key; R.classList.add('pdock-open'); }
-    pdSync();
-  };
-  window.pdClose=function(){ PD_TAB=''; document.documentElement.classList.remove('pdock-open'); pdSync(); };
-
-  function condsPanel(my){
+  function condsNode(my){
     var have={}; (my.conds||[]).forEach(function(c){ if(c) have[c.t]=1; });
     var chip=function(n,b){ return '<button class="tbp-c'+(b?' buff':'')+(have[n]?' on':'')+
       '" onclick="pdCondToggle(\''+String(n).replace(/'/g,"\\'")+'\','+(b?1:0)+')">'+esc(n)+'</button>'; };
     var bad=(typeof TRK_CONDS!=='undefined'?TRK_CONDS:[]).map(function(n){ return chip(n,0); }).join('');
     var good=(typeof TRK_BUFFS!=='undefined'?TRK_BUFFS:[]).map(function(n){ return chip(n,1); }).join('');
-    var w=document.createElement('div');
+    var w=document.createElement('div'); w.setAttribute('data-pd','cond');
     w.innerHTML='<div class="pd-h">Состояния</div><div class="pd-conds">'+bad+'</div>'+
                 '<div class="pd-h" style="margin-top:16px">Благословения</div><div class="pd-conds">'+good+'</div>';
     return w;
   }
 
+  /* Переключение корешка НИЧЕГО не пересобирает — только меняет
+     data-tab, по которому CSS показывает нужную группу. */
+  window.pdTab=function(key){
+    var d=document.getElementById('pdock'); if(!d) return;
+    // корешка с таким ключом у этого листа может не быть — тогда не открываем
+    // пустую панель
+    if(key && !d.querySelector('.pd-tab[data-k="'+key+'"]')) return;
+    var R=document.documentElement;
+    if(PD_TAB===key && R.classList.contains('pdock-open')) PD_TAB='';
+    else PD_TAB=key;
+    d.setAttribute('data-tab', PD_TAB);
+    R.classList.toggle('pdock-open', !!PD_TAB);
+    Array.prototype.slice.call(d.querySelectorAll('.pd-tab')).forEach(function(b){
+      b.classList.toggle('on', b.getAttribute('data-k')===PD_TAB); });
+    var x=d.querySelector('.pd-x'); if(x) x.style.display=PD_TAB?'grid':'none';
+  };
+  window.pdClose=function(){ pdTab(PD_TAB); };
+
+  var TAB_NAMES={death:'Спасброски', atk:'Атаки', sp:'Заклинания', slots:'Ячейки',
+                 cond:'Состояния', inv:'Снаряжение', rest:'Отдых'};
+  var TAB_ORDER=['death','atk','sp','slots','cond','inv','rest'];
+
   function pdSync(){
     var R=document.documentElement;
-    if(!DESK() || (typeof ADMIN!=='undefined' && ADMIN) || !onCombat()){ pdOff(); return; }
+    if(!DESK() || isGM() || !onCombat()){ pdOff(); return; }
     var me=document.querySelector('#trkBox .trk-pside .trk-me');
     if(!me){ pdOff(); return; }
     var vp=trkActiveForPlayer(); if(!vp){ pdOff(); return; }
     var my=playerMyCard(vp); if(!my){ pdOff(); return; }
 
-    var g=collect(me);
+    var d=ensureDock();
+    var pin=d.querySelector('.pd-panel-in');
+    pin.innerHTML='';                     // прошлый снимок панели уходит целиком
+    pin.appendChild(me);                  // свежий — переезжает как есть
+    var have=mark(me);
+    me.appendChild(condsNode(my)); have.cond=true;
+
     var maxHp=playerMaxHp(vp, my.charId), hp=parseInt(my.hp,10)||0;
     var pct = maxHp ? Math.max(0,Math.min(100,Math.round(hp/maxHp*100))) : (hp>0?100:0);
     var ava=''; try{ ava=trkAva(my, boardProj(vp))||''; }catch(e){}
-    var d=ensureDock();
 
-    /* корешки: показываем только то, что у персонажа реально есть */
-    var tabs=[];
-    if(g.death.length) tabs.push(['death','Спасброски', g.death.length?'':'']);
-    if(g.atk.length)   tabs.push(['atk','Атаки','']);
-    if(g.sp.length)    tabs.push(['sp','Заклинания','']);
-    if(g.slots.length) tabs.push(['slots','Ячейки','']);
-    tabs.push(['cond','Состояния', (my.conds||[]).length?String((my.conds||[]).length):'']);
-    if(g.inv.length)   tabs.push(['inv','Снаряжение','']);
-    if(g.rest.length)  tabs.push(['rest','Отдых','']);
-    if(!tabs.some(function(t){ return t[0]===PD_TAB; })) {
-      if(PD_TAB) PD_TAB = g.death.length ? 'death' : tabs[0][0];
-    }
+    var tabs=TAB_ORDER.filter(function(k){ return have[k]; });
+    // персонаж при смерти — спасброски раскрываем сами; корешок, которого
+    // у этого листа больше нет, просто сворачиваем
+    if(have.death && !PD_TAB) PD_TAB='death';
+    if(tabs.indexOf(PD_TAB)<0) PD_TAB='';
 
     var bar=d.querySelector('.pd-bar');
     bar.innerHTML=
@@ -12640,47 +12712,74 @@ function openInstallHelp(){
         '<button class="pd-hpb heal" onclick="playerHpAdjust(\'heal\')" title="Восполнить">+</button>'+
       '</div>'+
       '<div class="pd-st">КД<b>'+(my.ac?esc(String(my.ac)):'—')+'</b></div>'+
-      '<div class="pd-tabs">'+tabs.map(function(t){
-        return '<button class="pd-tab'+(PD_TAB===t[0]?' on':'')+'" onclick="pdTab(\''+t[0]+'\')">'+
-               esc(t[1])+(t[2]?'<i>'+esc(t[2])+'</i>':'')+'</button>'; }).join('')+
-        (PD_TAB?'<button class="pd-x" onclick="pdClose()" aria-label="Свернуть">▾</button>':'')+
+      '<div class="pd-tabs">'+tabs.map(function(k){
+        var n = k==='cond' && (my.conds||[]).length ? '<i>'+(my.conds||[]).length+'</i>' : '';
+        return '<button class="pd-tab'+(PD_TAB===k?' on':'')+'" data-k="'+k+'" onclick="pdTab(\''+k+'\')">'+
+               esc(TAB_NAMES[k])+n+'</button>'; }).join('')+
+        '<button class="pd-x" onclick="pdClose()" aria-label="Свернуть" style="display:'+(PD_TAB?'grid':'none')+'">▾</button>'+
       '</div>';
 
-    var pin=d.querySelector('.pd-panel-in');
-    pin.innerHTML='';
-    if(PD_TAB){
-      var wrap=document.createElement('div');
-      // класс .trk-me обязателен: всё оформление секций (атаки, ячейки,
-      // отдых, инвентарь) в файле описано селекторами вида «.trk-me .tm-...»,
-      // и без обёртки перенесённые узлы теряют вид
-      wrap.className='trk-me pd-grid'+((PD_TAB==='sp'||PD_TAB==='inv')?' wide':'');
-      if(PD_TAB==='cond') wrap.appendChild(condsPanel(my));
-      else (g[PD_TAB]||[]).forEach(function(n){ wrap.appendChild(n); });
-      pin.appendChild(wrap);
-    }
+    d.setAttribute('data-tab', PD_TAB);
     R.classList.add('pdock-on');
     R.classList.toggle('pdock-open', !!PD_TAB);
+  }
+
+  /* ═══ 2. Карта боя у игрока — всегда сбоку ═══
+     Переключатель на десктопе оставляет только «Список» и «Карточки»:
+     карта не прячется за вкладкой, а постоянно стоит в правой колонке,
+     как у ГМа. */
+  function sideMap(){
+    var side=document.querySelector('#trkBox .trk-pside');
+    if(!side || !DESK() || isGM()) return;
+    var vp=trkActiveForPlayer(); if(!vp) return;
+    var s=TRK_SHARED[vp]||{};
+    var order=[]; try{ order=trkOrder(s.list||[]); }catch(e){}
+    var html='';
+    try{ html=trkMapHtml({order:order, activeKey:s.activeKey||'', proj:boardProj(vp),
+                          playerView:true, vp:vp}); }catch(e){ return; }
+    side.innerHTML='<div class="pd-map"><div class="pd-map-h">Карта боя</div>'+html+'</div>';
+    try{ trkMapBind(); }catch(e){}
   }
 
   /* ═══ 3. Хук на перерисовку доски ═══ */
   var _rt=window.renderTracker;
   if(typeof _rt==='function'){
     window.renderTracker=function(){
+      // на десктопе у игрока «Карта» отдельным видом не нужна — она сбоку
+      try{ if(DESK() && !isGM() && trkViewMode()==='map'){
+        localStorage.setItem('comik:trk:view','list'); } }catch(e){}
       var r=_rt.apply(this, arguments);
       try{ pdSync(); }catch(e){}
+      try{ sideMap(); }catch(e){}
       return r;
     };
   }
-  /* уход с раздела прячет пульт */
+  /* Догоняющая перерисовка. При смене сеттинга и при заходе на доску листы
+     персонажа встают не мгновенно (их тянут из облака), и первый рендер
+     доски успевает пройти без панели — пульт тогда не поднимался вовсе,
+     пока что-нибудь не перерисует доску само. Дважды проверяем: если пульт
+     ДОЛЖЕН быть, а его нет, — перерисовываем. Лишних перерисовок не даёт. */
+  function bump(){
+    [300,1200].forEach(function(ms){ setTimeout(function(){
+      try{
+        if(!DESK() || isGM() || !onCombat()) return;
+        if(document.getElementById('pdock')) return;
+        var vp=trkActiveForPlayer(); if(!vp || !playerMyCard(vp)) return;
+        renderTracker();
+      }catch(e){}
+    }, ms); });
+  }
   var _go=window.go;
   if(typeof _go==='function'){
     window.go=function(){
       var r=_go.apply(this, arguments);
-      try{ if(!onCombat()) pdOff(); else if(typeof renderTracker==='function') pdSync(); }catch(e){}
+      try{ if(!onCombat()) pdOff(); else bump(); }catch(e){}
       return r;
     };
   }
-  addEventListener('resize', function(){ try{ if(!DESK()) pdOff(); else if(onCombat()) pdSync(); }catch(e){} });
+  addEventListener('resize', function(){
+    try{ if(!DESK()) pdOff(); else if(onCombat() && typeof renderTracker==='function') renderTracker(); }catch(e){}
+  });
 
   /* ═══ 4. Раздел «Игрок»: круглый «+» вместо верхней кнопки ═══ */
   function addFab(){
@@ -12692,15 +12791,41 @@ function openInstallHelp(){
     b.onclick=function(){ newCharFlow(); };
     document.body.appendChild(b);
   }
-  /* Создание начинается с калькулятора: сперва раскидать характеристики,
-     а уже из него — в лист. Пропустить можно кнопкой в самом калькуляторе. */
   window.newCharFlow=function(){
     if(!SESSION){ toast('Войдите в аккаунт, чтобы создать персонажа');
       try{ openAccessModal(null,'account'); }catch(e){} return; }
     openStatCalc(true);
   };
-  if(document.readyState==='loading') addEventListener('DOMContentLoaded', addFab);
-  else addFab();
+
+  /* ═══ 5. Сеттинги — рядом в шапке вместо пилюли с меню ═══
+     Оформление каждого сеттинга берут те же классы .pm-<id>, что и пункты
+     выпадающего списка, — шрифт, разрядка и цвет остаются прежними. */
+  function projRow(){
+    var bar=document.querySelector('header .bar'); if(!bar) return;
+    var row=document.getElementById('projRow');
+    if(!row){
+      row=document.createElement('nav'); row.id='projRow'; row.setAttribute('aria-label','Сеттинг');
+      var anchor=document.getElementById('projSwipe');
+      if(anchor && anchor.parentNode===bar) bar.insertBefore(row, anchor.nextSibling);
+      else bar.insertBefore(row, bar.firstChild);
+    }
+    var list=[]; try{ list=visibleProjects(); }catch(e){ list=Object.keys(PROJECT_TITLES); }
+    var cur=(typeof CUR_PROJECT!=='undefined')?CUR_PROJECT:'';
+    row.innerHTML=list.map(function(g){
+      return '<button class="pm-item pm-'+g+' hdr-proj'+(g===cur?' cur':'')+
+             '" onclick="projPick(\''+g+'\')"'+(g===cur?' aria-current="true"':'')+'>'+
+             (PROJECT_TITLES[g]||g)+'</button>'; }).join('');
+  }
+  window.projRowSync=projRow;
+  var _sp=window.setProject;
+  if(typeof _sp==='function'){
+    window.setProject=function(){ var r=_sp.apply(this, arguments);
+      try{ projRow(); }catch(e){} try{ bump(); }catch(e){} return r; };
+  }
+
+  function boot(){ addFab(); projRow(); }
+  if(document.readyState==='loading') addEventListener('DOMContentLoaded', boot);
+  else boot();
 })();
 </script>
 <style id="shelf-css">
