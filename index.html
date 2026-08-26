@@ -3759,8 +3759,22 @@ const mem = {};
 // страховка: если асинхронный мост хранилища зависнет, промис резолвится сам через таймаут
 const withTimeout = (p, ms=1500) => Promise.race([p, new Promise(res=>setTimeout(()=>res(undefined), ms))]);
 /* ====================== Supabase (заполни URL и KEY — и сайт переедет в облако) ====================== */
-const SUPA_URL = 'https://xstrdpoxwbkbumigspdv.supabase.co';
-const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhzdHJkcG94d2JrYnVtaWdzcGR2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQwMjg1ODIsImV4cCI6MjA5OTYwNDU4Mn0.En-AP7WJh8AZkylbM44yhhJyNcFf0-ra6M3Yu8ZxAhs';
+/* ═══ АДРЕС ОБЛАКА — при переезде меняется ТОЛЬКО этот блок ═══
+   Плюс две строки в самом верху файла: CSP (meta http-equiv, строка с
+   connect-src) и preconnect/dns-prefetch — там прописан домен облака.
+   Для проверки НОВОГО сервера до переключения всех: в консоли браузера
+     localStorage.setItem('comik:cloud', JSON.stringify(
+       {url:'https://cloud.новый-адрес.ru', key:'АНОН_КЛЮЧ_НОВОГО'}))
+   и обновить страницу — только этот браузер начнёт ходить в новое облако.
+   Вернуть как было: localStorage.removeItem('comik:cloud'). */
+const CLOUD_DEFAULT = {
+  url: 'https://xstrdpoxwbkbumigspdv.supabase.co',
+  key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhzdHJkcG94d2JrYnVtaWdzcGR2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQwMjg1ODIsImV4cCI6MjA5OTYwNDU4Mn0.En-AP7WJh8AZkylbM44yhhJyNcFf0-ra6M3Yu8ZxAhs'
+};
+const CLOUD = (()=>{ try{ const o=JSON.parse(localStorage.getItem('comik:cloud')||'null');
+  if(o && o.url && o.key) return o; }catch(e){} return CLOUD_DEFAULT; })();
+const SUPA_URL = CLOUD.url;
+const SUPA_KEY = CLOUD.key;
 let supa = null;
 
 async function initSupa(){
@@ -11296,7 +11310,7 @@ if('serviceWorker' in navigator){
    что вызывает dev. Так обходим 401 на новых проектах Supabase. */
 async function pushCall(body){
   let userTok=''; try{ if(supa){ const s=await supa.auth.getSession(); userTok=(s.data.session&&s.data.session.access_token)||''; } }catch(e){}
-  return fetch(SUPA_URL+'/functions/v1/notify-game', {
+  return fetch(SUPA_URL+'/functions/v1/notify-game', {  // адрес берётся из блока АДРЕС ОБЛАКА
     method:'POST',
     headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPA_KEY, apikey:SUPA_KEY, 'x-user-token':userTok},
     body:JSON.stringify(body)
