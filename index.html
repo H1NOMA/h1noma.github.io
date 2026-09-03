@@ -74,6 +74,15 @@
     --glow:rgba(255,217,112,.14); --header:rgba(35,27,13,.92); --accent-rgb:255,217,112;
     --glass:rgba(46,36,18,.74); --glass2:rgba(58,46,24,.84);
   }
+  [data-project="skazki"]{
+    /* РУССКИЕ СКАЗКИ: еловая тьма, молодая листва и отсвет лучины */
+    --bg:#101a12; --bg2:#16241a; --surface:#1d2f21; --surface2:#263c2a;
+    --line:rgba(166,224,150,.16); --line2:rgba(166,224,150,.3);
+    --txt:#e9f1dd; --dim:#c6d8b4; --muted:#97ab85;
+    --red:#a5e07f; --red-dim:#8ac763; --red-soft:rgba(165,224,127,.2);
+    --glow:rgba(165,224,127,.13); --header:rgba(16,26,18,.92); --accent-rgb:165,224,127;
+    --glass:rgba(22,36,26,.74); --glass2:rgba(29,47,33,.84);
+  }
   [data-project="terra"]{
     --bg:#22201b; --bg2:#2b2823; --surface:#35322b; --surface2:#423e35;
     --line:rgba(235,225,200,.15); --line2:rgba(235,225,200,.28);
@@ -293,10 +302,15 @@
   /* у каждого сеттинга — свой стиль написания и цвет */
   .pm-item.pm-legacy{font-family:'Cinzel Decorative','Cinzel',serif;letter-spacing:.06em;color:#bcacff}
   .pm-item.pm-neverland{font-family:'Cinzel Decorative',Georgia,serif;letter-spacing:.12em;color:#f0c869}
+  .amb-skazki{font-family:Georgia,serif;font-variant:small-caps;font-size:calc(14px*var(--s));line-height:1;
+    color:rgba(165,224,127,.4);text-shadow:0 0 10px rgba(165,224,127,.32);
+    animation:ambFloat var(--d) ease-in-out var(--dl) infinite, ambTwinkle calc(var(--d)*.8) ease-in-out var(--dl) infinite}
   .pm-item.pm-terra{font-family:Georgia,'Times New Roman',serif;font-style:italic;letter-spacing:.05em;color:#ddd2b4}
   .pm-item.pm-assimilation{font-family:var(--f-disp);letter-spacing:.22em;color:#ff5763}
   .pm-item.pm-assimilation i{color:#ff8f97}
   .pm-item.pm-classic{font-family:var(--f-disp);letter-spacing:.14em;color:#d9b24f}
+  .pm-item.pm-skazki{font-family:Georgia,'Times New Roman',serif;font-variant:small-caps;
+    text-transform:none;letter-spacing:.1em;color:#a5e07f}
   /* мини-«КОМИК» в зоне чёлки/островка (только PWA на телефонах с вырезом):
      в жизни надпись прячется за железом, но проявляется на скриншотах */
   #notchBrand{position:fixed;top:15px;left:50%;transform:translateX(-50%);z-index:200;
@@ -324,6 +338,8 @@
   .plogo .pname{position:relative;font-weight:700;font-size:1.85rem;line-height:1;-webkit-background-clip:text;background-clip:text;color:transparent}
   .plogo .ptag{position:relative;font-family:var(--f-mono);font-size:.62rem;letter-spacing:.16em;text-transform:uppercase;opacity:.85}
   .plogo svg.decor{display:none}
+  /* у сказок нет фотографии — карточку несёт рисованный бор с месяцем */
+  .p-skazki svg.decor{display:block;position:absolute;left:0;right:0;bottom:0;width:100%;height:100%;z-index:-1}
   .plogo .pphoto{position:absolute;top:0;right:0;height:100%;width:68%;object-fit:cover;z-index:-1;pointer-events:none;
     -webkit-mask-image:linear-gradient(90deg,transparent 0,#000 55%);
     mask-image:linear-gradient(90deg,transparent 0,#000 55%)}
@@ -670,6 +686,12 @@
 
 /* ═══ NEVERLAND: золото заливает камень ════════════════════════════
    Логотип начинает камнем, золото стекает сверху вниз по его же маске. */
+[data-project="skazki"] .splash{--sp-base:#08110a;--sp-glint:rgba(214,255,186,1)}
+[data-project="skazki"] .sp-bg{
+  background:
+    radial-gradient(1100px 700px at 50% 30%, rgba(165,224,127,.14), transparent 62%),
+    radial-gradient(1400px 900px at 50% 110%, rgba(20,60,30,.5), transparent 70%),
+    linear-gradient(180deg,#0c1710 0%,#08110a 55%,#050a06 100%)}
 [data-project="neverland"] .splash{--sp-base:#0d0904;--sp-glint:rgba(255,246,206,1)}
 [data-project="neverland"] .sp-bg{
   background:radial-gradient(circle at 50% 112%, rgba(255,206,98,.24), transparent 58%),
@@ -924,6 +946,7 @@
   [data-project="legacy"] .splash-logo{filter:grayscale(1) sepia(1) saturate(3) hue-rotate(208deg) brightness(1.26)}
   [data-project="neverland"] .splash-logo{filter:grayscale(1) sepia(1) saturate(2.4) hue-rotate(-12deg) brightness(1.42)}
   [data-project="terra"] .splash-logo{filter:sepia(.78) saturate(.85) brightness(1.05) contrast(1.12)}
+  [data-project="skazki"] .splash-logo{filter:grayscale(1) sepia(1) saturate(2.4) hue-rotate(58deg) brightness(1.2)}
   [data-project="assimilation"] .splash-logo{opacity:1 !important}
 }
 .dice-circle{position:fixed;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:60;width:58px;height:58px;border-radius:50%;border:var(--hair) solid var(--line2);background:var(--glass);backdrop-filter:blur(28px) saturate(180%);-webkit-backdrop-filter:blur(28px) saturate(180%);color:var(--dim);display:flex;align-items:center;justify-content:center;box-shadow:0 7px 20px rgba(0,0,0,.38),0 0 0 .5px rgba(255,255,255,.05) inset;cursor:pointer;transition:color .18s,transform .2s var(--spring)}
@@ -1463,6 +1486,7 @@
   .komik{transition:filter .35s ease;transform:translateY(2px)}
   [data-project="legacy"] .komik{filter:grayscale(1) sepia(1) saturate(3) hue-rotate(208deg) brightness(1.22)}
   [data-project="neverland"] .komik{filter:grayscale(1) sepia(1) saturate(2.4) hue-rotate(-12deg) brightness(1.42) contrast(1)}
+  [data-project="skazki"] .komik{filter:grayscale(1) sepia(1) saturate(2.4) hue-rotate(58deg) brightness(1.18)}
   [data-project="terra"] .komik{filter:sepia(.75) saturate(.9) brightness(.95) contrast(1.12)}
 
   .acc-tabs{display:flex;gap:6px;margin-bottom:16px;background:var(--bg2);border-radius:12px;padding:4px}
@@ -1916,6 +1940,10 @@
   .dice-fab:active{transform:scale(.9)}
   .dice-fab.show{display:flex}
   @media(min-width:880px){.dice-fab{display:none !important}}
+  .p-skazki{background:linear-gradient(180deg,#12231a 0%,#0f1d13 45%,#08110a 100%);border:1px solid rgba(165,224,127,.35)}
+  .p-skazki .pname{font-family:Georgia,'Times New Roman',serif;font-variant:small-caps;text-transform:none;letter-spacing:.06em;font-size:1.4rem;
+    background-image:linear-gradient(180deg,#eaffdd,#a5e07f 50%,#4e7a38);filter:drop-shadow(0 0 14px rgba(165,224,127,.45))}
+  .p-skazki .ptag{color:#bfe0a8}
   .p-terra{background:linear-gradient(180deg,#201f1a 0%,#26251f 45%,#15140f 100%);border:1px solid rgba(216,208,191,.35)}
   .p-terra .pname{font-family:Georgia,'Times New Roman',serif;letter-spacing:.1em;font-size:1.3rem;background-image:linear-gradient(180deg,#fbf7ec,#ddd5c2 50%,#a89f8a);filter:drop-shadow(0 0 14px rgba(216,208,191,.4))}
   .p-terra .ptag{color:#cfc7b4}
@@ -2798,6 +2826,7 @@ html.dr-live body{overflow-x:clip}
 [data-project="legacy"] .dr-logo{filter:grayscale(1) sepia(1) saturate(3) hue-rotate(208deg) brightness(1.22)}
 [data-project="neverland"] .dr-logo{filter:grayscale(1) sepia(1) saturate(2.4) hue-rotate(-12deg) brightness(1.42) contrast(1)}
 [data-project="terra"] .dr-logo{filter:sepia(.75) saturate(.9) brightness(.95) contrast(1.12)}
+[data-project="skazki"] .dr-logo{filter:grayscale(1) sepia(1) saturate(2.4) hue-rotate(58deg) brightness(1.18)}
 .dr-logo:hover{opacity:1;transform:translateY(-1px)}
 .dr-list{flex:1;overflow-y:auto;overscroll-behavior:contain;padding:0 12px;display:flex;flex-direction:column;gap:2px}
 /* низ шторки: аватар слева, действие справа */
@@ -3257,6 +3286,30 @@ localStorage.removeItem('comik:a11y:mirror');d.classList.remove('mirror-ui');}ca
         <span class="pname">TERRA AETERNA</span>
         <span class="ptag">Eternal Earth</span>
       </div>
+<div class="plogo p-skazki" role="button" tabindex="0">
+        <svg class="decor" viewBox="0 0 320 108" preserveAspectRatio="xMidYMax slice" fill="none">
+          <defs>
+            <radialGradient id="skMoon" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#eaffdd" stop-opacity=".8"/><stop offset="100%" stop-color="#eaffdd" stop-opacity="0"/></radialGradient>
+            <linearGradient id="skMist" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#a5e07f" stop-opacity="0"/><stop offset="100%" stop-color="#a5e07f" stop-opacity=".16"/></linearGradient>
+          </defs>
+          <circle cx="262" cy="24" r="34" fill="url(#skMoon)" opacity=".6"/>
+          <circle cx="262" cy="24" r="12" fill="#eaffdd" opacity=".8"/>
+          <g fill="#dff5cd" opacity=".8"><circle cx="34" cy="14" r="1.1"/><circle cx="96" cy="26" r=".8"/><circle cx="150" cy="12" r="1"/><circle cx="208" cy="34" r=".8"/><circle cx="300" cy="58" r=".9"/></g>
+          <g fill="#12231a">
+            <path d="M28 108V78l-8 4 10-20-6 2 10-18 10 18-6-2 10 20-8-4v30z"/>
+            <path d="M120 108V72l-9 5 11-22-6 2 11-20 11 20-6-2 11 22-9-5v36z"/>
+            <path d="M236 108V80l-7 4 9-18-5 2 9-16 9 16-5-2 9 18-7-4v28z"/>
+          </g>
+          <rect x="0" y="66" width="320" height="42" fill="url(#skMist)"/>
+          <g fill="#0a1510">
+            <path d="M70 108V88l-6 3 8-15-4 1 7-13 7 13-4-1 8 15-6-3v20z"/>
+            <path d="M172 108V86l-7 3 9-16-5 1 8-14 8 14-5-1 9 16-7-3v22z"/>
+            <path d="M296 108V90l-5 2 7-13-4 1 6-11 6 11-4-1 7 13-5-2v18z"/>
+          </g>
+        </svg>
+        <span class="pname">Русские сказки</span>
+        <span class="ptag">Beyond Thrice-Nine Lands</span>
+      </div>
 </div>
 
 <main>
@@ -3605,12 +3658,22 @@ function updateArchLock(){
   document.querySelectorAll('[data-nav="world"]').forEach(b=>{ b.hidden=locked; });
   if(locked){ const av=document.getElementById('view-world'); if(av && av.classList.contains('active')) go('news'); }
 }
+/* категории сказок — те же разделы классики, но подписи оружейной и
+   волшебной полок переложены на старославянский манер */
+const SKAZKI_CATS=(()=>{ const c=DND_CATS(false,[]);
+  const ren={items:'Скарб', spells:'Чары'};
+  const subRen={weapons:'Оружье', armor:'Брони', gear:'Утварь и припасы',
+    magic:'Диковины и обереги', spellcasting:'Волшба и чары'};
+  c.forEach(cat=>{ if(ren[cat.id]) cat.label=ren[cat.id];
+    (cat.subs||[]).forEach(s=>{ if(subRen[s.id]) s.label=subRen[s.id]; }); });
+  return c; })();
 const CATS_ALL={
   assimilation: ASSIM_CATS.concat([CAT_AETHER]),
   legacy:    DND_CATS(true,  [CAT_ABYSS]),
   neverland: DND_CATS(false, [CAT_ABYSS]),
   terra:     DND_CATS(false, [CAT_ARCHON, CAT_TRAUMA]),
   classic:   DND_CATS(false, []),   // «Классика» — базовые каноничные D&D-разделы, без особенностей сеттингов
+  skazki:    SKAZKI_CATS,
 };
 let CATS = ASSIM_CATS;
 let cardCats = CATS.filter(c=>c.type==='cards');
@@ -3821,7 +3884,7 @@ async function cloudGetPrefix(prefix){
 }
 // собрать все листы персонажей из облака: легаси-блоб comik:chars:v1 + все пер-юзерные comik:chars:<тег>
 async function fetchCloudChars(){
-  const merged={legacy:[],neverland:[],assimilation:[],terra:[],classic:[]};
+  const merged={legacy:[],neverland:[],assimilation:[],terra:[],classic:[],skazki:[]};
   let rows;
   try{ rows=await cloudGetPrefix('comik:chars:'); }catch(e){ return null; }
   if(!Array.isArray(rows)) return null;
@@ -3829,7 +3892,7 @@ async function fetchCloudChars(){
     let v=r && r.value; if(typeof v==='string'){ try{ v=JSON.parse(v); }catch(e){ return; } }
     if(!v || typeof v!=='object') return;
     const rm=normGameMap(v);
-    ['legacy','neverland','assimilation','terra','classic'].forEach(g=>{ merged[g]=mergeChars(merged[g], rm[g]); });
+    ['legacy','neverland','assimilation','terra','classic','skazki'].forEach(g=>{ merged[g]=mergeChars(merged[g], rm[g]); });
   });
   return merged;
 }
@@ -3886,17 +3949,17 @@ async function ssetLocal(key,val, shared=SHARED){
 let CORE=[];                                    // общее ядро SRD — одна копия на все игры
 let CORE_HIDDEN=[];   // удалённые карточки ядра — общие для всех D&D-игр
 let CORE_OVER={};     // правки карточек ядра — общие для всех D&D-игр
-let ARCHIVE_ALL={legacy:[],neverland:[],assimilation:[],terra:[],classic:[]};
-let CHARS_ALL={legacy:[],neverland:[],assimilation:[],terra:[],classic:[]};
+let ARCHIVE_ALL={legacy:[],neverland:[],assimilation:[],terra:[],classic:[],skazki:[]};
+let CHARS_ALL={legacy:[],neverland:[],assimilation:[],terra:[],classic:[],skazki:[]};
 let ARCHIVE=ARCHIVE_ALL.assimilation, CHARS=CHARS_ALL.assimilation, USERS=[], SESSION=null, activeCat='all', activeSub=null;
 /* старый формат (просто массив) считаем данными ASSIMILATION */
 function normGameMap(v){
-  const empty={legacy:[],neverland:[],assimilation:[],terra:[],classic:[]};
+  const empty={legacy:[],neverland:[],assimilation:[],terra:[],classic:[],skazki:[]};
   if(!v) return empty;
   if(Array.isArray(v)) return Object.assign(empty,{assimilation:v});
   return Object.assign(empty, v);
 }
-const CORE_GAMES=['legacy','neverland','terra','classic'];   // D&D-сеттинги с ядром SRD (ASSIMILATION — без ядра)
+const CORE_GAMES=['legacy','neverland','terra','classic','skazki'];   // D&D-сеттинги с ядром SRD (ASSIMILATION — без ядра)
 function isCore(id){ return !!id && CORE.some(c=>c.id===id); }
 /* Пер-игровые ограничения. Два механизма:
    1) hideIn:['terra'] на карточке — точечное скрытие (следопыт);
@@ -3908,14 +3971,46 @@ function srcBlocked(game, sub, book){
   const p=GAME_SRC_BLOCK[game];
   return !!(p && book && p.subs.indexOf(sub)>=0 && p.srcs.indexOf(book)>=0);
 }
+/* ── РУССКИЕ СКАЗКИ: своё прочтение ядра ──
+   Правила и снаряжение — из классики, но существа, локации, божества,
+   фракции и персоналии Забытых Королевств в сказки не переносятся: этот
+   мир наполняется своим. Названия оружия переложены на старославянский
+   манер — механика та же, каноничное имя остаётся первой строкой досье. */
+const SKAZKI_HIDE_SUBS=['bestiary','deities','locations','factions','npc'];
+const SKAZKI_WEAPONS={
+  'Кинжал':'Нож засапожный', 'Дубина':'Ослоп', 'Боевой посох':'Посох окованный',
+  'Лёгкий арбалет':'Самострел лёгкий', 'Тяжёлый арбалет':'Самострел тяжёлый',
+  'Ручной арбалет':'Самострел ручной', 'Арбалет-станок':'Самострел станковый',
+  'Короткий лук':'Лук охотничий', 'Длинный лук':'Тугой лук',
+  'Большой длинный лук':'Лук богатырский',
+  'Длинный меч':'Меч харалужный', 'Короткий меч':'Корд',
+  'Двуручный меч':'Меч-кладенец', 'Скимитар':'Сабля',
+  'Боевой топор':'Топор ратный', 'Ручной топор':'Топорик',
+  'Боевой молот':'Молот ратный', 'Молот лёгкий':'Молот малый',
+  'Метательное копьё':'Сулица', 'Длинное копьё':'Копьё долгое',
+  'Пика':'Рогатина', 'Глефа':'Совня', 'Алебарда':'Бердыш',
+  'Цеп':'Кистень', 'Моргенштерн':'Шестопёр', 'Трезубец':'Острога',
+  'Боевая кирка':'Клевец', 'Сеть':'Тенёта', 'Мушкет':'Пищаль'
+};
+function skazkiAdapt(list){
+  return list
+    .filter(c=>!(c.cat==='world' && SKAZKI_HIDE_SUBS.indexOf(c.sub)>=0))
+    .map(c=>{
+      if(c.sub!=='weapons') return c;
+      const nm=SKAZKI_WEAPONS[c.title]; if(!nm) return c;
+      return Object.assign({}, c, { title:nm,
+        dossier:[{k:'В каноне', v:c.title}].concat(c.dossier||[]) });
+    });
+}
 function coreFor(game){
   if(CORE_GAMES.indexOf(game)<0) return [];
   // скрытие теперь пер-сеттинговое (через hideIn у карточки); общий CORE_HIDDEN больше не применяем —
   // это и возвращает случайно удалённые карточки, и убирает синхронизацию удалений между сеттингами
-  return CORE
+  const base=CORE
     .map(c=> CORE_OVER[c.id] || c)
     .filter(c=>!(Array.isArray(c.hideIn) && c.hideIn.indexOf(game)>=0))
     .filter(c=>!srcBlocked(game, c.sub, c.srcbook));
+  return game==='skazki' ? skazkiAdapt(base) : base;
 }
 /* TERRA: старые карточки разделов «Воля»/«Перо дьявола» переносим в объединённый раздел
    «Сила Архонта» соответствующим подразделом (in-place, идемпотентно; сохранится при след. правке) */
@@ -4040,7 +4135,7 @@ async function boot(){
   const coreIds=new Set(CORE.map(c=>c.id));
   let embA=null; try{ embA=JSON.parse(document.getElementById('archive-data').textContent); }catch(e){}
   const arcMap=normGameMap(arc), embMap=normGameMap(embA), chMap=normGameMap(chars);
-  ['legacy','neverland','assimilation','terra','classic'].forEach(g=>{
+  ['legacy','neverland','assimilation','terra','classic','skazki'].forEach(g=>{
     // миграция: карточки ядра, лежавшие раньше в пользовательских, выкидываем — они теперь в CORE
     const own = mergeChars(mergeById(arcMap[g], embMap[g]), ARCHIVE_ALL[g]).filter(c=>c && !coreIds.has(c.id));
     ARCHIVE_ALL[g] = own;
@@ -4055,7 +4150,7 @@ async function boot(){
       const local=await sgetLocal('comik:chars:'+tg, true);
       if(local && typeof local==='object'){
         const lm=normGameMap(local);
-        ['legacy','neverland','assimilation','terra','classic'].forEach(g=>{ CHARS_ALL[g]=mergeChars(CHARS_ALL[g], lm[g]); });
+        ['legacy','neverland','assimilation','terra','classic','skazki'].forEach(g=>{ CHARS_ALL[g]=mergeChars(CHARS_ALL[g], lm[g]); });
       }
     }
   }catch(e){}
@@ -4063,7 +4158,7 @@ async function boot(){
   if(supa){
     try{
       const perUser=await withTimeout(fetchCloudChars(), CLOUD_TMO);
-      if(perUser) ['legacy','neverland','assimilation','terra','classic'].forEach(g=>{ CHARS_ALL[g]=mergeChars(CHARS_ALL[g], perUser[g]); });
+      if(perUser) ['legacy','neverland','assimilation','terra','classic','skazki'].forEach(g=>{ CHARS_ALL[g]=mergeChars(CHARS_ALL[g], perUser[g]); });
     }catch(e){}
   }
   const [chid, cov] = await Promise.all([sget(KEY_COREHID, true), sget(KEY_COREOVER, true)]);
@@ -4106,7 +4201,7 @@ async function boot(){
   }
   refreshAdmin();   // сессия окончательно определена → сразу выставляем флаг режима ГМ (.is-gm)
   let charsMigrated=false;
-  ['legacy','neverland','assimilation','terra','classic'].forEach(g=>(CHARS_ALL[g]||[]).forEach(c=>{
+  ['legacy','neverland','assimilation','terra','classic','skazki'].forEach(g=>(CHARS_ALL[g]||[]).forEach(c=>{
     if(!c) return; let ch=false;
     if(c.owner && c.owner!==normTag(c.owner)){ c.owner=normTag(c.owner); ch=true; }
     if(typeof c.player==='string' && /^@/.test(c.player.trim())){ c.player=c.player.trim().replace(/^@+/,''); ch=true; }
@@ -4903,10 +4998,10 @@ function openPolicy(overlay){
 document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ const vit=document.getElementById('csVitrine'); if(vit && vit.classList.contains('open')){ closeVitrine(); return; } const s2=document.getElementById('scrim2'); if(s2 && s2.classList.contains('open')) closeOverlay(); else closeModal(); } });
 
 /* ====================== Хронология ====================== */
-const CHRONO_NAMES={legacy:'LEGACY',neverland:'NEVERLAND',assimilation:'ASSIMILATION',terra:'TERRA AETERNA',classic:'КЛАССИКА'};
+const CHRONO_NAMES={legacy:'LEGACY',neverland:'NEVERLAND',assimilation:'ASSIMILATION',terra:'TERRA AETERNA',classic:'КЛАССИКА',skazki:'РУССКИЕ СКАЗКИ'};
 function initChrono(){
   const wrap=document.getElementById('chrono-list'); if(!wrap || wrap.children.length) return;
-  ['terra','legacy','neverland','assimilation'].forEach(id=>{
+  ['terra','legacy','neverland','assimilation','skazki'].forEach(id=>{
     const src=document.querySelector('#plogo-templates .p-'+id); if(!src) return;
     const node=src.cloneNode(true);
     node.setAttribute('onclick', "openChronoCampaign('"+id+"')");   // клик → архив игр ГМа этой кампании
@@ -4916,7 +5011,7 @@ function initChrono(){
 }
 /* ====================== Архив игр ГМа (в хронологии, только разработчикам) ====================== */
 const KEY_CHRONO_GAMES='comik:chrono:games:v1';
-let CHRONO_GAMES={legacy:[],neverland:[],terra:[],assimilation:[]};
+let CHRONO_GAMES={legacy:[],neverland:[],terra:[],assimilation:[],skazki:[]};
 let CHRONO_EDIT=null, CHRONO_LINK=null;
 const CHRONO_SECTIONS=[
   ['story','История и сюжет'],
@@ -4929,7 +5024,7 @@ const CHRONO_SECTIONS=[
   ['other','Прочее'],
 ];
 async function chronoGamesLoad(){
-  try{ const v=await sget(KEY_CHRONO_GAMES,true); if(v && typeof v==='object') CHRONO_GAMES=Object.assign({legacy:[],neverland:[],terra:[],assimilation:[]}, v); }catch(e){}
+  try{ const v=await sget(KEY_CHRONO_GAMES,true); if(v && typeof v==='object') CHRONO_GAMES=Object.assign({legacy:[],neverland:[],terra:[],assimilation:[],skazki:[]}, v); }catch(e){}
 }
 async function persistChronoGames(){ await sset(KEY_CHRONO_GAMES, CHRONO_GAMES, true).catch(()=>{}); }
 /* список игр кампании */
@@ -5234,7 +5329,7 @@ async function persistArchive(){
       const remote=await withTimeout(cloudGet(KEY_ARCHIVE), CLOUD_TMO);
       if(remote && typeof remote==='object'){
         const rmap=normGameMap(remote), coreIds=new Set(CORE.map(c=>c.id));
-        ['legacy','neverland','assimilation','terra','classic'].forEach(g=>{
+        ['legacy','neverland','assimilation','terra','classic','skazki'].forEach(g=>{
           ARCHIVE_ALL[g]=mergeChars(ARCHIVE_ALL[g], rmap[g])
             .filter(c=>c && !coreIds.has(c.id) && !(c.deleted && (Date.now()-(c.updatedAt||0))>90*864e5));
         });
@@ -5263,12 +5358,12 @@ async function cloudRepull(reason){
     let changed=false;
     if(arc && typeof arc==='object'){
       const rmap=normGameMap(arc), coreIds=new Set(CORE.map(c=>c.id));
-      ['legacy','neverland','assimilation','terra','classic'].forEach(g=>{
+      ['legacy','neverland','assimilation','terra','classic','skazki'].forEach(g=>{
         ARCHIVE_ALL[g]=mergeChars(ARCHIVE_ALL[g], rmap[g]).filter(c=>c && !coreIds.has(c.id) && !(c.deleted && (Date.now()-(c.updatedAt||0))>90*864e5));
       });
       changed=true;
     }
-    if(perUser){ ['legacy','neverland','assimilation','terra','classic'].forEach(g=>{ CHARS_ALL[g]=mergeChars(CHARS_ALL[g], perUser[g]); }); changed=true; }
+    if(perUser){ ['legacy','neverland','assimilation','terra','classic','skazki'].forEach(g=>{ CHARS_ALL[g]=mergeChars(CHARS_ALL[g], perUser[g]); }); changed=true; }
     if(Array.isArray(nws)){ NEWS=mergeChars(NEWS, nws).filter(n=>n && !(n.deleted && (Date.now()-(n.updatedAt||0))>90*864e5)); changed=true; }
     if(changed){
       bindGameData();
@@ -5428,7 +5523,7 @@ function runSearch(q){
         SF_RES.push({b:'Архив', ch:false, t:e.title, id:e.id});
       }
     }
-    ['legacy','neverland','assimilation','terra'].forEach(camp=>['Приключения'].forEach(br=>{
+    ['legacy','neverland','assimilation','terra','skazki'].forEach(camp=>['Приключения'].forEach(br=>{
       if(!hasChronoAccess(camp)) return;
       const hay=(CHRONO_NAMES[camp]+' '+br+' '+stripHtml(CHRONO_DATA[camp+':'+br])).toLowerCase();
       if(hay.includes(q)) SF_RES.push({b:'Хронология', ch:true, t:CHRONO_NAMES[camp]+' — '+br, camp, br});
@@ -5872,7 +5967,7 @@ const PLAYER_HASHES={
   '9c1431eeb94d267d98b1b11898232ef7095e72b4ea3b269ad458e5a317c81ae8':'terra'
 };
 const KEY_ACCESS='comik:access:v1', KEY_COREHID='comik:corehid:v1', KEY_COREOVER='comik:coreover:v1';
-let ACCESS={legacy:false,neverland:false,assimilation:false,terra:false,classic:false};
+let ACCESS={legacy:false,neverland:false,assimilation:false,terra:false,classic:false,skazki:false};
 /* хронология в общем доступе, пароли упразднены */
 function hasChronoAccess(camp){ return isDev() && CUR_PROJECT!=='classic'; }   // хронология — только разработчикам и не в «Классике»
 function updateChronoLocks(){ /* замки упразднены: хронология — раздел Мастера целиком */ }
@@ -6378,7 +6473,7 @@ async function persistChars(){
       try{
         const cloud=await withTimeout(fetchCloudChars(), CLOUD_TMO);
         if(cloud){
-          ['legacy','neverland','assimilation','terra','classic'].forEach(g=>{
+          ['legacy','neverland','assimilation','terra','classic','skazki'].forEach(g=>{
             CHARS_ALL[g]=mergeChars(CHARS_ALL[g], cloud[g]);
             // надгробия старше 90 дней вычищаем — облако к этому времени везде синхронизировано
             CHARS_ALL[g]=CHARS_ALL[g].filter(c=>!(c && c.deleted && (Date.now()-(c.updatedAt||0))>90*864e5));
@@ -6388,7 +6483,7 @@ async function persistChars(){
       }catch(e){}
       // пишем ТОЛЬКО свои листы в свой ключ — RLS запрещает писать чужой comik:chars:<тег>
       const mine={legacy:[],neverland:[],assimilation:[],terra:[],classic:[]};
-      ['legacy','neverland','assimilation','terra','classic'].forEach(g=>{
+      ['legacy','neverland','assimilation','terra','classic','skazki'].forEach(g=>{
         // Свои — и те, у кого владельца нет вовсе: это старые листы под кодом
         // доступа. Править их код разрешает (canEdit), а сохранять было некуда:
         // фильтр по тегу их вырезал, и правки жили только до перезагрузки.
@@ -6418,7 +6513,7 @@ setInterval(async ()=>{
     ]);
     let chChanged=false, gmChanged=false;
     if(ch && typeof ch==='object'){
-      ['legacy','neverland','assimilation','terra','classic'].forEach(g=>{
+      ['legacy','neverland','assimilation','terra','classic','skazki'].forEach(g=>{
         const merged=mergeChars(CHARS_ALL[g], ch[g]);
         if(JSON.stringify(merged)!==JSON.stringify(CHARS_ALL[g])){ CHARS_ALL[g]=merged; chChanged=true; }
       });
@@ -8964,8 +9059,13 @@ async function deletePlayer(id){
 
 
 /* ====================== Навигация / тосты ====================== */
-const PROJECT_TITLES={legacy:'LEGACY',neverland:'NEVERLAND',assimilation:'ASS<i>I</i>MILATION',terra:'TERRA AETERNA',classic:'КЛАССИКА'};
+const PROJECT_TITLES={legacy:'LEGACY',neverland:'NEVERLAND',assimilation:'ASS<i>I</i>MILATION',terra:'TERRA AETERNA',classic:'КЛАССИКА',skazki:'РУССКИЕ СКАЗКИ'};
 const GAME_HERO={
+  skazki:{
+    title:'За тридевять земель',
+    text:`Там, где кончаются торные дороги и начинается тёмный бор, живут истории, которые рассказывали у печи. <span style="color:var(--red-ink)">РУССКИЕ СКАЗКИ</span> — поход в мир былин и наговоров: избушки на куриных ногах, царства за огненной рекой и цена, которую берёт лес за каждое исполненное желание. Бери меч-кладенец — и ступай, куда глаза глядят.`,
+    empty:'Сказка сказывается, да не скоро дело делается. Вестей пока нет.'
+  },
   assimilation:{
     title:'Новый рассвет над New-Liberty',
     text:`<span style="color:var(--red-ink)">Легендами</span> не рождаются — их куёт эпоха. Финальная глава <span style="color:var(--red-ink)">RISING OF DARKNESS</span> приведёт «героев» в город больших обещаний — <span style="color:var(--red-ink)">New-Liberty</span>, где неон ярче солнца, а память стоит дешевле патронов. Сможете ли вы закончить то, что началось на <span style="color:var(--red-ink)">Луне</span>?`,
@@ -9052,14 +9152,18 @@ function resetHero(){
   markDirty();
   closeModal(); applyGameHero(); toast('Возвращён стандартный текст');
 }
-const PROJECT_ORDER=['classic','terra','legacy','neverland','assimilation'];
+const PROJECT_ORDER=['classic','terra','legacy','neverland','assimilation','skazki'];
 let CUR_PROJECT='classic';   // дефолт до boot: публичный сеттинг, чтобы под заставкой не мелькала ASSIMILATION
 /* ASSIMILATION виден всем игрокам (ГМ-функции по-прежнему только у dev-тегов через isDev/ADMIN) */
 function assimVisible(){ return true; }
-function visibleProjects(){ return PROJECT_ORDER.filter(g=> g!=='assimilation' || assimVisible()); }
+/* «Русские сказки» пока закрыты: сеттинг в работе, видят только dev-аккаунты
+   (hinoma и herr_teo). Открыть всем — заменить skazkiVisible на ()=>true. */
+function skazkiVisible(){ return typeof isDev==='function' && isDev(); }
+function visibleProjects(){ return PROJECT_ORDER.filter(g=> (g!=='assimilation' || assimVisible()) && (g!=='skazki' || skazkiVisible())); }
 /* тематический фон по краям экрана (десктоп): частицы под каждый сеттинг, медленно и плавно */
 const AMB_RUNES=['ᚠ','ᚢ','ᚦ','ᚨ','ᚱ','ᚲ','ᚷ','ᚹ','ᚾ','ᛃ','ᛈ','ᛉ','ᛋ','ᛏ','ᛒ','ᛗ','ᛚ','ᛜ','ᛟ','ᛞ'];
 const AMB_BITS=['0','1','0','1','//','#','[]','01','10','+','×','}'];
+const AMB_BUKI=['Ѣ','Ѫ','Ѳ','Ѵ','Ѕ','Ѯ','Ѱ','Ѡ','Ѧ','Ждан','Лихо','Явь','Навь'];
 function renderAmbient(){
   const host=document.getElementById('ambient'); if(!host) return;
   if(!window.matchMedia('(min-width:880px)').matches){ host.innerHTML=''; return; }
@@ -9075,6 +9179,7 @@ function renderAmbient(){
     let inner='';
     if(g==='neverland') inner=AMB_RUNES[Math.floor(Math.random()*AMB_RUNES.length)];
     else if(g==='assimilation') inner=AMB_BITS[Math.floor(Math.random()*AMB_BITS.length)];
+    else if(g==='skazki') inner=AMB_BUKI[Math.floor(Math.random()*AMB_BUKI.length)];
     html+=`<span class="amb amb-${g}" style="${side}:${pos}%;top:${top}%;--d:${dur}s;--dl:${delay}s;--s:${s};--dx:${dx}px">${inner}</span>`;
   }
   host.innerHTML=html;
@@ -9855,7 +9960,7 @@ function restoreBackup(inp){
     try{
       const d=JSON.parse(r.result);
       if(d.format!=='comik-backup') { toast('Это не файл резервной копии КОМИК'); return; }
-      ['legacy','neverland','assimilation','terra','classic'].forEach(g=>{
+      ['legacy','neverland','assimilation','terra','classic','skazki'].forEach(g=>{
         if(d.chars && d.chars[g]) CHARS_ALL[g]=mergeChars(CHARS_ALL[g], d.chars[g]);
         if(d.archive && d.archive[g]) ARCHIVE_ALL[g]=mergeById(ARCHIVE_ALL[g], d.archive[g]);
       });
@@ -10966,7 +11071,7 @@ function trkSuggest(q){
   if(q.length<2){ el.innerHTML=''; return; }
   // сначала — уже созданные листы этого сеттинга (NPC и персонажи), потом бестиарий
   const chars=(CHARS_ALL[CUR_PROJECT]||[]).filter(c=>c && !c.deleted && (c.name||'').toLowerCase().includes(q) && !TRK.list.some(x=>x.charId===c.id)).slice(0,6);
-  const hits=CORE.filter(c=>c.sub==='bestiary' && c.title.toLowerCase().includes(q)).slice(0,6);
+  const hits=ARCHIVE.filter(c=>c.sub==='bestiary' && c.title.toLowerCase().includes(q)).slice(0,6);  // из архива сеттинга: в сказках классических чудищ нет
   el.innerHTML =
     chars.map(c=>`<button class="btn ghost sm" style="margin:6px 6px 0 0" onclick="trkAddChar('${c.id}')">👤 ${esc(c.name)}</button>`).join('') +
     hits.map(c=>`<button class="btn ghost sm" style="margin:6px 6px 0 0" onclick="trkAddBeast('${c.id}')">${esc(c.title)}</button>`).join('');
@@ -12850,6 +12955,13 @@ function openInstallHelp(){
   if(typeof _sp==='function'){
     window.setProject=function(){ var r=_sp.apply(this, arguments);
       try{ projRow(); }catch(e){} try{ bump(); }catch(e){} return r; };
+  }
+
+  /* вход dev-аккаунта открывает «Русские сказки» — пересобираем ряд в шапке */
+  var _ud=window.updateDevUI;
+  if(typeof _ud==='function'){
+    window.updateDevUI=function(){ var r=_ud.apply(this, arguments);
+      try{ projRow(); }catch(e){} return r; };
   }
 
   function boot(){ addFab(); projRow(); }
