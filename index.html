@@ -7027,9 +7027,17 @@ let PB={mode:'array', pool:PB_ARRAY.slice(), assign:{}, base:{str:8,dex:8,con:8,
    Ключ — название базовой расы; варианты выбираются вторым списком поверх базовой расы.
    asi — прибавки поверх бонусов базовой расы. */
 const SUBRACES={
+  'Человек':[
+    /* Вариант человека из PHB: вместо «+1 ко всем» — +1 к двум РАЗНЫМ
+       характеристикам на выбор, один навык и черта на 1-м уровне. Выбор
+       бонусов не влезает в обычную схему asi:{...} — поле asiMod меняет
+       саму раскладку бонусов базовой расы (см. pbAsiEff). */
+    {name:'Альтернативный', asi:{}, asiMod:{all:0, choose2:0, choose1:2},
+     desc:'+1 к двум разным характеристикам на выбор, владение одним навыком на выбор и одна черта на 1-м уровне — вместо +1 ко всем характеристикам.'}
+  ],
   'Эльф':[
     {name:'Высший эльф', asi:{int:1}, desc:'Знает один заговор волшебника (по Интеллекту), владеет длинным и коротким мечом, коротким и длинным луком, знает дополнительный язык.'},
-    {name:'Лесной эльф', asi:{wis:1}, desc:'Скорость 10,5 м; может прятаться, укрываясь лёгкой природной маскировкой; владеет мечами и луками.'},
+    {name:'Лесной эльф', asi:{wis:1}, desc:'Скорость 35 футов; может прятаться, укрываясь лёгкой природной маскировкой; владеет мечами и луками.'},
     {name:'Тёмный эльф (дроу)', asi:{cha:1}, desc:'Улучшенное тёмное зрение, врождённые заклинания, помеха при ярком свете; владеет рапирой, коротким мечом и ручным арбалетом.'}
   ],
   'Дварф':[
@@ -7061,6 +7069,13 @@ const SUBRACES={
   ]
 };
 function subracesFor(raceTitle){ return SUBRACES[raceTitle]||null; }
+/* раскладка бонусов расы с поправкой подрасы: asiMod у подрасы замещает
+   соответствующие поля (альтернативный человек гасит all и даёт два +1) */
+function pbAsiEff(card, subraceName){
+  const a=Object.assign({fixed:{},all:0,choose2:0,choose1:0}, card?pbAsi(card):{});
+  const sr=card?subraceInfo(card.title, subraceName):null;
+  return (sr && sr.asiMod) ? Object.assign({}, a, sr.asiMod) : a;
+}
 function subraceInfo(raceTitle, name){ const l=SUBRACES[raceTitle]; if(!l||!name) return null; return l.find(s=>s.name===name)||null; }
 /* Магия от расы/подрасы (D&D): врождённые заговоры и — если раса их даёт — ячейки заклинаний.
    cantrips — сколько заговоров даёт раса; slots — {круг:кол-во} врождённых ячеек (обычно нет).
@@ -7120,7 +7135,7 @@ function pbBonuses(){
   const out={str:0,dex:0,con:0,int:0,wis:0,cha:0};
   const card=pbRaceList().find(c=>c.id===PB.race);
   if(!card) return out;
-  const a=pbAsi(card);
+  const a=pbAsiEff(card, PB.subrace);
   for(const k in (a.fixed||{})) out[k]+=a.fixed[k];
   if(a.all) for(const k in out) out[k]+=a.all;
   if(a.choose2>0 && PB.b2) out[PB.b2]+=2;
@@ -7156,7 +7171,7 @@ function pbRoll(){
   renderStatCalc();
 }
 function pbRacePick(id){ PB.race=id; PB.subrace=''; PB.b2=''; PB.b1=''; PB.b1c=''; renderStatCalc(); }
-function pbSubracePick(v){ PB.subrace=v; renderStatCalc(); }
+function pbSubracePick(v){ PB.subrace=v; PB.b2=''; PB.b1=''; PB.b1c=''; renderStatCalc(); }
 let SC_MODE='drawer', SC_STICKY=false;
 function openStatCalc(sticky){
   PB={mode:'array', pool:PB_ARRAY.slice(), assign:{}, base:{str:8,dex:8,con:8,int:8,wis:8,cha:8}, race:'', subrace:'', b2:'', b1:'', b1c:''};
@@ -7190,7 +7205,7 @@ function renderStatCalc(){
   const bon=pbBonuses();
   const races=pbRaceList().slice().sort((a,b)=>a.title.localeCompare(b.title,'ru'));
   const raceCard=races.find(c=>c.id===PB.race);
-  const A=pbAsi(raceCard);
+  const A=pbAsiEff(raceCard, PB.subrace);
   const fixedKeys=Object.keys(A.fixed||{}).filter(k=>A.fixed[k]>0);
   const isPick=PB.mode!=='points';
   const rows=isPick
