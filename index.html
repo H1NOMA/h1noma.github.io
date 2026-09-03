@@ -305,6 +305,9 @@
   .amb-skazki{font-family:'Ruslan Display',Georgia,serif;font-size:calc(14px*var(--s));line-height:1;
     color:rgba(165,224,127,.4);text-shadow:0 0 10px rgba(231,193,100,.3);
     animation:ambFloat var(--d) ease-in-out var(--dl) infinite, ambTwinkle calc(var(--d)*.8) ease-in-out var(--dl) infinite}
+  /* роспись в три краски: зелень, золото, киноварь */
+  .amb-skazki:nth-child(3n){color:rgba(231,193,100,.42);text-shadow:0 0 10px rgba(231,193,100,.32)}
+  .amb-skazki:nth-child(7n){color:rgba(212,110,80,.42);text-shadow:0 0 10px rgba(224,120,86,.3)}
   .pm-item.pm-terra{font-family:Georgia,'Times New Roman',serif;font-style:italic;letter-spacing:.05em;color:#ddd2b4}
   .pm-item.pm-assimilation{font-family:var(--f-disp);letter-spacing:.22em;color:#ff5763}
   .pm-item.pm-assimilation i{color:#ff8f97}
@@ -760,7 +763,7 @@
     radial-gradient(140px 140px at 76% 16%, rgba(222,255,196,.28), transparent 62%),
     radial-gradient(44px 44px at 76% 16%, rgba(236,255,220,.85), transparent 72%),
     radial-gradient(circle at 50% 46%, rgba(165,224,127,.1), transparent 58%),
-    linear-gradient(180deg,#0c1810 0%,#08110a 56%,#040805 100%);
+    linear-gradient(180deg,#101a2b 0%,#0a1510 54%,#040805 100%);
   animation:spFadeIn .5s ease both}
 /* бор по нижней кромке — проявляется из темноты */
 [data-project="skazki"] .sp-fx1>i:nth-child(1){
@@ -770,14 +773,15 @@
 /* перо: влетает слева снизу, взмывает над логотипом и тает */
 [data-project="skazki"] .sp-fx1>i:nth-child(2){
   background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 150' fill='none'%3E%3Cdefs%3E%3ClinearGradient id='fg' x1='0' y1='1' x2='1' y2='0'%3E%3Cstop offset='0' stop-color='%23e07856'/%3E%3Cstop offset='.45' stop-color='%23e7c164'/%3E%3Cstop offset='1' stop-color='%23a5e07f'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cg stroke='url(%23fg)' stroke-linecap='round' fill='none'%3E%3Cpath d='M14 136 Q90 96 178 40' stroke-width='5'/%3E%3Cpath d='M44 121 Q58 92 50 68' stroke-width='3.4' opacity='.85'/%3E%3Cpath d='M66 110 Q82 80 76 54' stroke-width='3.4' opacity='.9'/%3E%3Cpath d='M90 97 Q108 68 104 42' stroke-width='3.4' opacity='.9'/%3E%3Cpath d='M114 84 Q134 58 132 32' stroke-width='3.4' opacity='.95'/%3E%3Cpath d='M138 71 Q158 48 158 24' stroke-width='3.4'/%3E%3Cpath d='M52 124 Q72 116 88 116' stroke-width='2.4' opacity='.55'/%3E%3Cpath d='M78 112 Q100 102 116 102' stroke-width='2.4' opacity='.6'/%3E%3Cpath d='M104 98 Q126 88 142 88' stroke-width='2.4' opacity='.6'/%3E%3Cellipse cx='190' cy='33' rx='17' ry='11' transform='rotate(-33 190 33)' stroke-width='3.4' fill='rgba(224,120,86,.35)'/%3E%3Cellipse cx='193' cy='31' rx='7' ry='4.6' transform='rotate(-33 193 31)' fill='%23ffe9a8' stroke='none'/%3E%3C/g%3E%3C/svg%3E") center/min(58vw,420px) no-repeat;
-  opacity:0;animation:skFeather 2.1s cubic-bezier(.3,.7,.3,1) .15s both;
+  opacity:0;animation:skFeather 2.3s cubic-bezier(.22,.55,.45,.92) .15s both;
   filter:drop-shadow(0 0 18px rgba(231,193,100,.8)) drop-shadow(0 0 44px rgba(224,120,86,.5))}
+/* путь — одна прямая через центр (над логотипом), транформ единым отрезком:
+   промежуточных ключей с transform нет, поэтому скорость нигде не скачет */
 @keyframes skFeather{
-  0%{opacity:0;transform:translate3d(-52vw,34vh,0) rotate(-38deg) scale(.5)}
-  16%{opacity:.95}
-  52%{opacity:.9;transform:translate3d(2vw,-6vh,0) rotate(6deg) scale(1.02)}
-  74%{opacity:.7;transform:translate3d(16vw,-14vh,0) rotate(14deg) scale(.98)}
-  100%{opacity:0;transform:translate3d(34vw,-24vh,0) rotate(22deg) scale(.9)}
+  0%{opacity:0;transform:translate3d(-46vw,30vh,0) rotate(-30deg) scale(.6)}
+  13%{opacity:.95}
+  76%{opacity:.85}
+  100%{opacity:0;transform:translate3d(40vw,-26vh,0) rotate(16deg) scale(.96)}
 }
 /* искры за пером — тёплая пыль, всплывает и гаснет */
 [data-project="skazki"] .sp-fx1>i:nth-child(3){
@@ -788,11 +792,11 @@
     radial-gradient(5px 5px at 55% 42%, rgba(165,224,127,.8), transparent 65%),
     radial-gradient(4px 4px at 63% 37%, rgba(231,193,100,.75), transparent 65%),
     radial-gradient(3.5px 3.5px at 70% 33%, rgba(224,120,86,.7), transparent 65%);
-  opacity:0;animation:skSparks 2s ease .5s both}
+  opacity:0;animation:skSparks 2.2s cubic-bezier(.25,.5,.5,.95) .5s both}
 @keyframes skSparks{
   0%{opacity:0;transform:translate3d(-6vw,6vh,0)}
-  22%{opacity:1}
-  70%{opacity:.7;transform:translate3d(3vw,-4vh,0)}
+  20%{opacity:1}
+  68%{opacity:.7}
   100%{opacity:0;transform:translate3d(7vw,-9vh,0)}
 }
 /* зарево на пролёте пера */
@@ -1553,8 +1557,9 @@
   /* --- РУССКИЕ СКАЗКИ: еловая тьма с отсветом лучины и следом Жар-птицы --- */
   /* тёплый отсвет снизу-справа — чтобы зелень не была монолитной */
   [data-project="skazki"] body::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;background:
-    radial-gradient(circle at 84% 112%, rgba(231,193,100,.075), transparent 44%),
-    radial-gradient(circle at 6% -8%, rgba(165,224,127,.055), transparent 40%)}
+    radial-gradient(circle at 50% -14%, rgba(58,82,140,.17), transparent 46%),
+    radial-gradient(circle at 84% 112%, rgba(231,193,100,.085), transparent 44%),
+    radial-gradient(circle at 6% 34%, rgba(140,199,99,.05), transparent 38%)}
   /* резной уголок на карточках — берёзовое золото */
   [data-project="skazki"] .card,[data-project="skazki"] .news-card{border-color:rgba(165,224,127,.24)}
   [data-project="skazki"] .card::after{content:"";position:absolute;top:6px;right:6px;width:12px;height:12px;background:none;border-top:2px solid rgba(231,193,100,.42);border-right:2px solid rgba(231,193,100,.42);border-radius:0 5px 0 0}
@@ -1741,8 +1746,9 @@
       linear-gradient(45deg,transparent 44%,rgba(240,220,140,.9) 44% 56%,transparent 56%) right 3px bottom 3px/9px 9px no-repeat,
       linear-gradient(45deg,transparent 44%,rgba(240,220,140,.9) 44% 56%,transparent 56%) left 3px bottom 3px/9px 9px no-repeat}
   [data-project="skazki"] #view-news .masthead h1{font-family:'Ruslan Display',Georgia,serif;font-weight:400;text-transform:none;letter-spacing:.05em;font-size:1.5rem;
-    color:#f0dc9a;text-align:center;text-shadow:0 1px 0 rgba(0,0,0,.55), 0 0 18px rgba(231,193,100,.35)}
-  [data-project="skazki"] #view-news .masthead p{font-family:var(--f-body);color:#d9e6c3;background:none;border:none;padding:0;margin-top:6px}
+    color:#f4e2a4;text-align:center;text-shadow:0 2px 4px rgba(0,0,0,.85), 0 0 18px rgba(231,193,100,.4)}
+  [data-project="skazki"] #view-news .masthead p{font-family:var(--f-body);color:#eef4dc;background:none;border:none;padding:0;margin-top:6px;
+    text-shadow:0 1px 2px rgba(0,0,0,.85), 0 0 10px rgba(0,0,0,.6)}
   /* вышитая тесьма: ряд ромбиков по золотой нити */
   [data-project="skazki"] #view-news .masthead .rule{height:9px;width:62%;margin:14px auto 8px;border:none;-webkit-mask-image:none;mask-image:none;
     background:
@@ -2056,7 +2062,7 @@
   .dice-fab:active{transform:scale(.9)}
   .dice-fab.show{display:flex}
   @media(min-width:880px){.dice-fab{display:none !important}}
-  .p-skazki{background:linear-gradient(180deg,#12231a 0%,#0f1d13 45%,#08110a 100%);border:1px solid rgba(165,224,127,.35)}
+  .p-skazki{background:linear-gradient(180deg,#151f36 0%,#12231a 42%,#08110a 100%);border:1px solid rgba(165,224,127,.35)}
   .p-skazki .pname{font-family:'Ruslan Display',Georgia,serif;font-weight:400;text-transform:none;letter-spacing:.05em;font-size:1.5rem;
     background-image:linear-gradient(180deg,#f4ffe0,#b8e58c 40%,#e7c164 82%,#a8752e);filter:drop-shadow(0 0 14px rgba(203,205,110,.5))}
   .p-skazki .ptag{color:#bfe0a8}
@@ -9239,7 +9245,7 @@ function applyGameHero(){
       const overlay = CUR_PROJECT==='classic'
         ? 'linear-gradient(rgba(8,16,10,.56),rgba(5,11,7,.85))'
         : CUR_PROJECT==='skazki'
-        ? 'linear-gradient(rgba(8,17,10,.38),rgba(4,10,6,.82))'
+        ? 'linear-gradient(180deg, rgba(8,17,10,.28) 0%, rgba(6,13,8,.6) 34%, rgba(4,10,6,.9) 64%, rgba(3,8,5,.96) 100%)'
         : 'linear-gradient(rgba(10,10,14,.62),rgba(10,10,14,.86))';
       mh.style.backgroundImage=`${overlay}, url("${hi}")`;
       mh.style.backgroundSize='cover'; mh.style.backgroundPosition=pos;
