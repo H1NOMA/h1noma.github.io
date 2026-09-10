@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <!-- Безопасность: ограничиваем источники (защита от инъекций/утечек). script/style — только свои + инлайн
      (приложению нужны инлайновые обработчики); подключения — только к себе и Supabase; object/embed запрещены. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; media-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src 'none'; manifest-src 'self'; worker-src 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; media-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://cloud.komikdnd.ru wss://cloud.komikdnd.ru; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src 'none'; manifest-src 'self'; worker-src 'self'">
 <meta name="referrer" content="strict-origin-when-cross-origin">
 <!-- анти-кликджекинг: сайт не должен работать внутри чужого фрейма (GitHub Pages не даёт задать заголовок) -->
 <script>try{if(window.top!==window.self){try{window.top.location=window.self.location;}catch(_){document.documentElement.style.display='none';}}}catch(e){}</script>
