@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 # ══════════════════════════════════════════════════════════════════════
 #  КОМИК · автоустановка облака на свой сервер (Ubuntu 22.04+, root)
-#  Ставит Docker, swap, self-hosted Supabase, схему БД, Caddy (HTTPS),
-#  переносит данные kv и аккаунты игроков, разворачивает пуш-функцию.
-#  Запуск:  bash <(curl -s https://komikdnd.ru/migrate/setup.sh)
-#  Повторный запуск безопасен: готовые шаги пропускаются.
+#  Ставит Docker, swap, self-hosted Supabase (ревизия запинована),
+#  схему БД, Caddy (HTTPS), переносит данные kv и аккаунты игроков,
+#  разворачивает пуш-функцию notify-game.
+#  Запуск:  bash <(curl -fsS https://komikdnd.ru/migrate/setup.sh)
+#  Повторный запуск безопасен: готовые шаги пропускаются,
+#  перенесённые данные повторно НЕ перезаписываются.
 # ══════════════════════════════════════════════════════════════════════
 set -euo pipefail
 
@@ -12,6 +14,8 @@ CLOUD_DOMAIN="cloud.komikdnd.ru"
 OLD_URL="https://xstrdpoxwbkbumigspdv.supabase.co"
 # анон-ключ старого облака (он и так публичный — вшит в сайт)
 OLD_ANON="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhzdHJkcG94d2JrYnVtaWdzcGR2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQwMjg1ODIsImV4cCI6MjA5OTYwNDU4Mn0.En-AP7WJh8AZkylbM44yhhJyNcFf0-ra6M3Yu8ZxAhs"
+# проверенная ревизия supabase/supabase (структура compose сверена именно с ней)
+SB_SHA="6c3e8a6a4e1668d71c53cdca2359893ebf106e6a"
 SB_DIR=/opt/supabase/docker
 INFO=/root/komik-cloud-info.txt
 
@@ -40,19 +44,21 @@ free -h | grep -i swap
 
 say "4/9 · Caddy (HTTPS)"
 if ! command -v caddy >/dev/null; then
-  curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy.gpg
-  curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' \
+  curl -1sSLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --yes --dearmor -o /usr/share/keyrings/caddy.gpg
+  curl -1sSLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' \
     | sed 's|deb |deb [signed-by=/usr/share/keyrings/caddy.gpg] |' > /etc/apt/sources.list.d/caddy.list
   apt-get update -q && apt-get install -yq caddy
 fi
 
-say "5/9 · Supabase: дистрибутив и секреты"
+say "5/9 · Supabase: дистрибутив, секреты, конфигурация"
 if [ ! -d /opt/supabase ]; then
-  git clone --depth 1 https://github.com/supabase/supabase /opt/supabase
+  git clone --filter=blob:none https://github.com/supabase/supabase /opt/supabase
 fi
+git -C /opt/supabase checkout -q "$SB_SHA"
 cd "$SB_DIR"
 if [ ! -f .env ]; then
   cp .env.example .env
+  chmod 600 .env
   PGPASS=$(openssl rand -hex 20)
   JWTSEC=$(openssl rand -hex 20)
   DASHPASS=$(openssl rand -hex 10)
@@ -74,8 +80,19 @@ PY
   sedvar DASHBOARD_USERNAME supabase
   sedvar DASHBOARD_PASSWORD "$DASHPASS"
   sedvar SITE_URL "https://komikdnd.ru"
-  sedvar API_EXTERNAL_URL "https://$CLOUD_DOMAIN"
+  sedvar API_EXTERNAL_URL "https://$CLOUD_DOMAIN/auth/v1"
   sedvar SUPABASE_PUBLIC_URL "https://$CLOUD_DOMAIN"
+  # регистрация на сайте идёт с синтетическими email — подтверждать их некому
+  sedvar ENABLE_EMAIL_AUTOCONFIRM true
+  # шлюз наружу не выставляем: доступ только через Caddy (TLS)
+  sedvar API_GW_HTTP_PORT "127.0.0.1:8000"
+  # дефолтные криптоключи из публичного примера заменяем случайными
+  sedvar SECRET_KEY_BASE "$(openssl rand -hex 32)"
+  sedvar VAULT_ENC_KEY "$(openssl rand -hex 16)"
+  sedvar PG_META_CRYPTO_KEY "$(openssl rand -hex 16)"
+  sedvar LOGFLARE_PUBLIC_ACCESS_TOKEN "$(openssl rand -hex 16)"
+  sedvar LOGFLARE_PRIVATE_ACCESS_TOKEN "$(openssl rand -hex 16)"
+  sedvar POOLER_TENANT_ID komik
 else
   echo ".env уже есть — секреты не трогаю"
 fi
@@ -85,18 +102,58 @@ ANON=$(grep '^ANON_KEY=' .env | cut -d= -f2-)
 SERVICE=$(grep '^SERVICE_ROLE_KEY=' .env | cut -d= -f2-)
 DASHPASS=$(grep '^DASHBOARD_PASSWORD=' .env | cut -d= -f2-)
 
+# override: порты Postgres-пулера прячем на loopback; сюда же — VAPID для пушей
+VPUB=""; VPRIV=""
+if [ -f docker-compose.override.yml ]; then
+  VPUB=$(grep 'VAPID_PUBLIC:' docker-compose.override.yml | sed 's/.*: *"//;s/"//' || true)
+  VPRIV=$(grep 'VAPID_PRIVATE:' docker-compose.override.yml | sed 's/.*: *"//;s/"//' || true)
+fi
+if [ -z "$VPUB" ] || [ -z "$VPRIV" ]; then
+  echo
+  echo "VAPID-секреты пушей из старого проекта (supabase.com → Edge Functions → Secrets)."
+  echo "Нужны ТЕ ЖЕ значения, иначе подписки игроков умрут. Enter — пропустить (донастроишь повторным запуском)."
+  read -rp "VAPID_PUBLIC: " VPUB </dev/tty || true
+  read -rp "VAPID_PRIVATE: " VPRIV </dev/tty || true
+fi
+{
+  echo 'services:'
+  echo '  supavisor:'
+  echo '    ports: !override'
+  echo '      - "127.0.0.1:5432:5432"'
+  echo '      - "127.0.0.1:6543:6543"'
+  if [ -n "$VPUB" ] && [ -n "$VPRIV" ]; then
+    echo '  functions:'
+    echo '    environment:'
+    echo "      VAPID_PUBLIC: \"$VPUB\""
+    echo "      VAPID_PRIVATE: \"$VPRIV\""
+    echo '      VAPID_SUBJECT: "mailto:admin@komikdnd.ru"'
+  fi
+} > docker-compose.override.yml
+chmod 600 docker-compose.override.yml
+# в этом .env задан COMPOSE_FILE — override сам не подхватится, прописываем явно
+sed -i 's|^COMPOSE_FILE=.*|COMPOSE_FILE=docker-compose.yml:docker-compose.override.yml|' .env
+
 say "6/9 · Запуск Supabase (первый раз — 5-10 минут на загрузку образов)"
 docker compose pull -q || true
 docker compose up -d
 echo "жду готовности базы…"
-for i in $(seq 1 60); do
-  docker exec supabase-db pg_isready -U postgres >/dev/null 2>&1 && break
+DB_OK=""
+for i in $(seq 1 90); do
+  docker exec supabase-db pg_isready -h 127.0.0.1 -U postgres >/dev/null 2>&1 && { DB_OK=1; break; }
   sleep 5
 done
-docker exec supabase-db pg_isready -U postgres
+[ -n "$DB_OK" ] || { warn "база не поднялась за 7 минут — смотри docker compose logs db"; exit 1; }
+echo "жду готовности API-шлюза…"
+GW_OK=""
+for i in $(seq 1 60); do
+  curl -sf -o /dev/null http://localhost:8000/rest/v1/ -H "apikey: $ANON" -H "Authorization: Bearer $ANON" && { GW_OK=1; break; }
+  sleep 5
+done
+[ -n "$GW_OK" ] || { warn "шлюз :8000 не отвечает — смотри docker compose logs api-gw rest"; exit 1; }
+echo "стек поднят ✓"
 
 say "7/9 · Схема БД (таблица kv, политики, realtime, RPC доски ходов)"
-docker exec -i supabase-db psql -U postgres -d postgres <<'SQL'
+docker exec -i supabase-db psql -v ON_ERROR_STOP=1 -U postgres -d postgres <<'SQL'
 create table if not exists public.kv (key text primary key, value jsonb);
 alter table public.kv enable row level security;
 do $$ begin
@@ -110,13 +167,13 @@ do $$ begin
 exception when duplicate_object then null; end $$;
 
 create or replace function public.kv_deep_merge(p_key text, p_patch jsonb)
-returns void language sql security definer as $$
+returns void language sql security definer set search_path = public as $$
   insert into public.kv(key, value) values (p_key, p_patch)
   on conflict (key) do update set value = kv.value || excluded.value;
 $$;
 
 create or replace function public.trk_card_patch(p_key text, p_board text, p_cardkey text, p_patch jsonb)
-returns void language plpgsql security definer as $$
+returns void language plpgsql security definer set search_path = public as $$
 begin
   update public.kv set value = jsonb_set(value, array[p_board,'cards',p_cardkey],
     coalesce(value#>array[p_board,'cards',p_cardkey],'{}'::jsonb) || p_patch, true)
@@ -124,7 +181,7 @@ begin
 end $$;
 
 create or replace function public.trk_log_push(p_key text, p_board text, p_entry jsonb, p_cap int default 80)
-returns void language plpgsql security definer as $$
+returns void language plpgsql security definer set search_path = public as $$
 declare cur jsonb;
 begin
   cur := coalesce((select value#>array[p_board,'log'] from public.kv where key=p_key), '[]'::jsonb);
@@ -135,18 +192,35 @@ begin
   end if;
   update public.kv set value = jsonb_set(value, array[p_board,'log'], cur, true) where key=p_key;
 end $$;
+
+-- RPC пишут в обход RLS (security definer) — анониму их звать нельзя
+revoke execute on function public.kv_deep_merge(text,jsonb) from public, anon;
+revoke execute on function public.trk_card_patch(text,text,text,jsonb) from public, anon;
+revoke execute on function public.trk_log_push(text,text,jsonb,int) from public, anon;
+grant execute on function public.kv_deep_merge(text,jsonb) to authenticated, service_role;
+grant execute on function public.trk_card_patch(text,text,text,jsonb) to authenticated, service_role;
+grant execute on function public.trk_log_push(text,text,jsonb,int) to authenticated, service_role;
 SQL
+echo "схема применена ✓"
 
 say "8/9 · Перенос данных и аккаунтов"
-# 8а. данные kv: старое облако → новое (идемпотентно, merge-duplicates)
-echo "скачиваю kv из старого облака…"
-curl -sf "$OLD_URL/rest/v1/kv?select=key,value" \
-  -H "apikey: $OLD_ANON" -H "Authorization: Bearer $OLD_ANON" -o /root/kv_backup.json
-python3 -c "import json;d=json.load(open('/root/kv_backup.json'));assert isinstance(d,list) and d, 'бэкап пуст';print('  строк:',len(d))"
-curl -sf -X POST "http://localhost:8000/rest/v1/kv" \
-  -H "apikey: $SERVICE" -H "Authorization: Bearer $SERVICE" \
-  -H "Content-Type: application/json" -H "Prefer: resolution=merge-duplicates" \
-  --data-binary @/root/kv_backup.json >/dev/null && echo "  kv залит ✓"
+# 8а. данные kv: ТОЛЬКО в пустую базу — повторный запуск не перетрёт свежие данные
+KVCNT=$(docker exec supabase-db psql -U postgres -d postgres -tAc "select count(*) from public.kv" || echo 0)
+if [ "${KVCNT:-0}" -gt 0 ]; then
+  echo "  kv уже содержит $KVCNT ключей — импорт пропускаю (данные не трогаю)"
+else
+  echo "  скачиваю kv из старого облака…"
+  curl -sSf "$OLD_URL/rest/v1/kv?select=key,value&limit=10000" \
+    -H "apikey: $OLD_ANON" -H "Authorization: Bearer $OLD_ANON" -o /root/kv_backup.json \
+    || { warn "старое облако не отвечает (проект на паузе? зайди в Dashboard и разбуди) — kv не перенесён"; exit 1; }
+  python3 -c "import json;d=json.load(open('/root/kv_backup.json'));assert isinstance(d,list) and d,'бэкап пуст или ошибка';print('  строк в бэкапе:',len(d))"
+  curl -sSf -X POST "http://localhost:8000/rest/v1/kv" \
+    -H "apikey: $SERVICE" -H "Authorization: Bearer $SERVICE" \
+    -H "Content-Type: application/json" -H "Prefer: resolution=ignore-duplicates" \
+    --data-binary @/root/kv_backup.json >/dev/null \
+    || { warn "заливка kv не удалась — данные НЕ перенесены"; exit 1; }
+  echo "  kv залит: $(docker exec supabase-db psql -U postgres -d postgres -tAc 'select count(*) from public.kv') ключей ✓"
+fi
 
 # 8б. аккаунты игроков (пароли переезжают bcrypt-хэшами)
 CNT=$(docker exec supabase-db psql -U postgres -d postgres -tAc "select count(*) from auth.users" || echo 0)
@@ -155,14 +229,16 @@ if [ "${CNT:-0}" -gt 0 ]; then
 else
   echo
   echo "Вставь строку подключения к СТАРОЙ базе (Dashboard → Database → Connection string,"
-  echo "лучше вкладка Session pooler; строка вида postgresql://postgres...@...:5432/postgres)."
-  echo "Просто Enter — пропустить и перенести позже."
-  read -rp "Строка: " OLDDB
+  echo "вкладка Session pooler; вид: postgresql://postgres.xstrd...:пароль@aws-0-...pooler.supabase.com:5432/postgres)."
+  echo "Просто Enter — пропустить и перенести позже повторным запуском."
+  read -rp "Строка: " OLDDB </dev/tty || true
   if [ -n "${OLDDB:-}" ]; then
-    docker exec supabase-db sh -c "pg_dump '$OLDDB' --data-only -t auth.users -t auth.identities" > /root/auth_dump.sql \
-      && docker exec -i supabase-db psql -U postgres -d postgres < /root/auth_dump.sql \
-      && echo "  аккаунтов перенесено: $(docker exec supabase-db psql -U postgres -d postgres -tAc 'select count(*) from auth.users') ✓" \
-      || warn "перенос аккаунтов не удался — проверь строку (нужен Session pooler, не Transaction) и запусти скрипт ещё раз"
+    if docker exec -e OLDDB="$OLDDB" supabase-db sh -c 'pg_dump "$OLDDB" --data-only -t auth.users -t auth.identities' \
+       | docker exec -i supabase-db psql -v ON_ERROR_STOP=1 -U postgres -d postgres; then
+      echo "  аккаунтов перенесено: $(docker exec supabase-db psql -U postgres -d postgres -tAc 'select count(*) from auth.users') ✓"
+    else
+      warn "перенос аккаунтов не удался — проверь строку (нужен Session pooler, не Transaction) и запусти скрипт ещё раз"
+    fi
   else
     warn "аккаунты не перенесены — игроки не смогут войти, пока не выполнишь этот шаг"
   fi
@@ -170,30 +246,10 @@ fi
 
 say "9/9 · Пуш-функция и Caddy"
 mkdir -p "$SB_DIR/volumes/functions/notify-game"
-curl -sf -o "$SB_DIR/volumes/functions/notify-game/index.ts" \
+curl -sSf -o "$SB_DIR/volumes/functions/notify-game/index.ts" \
   https://raw.githubusercontent.com/H1NOMA/h1noma.github.io/main/supabase/functions/notify-game/index.ts \
-  && echo "  notify-game скачана ✓" || warn "не смог скачать notify-game"
-if [ ! -f "$SB_DIR/docker-compose.override.yml" ]; then
-  echo
-  echo "VAPID-секреты пушей из старого проекта (Dashboard → Edge Functions → Secrets)."
-  echo "Просто Enter — пропустить (пуши можно донастроить позже)."
-  read -rp "VAPID_PUBLIC: " VPUB
-  read -rp "VAPID_PRIVATE: " VPRIV
-  if [ -n "${VPUB:-}" ] && [ -n "${VPRIV:-}" ]; then
-    cat > "$SB_DIR/docker-compose.override.yml" <<EOF2
-services:
-  functions:
-    environment:
-      VAPID_PUBLIC: "$VPUB"
-      VAPID_PRIVATE: "$VPRIV"
-      VAPID_SUBJECT: "mailto:admin@komikdnd.ru"
-EOF2
-    docker compose up -d functions
-    echo "  VAPID вшиты ✓"
-  else
-    warn "VAPID пропущены — пуши заработают после повторного запуска скрипта с ключами"
-  fi
-fi
+  && echo "  notify-game скачана ✓" || warn "не смог скачать notify-game — пуши не заработают"
+docker compose up -d functions >/dev/null 2>&1 || docker compose up -d
 
 if ! grep -q "$CLOUD_DOMAIN" /etc/caddy/Caddyfile 2>/dev/null; then
   cat >> /etc/caddy/Caddyfile <<EOF2
@@ -205,25 +261,24 @@ EOF2
   systemctl reload caddy
 fi
 
-# необязательная экономия памяти: аналитика и файлохранилище сайту не нужны
-docker compose stop analytics vector storage imgproxy >/dev/null 2>&1 || true
-for c in supabase-analytics supabase-vector supabase-storage supabase-imgproxy; do
-  docker update --restart=no "$c" >/dev/null 2>&1 || true
-done
+# необязательная экономия памяти: файлохранилище сайту не нужно
+for s in storage imgproxy; do docker compose stop "$s" >/dev/null 2>&1 || true; done
+for c in supabase-storage supabase-imgproxy; do docker update --restart=no "$c" >/dev/null 2>&1 || true; done
 
 IP=$(curl -s4 ifconfig.me || hostname -I | awk '{print $1}')
 cat > "$INFO" <<EOF2
 ══ КОМИК · параметры нового облака ══
 Адрес API:        https://$CLOUD_DOMAIN
-Studio (панель):  http://$IP:8000  · логин: supabase · пароль: $DASHPASS
-ANON_KEY (пойдёт в сайт):
+Studio (панель):  https://$CLOUD_DOMAIN  · логин: supabase · пароль: $DASHPASS
+ANON_KEY — этот ключ пойдёт в сайт, его можно отправить Клоду:
 $ANON
-SERVICE_ROLE_KEY (секрет! никому не отправлять):
+
+SERVICE_ROLE_KEY — СЕКРЕТ. Никому и никуда не отправлять:
 $SERVICE
 EOF2
+chmod 600 "$INFO"
 say "ГОТОВО"
-echo "Все параметры сохранены в $INFO"
+echo "Все параметры сохранены в $INFO (посмотреть: cat $INFO)"
 echo
-echo "Проверка: https://$CLOUD_DOMAIN должен отвечать JSON-ом (когда DNS-запись cloud → $IP разойдётся)."
-echo "Дальше: отправь Клоду ТОЛЬКО ANON_KEY (строку выше) — он переключит сайт."
-echo "SERVICE_ROLE_KEY не отправляй никому и никуда."
+echo "Проверь в браузере: https://$CLOUD_DOMAIN — должен ответить JSON (нужна DNS-запись cloud → $IP)."
+echo "Дальше: отправь Клоду ТОЛЬКО ANON_KEY (первый ключ выше) — он переключит сайт."
