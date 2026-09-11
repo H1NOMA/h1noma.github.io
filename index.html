@@ -6712,18 +6712,10 @@ function renderPlayers(){
     const lock = isOwner(c) ? '' :
       `<span class="pt-lock" title="${c.owner?('владелец '+esc(dispTag(c.owner))):'под кодом'}">🔒</span>`;
     const ph = (c.name||'?').trim().charAt(0).toUpperCase()||'?';
-    // на десктопе карточка крупная, и одного имени ей мало: добавляем то,
-    // что спрашивают за столом первым — хиты, защиту и инициативу
-    const chips=[
-      c.hp?`<span class="pt-chip hp">ХП <b>${esc(String(c.hp))}</b></span>`:'',
-      c.ac?`<span class="pt-chip">КД <b>${esc(String(c.ac))}</b></span>`:'',
-      c.init?`<span class="pt-chip">Иниц <b>${esc(String(c.init))}</b></span>`:''
-    ].filter(Boolean).join('');
     return `<div class="ptile${isOwner(c)?' mine':''}" onclick="openInlineSheet('${c.id}', this)" title="${esc(c.name)}">
       <div class="pt-ava">${c.ava?`<img src="${esc(safeUrl(c.ava))}" alt="">`:`<span class="pt-ph">${esc(ph)}</span>`}${lock}</div>
       <div class="pt-name">${esc(c.name)}</div>
       ${sub?`<div class="pt-sub">${sub}</div>`:''}
-      ${chips?`<div class="pt-line">${chips}</div>`:''}
     </div>`;
   };
   el.innerHTML = visible.slice().sort((a,b)=>(a.name||'').localeCompare(b.name||'','ru')).map(tileHtml).join('')
