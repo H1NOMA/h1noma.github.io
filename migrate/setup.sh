@@ -26,6 +26,8 @@ warn(){ printf '\033[1;33m⚠ %s\033[0m\n' "$*"; }
 
 say "1/9 · Система: базовые пакеты"
 export DEBIAN_FRONTEND=noninteractive
+# битый список Caddy от прежней версии скрипта ломал apt — подчищаем
+rm -f /etc/apt/sources.list.d/caddy.list
 apt-get update -q
 apt-get install -yq curl git nano ca-certificates gnupg python3 >/dev/null
 
@@ -44,9 +46,9 @@ free -h | grep -i swap
 
 say "4/9 · Caddy (HTTPS)"
 if ! command -v caddy >/dev/null; then
-  curl -1sSLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --yes --dearmor -o /usr/share/keyrings/caddy.gpg
-  curl -1sSLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' \
-    | sed 's|deb |deb [signed-by=/usr/share/keyrings/caddy.gpg] |' > /etc/apt/sources.list.d/caddy.list
+  # файл источников от Cloudsmith уже содержит [signed-by=…caddy-stable-archive-keyring.gpg]
+  curl -1sSLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --yes --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+  curl -1sSLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' > /etc/apt/sources.list.d/caddy-stable.list
   apt-get update -q && apt-get install -yq caddy
 fi
 
