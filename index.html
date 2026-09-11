@@ -3784,8 +3784,8 @@ const CAT_TRAUMA= {id:'trauma', label:'Болезни и медицина', type
 /* теги разработчиков: видят dev-разделы; список пополняется по указанию владельца */
 const DEV_TAGS=['hinoma','herr_teo'];
 function isDev(){ return !!(SESSION && DEV_TAGS.indexOf(normTag(SESSION))>=0); }
-/* архив ASSIMILATION открыт всем (ГМ-правки — только у dev через isDev) */
-function assimArchLocked(){ return false; }
+/* архив ASSIMILATION виден только разработчикам (hinoma, herr_teo) */
+function assimArchLocked(){ return CUR_PROJECT==='assimilation' && !isDev(); }
 function updateArchLock(){
   const locked=assimArchLocked();
   document.querySelectorAll('[data-nav="world"]').forEach(b=>{ b.hidden=locked; });
