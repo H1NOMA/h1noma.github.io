@@ -144,9 +144,10 @@ for i in $(seq 1 90); do
 done
 [ -n "$DB_OK" ] || { warn "база не поднялась за 7 минут — смотри docker compose logs db"; exit 1; }
 echo "жду готовности API-шлюза…"
+# корень /rest/v1/ в этой ревизии Envoy пускает только сервисный ключ — им и проверяем
 GW_OK=""
 for i in $(seq 1 60); do
-  curl -sf -o /dev/null http://localhost:8000/rest/v1/ -H "apikey: $ANON" -H "Authorization: Bearer $ANON" && { GW_OK=1; break; }
+  curl -sf -o /dev/null http://127.0.0.1:8000/rest/v1/ -H "apikey: $SERVICE" -H "Authorization: Bearer $SERVICE" && { GW_OK=1; break; }
   sleep 5
 done
 [ -n "$GW_OK" ] || { warn "шлюз :8000 не отвечает — смотри docker compose logs api-gw rest"; exit 1; }
@@ -214,7 +215,7 @@ else
     -H "apikey: $OLD_ANON" -H "Authorization: Bearer $OLD_ANON" -o /root/kv_backup.json \
     || { warn "старое облако не отвечает (проект на паузе? зайди в Dashboard и разбуди) — kv не перенесён"; exit 1; }
   python3 -c "import json;d=json.load(open('/root/kv_backup.json'));assert isinstance(d,list) and d,'бэкап пуст или ошибка';print('  строк в бэкапе:',len(d))"
-  curl -sSf -X POST "http://localhost:8000/rest/v1/kv" \
+  curl -sSf -X POST "http://127.0.0.1:8000/rest/v1/kv" \
     -H "apikey: $SERVICE" -H "Authorization: Bearer $SERVICE" \
     -H "Content-Type: application/json" -H "Prefer: resolution=ignore-duplicates" \
     --data-binary @/root/kv_backup.json >/dev/null \
