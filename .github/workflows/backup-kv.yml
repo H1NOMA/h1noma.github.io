@@ -25,8 +25,8 @@ jobs:
       - name: Дамп таблицы kv и коммит в ветку backups
         env:
           # Публичный anon-ключ (только чтение; запись закрыта RLS) — тот же, что в index.html
-          SUPA_URL: https://xstrdpoxwbkbumigspdv.supabase.co
-          SUPA_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhzdHJkcG94d2JrYnVtaWdzcGR2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQwMjg1ODIsImV4cCI6MjA5OTYwNDU4Mn0.En-AP7WJh8AZkylbM44yhhJyNcFf0-ra6M3Yu8ZxAhs
+          SUPA_URL: https://cloud.komikdnd.ru
+          SUPA_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzg5MDg1MzA1LCJleHAiOjIxMDQ0NDUzMDV9.7evXWwQ2bbrEVPTpfMEnrFv8ON5dFC_iU-v7MiVQPyc
         run: |
           set -euo pipefail
           DATE=$(date -u +%Y-%m-%d)
