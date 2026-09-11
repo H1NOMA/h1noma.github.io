@@ -261,8 +261,10 @@ $CLOUD_DOMAIN {
     reverse_proxy localhost:8000
 }
 EOF2
-  systemctl reload caddy
 fi
+# restart, не reload: поднимает сервис и если он не был запущен
+systemctl enable caddy >/dev/null 2>&1 || true
+systemctl restart caddy || warn "Caddy не стартовал — пришли вывод: systemctl status caddy --no-pager | head -20"
 
 # необязательная экономия памяти: файлохранилище сайту не нужно
 for s in storage imgproxy; do docker compose stop "$s" >/dev/null 2>&1 || true; done
