@@ -2656,6 +2656,48 @@
     footer .allowed.sources-allowed{grid-area:materials;justify-self:center;margin:0}
     footer .foot-social{grid-area:social;justify-self:end;margin:0}
   }
+  /* ══ КАЛЕНДАРЬ ИГР — общий по всем сеттингам, только чтение.
+     Число дня с игрой обведено кольцом цвета сеттинга; несколько игр в день —
+     кольцо из нескольких цветов (conic-gradient, по сектору на игру). ══ */
+  .cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+  .cal-month{font-family:var(--f-disp);font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:.9rem;color:var(--txt)}
+  .cal-nav{width:34px;height:34px;border-radius:50%;border:var(--hair) solid var(--line2);background:var(--surface2);color:var(--dim);font-size:1.25rem;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0 0 2px}
+  .cal-nav:hover{color:var(--red-ink)}
+  .cal-dow{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:4px}
+  .cal-dow span{text-align:center;font-family:var(--f-mono);font-size:.58rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+  .cd{aspect-ratio:1;border:none;background:none;padding:0;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--muted);font-family:var(--f-mono);font-size:.82rem;position:relative;cursor:default}
+  .cd i{font-style:normal;display:flex;align-items:center;justify-content:center;width:100%;height:100%;border-radius:50%}
+  .cd.past{opacity:.5}
+  .cd.today i{color:var(--red-ink);font-weight:700;box-shadow:inset 0 0 0 1px rgba(var(--accent-rgb),.55)}
+  .cd.has{background:var(--ring);padding:2.5px;cursor:pointer;color:var(--txt);opacity:1}
+  .cd.has i{background:var(--surface);font-weight:700}
+  .cd.has:hover i{background:var(--surface2)}
+  .cd.sel{box-shadow:0 0 0 2px var(--bg),0 0 0 3.5px rgba(var(--accent-rgb),.75)}
+  .cal-legend{display:flex;flex-wrap:wrap;gap:6px 12px;margin-top:10px}
+  .cal-lg{display:inline-flex;align-items:center;gap:6px;font-family:var(--f-mono);font-size:.58rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+  .cal-lg b{width:9px;height:9px;border-radius:50%;display:inline-block;flex:none}
+  .cal-day,.cal-up{margin-top:12px;border-top:1px solid var(--line);padding-top:10px}
+  .cal-day-h,.cal-up-h{font-family:var(--f-mono);font-size:.62rem;letter-spacing:.14em;text-transform:uppercase;color:var(--red-ink);margin-bottom:6px}
+  .cal-game{display:flex;flex-direction:column;gap:2px;width:100%;text-align:left;background:var(--surface);border:var(--hair) solid var(--line);border-left:3px solid var(--c);border-radius:10px;padding:9px 11px;margin-bottom:6px;cursor:pointer;color:var(--txt);transition:background .15s}
+  .cal-game:hover{background:var(--surface2)}
+  .cal-game-set{font-family:var(--f-mono);font-size:.58rem;letter-spacing:.14em;text-transform:uppercase;color:var(--c)}
+  .cal-game-t{font-family:var(--f-disp);font-weight:700;font-size:.92rem;line-height:1.25}
+  .cal-game-m{font-family:var(--f-mono);font-size:.66rem;color:var(--muted);line-height:1.5}
+  .cal-empty{font-family:var(--f-mono);font-size:.68rem;color:var(--muted);padding:8px 0;text-align:center}
+  .modal .cal-set{font-style:normal;color:var(--c)}
+  .modal .cal-set i{font-style:normal}
+  /* плавающая кнопка — только в новостях; на широком десктопе календарь развёрнут третьей колонкой */
+  #calFab{display:none;right:78px}
+  html.view-news #calFab{display:flex}
+  .mirror-ui #calFab{left:78px;right:auto}
+  #newsCal{display:none}
+  @media(min-width:880px){ #calFab{right:var(--edge)} .mirror-ui #calFab{left:calc(var(--fr) + 70px);right:auto} }
+  @media(min-width:1180px){
+    #calFab{display:none !important}
+    #view-news{grid-template-columns:minmax(300px,360px) minmax(0,1fr) minmax(280px,330px)}
+    #newsCal{display:block;position:sticky;top:76px;align-self:start;min-width:0;background:var(--surface);border:var(--hair) solid var(--line2);border-radius:16px;padding:16px 16px 14px;max-height:calc(100vh - 96px);overflow:auto;scrollbar-width:thin}
+  }
   .tool-title.trk{display:flex;align-items:center;justify-content:center;gap:16px;font-family:var(--f-disp);font-weight:700;font-size:1.05rem;letter-spacing:.14em;margin-bottom:14px}
   .tool-title.trk .tt-ico{width:30px;height:30px;flex:none;color:var(--red-ink);opacity:.55}
   .tool-title.trk .tt-ico svg{width:100%;height:100%;display:block}
@@ -3472,6 +3514,8 @@ localStorage.removeItem('comik:a11y:mirror');d.classList.remove('mirror-ui');}ca
       </div>
     </div>
     <div class="news-feed" id="newsFeed"></div>
+    <!-- календарь игр всех сеттингов: на широком десктопе — третья колонка, иначе — по плавающей кнопке -->
+    <aside class="news-cal" id="newsCal" aria-label="Календарь игр"></aside>
   </section>
 
   <!-- ARCHIVE -->
@@ -3591,6 +3635,10 @@ localStorage.removeItem('comik:a11y:mirror');d.classList.remove('mirror-ui');}ca
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v11M8 10.5l4 4 4-4"/><path d="M5 20h14"/></svg>
 </button>
 <input type="file" id="importCharFile" accept="application/json,.json" hidden onchange="importCharFile(this)">
+
+<button class="fab-side cal-circle" id="calFab" onclick="openCalendar()" aria-label="Календарь игр" title="Календарь игр">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/><circle cx="12" cy="15.5" r="1.5" fill="currentColor" stroke="none"/></svg>
+</button>
 
 <button class="dice-fab" id="diceBtn" onclick="toggleDice(event)" aria-label="Бросить куб">
   <svg class="fab-dice" viewBox="0 0 24 24"><path d="M12 2l8.7 5v10L12 22l-8.7-5V7L12 2z"/><path d="M12 2v4.6M3.3 7l8.7-.4 8.7.4M12 6.6L5.6 16.4h12.8L12 6.6M3.3 17l2.3-.6M20.7 17l-2.3-.6M12 22l-6.4-5.6M12 22l6.4-5.6"/></svg>
@@ -5256,7 +5304,10 @@ function announceChronoGame(){
   document.getElementById('scrim').classList.add('open');
   const set=(id,v)=>{ const el=document.getElementById(id); if(el) el.value=v; };
   set('gc-title', g.title||''); set('gc-loc', g.loc||'');
-  set('gc-time', [g.date,g.time].filter(Boolean).join(', ')); set('gc-seats', g.seats||'5');
+  // дата из хронологии — в поле даты (если разобралась), остаток — в строку времени
+  const iso=parseRuDate(g.date);
+  set('gc-date', iso||'');
+  set('gc-time', iso ? (g.time||'') : [g.date,g.time].filter(Boolean).join(', ')); set('gc-seats', g.seats||'5');
 }
 
 /* ---------- выбор тегов ---------- */
@@ -5697,10 +5748,12 @@ function fmtDate(iso){
   try{ return new Date(iso).toLocaleDateString('ru-RU',{day:'numeric',month:'long',year:'numeric'}); }
   catch(e){ return ''; }
 }
-/* баннер «Ближайшая игра» — первая открытая заявка текущего сеттинга */
+/* баннер «Ближайшая игра» — ближайшая по дате открытая заявка текущего сеттинга (без даты — в конец) */
 function updateNextGame(){
   const el=document.getElementById('nextGame'); if(!el) return;
-  const s=(GAMES||[]).find(g=>g && g.game===CUR_PROJECT);
+  const today=calToday();
+  const list=gamesByDate((GAMES||[]).filter(g=>g && g.game===CUR_PROJECT));
+  const s=list.find(g=>{ const d=gameDateOf(g); return !d || d>=today; }) || list[0];
   const su=document.getElementById('signupBtn');
   // нет запланированной ГМом кампании → ни баннера, ни кнопки записи (пустота)
   if(!s){ el.hidden=true; el.innerHTML=''; if(su) su.hidden=true; return; }
@@ -5709,11 +5762,12 @@ function updateNextGame(){
   el.innerHTML=`<div class="ng-card" onclick="openGameSignup()" role="button" tabindex="0" onkeydown="if(event.key==='Enter')openGameSignup()">
     <span class="ng-k">Ближайшая игра</span>
     <b>${esc(s.title||gameTitle(s.game))}</b>
-    <span class="ng-meta">${[s.time, s.loc, 'мест '+seatsLeft(s)+'/'+(s.seats||'—')].filter(Boolean).map(esc).join(' · ')}</span>
+    <span class="ng-meta">${[s.date?fmtGameDate(s.date):'', s.time, s.loc, 'мест '+seatsLeft(s)+'/'+(s.seats||'—')].filter(Boolean).map(esc).join(' · ')}</span>
   </div>`;
 }
 function renderNews(){
   updateNextGame();
+  if(typeof calRefresh==='function') calRefresh();   // календарь игр — на новостях и в открытой модалке
   const w=document.getElementById('newsFeed'); if(!w) return;
   // «+ Новость» — свободные новости может публиковать только разработчик;
   // игроку-ГМ в «Классике» доступен лишь анонс игры через расписание (кнопка ниже)
@@ -5860,10 +5914,149 @@ const gameTitle = id => (PROJECT_TITLES[id]||id).replace(/<[^>]*>/g,'');
 function seatsLeft(s){ return Math.max(0, (parseInt(s.seats,10)||0) - (s.players||[]).length); }
 function myEntry(s){ return SESSION ? (s.players||[]).find(p=>normTag(p.tag)===currentTag()) : null; }
 
+/* ── даты игр. У ячейки есть поле date (YYYY-MM-DD, из редактора ГМа); старые записи
+   держали дату внутри строки time («сб 21.07, 18:00», «21 июля») — разбираем её как запасной путь. ── */
+const calPad=n=>String(n).padStart(2,'0');
+function calToday(){ const n=new Date(); return n.getFullYear()+'-'+calPad(n.getMonth()+1)+'-'+calPad(n.getDate()); }
+function parseRuDate(str){
+  if(!str) return null;
+  const t=String(str).trim();
+  let m=t.match(/^(\d{4})-(\d{2})-(\d{2})/); if(m) return m[0];
+  let d=null, mo=null, y=null;
+  m=t.match(/(\d{1,2})[.\/](\d{1,2})(?:[.\/](\d{2,4}))?/);
+  if(m){ d=+m[1]; mo=+m[2]; if(m[3]){ y=+m[3]; if(y<100) y+=2000; } }
+  else {
+    const MONTHS=[/^янв/,/^фев/,/^мар/,/^апр/,/^ма[йя]/,/^июн/,/^июл/,/^авг/,/^сен/,/^окт/,/^ноя/,/^дек/];
+    m=t.toLowerCase().match(/(\d{1,2})\s+([а-яё]+)(?:\s+(\d{4}))?/);
+    if(m){ const i=MONTHS.findIndex(r=>r.test(m[2])); if(i>=0){ d=+m[1]; mo=i+1; if(m[3]) y=+m[3]; } }
+  }
+  if(!d||!mo||mo<1||mo>12||d<1||d>31) return null;
+  if(!y){ // год не указан: берём текущий, а если дата уже давно прошла — следующий
+    const now=new Date(); y=now.getFullYear();
+    if(new Date(y,mo-1,d) < new Date(now.getTime()-45*864e5)) y+=1;
+  }
+  return y+'-'+calPad(mo)+'-'+calPad(d);
+}
+function gameDateOf(s){
+  if(!s) return null;
+  if(s.date && /^\d{4}-\d{2}-\d{2}$/.test(s.date)) return s.date;
+  return parseRuDate(s.time);
+}
+function fmtGameDate(iso, opts){
+  if(!iso) return '';
+  const [y,m,d]=iso.split('-').map(Number);
+  return new Date(y,m-1,d).toLocaleDateString('ru-RU', opts||{weekday:'short',day:'numeric',month:'long'});
+}
+/* сортировка: сначала ближайшие по дате, без даты — в конец; при равенстве — по созданию */
+function gamesByDate(list){
+  return list.slice().sort((a,b)=>{ const da=gameDateOf(a)||'9999', db=gameDateOf(b)||'9999';
+    return da<db?-1:da>db?1:(a.createdAt||0)-(b.createdAt||0); });
+}
+
+/* ══ КАЛЕНДАРЬ ИГР — общий по всем сеттингам, только чтение: данные берутся из GAMES ══ */
+const CAL_COLORS={classic:'#d3a84a',terra:'#e8dcbf',legacy:'#a78bfa',neverland:'#ffd970',assimilation:'#ff4757',skazki:'#a5e07f'};
+let CAL={y:null, m:null, sel:null};
+function calInit(){ if(CAL.y===null){ const n=new Date(); CAL.y=n.getFullYear(); CAL.m=n.getMonth(); } }
+function calGames(){
+  const vis=(typeof visibleProjects==='function') ? visibleProjects() : Object.keys(PROJECT_TITLES);
+  return (GAMES||[]).filter(s=>s && vis.indexOf(s.game)>=0).map(s=>({s, d:gameDateOf(s)})).filter(x=>x.d);
+}
+function calByDay(){ const by={}; calGames().forEach(x=>{ (by[x.d]=by[x.d]||[]).push(x.s); }); return by; }
+function calShift(dm){ calInit(); CAL.m+=dm; if(CAL.m<0){ CAL.m=11; CAL.y--; } if(CAL.m>11){ CAL.m=0; CAL.y++; } CAL.sel=null; calRefresh(); }
+function calPick(iso){ CAL.sel = (CAL.sel===iso) ? null : iso; calRefresh(); }
+function calGameRow(s, withDate){
+  const col=CAL_COLORS[s.game]||'#fff', d=gameDateOf(s);
+  const meta=[withDate&&d?fmtGameDate(d):'', s.time, s.loc, 'мест '+seatsLeft(s)+'/'+(s.seats||'—')].filter(Boolean).map(esc).join(' · ');
+  return `<button type="button" class="cal-game" style="--c:${col}" onclick="openGameBrief('${s.id}')">
+    <span class="cal-game-set">${esc(gameTitle(s.game))}</span>
+    <span class="cal-game-t">${esc(s.title||'Сессия')}</span>
+    <span class="cal-game-m">${meta}</span></button>`;
+}
+function calHtml(){
+  calInit();
+  const by=calByDay(), today=calToday();
+  const first=new Date(CAL.y, CAL.m, 1);
+  const startDow=(first.getDay()+6)%7;                       // неделя с понедельника
+  const dim=new Date(CAL.y, CAL.m+1, 0).getDate();
+  const monthName=first.toLocaleDateString('ru-RU',{month:'long',year:'numeric'}).replace(' г.','');
+  let cells='';
+  for(let i=0;i<startDow;i++) cells+='<span class="cd blank"></span>';   // не .empty — это глобальный плейсхолдер с рамкой
+  for(let d=1; d<=dim; d++){
+    const iso=CAL.y+'-'+calPad(CAL.m+1)+'-'+calPad(d);
+    const gs=by[iso]||[];
+    const cls=['cd', gs.length?'has':'', iso===today?'today':'', iso===CAL.sel?'sel':'', iso<today?'past':''].filter(Boolean).join(' ');
+    let ring='';
+    if(gs.length){
+      const cols=gs.map(s=>CAL_COLORS[s.game]||'#fff'), n=cols.length;
+      const stops=cols.map((c,i)=>`${c} ${(i/n*100).toFixed(2)}% ${((i+1)/n*100).toFixed(2)}%`).join(',');
+      ring=` style="--ring:conic-gradient(from -90deg,${stops})"`;
+    }
+    cells+= gs.length
+      ? `<button type="button" class="${cls}"${ring} onclick="calPick('${iso}')" title="${gs.length===1?'1 игра':gs.length+' игры'}"><i>${d}</i></button>`
+      : `<span class="${cls}"><i>${d}</i></span>`;
+  }
+  const vis=(typeof visibleProjects==='function') ? visibleProjects() : Object.keys(PROJECT_TITLES);
+  const legend=vis.map(g=>`<span class="cal-lg"><b style="background:${CAL_COLORS[g]||'#fff'}"></b>${esc(gameTitle(g))}</span>`).join('');
+  const sel = CAL.sel ? `<div class="cal-day"><div class="cal-day-h">${esc(fmtGameDate(CAL.sel,{weekday:'long',day:'numeric',month:'long'}))}</div>${(by[CAL.sel]||[]).map(s=>calGameRow(s,false)).join('')}</div>` : '';
+  return `<div class="cal cal-root">
+    <div class="cal-head"><button type="button" class="cal-nav" onclick="calShift(-1)" aria-label="Предыдущий месяц">‹</button><span class="cal-month">${esc(monthName)}</span><button type="button" class="cal-nav" onclick="calShift(1)" aria-label="Следующий месяц">›</button></div>
+    <div class="cal-dow">${['Пн','Вт','Ср','Чт','Пт','Сб','Вс'].map(w=>`<span>${w}</span>`).join('')}</div>
+    <div class="cal-grid">${cells}</div>
+    <div class="cal-legend">${legend}</div>
+    ${sel}</div>`;
+}
+function calUpcomingHtml(n){
+  const today=calToday();
+  const up=gamesByDate(calGames().map(x=>x.s)).filter(s=>gameDateOf(s)>=today).slice(0, n||5);
+  return `<div class="cal-up"><div class="cal-up-h">Ближайшие игры</div>${up.length?up.map(s=>calGameRow(s,true)).join(''):'<div class="cal-empty">Пока ничего не запланировано</div>'}</div>`;
+}
+function calModalHtml(){
+  return `<button class="x" onclick="closeModal()" aria-label="Закрыть">✕</button>
+    <div class="top">${rune('history',24)}<span class="clabel">Календарь игр · все сеттинги</span></div>`
+    + calHtml() + calUpcomingHtml(5);
+}
+function openCalendar(){
+  document.getElementById('modal').innerHTML=calModalHtml();
+  document.getElementById('scrim').classList.add('open');
+}
+/* перерисовка обеих витрин календаря: колонки на новостях и открытой модалки */
+function calRefresh(){
+  const aside=document.getElementById('newsCal');
+  if(aside) aside.innerHTML=`<div class="kicker" style="margin-bottom:8px">Календарь игр</div>`+calHtml()+calUpcomingHtml(5);
+  const m=document.getElementById('modal');
+  if(m && m.querySelector('.cal-root') && document.getElementById('scrim').classList.contains('open')) m.innerHTML=calModalHtml();
+}
+/* краткая инфа об игре: поверх открытого календаря — во втором слое, иначе — в основной модалке */
+function openGameBrief(id){
+  const s=(GAMES||[]).find(x=>x&&x.id===id); if(!s) return;
+  const inModal=document.getElementById('scrim').classList.contains('open');
+  const tgt=inModal?'modal2':'modal', scr=inModal?'scrim2':'scrim', closeFn=inModal?'closeOverlay()':'closeModal()';
+  const d=gameDateOf(s), col=CAL_COLORS[s.game]||'#fff';
+  const players=(s.players||[]).map(p=>esc(p.name||dispTag(p.tag)||'?')).join(', ');
+  const kv=(k,v)=>v?`<div class="kv"><div class="k">${k}</div><div class="v">${v}</div></div>`:'';
+  document.getElementById(tgt).innerHTML=`
+    <button class="x" onclick="${closeFn}" aria-label="Закрыть">✕</button>
+    <div class="top">${rune('history',24)}<span class="clabel"><span class="cal-set pm-item pm-${esc(s.game)}" style="--c:${col}">${PROJECT_TITLES[s.game]||esc(s.game)}</span> · игра</span></div>
+    <h2>${esc(s.title||'Сессия')}</h2>
+    ${kv('Дата', d?esc(fmtGameDate(d,{weekday:'long',day:'numeric',month:'long',year:'numeric'})):'')}
+    ${kv('Время', esc(s.time||''))}
+    ${kv('Место', esc(s.loc||''))}
+    ${kv('Цена', esc(s.price||''))}
+    ${kv('Места', `${(s.players||[]).length} / ${esc(String(s.seats||'—'))}${players?` — ${players}`:''}`)}
+    ${kv('Ведущий', s.owner?('@'+esc(dispTag(s.owner))):'')}
+    <div class="pacts">
+      <button class="btn primary" onclick="${inModal?'closeOverlay();':''}closeModal();openGameDeep('${s.id}')">К записи на игру</button>
+      <button class="btn ghost" onclick="${closeFn}">Закрыть</button>
+    </div>`;
+  document.getElementById(scr).classList.add('open');
+}
+/* на первом экране раздел «Новости» активен без вызова go() — ставим класс, по которому живёт кнопка календаря */
+(function(){ const v=document.getElementById('view-news'); if(v && v.classList.contains('active')) document.documentElement.classList.add('view-news'); })();
+
 /* --- игрок: список анонсов и запись --- */
 function openGameSignup(){
   // анонсы разделены по сеттингам: показываем только сессии открытой игры
-  const list=GAMES.filter(s=>s.game===CUR_PROJECT).sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
+  const list=gamesByDate(GAMES.filter(s=>s && s.game===CUR_PROJECT));
   const body=list.length ? list.map(s=>gsCardHtml(s)).join('')
     : `<div class="empty" style="margin-top:14px">[ ПОКА ПУСТО ]<br>В ${esc(gameTitle(CUR_PROJECT))} нет анонсированных сессий — загляни позже или переключи игру в шапке.</div>`;
   document.getElementById('modal').innerHTML=`
@@ -5891,6 +6084,7 @@ function gsCardHtml(s){
   return `<div class="gs-card">
     <div class="gs-title">${esc(s.title||'Сессия')}</div>
     <div class="gs-meta">
+      ${s.date?`<span>📅 ${esc(fmtGameDate(s.date))}</span>`:''}
       ${s.time?`<span>🕑 ${esc(s.time)}</span>`:''}
       ${s.loc?`<span>📍 ${esc(s.loc)}</span>`:''}
       ${s.price?`<span>💳 ${esc(s.price)}</span>`:''}
@@ -6055,7 +6249,10 @@ function openCellEditor(id){
       <div class="field"><label>Цена</label><input id="gc-price" maxlength="30" placeholder="бесплатно" value="${s?esc(s.price||''):''}"></div>
     </div>
     <div class="field"><label>Локация</label><input id="gc-loc" maxlength="80" value="${s?esc(s.loc||''):''}"></div>
-    <div class="field"><label>Время проведения</label><input id="gc-time" maxlength="60" placeholder="сб 21.07, 18:00" value="${s?esc(s.time||''):''}"></div>
+    <div class="row">
+      <div class="field"><label>Дата игры</label><input type="date" id="gc-date" value="${s?esc(s.date||gameDateOf(s)||''):''}"></div>
+      <div class="field"><label>Время проведения</label><input id="gc-time" maxlength="60" placeholder="18:00" value="${s?esc(s.time||''):''}"></div>
+    </div>
     ${!s?`<label class="ck-line" style="margin-bottom:6px"><input type="checkbox" id="gc-notify" checked> 🔔 Оповестить подписчиков о новой игре</label>`:''}
     <div class="pacts">
       <button class="btn primary" onclick="saveCell(${s?`'${s.id}'`:'null'})">Сохранить</button>
@@ -6073,7 +6270,8 @@ async function saveCell(id){
   const cellGame = isDev() ? SCHED_GAME : 'classic';
   const cell=Object.assign(s||{id:'gm'+Date.now().toString(36), game:cellGame, owner:currentTag(), players:[], createdAt:Date.now()},{
     title, seats:Math.max(1,parseInt(pval('gc-seats'),10)||1),
-    price:pval('gc-price'), loc:pval('gc-loc'), time:pval('gc-time')
+    price:pval('gc-price'), loc:pval('gc-loc'), time:pval('gc-time'),
+    date:(/^\d{4}-\d{2}-\d{2}$/.test(pval('gc-date')) ? pval('gc-date') : '')   // календарь игр читает это поле
   });
   if(!s){ const cr=pval('gc-chrono'); if(cr){ try{ cell.chronoRef=JSON.parse(cr); }catch(e){} } GAMES.push(cell); }
   const notify = !s && (document.getElementById('gc-notify')||{}).checked;
@@ -11601,7 +11799,10 @@ function openGameDeep(gid){
     const s=(typeof GAMES!=='undefined'?GAMES:[]).find(x=>x&&x.id===gid);
     if(!s) return false;
     if(s.game && s.game!==CUR_PROJECT) setProject(s.game);
-    go('news'); openSignupForm(gid); return true;
+    go('news'); openSignupForm(gid);
+    // openSignupForm только заполняет #modal — с холодного старта/из календаря оверлей надо открыть самим
+    if(document.getElementById('modal').innerHTML.trim()) document.getElementById('scrim').classList.add('open');
+    return true;
   };
   if(attempt()) return;
   const t=setInterval(()=>{ if(attempt()||++tries>40) clearInterval(t); }, 300);  // ждём загрузки игр из облака
