@@ -2,7 +2,7 @@
    Стратегия stale-while-revalidate: отдаём страницу из кэша мгновенно,
    а в фоне тихо перекачиваем свежую — она подхватится на следующем заходе.
    Так первый экран открывается сразу, без ожидания сети, и остаётся актуальным. */
-const CACHE = 'comik-v254';
+const CACHE = 'comik-v255';
 // мелкие статические файлы прогреваем сразу при установке
 // core-bestiary.json вынесен из index.html (это была почти половина его веса)
 // и обязан лежать в кэше: без него архив останется без монстров в офлайне.
@@ -71,13 +71,29 @@ self.addEventListener('fetch', e => {
       // «не доезжали» до пользователя до второй перезагрузки — казалось, что ничего не изменилось.
       if (isNav) {
         const fromCache = () => cache.match(e.request).then(c => c || cache.match('/') || cache.match('index.html'));
-        const network = fetch(e.request)
-          .then(res => { if (res && res.ok) cache.put(e.request, res.clone()).catch(() => {}); return res; });
+        // что отдали странице: 'net' — свежую с сети, 'cache' — копию по таймауту
+        let served = null;
+        const network = fetch(e.request).then(async res => {
+          if (res && res.ok) {
+            const prev = await cache.match(e.request).catch(() => null);
+            const changed = !!prev && (prev.headers.get('etag') || prev.headers.get('content-length') || '') !==
+                                       (res.headers.get('etag') || res.headers.get('content-length') || '');
+            await cache.put(e.request, res.clone()).catch(() => {});
+            // Страница уже открыта из старого кэша, а с сети пришла новая версия: раньше она
+            // ждала следующего запуска (на телефоне — второго-третьего), теперь страница
+            // узнаёт об этом сразу и перезапускается сама, как только это безопасно.
+            if (changed && served === 'cache') {
+              self.clients.matchAll({ type: 'window' }).then(list => list.forEach(c => c.postMessage({ type: 'komik-updated' })));
+            }
+          }
+          return res;
+        });
         // Гонка: кто быстрее — сеть или таймаут. По таймауту отдаём кэш, а закачка продолжается
         // в фоне и обновит кэш к следующему заходу. Если кэша ещё нет — честно ждём сеть.
         return Promise.race([
-          network.catch(() => fromCache().then(c => c || Promise.reject(new Error('offline')))),
-          new Promise(res => setTimeout(() => res(fromCache().then(c => c || network)), NAV_TIMEOUT)),
+          network.then(r => { if (!served) served = 'net'; return r; })
+                 .catch(() => fromCache().then(c => c || Promise.reject(new Error('offline')))),
+          new Promise(res => setTimeout(() => res(fromCache().then(c => { if (c) { if (!served) served = 'cache'; return c; } return network; })), NAV_TIMEOUT)),
         ]).catch(() => fromCache());
       }
       // Прочие статические ресурсы — stale-while-revalidate: мгновенно из кэша, свежее в фоне.

@@ -2720,6 +2720,11 @@
     html.dock-on.view-news #calFab{display:flex !important}
   }
   @media(min-width:1600px){ #view-news{grid-template-columns:minmax(300px,360px) minmax(0,1fr) minmax(280px,330px)} }
+  /* Облегчённый режим (Android, класс html.lite ставится при старте): размытие фона
+     (backdrop-filter) на мобильных GPU режет кадры при прокрутке под панелями и кнопками.
+     Стеклянные поверхности становятся плотными — рисунок тот же, blur не считается */
+  html.lite{--glass:var(--bg2);--glass2:var(--surface)}
+  html.lite *{backdrop-filter:none !important;-webkit-backdrop-filter:none !important}
   /* подсказка пустого раздела «Игрок» зависит от раскладки: до 1180 кнопка «＋ Добавить» сверху,
      с 1180 — плавающий «＋» внизу справа (тот же порог, что у #addCharFab) */
   .pl-empty-hint.hint-desk{display:none}
@@ -3344,7 +3349,9 @@ addEventListener('beforeinstallprompt', function(e){ e.preventDefault(); DEFERRE
 <script>(function(){try{var d=document.documentElement;var sc=localStorage.getItem('comik:a11y:scheme');if(sc&&sc!=='default')d.setAttribute('data-a11y',sc);
 /* зеркальный интерфейс убран из настроек — снимаем и у тех, у кого он был включён,
    иначе выключить его стало бы нечем */
-localStorage.removeItem('comik:a11y:mirror');d.classList.remove('mirror-ui');}catch(e){}})();</script>
+localStorage.removeItem('comik:a11y:mirror');d.classList.remove('mirror-ui');
+/* Android — облегчённый режим без размытия фона (html.lite, см. CSS) */
+if(/Android/i.test(navigator.userAgent||'')) d.classList.add('lite');}catch(e){}})();</script>
 <script>
 /* Заставка целиком живёт на CSS: и фон, и логотип, и характер сеттинга.
    Сюда вынесено единственное, что нельзя выразить стилями — нарезка логотипа
@@ -11951,7 +11958,24 @@ function pushDeepLinkFromUrl(){
 }
 /* тап по уведомлению при уже открытом приложении — SW пришлёт сообщение */
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.addEventListener('message', e=>{ if(e.data && e.data.type==='komik-open-game') openGameDeep(e.data.gid); });
+  navigator.serviceWorker.addEventListener('message', e=>{
+    if(!e.data) return;
+    if(e.data.type==='komik-open-game') openGameDeep(e.data.gid);
+    if(e.data.type==='komik-updated') swUpdateReady();
+  });
+}
+/* сервис-воркер докачал новую версию, пока открыта старая: перезапускаемся сами.
+   Если человек посреди правки листа или в модалке — ждём, пока он свернёт приложение
+   или закроет окно, и перезапускаем тогда (правки к этому моменту уже автосохранены) */
+let SW_UPDATE_PENDING=false;
+function swUpdateBusy(){ return !!(document.querySelector('.scrim.open') || (typeof INLINE_ID!=='undefined' && INLINE_ID) || document.querySelector('.hp-prompt')); }
+function swUpdateReady(){
+  if(SW_UPDATE_PENDING) return; SW_UPDATE_PENDING=true;
+  const go=()=>{ try{ if(typeof flushInlineSave==='function') flushInlineSave(); }catch(e){} location.reload(); };
+  if(!swUpdateBusy()){ go(); return; }
+  toast('Есть новая версия — обновится, когда закроешь окно');
+  document.addEventListener('visibilitychange', ()=>{ if(document.hidden) go(); });
+  const t=setInterval(()=>{ if(!swUpdateBusy()){ clearInterval(t); go(); } }, 1500);
 }
 /* вызов серверной функции рассылки. На шлюз идёт анон-ключ (он всегда проходит),
    а пользовательский токен передаём отдельным заголовком — функция им проверяет,
