@@ -1951,15 +1951,17 @@
   .ma-card h4{margin:3px 0 0;font-size:.9rem;line-height:1.2}
   .ma-card .mc-src{margin-left:auto;font-size:.9em;color:var(--dim)}
   .ma-empty{color:var(--dim);font-family:var(--f-mono);font-size:.72rem;text-align:center;padding:26px 8px}
-  /* широкий десктоп (≥1200): узкая панель слева; лист сдвигается вправо, чтобы не прятался под ней */
-  @media(min-width:1200px){
-    .ma-drawer{display:block;position:fixed;inset:70px auto 0 0;z-index:78;width:min(360px,92vw);transform:translateX(calc(-100% - 90px));transition:transform .4s cubic-bezier(.22,1,.36,1);pointer-events:none;will-change:transform}
+  /* широкий десктоп (≥1180 — тот же порог, что у постоянного рейла): узкая панель слева; лист сдвигается вправо, чтобы не прятался под ней */
+  @media(min-width:1180px){
+    /* z-index ниже .scrim (70): карточка, открытая из панели, ложится поверх неё, а не под неё */
+    .ma-drawer{display:block;position:fixed;inset:70px auto 0 0;z-index:68;width:min(360px,92vw);transform:translateX(calc(-100% - 90px));transition:transform .4s cubic-bezier(.22,1,.36,1);pointer-events:none;will-change:transform}
     .ma-drawer.open{transform:translateX(0);pointer-events:auto}
     #view-players.ma-open{padding-left:384px}   /* лист уезжает правее панели, не прячась под ней */
+    #view-players.calc-open{padding-right:calc(min(440px,94vw) - 24px)}   /* «липкий» калькулятор справа — лист сдвигается, а не прячется под ним */
   }
-  /* мобилка/планшет/узкий десктоп (<1200): широкая панель ВЫЕЗЖАЕТ СЛЕВА и перекрывает лист.
+  /* мобилка/планшет/узкий десктоп (<1180): широкая панель ВЫЕЗЖАЕТ СЛЕВА и перекрывает лист.
      z-index ниже модалки карточки (scrim=70), чтобы карточка открывалась поверх архива */
-  @media(max-width:1199px){
+  @media(max-width:1179px){
     .ma-drawer{display:block;position:fixed;inset:0 auto 0 0;z-index:68;width:min(440px,92vw);transform:translateX(calc(-100% - 30px));transition:transform .35s cubic-bezier(.22,1,.36,1);pointer-events:none;will-change:transform}
     .ma-drawer.open{transform:translateX(0);pointer-events:auto}
     /* поверх листа — панель непрозрачная, чтобы контент из-под неё не просвечивал */
@@ -2026,8 +2028,9 @@
   .pdot{width:18px;height:18px;border-radius:50%;border:1.7px solid var(--line2);background:transparent;cursor:pointer;padding:0;flex:none;transition:background .14s,border-color .14s,box-shadow .14s}
   .pdot:active{transform:scale(.9)}
   .pdot.on{background:var(--red);border-color:var(--red);box-shadow:0 0 8px rgba(var(--accent-rgb),.5)}
-  .prof-l{flex:1;font-family:var(--f-body);font-size:.82rem;color:var(--txt);line-height:1.2}
-  .prof-v{font-family:var(--f-disp);font-weight:700;font-size:.9rem;color:var(--red-ink);min-width:26px;text-align:right}
+  /* min-width:0 + перенос: «Проницательность» в узкой ячейке (просмотр листа, 2–3 колонки) переносится, а не выталкивает значение за край */
+  .prof-l{flex:1;min-width:0;overflow-wrap:anywhere;font-family:var(--f-body);font-size:.82rem;color:var(--txt);line-height:1.2}
+  .prof-v{flex:none;font-family:var(--f-disp);font-weight:700;font-size:.9rem;color:var(--red-ink);min-width:26px;text-align:right}
   .abil-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:6px}
   .abil{position:relative;display:flex;flex-direction:column;align-items:center;gap:2px;background:var(--surface);border:var(--hair) solid var(--line2);border-radius:12px;padding:9px 4px 7px}
   .abil-l{font-family:var(--f-mono);font-size:.56rem;letter-spacing:.12em;color:var(--muted)}
@@ -2693,11 +2696,36 @@
   .mirror-ui #calFab{left:78px;right:auto}
   #newsCal{display:none}
   @media(min-width:880px){ #calFab{right:var(--edge)} .mirror-ui #calFab{left:calc(var(--fr) + 70px);right:auto} }
+  /* с 1180 слева постоянный рейл разделов (--rail-w из блока «Десктоп v2»): в зеркальном режиме
+     плавающие кнопки и меню кубов отсчитываем от его правого края, а не от края экрана — иначе
+     они прячутся под рейлом. Поиск на десктопе остаётся справа: слева от него ряд сеттингов */
   @media(min-width:1180px){
-    #calFab{display:none !important}
-    #view-news{grid-template-columns:minmax(300px,360px) minmax(0,1fr) minmax(280px,330px)}
-    #newsCal{display:block;position:sticky;top:76px;align-self:start;min-width:0;background:var(--surface);border:var(--hair) solid var(--line2);border-radius:16px;padding:16px 16px 14px;max-height:calc(100vh - 96px);overflow:auto;scrollbar-width:thin}
+    .mirror-ui .dice-circle,.mirror-ui .bm-circle,.mirror-ui .dice-fab,.mirror-ui .dice-menu,.mirror-ui .dice-calc{left:calc(var(--rail-w,0px) + var(--fr))}
+    .mirror-ui .imp-circle{left:calc(var(--rail-w,0px) + var(--fr))}
+    .mirror-ui #addCharFab{left:calc(var(--rail-w,0px) + var(--fr) + 64px)}   /* «+» рядом с импортом, как и в обычном режиме */
+    .mirror-ui #calFab{left:calc(var(--rail-w,0px) + var(--fr) + 70px)}
+    .mirror-ui .search-float{left:auto}
   }
+  /* третья колонка — только когда ленте хватает места. С 1180 до 1340 рядом с рейлом
+     лента ужималась до 115–320px: боковые колонки с px-максимумом забирали ширину первыми.
+     Поэтому до 1340 остаётся кнопка, а в 1340–1600 колонки делят место долями (fr), лента — самая широкая */
+  @media(min-width:1340px){
+    #calFab{display:none !important}
+    #view-news{grid-template-columns:minmax(250px,.9fr) minmax(0,1.4fr) minmax(250px,.85fr)}
+    #newsCal{display:block;position:sticky;top:76px;align-self:start;min-width:0;background:var(--surface);border:var(--hair) solid var(--line2);border-radius:16px;padding:16px 16px 14px;max-height:calc(100vh - 96px);overflow:auto;scrollbar-width:thin}
+    /* открытый карман инициативы (#dock, 324px) съедает ширину — возвращаемся к двум колонкам и кнопке */
+    html.dock-on #view-news{grid-template-columns:minmax(260px,320px) minmax(0,1fr)}
+    html.dock-on #newsCal{display:none}
+    html.dock-on.view-news #calFab{display:flex !important}
+  }
+  @media(min-width:1600px){ #view-news{grid-template-columns:minmax(300px,360px) minmax(0,1fr) minmax(280px,330px)} }
+  /* подсказка пустого раздела «Игрок» зависит от раскладки: до 1180 кнопка «＋ Добавить» сверху,
+     с 1180 — плавающий «＋» внизу справа (тот же порог, что у #addCharFab) */
+  .pl-empty-hint.hint-desk{display:none}
+  @media(min-width:1180px){ .pl-empty-hint.hint-mob{display:none} .pl-empty-hint.hint-desk{display:block} }
+  /* шапка 1180–1319: шесть сеттингов разработчика в ряд не влезали до фиксированного поля поиска
+     (шестой чип лежал под ним и не нажимался) — ужимаем чипы на этой полосе */
+  @media(min-width:1180px) and (max-width:1319px){ #projRow{gap:2px} #projRow .hdr-proj{padding:7px 8px;font-size:.74rem;letter-spacing:0} }
   .tool-title.trk{display:flex;align-items:center;justify-content:center;gap:16px;font-family:var(--f-disp);font-weight:700;font-size:1.05rem;letter-spacing:.14em;margin-bottom:14px}
   .tool-title.trk .tt-ico{width:30px;height:30px;flex:none;color:var(--red-ink);opacity:.55}
   .tool-title.trk .tt-ico svg{width:100%;height:100%;display:block}
@@ -4760,8 +4788,11 @@ function toggleMiniArch(){
   if(d && d.classList.contains('open')) dismissMiniArch(); else { MA_DISMISSED=false; openMiniArch(); }
 }
 function maRender(){ maRenderSearch(); maRenderCats(); maRenderCards(); }
+// закрытый архив (ASSIMILATION для не-разработчика) не подглядеть и через панель листа:
+// каждый из трёх рендеров сам проверяет замок — maSetCat/maQInput зовут их напрямую, минуя maRender
 function maRenderSearch(){
   const w=document.getElementById('maSearch'); if(!w) return;
+  if(assimArchLocked()){ w.innerHTML=''; return; }
   w.innerHTML=`<div class="ma-q">
     <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
     <input id="maQ" type="search" placeholder="Поиск по архиву…" autocomplete="off" value="${esc(MA_Q)}" oninput="maQInput(this.value)">
@@ -4769,6 +4800,7 @@ function maRenderSearch(){
 }
 function maRenderCats(){
   const w=document.getElementById('maCats'); if(!w) return;
+  if(assimArchLocked()){ w.innerHTML=''; return; }
   const subCounts={};
   ARCHIVE.forEach(e=>{ if(e.sub){ (subCounts[e.cat]=subCounts[e.cat]||{})[e.sub]=(subCounts[e.cat][e.sub]||0)+1; } });
   let html=`<button class="ma-cat${MA_CAT==='all'?' on':''}" onclick="maSetCat('all')">Все</button>`;
@@ -4793,6 +4825,7 @@ function maQInput(v){ MA_Q=(v||'').trim(); MA_SHOWN=MA_PAGE; maRenderCards(); }
 function maMore(){ MA_SHOWN+=MA_PAGE*2; maRenderCards(); }
 function maRenderCards(){
   const el=document.getElementById('maCards'); if(!el) return;
+  if(assimArchLocked()){ el.innerHTML=`<div class="ma-empty">Архив этого сеттинга пока закрыт</div>`; return; }
   const q=MA_Q.toLowerCase();
   if(MA_CAT==='all' && !q){ el.innerHTML=`<div class="ma-empty">Выберите раздел слева<br>или начните поиск</div>`; return; }
   let list=ARCHIVE.filter(e=>{
@@ -4980,8 +5013,29 @@ function openModal(id, overlay){
     ${secs?`<div class="secs">${secs}</div>`:''}
     <div class="foot">${badge}${tags}<span class="src">${who}${srcChip(e)}${esc(cleanSrc(e.src))}</span></div>
     ${(isDev() && !overlay)?`<div class="chrono-tools"><button class="btn ghost" onclick="openCardEditor('${e.id}')">Редактировать</button></div>`:''}`;
+  // другая карточка при уже открытой модалке — читаем с начала; перерисовка той же (pickArch) прокрутку не трогает
+  if(!overlay){
+    if(openModal._last!==id){ document.getElementById('modal').scrollTop=0; document.getElementById('scrim').scrollTop=0; }
+    openModal._last=id;
+  }
   document.getElementById(overlay?'scrim2':'scrim').classList.add('open');
 }
+/* любая модалка открывается с начала: на мобиле прокручивается #modal, на планшете — сам .scrim,
+   и без сброса новая карточка показывалась с прокрутки предыдущей. Сброс — на переходе «закрыто → открыто» */
+(function(){
+  function arm(){
+    [['scrim','modal'],['scrim2','modal2']].forEach(([sid,mid])=>{
+      const s=document.getElementById(sid); if(!s) return;
+      let was=s.classList.contains('open');
+      new MutationObserver(()=>{
+        const now=s.classList.contains('open');
+        if(now && !was){ s.scrollTop=0; const m=document.getElementById(mid); if(m) m.scrollTop=0; }
+        was=now;
+      }).observe(s,{attributes:true,attributeFilter:['class']});
+    });
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', arm); else arm();
+})();
 function closeOverlay(){ document.getElementById('scrim2').classList.remove('open'); }
 
 /* ---------- Статблок божества (заполняет Game Master) ---------- */
@@ -5081,6 +5135,14 @@ function toggleBookmark(id){
   // красим ВСЕ копии этой карточки на экране: лист, оверлей поверх него, панель-читальня
   document.querySelectorAll('[data-bm="'+String(id).replace(/"/g,'\\"')+'"]')
     .forEach(b=>b.classList.toggle('on', isBookmarked(id)));
+  // и мини-флаг ⚑ на карточке в сетке архива: сетка кэшируется по сигнатуре выборки и сама не перерисуется
+  const on=isBookmarked(id), needle="'"+String(id)+"'";
+  document.querySelectorAll('#cards .card').forEach(c=>{
+    if(!(c.getAttribute('onclick')||'').includes(needle)) return;
+    const top=c.querySelector('.top'), f=top && top.querySelector('.bm-mini');
+    if(on && top && !f) top.insertAdjacentHTML('beforeend','<span class="bm-mini" title="В закладках">⚑</span>');
+    else if(!on && f) f.remove();
+  });
   const bb=document.getElementById('bmBtn'); if(bb) bb.classList.toggle('has', BMARKS.length>0);
 }
 /* закладки в аккаунте: при входе объединяем локальные с облачными профиля */
@@ -5186,7 +5248,21 @@ function openPolicy(overlay){
     </div>`;
   document.getElementById(overlay?'scrim2':'scrim').classList.add('open');
 }
-document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ const vit=document.getElementById('csVitrine'); if(vit && vit.classList.contains('open')){ closeVitrine(); return; } const s2=document.getElementById('scrim2'); if(s2 && s2.classList.contains('open')) closeOverlay(); else closeModal(); } });
+document.addEventListener('keydown',e=>{ if(e.key!=='Escape') return;
+  // всплывающие окна (.hp-prompt: умения класса, истощение, состояния, ввод урона) — самый верхний слой:
+  // Esc закрывает только его, а не модалку под ним (иначе терялся набранный лист, а окно оставалось висеть)
+  const inP=(e.target && e.target.closest) ? e.target.closest('.hp-prompt') : null;
+  if(inP){ if(document.body.contains(inP)) inP.remove(); return; }   // отвязанное окно уже закрыл его собственный обработчик
+  const hps=document.querySelectorAll('.hp-prompt'); if(hps.length){ hps[hps.length-1].remove(); return; }
+  const vit=document.getElementById('csVitrine'); if(vit && vit.classList.contains('open')){ closeVitrine(); return; }
+  const s2=document.getElementById('scrim2'); if(s2 && s2.classList.contains('open')){ closeOverlay(); return; }
+  const s=document.getElementById('scrim'); if(s && s.classList.contains('open')){ closeModal(); return; }
+  const sd=document.getElementById('statCalcDrawer'); if(sd && sd.classList.contains('open')){ closeStatCalc(); return; }
+  // на десктопе строка поиска постоянная — Esc сворачивает выпадающий список результатов
+  const sfr=document.getElementById('sfResults');
+  if(window.innerWidth>=880 && sfr && sfr.style.display==='block'){ const inp=document.getElementById('searchM'); if(inp){ inp.value=''; inp.blur(); } runSearch(''); return; }
+  navBack();   // дальше — те же слои и в том же порядке, что у жеста «назад»: меню сеттингов → шторка → строка поиска
+});
 
 /* ====================== Хронология ====================== */
 const CHRONO_NAMES={legacy:'LEGACY',neverland:'NEVERLAND',assimilation:'ASSIMILATION',terra:'TERRA AETERNA',classic:'КЛАССИКА',skazki:'РУССКИЕ СКАЗКИ'};
@@ -5707,6 +5783,12 @@ function runSearch(q){
   q=(q||'').trim().toLowerCase();
   SF_RES=[];
   if(q){
+    // хронология — первой: архивных совпадений бывает 30, а показываем 14, и ветки хроники не доходили до списка
+    ['legacy','neverland','assimilation','terra','skazki'].forEach(camp=>['Приключения'].forEach(br=>{
+      if(!hasChronoAccess(camp)) return;
+      const hay=(CHRONO_NAMES[camp]+' '+br+' '+stripHtml(CHRONO_DATA[camp+':'+br])).toLowerCase();
+      if(hay.includes(q)) SF_RES.push({b:'Хронология', ch:true, t:CHRONO_NAMES[camp]+' — '+br, camp, br});
+    }));
     // ранний выход: собираем не больше 30 совпадений — на 5000+ карточках это экономит массу работы
     for(let i=0;i<ARCHIVE.length && SF_RES.length<30 && !assimArchLocked();i++){
       const e=ARCHIVE[i];
@@ -5717,11 +5799,6 @@ function runSearch(q){
         SF_RES.push({b:'Архив', ch:false, t:e.title, id:e.id});
       }
     }
-    ['legacy','neverland','assimilation','terra','skazki'].forEach(camp=>['Приключения'].forEach(br=>{
-      if(!hasChronoAccess(camp)) return;
-      const hay=(CHRONO_NAMES[camp]+' '+br+' '+stripHtml(CHRONO_DATA[camp+':'+br])).toLowerCase();
-      if(hay.includes(q)) SF_RES.push({b:'Хронология', ch:true, t:CHRONO_NAMES[camp]+' — '+br, camp, br});
-    }));
   }
   const el=document.getElementById('sfResults');
   if(!q){ el.innerHTML=''; el.style.display='none'; return; }
@@ -5732,7 +5809,10 @@ function runSearch(q){
 }
 function sfOpen(i){
   const r=SF_RES[i]; if(!r) return;
-  toggleSearchBar();
+  // на десктопе (≥880) строка поиска постоянная: только очищаем её, не переключая состояние
+  // search-open — иначе оно инвертировалось и прятало кнопку кубов / оставляло список висеть
+  if(window.innerWidth>=880){ const inp=document.getElementById('searchM'); if(inp){ inp.value=''; inp.blur(); } runSearch(''); }
+  else toggleSearchBar();
   if(r.ch) openChronoBranch(r.camp, r.br);
   else if(r.story){ if(r.story!==CUR_PROJECT) setProject(r.story); go('world'); setCat('history'); }
   else openModal(r.id);
@@ -5753,9 +5833,11 @@ function updateNextGame(){
   const el=document.getElementById('nextGame'); if(!el) return;
   const today=calToday();
   const list=gamesByDate((GAMES||[]).filter(g=>g && g.game===CUR_PROJECT));
-  const s=list.find(g=>{ const d=gameDateOf(g); return !d || d>=today; }) || list[0];
+  // прошедшие, но не закрытые ГМом игры «ближайшими» не считаем — иначе баннер зовёт
+  // записаться на вчера, а календарь рядом пишет «ничего не запланировано»
+  const s=list.find(g=>{ const d=gameDateOf(g); return !d || d>=today; });
   const su=document.getElementById('signupBtn');
-  // нет запланированной ГМом кампании → ни баннера, ни кнопки записи (пустота)
+  // нет запланированной ГМом кампании (или все уже прошли) → ни баннера, ни кнопки записи (пустота)
   if(!s){ el.hidden=true; el.innerHTML=''; if(su) su.hidden=true; return; }
   el.hidden=false;
   if(su) su.hidden=false;
@@ -5918,10 +6000,12 @@ function myEntry(s){ return SESSION ? (s.players||[]).find(p=>normTag(p.tag)===c
    держали дату внутри строки time («сб 21.07, 18:00», «21 июля») — разбираем её как запасной путь. ── */
 const calPad=n=>String(n).padStart(2,'0');
 function calToday(){ const n=new Date(); return n.getFullYear()+'-'+calPad(n.getMonth()+1)+'-'+calPad(n.getDate()); }
+// «31 февраля» и «31.02» — не даты: Date их перекатывал бы на 3 марта, а в сетке календаря такой ключ не находился
+function calValid(y,mo,d){ const t=new Date(y,mo-1,d); return t.getFullYear()===y && t.getMonth()===mo-1 && t.getDate()===d; }
 function parseRuDate(str){
   if(!str) return null;
   const t=String(str).trim();
-  let m=t.match(/^(\d{4})-(\d{2})-(\d{2})/); if(m) return m[0];
+  let m=t.match(/^(\d{4})-(\d{2})-(\d{2})/); if(m) return calValid(+m[1],+m[2],+m[3]) ? m[0] : null;
   let d=null, mo=null, y=null;
   m=t.match(/(\d{1,2})[.\/](\d{1,2})(?:[.\/](\d{2,4}))?/);
   if(m){ d=+m[1]; mo=+m[2]; if(m[3]){ y=+m[3]; if(y<100) y+=2000; } }
@@ -5935,12 +6019,12 @@ function parseRuDate(str){
     const now=new Date(); y=now.getFullYear();
     if(new Date(y,mo-1,d) < new Date(now.getTime()-45*864e5)) y+=1;
   }
+  if(!calValid(y,mo,d)) return null;
   return y+'-'+calPad(mo)+'-'+calPad(d);
 }
 function gameDateOf(s){
   if(!s) return null;
-  if(s.date && /^\d{4}-\d{2}-\d{2}$/.test(s.date)) return s.date;
-  return parseRuDate(s.time);
+  return parseRuDate(s.date) || parseRuDate(s.time);
 }
 function fmtGameDate(iso, opts){
   if(!iso) return '';
@@ -6124,12 +6208,14 @@ async function doSignup(id){
   s.players=(s.players||[]).filter(p=>normTag(p.tag)!==currentTag());
   s.players.push({tag:SESSION, name, charId:ch?ch.id:'', charName:ch?ch.name:'', bg:profBg(SESSION), ink:profInk(SESSION), at:Date.now()});
   openGameSignup(); toast('Вы записаны!');
+  renderNews();   // баннер/календарь — сразу по локальным данным, облако догоняет в фоне (persistGames перерисует ещё раз)
   await persistGames();
 }
 async function cancelSignup(id){
   const s=GAMES.find(x=>x.id===id); if(!s || !SESSION) return;
   s.players=(s.players||[]).filter(p=>normTag(p.tag)!==currentTag());
   openGameSignup(); toast('Запись отменена');
+  renderNews();
   await persistGames();
 }
 /* тап по аватарке участника: имя пользователя + персонаж; ГМ может открыть лист персонажа */
@@ -6229,9 +6315,9 @@ async function gamePlayed(id){
   });
   trkSave();
   sset(KEY_TRKSHARED, TRK_SHARED, true).catch(()=>{});
+  // экран обновляем до ответа облака: пока шёл сетевой раунд, удалённая игра висела в расписании и баннере
+  openSchedule(); renderNews(); toast('Сессия завершена и удалена');
   await persistGames();
-  toast('Сессия завершена и удалена');
-  openSchedule();
 }
 function openCellEditor(id){
   if(!ADMIN) return;
@@ -6275,7 +6361,7 @@ async function saveCell(id){
   });
   if(!s){ const cr=pval('gc-chrono'); if(cr){ try{ cell.chronoRef=JSON.parse(cr); }catch(e){} } GAMES.push(cell); }
   const notify = !s && (document.getElementById('gc-notify')||{}).checked;
-  openSchedule(); toast('Сессия сохранена');
+  openSchedule(); toast('Сессия сохранена'); renderNews();
   await persistGames();
   if(notify && typeof notifyNewGame==='function') notifyNewGame(cell);   // пуш подписчикам о новой игре
 }
@@ -6286,7 +6372,7 @@ async function delCell(id){
   if(b && !b.dataset.arm){ b.dataset.arm='1'; b.textContent='Точно удалить?'; return; }
   GAMES=GAMES.filter(x=>x.id!==id);
   DELETED_GAMES.add(id);
-  openSchedule(); toast('Сессия удалена');
+  openSchedule(); toast('Сессия удалена'); renderNews();
   await persistGames();
 }
 async function kickPlayer(id,i){
@@ -6294,7 +6380,7 @@ async function kickPlayer(id,i){
   const s=GAMES.find(x=>x.id===id); if(!s||!s.players) return;
   if(!canManageGame(s)){ toast('Управлять записями можно только в своих играх'); return; }
   s.players.splice(i,1);
-  openSchedule(); toast('Запись убрана');
+  openSchedule(); toast('Запись убрана'); renderNews();
   await persistGames();
 }
 
@@ -6430,7 +6516,7 @@ function devToggleAdmin(){
   if(!isDev()) return;
   DEV_GM_OFF=!DEV_GM_OFF;                                       // разработчик выключает/включает свой режим ГМ
   try{ localStorage.setItem('comik:devgmoff', DEV_GM_OFF?'1':'0'); }catch(e){}
-  refreshAdmin(); adminSideFX();
+  refreshAdmin(); adminSideFX(); renderSettings();   // тумблер и бейдж в настройках — вместе с режимом
   toast(ADMIN ? 'Game Master: включён' : 'Game Master: выключен');
 }
 function admClick(){ openAccessModal(null,'account'); }
@@ -6697,7 +6783,7 @@ const AUTH_EMAIL_DOMAIN='komikdnd.ru';  // реальный домен прое�
 function loginToEmail(login){ return normTag(login)+'@'+AUTH_EMAIL_DOMAIN; }
 function emailToLogin(email){ return String(email||'').split('@')[0].toLowerCase(); }
 function authTimeout(p, ms=13000){ return Promise.race([ p, new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')), ms)) ]); }
-function afterAuthChange(){ renderAcct(); renderPlayers(); renderCats(); applyView(); updateDevUI(); bmCloudSync(); }
+function afterAuthChange(){ renderAcct(); renderPlayers(); renderCats(); applyView(); updateDevUI(); renderSettings(); bmCloudSync(); }
 function currentTag(){ return SESSION ? normTag(SESSION) : null; }
 function isOwner(c){ return !!(SESSION && c && c.owner && normTag(c.owner)===currentTag()); }
 function canEdit(c){ return isOwner(c) || (!!c && !c.owner && !!c.codeHash); }
@@ -6801,7 +6887,7 @@ async function logout(){
   if(supa){ try{ await authTimeout(supa.auth.signOut()); }catch(e){} }
   SESSION=null; await sset(KEY_SESSION, null, false);
   if(ADMIN_VIA_DEV){ ADMIN=false; ADMIN_VIA_DEV=false; adminSideFX(); }
-  renderAcct(); renderPlayers(); renderCats(); applyView(); updateDevUI(); toast('Вы вышли из аккаунта');
+  renderAcct(); renderPlayers(); renderCats(); applyView(); updateDevUI(); renderSettings(); toast('Вы вышли из аккаунта');
 }
 
 /* ====================== Игроки / персонажи ====================== */
@@ -6901,7 +6987,8 @@ function renderPlayers(){
     // видит чистый экран без единой зацепки.
     el.innerHTML = SESSION
       ? `<div class="empty pl-empty">[ ПУСТО ]<br>Здесь появятся ваши персонажи.<br>
-           <span class="pl-empty-hint">Нажмите <b>＋</b> в правом нижнем углу — начнём с калькулятора характеристик.</span></div>`
+           <span class="pl-empty-hint hint-mob">Нажмите «＋ Добавить персонажа» сверху; калькулятор характеристик — кнопка рядом с ней.</span>
+           <span class="pl-empty-hint hint-desk">Нажмите <b>＋</b> в правом нижнем углу — начнём с калькулятора характеристик.</span></div>`
       : `<div class="empty">[ ЛИЧНЫЙ РАЗДЕЛ ]<br>войдите в аккаунт — здесь появятся ваши персонажи</div>`;
     return;
   }
@@ -7149,9 +7236,7 @@ function edInitManual(p, el){
 /* скорость из карточки выбранной расы — если поле пусто */
 function edSpeedAuto(p){
   const s=document.getElementById(p+'-speed'); if(!s || s.value.trim()) return;
-  const rc=(ARCHIVE||[]).find(c=>c.sub==='races' && c.title===pval(p+'-origin')); if(!rc) return;
-  const m=(((rc.dossier||[]).find(r=>r.k==='Размер и скорость')||{}).v||'').match(/(\d+)\s*фут/);
-  if(m) s.value=m[1]+' фт.';
+  const spd=edRaceSpeed(p); if(spd) s.value=spd+' фт.';
 }
 function sheetWpnBlock(p, list){
   const L=sheetL();
@@ -7501,7 +7586,7 @@ const SUBRACES={
   ],
   'Эльф':[
     {name:'Высший эльф', asi:{int:1}, desc:'Знает один заговор волшебника (по Интеллекту), владеет длинным и коротким мечом, коротким и длинным луком, знает дополнительный язык.'},
-    {name:'Лесной эльф', asi:{wis:1}, desc:'Скорость 35 футов; может прятаться, укрываясь лёгкой природной маскировкой; владеет мечами и луками.'},
+    {name:'Лесной эльф', asi:{wis:1}, speed:35, desc:'Скорость 35 футов; может прятаться, укрываясь лёгкой природной маскировкой; владеет мечами и луками.'},
     {name:'Тёмный эльф (дроу)', asi:{cha:1}, desc:'Улучшенное тёмное зрение, врождённые заклинания, помеха при ярком свете; владеет рапирой, коротким мечом и ручным арбалетом.'}
   ],
   'Дварф':[
@@ -7557,6 +7642,15 @@ function pbAsiEff(card, subraceName){
   return (sr && sr.asiMod) ? Object.assign({}, a, sr.asiMod) : a;
 }
 function subraceInfo(raceTitle, name){ const l=SUBRACES[raceTitle]; if(!l||!name) return null; return l.find(s=>s.name===name)||null; }
+/* скорость по расе с поправкой подрасы (лесной эльф — 35 футов вместо 30 у базовой карточки) */
+function edRaceSpeed(p){
+  const race=pval(p+'-origin');
+  const rc=(ARCHIVE||[]).find(c=>c.sub==='races' && c.title===race); if(!rc) return null;
+  const m=(((rc.dossier||[]).find(r=>r.k==='Размер и скорость')||{}).v||'').match(/(\d+)\s*фут/);
+  const sr=subraceInfo(race, pval(p+'-subrace'));
+  return (sr && sr.speed) || (m ? +m[1] : null);
+}
+function edApplyRaceSpeed(p){ const spd=edRaceSpeed(p); if(spd){ const s=pf(p+'-speed'); if(s) s.value=spd+' фт.'; } }
 /* Магия от расы/подрасы (D&D): врождённые заговоры и — если раса их даёт — ячейки заклинаний.
    cantrips — сколько заговоров даёт раса; slots — {круг:кол-во} врождённых ячеек (обычно нет).
    Ключ базовой расы — её название; ключ подрасы — «Раса|Подраса». */
@@ -7666,9 +7760,13 @@ function openStatCalc(sticky){
   // из дашборда калькулятор «липкий» — закрывается только повторным нажатием или после переноса статов;
   // из списка персонажей — закрывается кликом вне панели
   if(!sticky) setTimeout(()=>document.addEventListener('mousedown', statCalcOutside), 0);
+  // «липкий» — рядом с открытым листом: лист сдвигаем влево (CSS .calc-open), а панель архива слева убираем,
+  // иначе на 1280–1440 калькулятор накрывал две трети листа
+  if(sticky){ const v=document.getElementById('view-players'); if(v) v.classList.add('calc-open'); if(typeof closeMiniArch==='function') closeMiniArch(); }
 }
 function closeStatCalc(){
   const d=document.getElementById('statCalcDrawer'); if(d){ d.classList.remove('open'); d.setAttribute('aria-hidden','true'); }
+  const v=document.getElementById('view-players'); if(v) v.classList.remove('calc-open');
   document.removeEventListener('mousedown', statCalcOutside); SC_STICKY=false;
 }
 function statCalcOutside(e){
@@ -7798,14 +7896,19 @@ function pbApply(){
   }
   if(window.innerWidth>=880){   // десктоп — сразу инлайн-дашборд с этими статами
     const ab={}; abilList().forEach(([k])=>{ ab[k]=String(vals[k]); });
-    addCharInline(ab, raceCard?raceCard.title:'');
+    addCharInline(ab, raceCard?raceCard.title:'', raceCard?(PB.subrace||''):'');   // подраса из калькулятора — в лист (бонус уже в статах)
     toast('Характеристики перенесены в новый лист');
     return;
   }
   openNewPlayer();
   if(!pf('np-ab-str')) return;
   abilList().forEach(([k])=>{ const e=pf('np-ab-'+k); if(e){ e.value=vals[k]; e.dispatchEvent(new Event('input')); } });
-  if(raceCard){ const o=pf('np-origin'); if(o && !o.value) o.value=raceCard.title; }
+  if(raceCard){   // как и в инлайн-ветке: раса, подраса, селект подрасы и скорость
+    const o=pf('np-origin'); if(o) o.value=raceCard.title;
+    const wrap=document.getElementById('np-subracewrap'); if(wrap) wrap.dataset.val=PB.subrace||'';
+    edRaceChange('np');
+    const s=pf('np-subrace'); if(s && PB.subrace){ s.value=PB.subrace; edAutoFill('np'); }
+  }
   toast('Характеристики перенесены в новый лист');
 }
 
@@ -7934,13 +8037,15 @@ function randomizeNewChar(){
     set('np-hp', String(hpForLevel(hd, conM, level)));
     set('np-ac', String(10+dexM));
     const spd=(((race.dossier||[]).find(r=>r.k==='Размер и скорость')||{}).v.match(/(\d+)\s*фут/)||[])[1];
-    set('np-speed',(spd||'30')+' фт.');
+    const srSpd=(subraceInfo(race.title, chosenSub)||{}).speed;   // подраса может менять скорость (лесной эльф)
+    set('np-speed',(srSpd||spd||'30')+' фт.');
     set('np-init',(dexM>=0?'+':'')+dexM);
     set('np-cfeats','Умения класса «'+cls.title+'»'+(chosenSubcls?' ('+chosenSubcls+')':'')+' до '+level+'-го уровня — см. карточку класса в архиве');
     set('np-rfeats','Черты расы «'+race.title+'»'+(chosenSub?' ('+chosenSub+')':'')+' — см. карточку расы в архиве');
     // проставляем подрасу и подкласс в направляемые поля, затем синхронизируем магию по правилам
     const srw=document.getElementById('np-subracewrap'); if(srw){ srw.dataset.val=chosenSub; edRenderSubrace('np'); }
-    const sw=document.getElementById('np-subwrap'); if(sw) sw.dataset.val=chosenSubcls;
+    const sw=document.getElementById('np-subwrap'); if(sw){ sw.dataset.val=chosenSubcls; sw.dataset.cls=cls.title; }   // cls — чтобы edRenderSubclass не принял смену класса за ручную и не сбросил подкласс
+    const hpIn=pf('np-hp'); if(hpIn) hpIn.dataset.manual='';   // случайные хиты — расчётные, не «ручные»
     edRandProfs('np', cls, bg);   // навыки + спасброски по правилам класса и фона
   } else {
     const orig=ARCHIVE.filter(c=>c.sub==='origin'), occ=ARCHIVE.filter(c=>c.sub==='occupation');
@@ -7966,11 +8071,11 @@ function randomizeNewChar(){
 /* --- создание --- */
 /* «Добавить персонажа» на десктопе — сразу инлайн-дашборд со вкладками (как открытие листа),
    без модалки: создаём пустого персонажа и открываем его в редакторе с автосейвом */
-function addCharInline(presetAbil, presetOrigin){
+function addCharInline(presetAbil, presetOrigin, presetSubrace){
   if(!SESSION){ toast('Войдите в аккаунт, чтобы создать персонажа'); openAccessModal(null,'account'); return; }
   const id=uid();
   const ch={ id, name:'Новый персонаж', player:dispTag(SESSION), owner:SESSION,
-    role:'', subcls:'', origin:presetOrigin||'', bg:'', align:'', level:'1', prof:'', xp:'',
+    role:'', subcls:'', origin:presetOrigin||'', subrace:presetSubrace||'', bg:'', align:'', level:'1', prof:'', xp:'',
     hp:'', ac:'', speed:'', init:'', hd:'',
     abil:presetAbil||{}, saves:{}, skills:{}, weapons:[], inv:[], featsList:[],
     createdAt:Date.now(), updatedAt:Date.now() };
@@ -8037,8 +8142,8 @@ function sheetStatsBlock(p, c){
   c=c||{}; const L=sheetL();
   const calc=hpCalcAvailable();
   const hpStat = calc
-    ? `<div class="stat hp-stat"><label>${L.hp} <button type="button" id="${p}-hpcalc-btn" class="hp-calc-btn" onclick="edHpCalcToggle('${p}')" aria-label="Расчёт хитов" title="Расчёт хитов">🖩</button></label><input id="${p}-hp" maxlength="9" value="${esc(c.hp||'')}"></div>`
-    : `<div class="stat"><label>${L.hp}</label><input id="${p}-hp" maxlength="9" value="${esc(c.hp||'')}"></div>`;
+    ? `<div class="stat hp-stat"><label>${L.hp} <button type="button" id="${p}-hpcalc-btn" class="hp-calc-btn" onclick="edHpCalcToggle('${p}')" aria-label="Расчёт хитов" title="Расчёт хитов">🖩</button></label><input id="${p}-hp" maxlength="9" data-manual="${c.hpManual?'1':''}" oninput="edHpManual('${p}',this)" value="${esc(c.hp||'')}"></div>`
+    : `<div class="stat"><label>${L.hp}</label><input id="${p}-hp" maxlength="9" data-manual="${c.hpManual?'1':''}" oninput="edHpManual('${p}',this)" value="${esc(c.hp||'')}"></div>`;
   return `<div class="sheet-stats">
     ${hpStat}
     <div class="stat"><label>${L.ac}</label><input id="${p}-ac" maxlength="5" data-manual="${c.acManual?'1':''}" oninput="edAcManual('${p}',this)" value="${esc(c.ac||'')}"></div>
@@ -8222,7 +8327,10 @@ function sheetAbilBlock(p, ab){
 }
 function bindAbilMods(p){
   abilList().forEach(([k])=>{ const inp=pf(p+'-ab-'+k), out=document.getElementById(p+'-mod-'+k);
-    if(inp&&out){ inp.addEventListener('input',()=>{ out.textContent=inp.value.trim()?mod(inp.value):'—'; edRecalcProf(p); if(k==='dex'){ edCalcAC(p); edAutoInit(p); } }); }
+    if(inp&&out){ inp.addEventListener('input',()=>{ out.textContent=inp.value.trim()?mod(inp.value):'—'; edRecalcProf(p); if(k==='dex'){ edCalcAC(p); edAutoInit(p); }
+      if(k==='con') edHpCalcRefresh(p);   // авто-хиты идут за ТЕЛ так же, как за уровнем и расой (ручные — не трогаются)
+      // лимиты магии считаются от ключевой характеристики класса — строка лимитов и затемнение списка обновляются сразу
+      if((k==='int'||k==='wis'||k==='cha') && SP_PFX===p && document.getElementById(p+'-sp-lim')){ updateSpLimits(); renderSpPickList(); } }); }
   });
 }
 function collectAbil(p){ const o={}; abilList().forEach(([k])=>{ const v=pval(p+'-ab-'+k); if(v) o[k]=v; }); return o; }
@@ -8352,7 +8460,12 @@ function edMcSubRefresh(p){
 }
 function edMcChanged(p){
   const wrap=document.getElementById(p+'-mcwrap');
-  if(wrap){ wrap.dataset.cls=pval(p+'-mc-cls'); wrap.dataset.lvl=pval(p+'-mc-lvl'); }
+  if(wrap){
+    const ncls=pval(p+'-mc-cls');
+    // сменили второй класс — его подкласс больше не подходит (смена уровня класс не трогает)
+    if(wrap.dataset.cls!==undefined && wrap.dataset.cls!==ncls){ wrap.dataset.sub=''; const s=pf(p+'-mc-sub'); if(s) s.value=''; }
+    wrap.dataset.cls=ncls; wrap.dataset.lvl=pval(p+'-mc-lvl');
+  }
   edMcSubRefresh(p);
   edAutoFill(p);
 }
@@ -8391,7 +8504,11 @@ function edRenderSubclass(p){
   const wrap=document.getElementById(p+'-subwrap'); if(!wrap) return;
   const game=CUR_PROJECT, L=sheetL(game);
   const name=pval(p+'-role'), level=parseInt(pval(p+'-level'),10)||1;
-  const cur=wrap.dataset.val||'';
+  let cur=wrap.dataset.val||'';
+  // помним, к какому классу относится значение: сменили класс — подкласс сбрасываем на «Базовый»
+  // (смена уровня и первичная отрисовка сохранённого, в т.ч. «(своё)», значение не трогают)
+  if(wrap.dataset.cls && wrap.dataset.cls!==name){ cur=''; wrap.dataset.val=''; }
+  wrap.dataset.cls=name;
   const card=edClassCard(name);
   const archs=card?(card.archs||[]).filter(a=>card.srcOk || !srcBlocked(game,'classes',a.src)):[];
   const need=SUBCLS_LVL[name]||3;
@@ -8489,11 +8606,12 @@ function edAutoSaves(p){
 }
 function edRaceChange(p){
   if(CORE_GAMES.indexOf(CUR_PROJECT)<0) return;
+  // подраса прежней расы к новой не относится — иначе она оставалась выбранной как «(своё)» и уходила в лист
+  const srw=document.getElementById(p+'-subracewrap');
+  if(srw && srw.dataset.val){ const list=subracesFor(pval(p+'-origin'))||[]; if(!list.some(s=>s.name===srw.dataset.val)) srw.dataset.val=''; }
   edRenderSubrace(p);
   edAutoFill(p);                       // раса влияет на заговоры/ячейки — пересчитать магию
-  const rc=ARCHIVE.find(c=>c.sub==='races' && c.title===pval(p+'-origin')); if(!rc) return;
-  const spd=(((rc.dossier||[]).find(r=>r.k==='Размер и скорость')||{}).v||'').match(/(\d+)\s*фут/);
-  if(spd){ const s=pf(p+'-speed'); if(s) s.value=spd[1]+' фт.'; }  // скорость по выбранной расе
+  edApplyRaceSpeed(p);                 // скорость по выбранной расе (и подрасе)
 }
 /* подраса в редакторе: второй список под расой (по образцу подкласса) с вариантом «Базовый» */
 function edRenderSubrace(p){
@@ -8506,7 +8624,7 @@ function edRenderSubrace(p){
   if(cur && !list.some(s=>s.name===cur)) opts.push(`<option value="${esc(cur)}" selected>${esc(cur)} (своё)</option>`);
   const sr=subraceInfo(race,cur);
   wrap.innerHTML=`<div class="field"><label>Подраса</label>
-    <select id="${p}-subrace" onchange="document.getElementById('${p}-subracewrap').dataset.val=this.value;edRenderSubrace('${p}');edAutoFill('${p}')">${opts.join('')}</select>
+    <select id="${p}-subrace" onchange="document.getElementById('${p}-subracewrap').dataset.val=this.value;edRenderSubrace('${p}');edAutoFill('${p}');edApplyRaceSpeed('${p}')">${opts.join('')}</select>
     ${sr?`<div class="opt" style="margin-top:6px">${esc(sr.desc)}</div>`:''}</div>`;
 }
 // первичная отрисовка направляемых полей при открытии редактора (без авто-перезаписи слотов/заклинаний)
@@ -8656,9 +8774,17 @@ function edHpRollSet(p,L,v){
   const n=parseInt(v,10);
   if(isNaN(n)) delete HP_ROLLS[L]; else HP_ROLLS[L]=Math.max(1,Math.min(20,n));
   const el=document.getElementById(p+'-hpcalc'); const b=el&&el.querySelector('.hpc-total'); if(b) b.textContent=edHpTotal(p);
-  const hpEl=pf(p+'-hp'); if(hpEl) hpEl.value=edHpTotal(p);   // авто-применение по мере ввода
+  const hpEl=pf(p+'-hp'); if(hpEl){ hpEl.dataset.manual=''; hpEl.value=edHpTotal(p); }   // авто-применение по мере ввода; расчёт снимает «ручной» флаг
 }
-function edHpApply(p){ const hp=edHpTotal(p); const el=pf(p+'-hp'); if(el) el.value=hp; toast('ХП рассчитаны: '+hp); }
+function edHpApply(p){ const hp=edHpTotal(p); const el=pf(p+'-hp'); if(el){ el.dataset.manual=''; el.value=hp; } toast('ХП рассчитаны: '+hp); }
+/* хиты, введённые рукой, — как ручной КБ (data-manual): авто-расчёт от класса/уровня/ТЕЛ/черт их не затирает.
+   У старых листов флага нет: если сохранённые хиты не совпадают с расчётом — считаем их ручными */
+function edHpManual(p, el){ el.dataset.manual = el.value.trim() ? '1' : ''; }
+function edHpSeedManual(p){
+  const el=pf(p+'-hp'); if(!el || el.dataset.manual==='1') return;
+  const v=el.value.trim(); if(!v || !edClassDie(pval(p+'-role'))) return;
+  if(String(edHpTotal(p))!==v) el.dataset.manual='1';
+}
 function edHpCalcToggle(p){
   const el=document.getElementById(p+'-hpcalc'); if(!el) return;
   const open=el.classList.toggle('open');
@@ -8666,8 +8792,8 @@ function edHpCalcToggle(p){
   if(open) edRenderHpCalc(p);
 }
 function edHpCalcRefresh(p){ const el=document.getElementById(p+'-hpcalc'); if(el&&el.classList.contains('open')) edRenderHpCalc(p);
-  // черты (Крепкий и т.п.) сразу влияют на основной расчёт ХП, даже если панель свёрнута
-  const hpEl=pf(p+'-hp'); if(hpEl && edClassDie(pval(p+'-role'))) hpEl.value=edHpTotal(p); }
+  // черты (Крепкий и т.п.) сразу влияют на основной расчёт ХП, даже если панель свёрнута — но ручное значение не трогаем
+  const hpEl=pf(p+'-hp'); if(hpEl && hpEl.dataset.manual!=='1' && edClassDie(pval(p+'-role'))) hpEl.value=edHpTotal(p); }
 function sheetEditorBody(p, c, game){
   c=c||{}; game=game||CUR_PROJECT; const L=sheetL(game);
   const magic=sheetHasMagic(game);
@@ -8763,7 +8889,7 @@ async function createPlayer(){
   const ch={ id:uid(), name, player, owner:SESSION,
     role:pval('np-role'), subcls:pval('np-subcls'), mc:edMc('np'), origin:pval('np-origin'), subrace:pval('np-subrace'), bg:pval('np-bg'), align:pval('np-align'),
     level:pval('np-level'), prof:pval('np-prof'), xp:pval('np-xp'),
-    hp:pval('np-hp'), ac:pval('np-ac'), acManual:(pf('np-ac')&&pf('np-ac').dataset.manual==='1')?1:0, speed:pval('np-speed'), init:pval('np-init'), hd:pval('np-hd'),
+    hp:pval('np-hp'), hpManual:(pf('np-hp')&&pf('np-hp').dataset.manual==='1')?1:0, ac:pval('np-ac'), acManual:(pf('np-ac')&&pf('np-ac').dataset.manual==='1')?1:0, speed:pval('np-speed'), init:pval('np-init'), hd:pval('np-hd'),
     armor:pval('np-armor'), shield:(document.getElementById('np-shield')&&document.getElementById('np-shield').checked)?1:0,
     will:sheetHasWill()?pval('np-will'):'',
     hum:sheetHasHum()?(pval('np-hum')||humDefault(collectAbil('np'))):'',
@@ -9028,6 +9154,7 @@ function openPlayer(id){
     ${spellbookViewHtml(c, G)}
     ${slotsViewHtml(c)}
     ${kv(L.spells, c.spells)}
+    ${coinsView(c,G)!=='—'?`<div class="kv"><div class="k">Деньги</div><div class="v">${coinsView(c,G)}</div></div>`:''}
     ${(c.inv&&c.inv.length)?`<div class="kv"><div class="k">Сокровища</div><div class="v"><div class="im-list ro">${c.inv.map(it=>`<div class="im-item"><span class="q">${esc(String(it.q||1))}×</span><span class="n">${esc(it.n||'')}</span></div>`).join('')}</div></div></div>`:''}
     ${kv(L.gear, c.gear)}
     ${c.xp?kv('Опыт (XP)', c.xp):''}
@@ -9248,7 +9375,7 @@ function renderPlayerEditor(id){
       <button class="btn ghost" onclick="openPlayer('${c.id}')">Назад</button>
       <button class="btn danger" onclick="confirmDeletePlayer('${c.id}')">Удалить</button>
     </div>`;
-  ensureItemDatalists(); bindAbilMods('ep'); bindProfAuto('ep'); edRecalcProf('ep'); edCalcAC('ep'); edSpeedAuto('ep'); edAutoInit('ep'); edInitGuided('ep');
+  ensureItemDatalists(); bindAbilMods('ep'); bindProfAuto('ep'); edRecalcProf('ep'); edCalcAC('ep'); edSpeedAuto('ep'); edAutoInit('ep'); edInitGuided('ep'); edHpSeedManual('ep');
   if(sheetHasMagic()) renderSpellUI();
 }
 /* собрать правки из формы 'ep' в объект персонажа. allowEmptyName — для автосейва,
@@ -9261,7 +9388,7 @@ function applyPlayerEdits(id, allowEmptyName){
   Object.assign(CHARS[i], { name:name||CHARS[i].name, player:pval('ep-player'), role:pval('ep-role'), subcls:pval('ep-subcls'), mc:(pf('ep-mc-cls')?edMc('ep'):(CHARS[i].mc||null)),
     origin:pval('ep-origin'), subrace:(pf('ep-subrace')?pval('ep-subrace'):(CHARS[i].subrace||'')), bg:pval('ep-bg'), align:pval('ep-align'),
     level:pval('ep-level'), prof:pval('ep-prof'), xp:pval('ep-xp'),
-    hp:pval('ep-hp'), ac:pval('ep-ac'), acManual:(pf('ep-ac')&&pf('ep-ac').dataset.manual==='1')?1:0, speed:pval('ep-speed'), init:pval('ep-init'), hd:pval('ep-hd'),
+    hp:pval('ep-hp'), hpManual:(pf('ep-hp')&&pf('ep-hp').dataset.manual==='1')?1:0, ac:pval('ep-ac'), acManual:(pf('ep-ac')&&pf('ep-ac').dataset.manual==='1')?1:0, speed:pval('ep-speed'), init:pval('ep-init'), hd:pval('ep-hd'),
     armor:pval('ep-armor'), shield:(document.getElementById('ep-shield')&&document.getElementById('ep-shield').checked)?1:0,
     will:sheetHasWill()?pval('ep-will'):(CHARS[i].will||''),
     hum:sheetHasHum()?(pval('ep-hum')||humDefault(collectAbil('ep'))):(CHARS[i].hum||''),
@@ -9345,7 +9472,7 @@ function openInlineSheet(id, tileEl, animate){
   spInit('ep', c.spellcasting); featInit(c.featsList); hpRollsInit(c); AVA_TMP=c.ava||'';
   host.innerHTML = `<div class="isheet-bar">
       <button class="btn ghost sm" onclick="closeInlineSheet()">← К персонажам</button>
-      <button class="btn ghost sm ma-toggle" onclick="toggleMiniArch()" title="Архив сеттинга">
+      <button class="btn ghost sm ma-toggle" onclick="toggleMiniArch()" title="Архив сеттинга"${assimArchLocked()?' hidden':''}>
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px"><path d="M4 5.5A1.5 1.5 0 015.5 4H10a2 2 0 012 2 2 2 0 012-2h4.5A1.5 1.5 0 0120 5.5V18a1 1 0 01-1 1h-5a2 2 0 00-2 2 2 2 0 00-2-2H5a1 1 0 01-1-1z"/></svg>
         Архив
       </button>
@@ -9363,7 +9490,7 @@ function openInlineSheet(id, tileEl, animate){
     </div>`;
   host.hidden=false;
   const view=document.getElementById('view-players'); if(view) view.classList.add('inline-open');
-  ensureItemDatalists(); bindAbilMods('ep'); bindProfAuto('ep'); edRecalcProf('ep'); edCalcAC('ep'); edSpeedAuto('ep'); edAutoInit('ep'); edInitGuided('ep');
+  ensureItemDatalists(); bindAbilMods('ep'); bindProfAuto('ep'); edRecalcProf('ep'); edCalcAC('ep'); edSpeedAuto('ep'); edAutoInit('ep'); edInitGuided('ep'); edHpSeedManual('ep');
   if(sheetHasMagic()) renderSpellUI();
   host.oninput=()=>inlineAutosave(id);
   host.onchange=()=>inlineAutosave(id);
@@ -9373,7 +9500,8 @@ function openInlineSheet(id, tileEl, animate){
   if(animate!==false) inlineExpandAnim(tileEl, host);
   try{ window.scrollTo(0,0); }catch(e){}
   // десктоп — архив выезжает сам в пустое поле; мобилка — только по кнопке «Архив» (он перекрывает лист)
-  if(!MA_DISMISSED && window.innerWidth>=1200) openMiniArch();   // авто-раскрытие только на широком экране (на планшете/узком — по кнопке)
+  if(!MA_DISMISSED && window.innerWidth>=1180 && !assimArchLocked()) openMiniArch();   // авто-раскрытие только на широком экране (на планшете/узком — по кнопке)
+  else if(assimArchLocked()) closeMiniArch();
 }
 function inlineExpandAnim(tileEl, host){
   try{
@@ -9996,18 +10124,10 @@ function applyAppIcon(key){
   // apple-touch-icon (иконка при добавлении на «Домой» в iOS) + фавикон вкладки
   const at=document.querySelector('link[rel="apple-touch-icon"]'); if(at) at.href=p192;
   const fav=document.querySelector('link[rel="icon"]'); if(fav){ fav.href=p192; fav.type='image/png'; }
-  // манифест пересобираем «на лету» c выбранными иконками — для установки на Android
-  try{
-    fetch('manifest.webmanifest').then(r=>r.json()).then(mf=>{
-      mf.icons=[{src:p192,sizes:'192x192',type:'image/png'},
-                {src:p512,sizes:'512x512',type:'image/png',purpose:'any maskable'}];
-      const blob=new Blob([JSON.stringify(mf)],{type:'application/manifest+json'});
-      const url=URL.createObjectURL(blob);
-      if(window.__manifestBlobUrl){ try{ URL.revokeObjectURL(window.__manifestBlobUrl); }catch(e){} }
-      window.__manifestBlobUrl=url;
-      const lk=document.querySelector('link[rel="manifest"]'); if(lk) lk.href=url;
-    }).catch(()=>{});
-  }catch(e){}
+  // манифест — статический файл на каждую иконку (manifest-<key>.webmanifest). Раньше он собирался
+  // в blob:-URL: его блокировала CSP (manifest-src 'self'), а относительные пути внутри blob-манифеста
+  // не разрешаются — в итоге у сайта не было манифеста вовсе и PWA не устанавливалось
+  const lk=document.querySelector('link[rel="manifest"]'); if(lk) lk.href='manifest-'+key+'.webmanifest';
 }
 function setAppIcon(key){
   try{ localStorage.setItem('comik:ui:appicon', key); }catch(e){}
@@ -10209,7 +10329,7 @@ function sanitizeImportedChar(s){
     name:str(s.name,60), player:str(s.player,40),
     role:str(s.role,50), subcls:str(s.subcls,50), origin:str(s.origin,50), bg:str(s.bg,50), align:str(s.align,40),
     level:str(s.level,12), prof:str(s.prof,8), xp:str(s.xp,12),
-    hp:str(s.hp,9), ac:str(s.ac,5), acManual:s.acManual?1:0, speed:str(s.speed,8), init:str(s.init,6), hd:str(s.hd,20), armor:str(s.armor,40), shield:s.shield?1:0,
+    hp:str(s.hp,9), hpManual:s.hpManual?1:0, ac:str(s.ac,5), acManual:s.acManual?1:0, speed:str(s.speed,8), init:str(s.init,6), hd:str(s.hd,20), armor:str(s.armor,40), shield:s.shield?1:0,
     will:str(s.will,9), hum:str(s.hum,9), cond:str(s.cond,4), exh:str(s.exh,4), insp:s.insp?1:0,
     profs:str(s.profs,1000), cfeats:str(s.cfeats||s.feats,2000), rfeats:str(s.rfeats,2000), tfeats:str(s.tfeats,2000),
     traits:str(s.traits,1000), ideals:str(s.ideals,1000), bonds:str(s.bonds,1000), flaws:str(s.flaws,1000),
@@ -10438,6 +10558,7 @@ function trkAbsorbShared(){
   const s=TRK_SHARED[gmBoardKey()]; if(!s||!Array.isArray(s.list)) return;
   const m={}; s.list.forEach(p=>{ if(p) m[trkCardKey(p)]=p; });
   TRK.list.forEach(x=>{
+    if(isFoeCard(x)) return;   // врагов/NPC ведёт ГМ — локальные значения главнее копии в столе
     const p=m[trkCardKey(x)]; if(!p) return;
     if(p.hp!=null) x.hp=p.hp;
     if(p.init!=null) x.init=p.init;
@@ -10715,7 +10836,7 @@ function trkRowHtml(x,o){
   const max=trkMaxHp(x,o.proj), hp=parseInt(x.hp,10)||0;
   const pct=max? Math.max(0,Math.min(100,Math.round(hp/max*100))) : (hp>0?100:0);
   const key0=trkCardKey(x), seld=TRK_SEL.has(key0);
-  const cls=['tb-row', x.charId?'pc':'foe', active?'on-turn':'', dead?'dead':'', o.edit?'gm':'', seld?'sel':''].filter(Boolean).join(' ');
+  const cls=['tb-row', foe?'foe':'pc', active?'on-turn':'', dead?'dead':'', o.edit?'gm':'', seld?'sel':''].filter(Boolean).join(' ');
   const check=o.edit?(foe?`<label class="tb-check"><input type="checkbox" ${seld?'checked':''} onchange="trkSelToggle('${esc(key0)}')" aria-label="Выбрать"></label>`:`<span class="tb-check"></span>`):'';
   const ini=o.edit
     ? `<input class="tb-ini-in" inputmode="numeric" value="${esc(String(x.init??0))}" onchange="trkSet(${o.idx},'init',this.value)">`
@@ -10756,9 +10877,9 @@ function trkRowHtml(x,o){
   return `<div class="${cls}" data-key="${esc(trkCardKey(x))}">
     ${check}
     <div class="tb-ini">${ini}<span class="l">иниц</span></div>
-    <div class="tb-av${foe?' foe':''}"${ava?` style="background-image:url('${cssUrl(ava)}')"`:''}></div>
+    <div class="tb-av${foe?' foe':''}"${ava?` style="background-image:url('${cssUrl(ava)}')"`:''}${o.openJs?` onclick="${o.openJs}" style="cursor:pointer" title="Открыть карточку"`:''}></div>
     <div class="tb-mid">
-      <div class="tb-nm">${nm}${conc}<span class="tb-tag ${x.charId?'pc':'foe'}">${x.charId?'игрок':'враг'}</span></div>
+      <div class="tb-nm">${nm}${conc}<span class="tb-tag ${foe?'foe':'pc'}">${foe?(x.charId?'NPC':'враг'):'игрок'}</span></div>
       ${hpBlock}
       <div class="tb-conds">${conds}${condAdd}</div>
     </div>
@@ -11124,13 +11245,15 @@ function trkSet(i,field,val){
   else x[field]=parseInt(val,10)||0;
   // карточка игрока: ХП/инициатива авторитетны в столе — пишем туда напрямую, без републикации,
   // иначе публикация возьмёт прежнее облачное значение и правка ГМа откатится
-  if((field==='hp'||field==='init') && x.charId){ trkSharedCardSet(x, field, x[field]); renderTracker(); return; }
+  if((field==='hp'||field==='init') && x.charId){ trkSharedCardSet(x, field, x[field]); renderTracker(); renderGmManage(); return; }
   // враг: мгновенно зеркалим в память, публикация возьмёт значение из локального списка
   if(field==='hp' || field==='init'){
     const s=TRK_SHARED[gmBoardKey()];
     if(s && Array.isArray(s.list)){ const t=s.list.find(r=>r && trkCardKey(r)===trkCardKey(x)); if(t) t[field]=x[field]; }
   }
   trkSave();
+  // порядок по инициативе, полоса ХП, 💀 и «N ХП» в панели управления — сразу, не дожидаясь стороннего перерендера
+  renderTracker(); renderGmManage();
 }
 function trkPlayerHpSet(charId,val){
   const vp=trkActiveForPlayer(); if(!vp) return;
@@ -11254,6 +11377,7 @@ function playerInitSet(val){
   if(!playerMyCard(vp)) return;
   const iv=parseInt(val,10)||0;
   const my=playerMyCard(vp); if(!my) return; my.init=iv; const s=TRK_SHARED[vp]; if(s) s.at=Date.now();
+  renderTracker();   // своя строка и порядок хода — сразу, как при смене ХП
   trkCloudCardPatch(vp, trkCardKey(my), {init:iv});
 }
 function rollDeathSave(){
@@ -11346,7 +11470,13 @@ function trkRestoreLast(){
   TRK.party=s.party||''; TRK.mapPos=s.mapPos||{};
   TRK.lastBoard=null;
   trkLog('combat','ГМ вернул прошлый бой');
-  trkSave(); renderTracker(); trkPublish();
+  // позиции фишек карта читает из общего стола, а публикация берёт их из облака (где после
+  // завершения пусто) — возвращаем их в стол и в облако явно, публикация — после слияния
+  const bk=gmBoardKey(), pos=Object.assign({}, s.mapPos||{});
+  const sh=TRK_SHARED[bk]; if(sh){ sh.mapPos=Object.assign({}, pos); sh.at=Date.now(); }
+  trkSave(); renderTracker();
+  if(Object.keys(pos).length) Promise.resolve(trkCloudBoardMerge(bk, {mapPos:pos})).catch(()=>{}).then(()=>trkPublish());
+  else trkPublish();
   toast('Прошлый бой возвращён');
 }
 function trkToggleActive(){
@@ -11363,7 +11493,9 @@ function trkToggleActive(){
     TRK.lastBoard={ list:(TRK.list||[]).slice(), round:TRK.round||1, activeKey:TRK.activeKey||'',
                     party:TRK.party||'', mapPos:TRK.mapPos||{}, at:Date.now() };
     trkLog('combat','Игра завершена — доска очищена');
-    TRK.list=[]; TRK.round=1; TRK.activeKey=''; TRK.mapPos={};
+    // партию тоже снимаем (как «Очистить»): иначе trkSyncParty при следующей перерисовке
+    // вернёт персонажей партии на пустую доску, а выделение висело бы на несуществующих участниках
+    TRK.list=[]; TRK.party=''; TRK.round=1; TRK.activeKey=''; TRK.mapPos={}; TRK_SEL.clear();
     trkSave();
   } else {
     trkLog('combat','Доска активна — бой начался');
@@ -11441,8 +11573,8 @@ function trkLiveStart(){
   }
 }
 function trkHp(i,d){ const x=TRK.list[i]; if(!x) return; x.hp=Math.max(0,(parseInt(x.hp,10)||0)+d); trkSave(); renderTracker(); }
-function trkDel(i){ const x=TRK.list[i]; if(x) trkLog('del','ГМ убрал: '+(x.name||'участник')); TRK.list.splice(i,1); trkSave(); renderTracker(); }
-function trkClear(){ TRK.list=[]; TRK.party=''; TRK.round=1; TRK.activeKey=''; trkSave(); renderTracker(); }
+function trkDel(i){ const x=TRK.list[i]; if(x){ trkLog('del','ГМ убрал: '+(x.name||'участник')); TRK_SEL.delete(trkCardKey(x)); } TRK.list.splice(i,1); trkSave(); renderTracker(); }
+function trkClear(){ TRK.list=[]; TRK.party=''; TRK.round=1; TRK.activeKey=''; TRK_SEL.clear(); trkSave(); renderTracker(); }
 function trkSort(){ TRK.list.sort((a,b)=>(b.init||0)-(a.init||0)); trkSave(); renderTracker(); }
 function trkAddManual(){
   const el=document.getElementById('trk-add'); const v=el?el.value.trim():'';
@@ -11582,6 +11714,8 @@ function gmManageHp(i,delta){
   trkLog(delta<0?'dmg':'heal','ГМ: '+(x.name||'')+(delta<0?' −':' +')+Math.abs(delta)+' ХП ('+nv+')');
   if(delta<0 && isFoeCard(x) && cur0>0 && nv<=0) trkLog('death',(x.name||'существо')+' повержено');
   if(isFoeCard(x)){
+    // зеркалим в общий стол до перерисовки: иначе renderTracker → trkAbsorbShared вернул бы прежнее ХП из стола
+    const s=TRK_SHARED[gmBoardKey()]; if(s&&Array.isArray(s.list)){ const t=s.list.find(r=>r&&trkCardKey(r)===trkCardKey(x)); if(t) t.hp=nv; }
     trkSave(); renderTracker();
   } else {
     const key=trkCardKey(x), bk=gmBoardKey();
@@ -11734,14 +11868,16 @@ function pushSupported(){ return 'serviceWorker' in navigator && 'PushManager' i
 async function pushStatus(){
   if(!pushSupported()) return 'unsupported';
   if(Notification.permission==='denied') return 'denied';
-  try{ const reg=await navigator.serviceWorker.ready; const sub=await reg.pushManager.getSubscription(); return sub?'on':'off'; }catch(e){ return 'off'; }
+  // без зарегистрированного сервис-воркера .ready не резолвится никогда — тумблер молча не отвечал
+  try{ const reg=await withTimeout(navigator.serviceWorker.ready, 2500); if(!reg) return 'unsupported'; const sub=await reg.pushManager.getSubscription(); return sub?'on':'off'; }catch(e){ return 'off'; }
 }
 async function pushEnable(){
   if(!pushSupported()){ toast('Устройство не поддерживает уведомления'); return; }
   let perm=Notification.permission; if(perm!=='granted') perm=await Notification.requestPermission();
   if(perm!=='granted'){ toast('Уведомления не разрешены'); pushRenderBtn(); return; }
   try{
-    const reg=await navigator.serviceWorker.ready;
+    const reg=await withTimeout(navigator.serviceWorker.ready, 4000);
+    if(!reg){ toast('Уведомления недоступны: сервис-воркер не запущен'); pushRenderBtn(); return; }
     let sub=await reg.pushManager.getSubscription();
     if(!sub) sub=await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:urlB64ToU8(VAPID_PUBLIC)});
     await pushSaveSub(sub); toast('Уведомления включены');
@@ -11762,6 +11898,7 @@ async function pushToggle(){
   }
   const st=await pushStatus();
   if(st==='denied'){ toast('Уведомления заблокированы в настройках устройства'); return; }
+  if(st==='unsupported'){ toast('Уведомления недоступны на этом устройстве'); pushRenderBtn(); return; }
   if(st==='on') pushDisable(); else pushEnable();
 }
 async function pushSaveSub(sub){
@@ -12189,6 +12326,11 @@ boot();
     if(typeof isDev==='function' && isDev())
       html+=drItem('music','Музыка',MUSIC_ICO,' dr-music');
     document.getElementById('drList').innerHTML=html;
+    // архив ASSIMILATION закрыт не-разработчику: пункт скрыт и после пересборки списка,
+    // а не только в момент смены сеттинга (updateArchLock)
+    if(typeof assimArchLocked==='function' && assimArchLocked()){
+      var w=document.querySelector('#drList [data-nav="world"]'); if(w) w.hidden=true;
+    }
   }
   drRender(); window.drRender=drRender;
 
@@ -13219,8 +13361,8 @@ function openInstallHelp(){
     var tabs=TAB_ORDER.filter(function(k){ return have[k]; });
     // персонаж при смерти — спасброски раскрываем сами; корешок, которого
     // у этого листа больше нет, просто сворачиваем
-    if(have.death && !PD_TAB) PD_TAB='death';
-    if(tabs.indexOf(PD_TAB)<0) PD_TAB='';
+    if(tabs.indexOf(PD_TAB)<0) PD_TAB='';           // сначала снимаем исчезнувший корешок (атаки при 0 ХП)…
+    if(have.death && !PD_TAB) PD_TAB='death';        // …и только потом раскрываем спасброски, иначе панель схлопывалась
 
     var bar=d.querySelector('.pd-bar');
     bar.innerHTML=
@@ -13302,7 +13444,10 @@ function openInstallHelp(){
     };
   }
   addEventListener('resize', function(){
-    try{ if(!DESK()) pdOff(); else if(onCombat() && typeof renderTracker==='function') renderTracker(); }catch(e){}
+    try{
+      if(!DESK()){ pdOff(); if(onCombat() && typeof renderTracker==='function') renderTracker(); }   // панель персонажа уехала вместе с пультом — вернуть её под доску
+      else if(onCombat() && typeof renderTracker==='function') renderTracker();
+    }catch(e){}
   });
 
   /* ═══ 4. Раздел «Игрок»: круглый «+» вместо верхней кнопки ═══ */
@@ -13422,7 +13567,7 @@ function openInstallHelp(){
   html.dock-on #appPane{margin-right:var(--dock-w)}
   html.dock-on .dice-fab,html.dock-on .dice-menu,html.dock-on #musicToggle,html.dock-on .fab-side{
     right:calc(var(--edge) + var(--dock-w))}
-  html.dock-on .search-float{right:calc(var(--edge) + 40px + 10px + var(--dock-w))}
+  html.dock-on .search-float{right:calc(var(--edge) + 40px + 10px + var(--dock-w)) !important}   /* !important — перебить .search-float{right:… !important} из шапки, иначе поиск уходил под карман */
   html.dock-on #profBtn.prof-btn{right:calc(var(--edge) + var(--dock-w))}
   html.dock-on #bmBtn.bm-circle{right:calc(var(--edge) + 40px + 10px + var(--search-w) + 8px + var(--dock-w))}
   .dk-head{display:flex;align-items:center;gap:10px;padding:14px 14px 12px;
@@ -13475,8 +13620,10 @@ function openInstallHelp(){
      («непонятное окно» поверх списка разделов). */
   .ma-drawer{left:var(--rail-w);transform:translateX(calc(-100% - var(--rail-w) - 90px))}
   .ma-drawer.open{transform:translateX(0)}
-  /* витрина и калькулятор выезжают справа — уступают открытому карману */
+  /* витрина и калькулятор выезжают справа — уступают открытому карману; закрытые —
+     уезжают за экран с учётом кармана, иначе торчали над ним призраком на 234 px */
   html.dock-on .vit-drawer{right:var(--dock-w)}
+  html.dock-on .vit-drawer:not(.open){transform:translateX(calc(100% + var(--dock-w) + 90px))}
   /* всплывашка центрируется по окну — при открытом кармане уводим её в полотно */
   html.dock-on .toast{right:var(--dock-w)}
 }

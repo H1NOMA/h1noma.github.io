@@ -1,0 +1,25 @@
+{
+  "name": "KOMIK — кодекс D&D",
+  "short_name": "KOMIK",
+  "description": "Кодекс игр LEGACY, NEVERLAND, TERRA AETERNA: архив правил, персонажи, записи на игры.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#14151a",
+  "theme_color": "#14151a",
+  "lang": "ru",
+  "icons": [
+    {
+      "src": "icon-assimilation-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-assimilation-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

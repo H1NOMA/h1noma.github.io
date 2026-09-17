@@ -2,11 +2,13 @@
    Стратегия stale-while-revalidate: отдаём страницу из кэша мгновенно,
    а в фоне тихо перекачиваем свежую — она подхватится на следующем заходе.
    Так первый экран открывается сразу, без ожидания сети, и остаётся актуальным. */
-const CACHE = 'comik-v251';
+const CACHE = 'comik-v252';
 // мелкие статические файлы прогреваем сразу при установке
 // core-bestiary.json вынесен из index.html (это была почти половина его веса)
 // и обязан лежать в кэше: без него архив останется без монстров в офлайне.
-const PRECACHE = ['manifest.webmanifest', 'fonts.css', 'supabase.js', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png', 'core-bestiary.json'];
+// манифесты на каждую иконку приложения — чтобы установка PWA работала и из офлайн-кэша
+const PRECACHE = ['manifest.webmanifest', 'fonts.css', 'supabase.js', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png', 'core-bestiary.json',
+  ...['classic','terra','legacy','neverland','assimilation','komik','komikw','komikn'].map(k => 'manifest-' + k + '.webmanifest')];
 // сколько ждём сеть для самой страницы, прежде чем отдать копию из кэша.
 // В регионах, где канал до хостинга душат, ожидание сети — это и есть «сайт не открывается»:
 // повторный заход обязан открыться мгновенно из кэша, а свежая версия догрузится фоном.
