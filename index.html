@@ -2691,9 +2691,10 @@
   .modal .cal-set{font-style:normal;color:var(--c)}
   .modal .cal-set i{font-style:normal}
   /* плавающая кнопка — только в новостях; на широком десктопе календарь развёрнут третьей колонкой */
-  #calFab{display:none;right:78px}
+  /* на новостях мобилки других плавающих кнопок внизу нет — кнопка стоит у самого края, как остальные fab */
+  #calFab{display:none;right:12px}
   html.view-news #calFab{display:flex}
-  .mirror-ui #calFab{left:78px;right:auto}
+  .mirror-ui #calFab{left:12px;right:auto}
   #newsCal{display:none}
   @media(min-width:880px){ #calFab{right:var(--edge)} .mirror-ui #calFab{left:calc(var(--fr) + 70px);right:auto} }
   /* с 1180 слева постоянный рейл разделов (--rail-w из блока «Десктоп v2»): в зеркальном режиме
