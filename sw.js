@@ -2,7 +2,11 @@
    Стратегия stale-while-revalidate: отдаём страницу из кэша мгновенно,
    а в фоне тихо перекачиваем свежую — она подхватится на следующем заходе.
    Так первый экран открывается сразу, без ожидания сети, и остаётся актуальным. */
-const CACHE = 'comik-v256';
+const CACHE = 'comik-v257';
+// Статика (шрифты, иконки, данные, фоны) живёт в ОТДЕЛЬНОМ кэше, который не сбрасывается при смене
+// версии: раньше каждое обновление кода стирало и шрифты с картинками, и на телефоне первый запуск
+// новой версии шёл без них, пока всё не перекачается заново. Обновляются они сами (stale-while-revalidate).
+const STATIC = 'comik-static-v1';
 // мелкие статические файлы прогреваем сразу при установке
 // core-bestiary.json вынесен из index.html (это была почти половина его веса)
 // и обязан лежать в кэше: без него архив останется без монстров в офлайне.
@@ -20,13 +24,13 @@ const NAV_TIMEOUT = 3500;
 
 self.addEventListener('install', e => {
   self.skipWaiting();
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(PRECACHE)).catch(() => {}));
+  e.waitUntil(caches.open(STATIC).then(c => c.addAll(PRECACHE)).catch(() => {}));
 });
 
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys()
-      .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+      .then(keys => Promise.all(keys.filter(k => k !== CACHE && k !== STATIC).map(k => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
@@ -101,12 +105,12 @@ self.addEventListener('fetch', e => {
         ]).catch(() => fromCache());
       }
       // Прочие статические ресурсы — stale-while-revalidate: мгновенно из кэша, свежее в фоне.
-      return cache.match(e.request).then(cached => {
+      return caches.open(STATIC).then(st => st.match(e.request).then(cached => {
         const network = fetch(e.request)
-          .then(res => { if (res && res.ok) cache.put(e.request, res.clone()).catch(() => {}); return res; })
+          .then(res => { if (res && res.ok) st.put(e.request, res.clone()).catch(() => {}); return res; })
           .catch(() => cached);
         return cached || network;
-      });
+      }));
     })
   );
 });

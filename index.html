@@ -2725,6 +2725,17 @@
      Стеклянные поверхности становятся плотными — рисунок тот же, blur не считается */
   html.lite{--glass:var(--bg2);--glass2:var(--surface)}
   html.lite *{backdrop-filter:none !important;-webkit-backdrop-filter:none !important}
+  /* кадрирование аватара — поверх любой модалки/редактора */
+  .crop-ov{position:fixed;inset:0;z-index:210;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.72);padding:16px}
+  .crop-box{width:min(92vw,440px);background:var(--surface);border:var(--hair) solid var(--line2);border-radius:18px;padding:16px;box-shadow:0 18px 60px rgba(0,0,0,.6)}
+  .crop-t{font-family:var(--f-disp);font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:.86rem;margin-bottom:10px;color:var(--txt)}
+  .crop-stage{position:relative;width:100%;border-radius:12px;overflow:hidden;background:#000;touch-action:none;user-select:none}
+  .crop-cv{display:block;touch-action:none;cursor:grab}
+  .crop-frame{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);border:2px solid rgba(var(--accent-rgb),.95);border-radius:14px;box-shadow:0 0 0 1px rgba(0,0,0,.6);pointer-events:none}
+  .crop-zoom{display:flex;align-items:center;gap:10px;margin-top:12px;color:var(--dim);font-size:1.1rem}
+  .crop-zoom input{flex:1;accent-color:var(--red)}
+  .crop-hint{font-family:var(--f-mono);font-size:.62rem;letter-spacing:.06em;color:var(--muted);margin-top:8px;text-align:center}
+  .crop-box .hp-acts{margin-top:12px}
   /* подсказка пустого раздела «Игрок» зависит от раскладки: до 1180 кнопка «＋ Добавить» сверху,
      с 1180 — плавающий «＋» внизу справа (тот же порог, что у #addCharFab) */
   .pl-empty-hint.hint-desk{display:none}
@@ -4281,10 +4292,10 @@ function bindGameData(resetNav){
 const uid = ()=> Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 // SRD-данные вынесены в отдельные файлы (быстрый старт): грузим фетчем, при сбое — из встроенного тега (пустой) или пустой массив
 let DATA_LOAD_FAILED = false;   // хоть один внешний файл так и не доехал
-async function loadDataFile(url, fallbackId, anyShape){
+async function loadDataFile(url, fallbackId, anyShape, low){
   const okShape = j => anyShape ? !!(j && typeof j==='object') : Array.isArray(j);
   for(let i=0;i<3;i++){
-    try{ const r=await fetch(url); if(r.ok){ const j=await r.json(); if(okShape(j)) return j; } }catch(e){}
+    try{ const r=await fetch(url, low?{priority:'low'}:undefined); if(r.ok){ const j=await r.json(); if(okShape(j)) return j; } }catch(e){}
     await new Promise(res=>setTimeout(res, 400*(i+1)));
   }
   DATA_LOAD_FAILED = true;   // три попытки впустую — дальше только встроенный запас
@@ -4302,7 +4313,16 @@ let DATA_P=null;
 function startDataLoad(){
   if(DATA_P) return DATA_P;
   DATA_P={};
-  Object.keys(DATA_FILES).forEach(k=>{ const [url,fb,any]=DATA_FILES[k]; DATA_P[k]=loadDataFile(url,fb,any).catch(()=>null); });
+  Object.keys(DATA_FILES).forEach(k=>{ if(k==='core') return; const [url,fb,any]=DATA_FILES[k]; DATA_P[k]=loadDataFile(url,fb,any).catch(()=>null); });
+  // Справочник (8 МБ) — последним и с низким приоритетом: на телефоне он иначе забивал канал,
+  // и шрифты с картинками первого экрана доезжали после него (в приложении это выглядело как
+  // «не подтянулись»). Ждём мелкие файлы и шрифты (но не дольше 2,5 с), затем качаем.
+  const [cu,cf,ca]=DATA_FILES.core;
+  DATA_P.core=(async()=>{
+    try{ await Promise.allSettled([DATA_P.archive, DATA_P.news, DATA_P.hero]); }catch(e){}
+    try{ await Promise.race([document.fonts && document.fonts.ready, new Promise(r=>setTimeout(r,2500))].filter(Boolean)); }catch(e){}
+    return loadDataFile(cu,cf,ca,true);
+  })().catch(()=>null);
   return DATA_P;
 }
 const esc = s => String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -4424,20 +4444,26 @@ async function boot(){
   });
   if(usersMigrated) sset(KEY_USERS, USERS, true).catch(()=>{});
   if(SESSION && SESSION!==normTag(SESSION)){ SESSION=normTag(SESSION); sset(KEY_SESSION, SESSION, false).catch(()=>{}); }
-  if(SESSION && !USERS.some(u=>normTag(u.tag)===normTag(SESSION))) SESSION=null;
-  // Вход теперь подтверждается сессией Supabase Auth; локальная строка — лишь зеркало для офлайна.
-  // Если облако доступно и Auth-сессии нет — считаем пользователя вышедшим (потребуется вход/миграция).
+  // Реестр логинов (USERS) — справочный список без паролей: если облако не ответило и в нём нет
+  // нашего тега, это не повод разлогинивать (раньше здесь стояло SESSION=null — и на Android при
+  // холодном старте с медленной сетью людей выбрасывало из аккаунта при каждом запуске)
+  if(SESSION && !USERS.some(u=>normTag(u.tag)===normTag(SESSION))){ USERS.push({ tag:normTag(SESSION), createdAt:Date.now() }); }
+  // Вход подтверждается сессией Supabase Auth; локальная строка — зеркало для офлайна.
+  // Выходим только по ОПРЕДЕЛЁННОМУ ответу облака «сессии нет» (или refresh-токен отозван):
+  // таймаут, обрыв сети и прочие ошибки обновления токена сессию не трогают.
   if(supa){
     try{
       const gs=await authTimeout(supa.auth.getSession(), 6000);
       const authUser = gs && gs.data && gs.data.session ? gs.data.session.user : null;
+      const err = gs && gs.error ? String(gs.error.message||gs.error) : '';
       if(authUser){
         SESSION = emailToLogin(authUser.email);
         if(!USERS.some(u=>normTag(u.tag)===normTag(SESSION))){ USERS.push({ tag:normTag(SESSION), createdAt:Date.now() }); sset(KEY_USERS, USERS, true).catch(()=>{}); }
         ssetLocal(KEY_SESSION, SESSION, false);
-      } else {
+      } else if(!err || /refresh token|invalid grant|not found|revoked/i.test(err)){
         SESSION = null; ssetLocal(KEY_SESSION, null, false);
       }
+      // иначе (сеть/таймаут внутри библиотеки) — оставляем локальную сессию
     }catch(e){ /* облако недоступно — оставляем локальную сессию, чтобы работать офлайн */ }
   }
   refreshAdmin();   // сессия окончательно определена → сразу выставляем флаг режима ГМ (.is-gm)
@@ -5273,6 +5299,7 @@ function openPolicy(overlay){
 document.addEventListener('keydown',e=>{ if(e.key!=='Escape') return;
   // всплывающие окна (.hp-prompt: умения класса, истощение, состояния, ввод урона) — самый верхний слой:
   // Esc закрывает только его, а не модалку под ним (иначе терялся набранный лист, а окно оставалось висеть)
+  const co=document.querySelector('.crop-ov'); if(co){ const x=co.querySelector('[data-x]'); if(x) x.click(); else co.remove(); return; }   // кадрирование аватара — самый верхний слой
   const inP=(e.target && e.target.closest) ? e.target.closest('.hp-prompt') : null;
   if(inP){ if(document.body.contains(inP)) inP.remove(); return; }   // отвязанное окно уже закрыл его собственный обработчик
   const hps=document.querySelectorAll('.hp-prompt'); if(hps.length){ hps[hps.length-1].remove(); return; }
@@ -6629,7 +6656,17 @@ function cleanFigs(node){
 /* качественное уменьшение: пошагово вдвое с высококачественным сглаживанием —
    так фото остаются чёткими даже при сильном уменьшении (без «мыла» и алиасинга) */
 function drawScaledCanvas(img, w, h){
-  let src=img, cw=img.width, ch=img.height;
+  let src=img, cw=img.width||img.naturalWidth, ch=img.height||img.naturalHeight;
+  // мобильные GPU не тянут холсты больше ~4096 px по стороне — такой холст рисуется чёрным
+  // квадратом (так и терялись новые фото персонажей с 12–50-мегапиксельных камер). Первый шаг
+  // сразу ужимаем до безопасного размера, дальше — привычное деление пополам.
+  const LIM=4096;
+  if(cw>LIM || ch>LIM){
+    const k=LIM/Math.max(cw,ch); const tw=Math.max(w,Math.round(cw*k)), th=Math.max(h,Math.round(ch*k));
+    const t=document.createElement('canvas'); t.width=tw; t.height=th;
+    const tx=t.getContext('2d'); tx.imageSmoothingEnabled=true; tx.imageSmoothingQuality='high';
+    tx.drawImage(src,0,0,tw,th); src=t; cw=tw; ch=th;
+  }
   while(cw*0.5 > w && ch*0.5 > h){
     cw=Math.max(w, Math.round(cw*0.5)); ch=Math.max(h, Math.round(ch*0.5));
     const t=document.createElement('canvas'); t.width=cw; t.height=ch;
@@ -6641,26 +6678,27 @@ function drawScaledCanvas(img, w, h){
   ctx.drawImage(src,0,0,w,h);
   return c;
 }
+/* Декодируем фото в bitmap: createImageBitmap учитывает EXIF-поворот и не держит в памяти
+   12-мегапиксельный <img>; если браузер формат не понял (HEIC на Android) — честно отказываем,
+   а не подсовываем сырой data-URL, который потом рисовался чёрным квадратом. */
+async function decodeImage(file){
+  if(window.createImageBitmap){ try{ return await createImageBitmap(file, {imageOrientation:'from-image'}); }catch(e){} }
+  return await new Promise((res,rej)=>{
+    const url=URL.createObjectURL(file); const img=new Image();
+    img.onload=()=>{ URL.revokeObjectURL(url); res(img); };
+    img.onerror=()=>{ URL.revokeObjectURL(url); rej(new Error('decode')); };
+    img.src=url;
+  });
+}
+function bitmapToDataUrl(img, maxDim, q){
+  const iw=img.width||img.naturalWidth, ih=img.height||img.naturalHeight;
+  const k=Math.min(1, maxDim/Math.max(iw,ih));
+  const w=Math.max(1,Math.round(iw*k)), h=Math.max(1,Math.round(ih*k));
+  return drawScaledCanvas(img, w, h).toDataURL('image/jpeg', q);
+}
 function compressImage(file, maxDim, q){
   maxDim=maxDim||1500; q=q||0.85;
-  return new Promise((res,rej)=>{
-    const r=new FileReader();
-    r.onerror=rej;
-    r.onload=()=>{
-      const img=new Image();
-      img.onload=()=>{
-        try{
-          const k=Math.min(1, maxDim/Math.max(img.width,img.height));
-          const w=Math.max(1,Math.round(img.width*k)), h=Math.max(1,Math.round(img.height*k));
-          const c=drawScaledCanvas(img, w, h);
-          res(c.toDataURL('image/jpeg', q));
-        }catch(e){ res(r.result); }
-      };
-      img.onerror=()=>res(r.result);
-      img.src=r.result;
-    };
-    r.readAsDataURL(file);
-  });
+  return decodeImage(file).then(img=>{ try{ return bitmapToDataUrl(img, maxDim, q); } finally { if(img.close) try{ img.close(); }catch(e){} } });
 }
 function chronoImg(){ const f=document.getElementById('chronoFile'); if(f) f.click(); }
 function chronoImgPick(inp){
@@ -8153,11 +8191,69 @@ function sheetAvaBlock(cur){
 }
 function avaPick(inp){
   const f=inp.files && inp.files[0]; if(!f) return; inp.value='';
-  // фото персонажа показывается крупной карточкой (до ~300pt, на retina ~900px) — храним в разрешении под это, а не 240px
-  compressImage(f, 900, .85).then(src=>{
+  // сначала ужимаем до рабочего размера (память телефона), затем даём выбрать область под постер 4:5;
+  // фото персонажа показывается крупной карточкой (до ~300pt, на retina ~900px) — храним под это
+  compressImage(f, 1600, .9).then(src=>openAvaCrop(src, 4/5, 720, 900)).then(src=>{
+    if(!src) return;   // отмена — прежний аватар остаётся
     AVA_TMP=src;
     const p=document.getElementById('avaPrev'); if(p) p.innerHTML=`<img src="${src}" alt="">`;
-  }).catch(()=>toast('⚠ Не удалось обработать фото'));
+  }).catch(()=>toast('⚠ Не удалось обработать фото: такой формат телефон не открыл (попробуй JPG/PNG)'));
+}
+/* ── Кадрирование аватара: рамка фиксированной пропорции (как постер персонажа 4:5), фото под ней
+   двигается пальцем/мышью и масштабируется щипком, колесом или ползунком. На выходе — jpeg
+   ровно того куска, что виден в рамке. Возвращает Promise<dataURL|null> (null — отмена). ── */
+function openAvaCrop(src, aspect, outW, outH){
+  return new Promise(resolve=>{
+    const img=new Image();
+    img.onload=()=>{
+      const ov=document.createElement('div'); ov.className='crop-ov';
+      ov.innerHTML=`<div class="crop-box">
+        <div class="crop-t">Выбери область для постера</div>
+        <div class="crop-stage"><canvas class="crop-cv"></canvas><div class="crop-frame"></div></div>
+        <div class="crop-zoom"><span>−</span><input type="range" class="crop-rng" min="0" max="100" value="0"><span>+</span></div>
+        <div class="crop-hint">Двигай фото пальцем, масштаб — щипком или ползунком</div>
+        <div class="hp-acts"><button class="btn ghost" data-x>Отмена</button><button class="btn primary" data-ok>Готово</button></div>
+      </div>`;
+      document.body.appendChild(ov);
+      const stage=ov.querySelector('.crop-stage'), cv=ov.querySelector('.crop-cv'), fr=ov.querySelector('.crop-frame'), rng=ov.querySelector('.crop-rng');
+      const SW=Math.min(stage.clientWidth||360, 420);            // ширина сцены на экране
+      const FW=Math.round(SW*0.82), FH=Math.round(FW/aspect);    // рамка
+      const SH=FH+48;
+      const dpr=Math.min(2, window.devicePixelRatio||1);
+      cv.width=Math.round(SW*dpr); cv.height=Math.round(SH*dpr); cv.style.width=SW+'px'; cv.style.height=SH+'px';
+      stage.style.height=SH+'px'; fr.style.width=FW+'px'; fr.style.height=FH+'px';
+      const fx=(SW-FW)/2, fy=(SH-FH)/2;                          // положение рамки на сцене
+      const iw=img.naturalWidth, ih=img.naturalHeight;
+      const minS=Math.max(FW/iw, FH/ih);                          // минимальный масштаб: фото закрывает рамку целиком
+      let s=minS, maxS=minS*4, cx=iw/2, cy=ih/2;                  // cx,cy — точка фото в центре рамки
+      const clamp=()=>{ const hw=FW/2/s, hh=FH/2/s; cx=Math.min(iw-hw, Math.max(hw, cx)); cy=Math.min(ih-hh, Math.max(hh, cy)); };
+      const draw=()=>{ clamp(); const g=cv.getContext('2d'); g.setTransform(dpr,0,0,dpr,0,0); g.clearRect(0,0,SW,SH);
+        const x=fx+FW/2-cx*s, y=fy+FH/2-cy*s; g.drawImage(img, x, y, iw*s, ih*s);
+        g.fillStyle='rgba(0,0,0,.55)'; g.fillRect(0,0,SW,fy); g.fillRect(0,fy+FH,SW,SH-fy-FH); g.fillRect(0,fy,fx,FH); g.fillRect(fx+FW,fy,SW-fx-FW,FH); };
+      const setScale=(ns, px, py)=>{ ns=Math.min(maxS, Math.max(minS, ns));   // масштабируем вокруг точки (px,py) сцены
+        const ox=(px-(fx+FW/2))/s, oy=(py-(fy+FH/2))/s; cx+=ox-ox*s/ns; cy+=oy-oy*s/ns; s=ns; rng.value=Math.round((s-minS)/(maxS-minS)*100); draw(); };
+      rng.oninput=()=>setScale(minS+(maxS-minS)*(+rng.value/100), fx+FW/2, fy+FH/2);
+      const pts=new Map(); let pinch0=null;
+      const pos=e=>{ const r=cv.getBoundingClientRect(); return {x:e.clientX-r.left, y:e.clientY-r.top}; };
+      cv.onpointerdown=e=>{ cv.setPointerCapture(e.pointerId); pts.set(e.pointerId,pos(e)); if(pts.size===2){ const [a,b]=[...pts.values()]; pinch0={d:Math.hypot(a.x-b.x,a.y-b.y), s}; } e.preventDefault(); };
+      cv.onpointermove=e=>{ if(!pts.has(e.pointerId)) return; const p=pos(e), prev=pts.get(e.pointerId); pts.set(e.pointerId,p);
+        if(pts.size===1){ cx-=(p.x-prev.x)/s; cy-=(p.y-prev.y)/s; draw(); }
+        else if(pts.size===2 && pinch0){ const [a,b]=[...pts.values()]; const d=Math.hypot(a.x-b.x,a.y-b.y); setScale(pinch0.s*d/pinch0.d, (a.x+b.x)/2, (a.y+b.y)/2); } };
+      cv.onpointerup=cv.onpointercancel=e=>{ pts.delete(e.pointerId); if(pts.size<2) pinch0=null; };
+      cv.onwheel=e=>{ e.preventDefault(); const p=pos(e); setScale(s*(e.deltaY<0?1.08:1/1.08), p.x, p.y); };
+      const done=v=>{ try{ ov.remove(); }catch(e){} resolve(v); };
+      ov.querySelector('[data-x]').onclick=()=>done(null);
+      ov.querySelector('[data-ok]').onclick=()=>{ clamp();
+        const out=document.createElement('canvas'); out.width=outW; out.height=outH;
+        const g=out.getContext('2d'); g.imageSmoothingEnabled=true; g.imageSmoothingQuality='high';
+        const sx=cx-FW/2/s, sy=cy-FH/2/s; g.drawImage(img, sx, sy, FW/s, FH/s, 0, 0, outW, outH);
+        done(out.toDataURL('image/jpeg', .86)); };
+      ov.onkeydown=e=>{ if(e.key==='Escape') done(null); };
+      draw();
+    };
+    img.onerror=()=>resolve(src);   // не смогли показать — берём как есть
+    img.src=src;
+  });
 }
 function avaClear(){
   AVA_TMP='';
