@@ -8,12 +8,14 @@ const CACHE = 'comik-v258';
 // новой версии шёл без них, пока всё не перекачается заново. Обновляются они сами (stale-while-revalidate).
 const STATIC = 'comik-static-v1';
 // мелкие статические файлы прогреваем сразу при установке
-// core-bestiary.json вынесен из index.html (это была почти половина его веса)
-// и обязан лежать в кэше: без него архив останется без монстров в офлайне.
 // манифесты на каждую иконку приложения — чтобы установка PWA работала и из офлайн-кэша
-// данные сайта (data/*.json) и фоны приветствий (img/hero-*.jpg) вынесены из index.html:
-// мелкие прогреваем сразу, справочник data/core.json (8 МБ) ляжет в кэш при первом запросе страницы
-const PRECACHE = ['manifest.webmanifest', 'fonts.css', 'supabase.js', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png', 'core-bestiary.json',
+// данные сайта (data/*.json), фоны приветствий (img/hero-*.jpg), логотип и фото команды
+// вынесены из index.html: мелкие прогреваем сразу. Тяжёлые справочники — data/core.json (8 МБ)
+// и core-bestiary.json (11 МБ) — в прогрев НЕ входят: страница сама запрашивает их после
+// первого кадра, и они ложатся в этот же кэш при первом запросе. Раньше бестиарий качался
+// при установке воркера и на первом заходе отбирал канал у самой страницы.
+const PRECACHE = ['manifest.webmanifest', 'fonts.css', 'supabase.js', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png',
+  'img/logo-komik.png', 'img/team-1.jpg', 'img/team-2.jpg', 'img/team-3.jpg', 'img/team-4.jpg', 'img/team-5.jpg',
   'data/archive.json', 'data/news.json', 'data/hero.json', 'data/chrono.json',
   ...['legacy','neverland','assimilation','terra','classic','skazki'].map(k => 'img/hero-' + k + '.jpg'),
   ...['classic','terra','legacy','neverland','assimilation','komik','komikw','komikn'].map(k => 'manifest-' + k + '.webmanifest')];
@@ -105,9 +107,24 @@ self.addEventListener('fetch', e => {
         ]).catch(() => fromCache());
       }
       // Прочие статические ресурсы — stale-while-revalidate: мгновенно из кэша, свежее в фоне.
+      // Фоновая проверка — условная: с ETag/Last-Modified кэшированной копии. Если файл на
+      // сервере не менялся, приходит 304 без тела — раньше каждый заход перекачивал в фоне
+      // справочник и бестиарий целиком (~3,5 МБ сжатых), теперь только заголовки.
       return caches.open(STATIC).then(st => st.match(e.request).then(cached => {
-        const network = fetch(e.request)
-          .then(res => { if (res && res.ok) st.put(e.request, res.clone()).catch(() => {}); return res; })
+        let req = e.request;
+        if (cached) {
+          const h = new Headers(e.request.headers);
+          const et = cached.headers.get('etag'), lm = cached.headers.get('last-modified');
+          if (et) h.set('If-None-Match', et);
+          if (lm) h.set('If-Modified-Since', lm);
+          if (et || lm) req = new Request(e.request, { headers: h });
+        }
+        const network = fetch(req)
+          .then(res => {
+            if (res && res.status === 304) return cached;   // не менялся — копия в кэше актуальна
+            if (res && res.ok) st.put(e.request, res.clone()).catch(() => {});
+            return res;
+          })
           .catch(() => cached);
         return cached || network;
       }));
