@@ -3113,6 +3113,24 @@ html.dr-live body{overflow-x:clip}
 .hdr-search svg{width:20px;height:20px}
 .hdr-search:hover{color:var(--red-ink)}
 .hdr-search:active{background:var(--surface2)}
+/* ── Мобильная шапка: без перегородки, три плавающие кнопки ──
+   Сама шапка прозрачна и касаний не ловит (контент под ней кликается), а бургер, пилюля
+   сеттинга и поиск — стеклянные кнопки на прежних местах; sticky держит их за пользователем
+   при прокрутке. Тонкий градиент сверху — только под системную строку статуса. */
+@media(max-width:879px){
+  header{background:transparent;border-bottom:0;pointer-events:none}
+  header::before{content:"";position:absolute;left:0;right:0;top:0;pointer-events:none;
+    height:calc(env(safe-area-inset-top,0px) + 14px);background:linear-gradient(var(--bg2),transparent)}
+  header .bar>*,header .proj-menu{pointer-events:auto}
+  header .nav-burger-top,header .hdr-search{border-radius:999px;border:var(--hair) solid var(--line2);
+    background:var(--glass2);box-shadow:0 1px 6px rgba(0,0,0,.22);
+    backdrop-filter:blur(18px) saturate(160%);-webkit-backdrop-filter:blur(18px) saturate(160%)}
+  header .lock .project{background:var(--glass2);
+    backdrop-filter:blur(18px) saturate(160%);-webkit-backdrop-filter:blur(18px) saturate(160%)}
+  /* облегчённый режим (Android): без размытия — плотная подложка */
+  html.lite header .nav-burger-top,html.lite header .hdr-search,html.lite header .lock .project{
+    backdrop-filter:none;-webkit-backdrop-filter:none;background:var(--surface2)}
+}
 .search-open .hdr-search{color:var(--red-ink);background:var(--surface2)}
 
 @media(max-width:879px){
