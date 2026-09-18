@@ -110,12 +110,21 @@ if [ -f docker-compose.override.yml ]; then
   VPUB=$(grep 'VAPID_PUBLIC:' docker-compose.override.yml | sed 's/.*: *"//;s/"//' || true)
   VPRIV=$(grep 'VAPID_PRIVATE:' docker-compose.override.yml | sed 's/.*: *"//;s/"//' || true)
 fi
-if [ -z "$VPUB" ] || [ -z "$VPRIV" ]; then
+# публичный ключ и так вшит в сайт — спрашиваем только приватный; кавычки и пробелы
+# при вставке ломали ключ («should be 65 bytes long») — вычищаем и проверяем длину
+SITE_VPUB="BJjgF7Dfj-PGEBho4AK_eec8YivMgnT5Oux8KdfLOx3sDcqpEBJ22tYzdsQ0fhx3S5IlRr-y3zTqsnOszzEpFI4"
+b64len(){ python3 -c "import base64,sys;s=sys.argv[1];print(len(base64.urlsafe_b64decode(s+'='*(-len(s)%4))))" "$1" 2>/dev/null || echo -1; }
+VPUB=$(printf '%s' "$VPUB" | tr -d '"\r\n\t '"'"); VPRIV=$(printf '%s' "$VPRIV" | tr -d '"\r\n\t '"'")
+[ "$(b64len "$VPUB")" = 65 ] || VPUB="$SITE_VPUB"
+if [ "$(b64len "$VPRIV")" != 32 ]; then
   echo
-  echo "VAPID-секреты пушей из старого проекта (supabase.com → Edge Functions → Secrets)."
-  echo "Нужны ТЕ ЖЕ значения, иначе подписки игроков умрут. Enter — пропустить (донастроишь повторным запуском)."
-  read -rp "VAPID_PUBLIC: " VPUB </dev/tty || true
+  echo "Приватный VAPID-ключ пушей из старого проекта (supabase.com → Edge Functions → Secrets → VAPID_PRIVATE)."
+  echo "Нужен ТОТ ЖЕ ключ, иначе подписки игроков умрут. Enter — пропустить (потом: bash <(curl -fsS https://komikdnd.ru/migrate/push.sh))."
   read -rp "VAPID_PRIVATE: " VPRIV </dev/tty || true
+  VPRIV=$(printf '%s' "$VPRIV" | tr -d '"\r\n\t '"'")
+  if [ -n "$VPRIV" ] && [ "$(b64len "$VPRIV")" != 32 ]; then
+    warn "ключ после декодирования $(b64len "$VPRIV") байт вместо 32 — не VAPID-ключ, пропускаю (донастроишь push.sh)"; VPRIV=""
+  fi
 fi
 {
   echo 'services:'

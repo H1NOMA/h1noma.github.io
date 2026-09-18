@@ -4935,6 +4935,15 @@ function storySave(){
 /* ====================== Модальное окно ====================== */
 let CUR_ARCH={};
 function pickArch(id,i){ CUR_ARCH[id]=i; openModal(id); }
+/* Подпись карточки (body) у большинства импортированных записей — это первые фразы
+   раздела «Описание»/«Подробности»: в открытой карточке текст шёл дважды подряд.
+   Приоритет у раздела: если подпись целиком содержится в каком-то разделе, сверху
+   её не показываем. В списках и превью подпись остаётся — там разделов нет. */
+function bodyDupOfSections(e){
+  const norm=v=>String(v||'').replace(/[«»"“”'’]/g,'').replace(/\s+/g,' ').trim().toLowerCase().replace(/[.…:;,]+$/,'');
+  const b=norm(e&&e.body); if(!b) return false;
+  return (e.sections||[]).some(sc=>{ const t=norm(sc&&sc.t); return !!t && (t===b || t.startsWith(b) || (b.length>40 && t.indexOf(b)>=0)); });
+}
 function openModal(id, overlay){
   if(assimArchLocked()) return;
   const e=ARCHIVE.find(x=>x.id===id); if(!e) return;
@@ -5032,6 +5041,7 @@ function openModal(id, overlay){
     ? secList(baseSecs) + secList(archSecs, A&&A.name)
     : baseSecs.map(x=>`<div class="sec"><h4>${esc(x.h)}</h4><p>${esc(x.t)}</p></div>`).join('');
   const epi = e.epigraph ? `<blockquote class="epi">${esc(e.epigraph)}</blockquote>` : '';
+  const showBody = !!e.body && !bodyDupOfSections(e);   // раздел важнее дублирующей подписи
   document.getElementById(overlay?'modal2':'modal').innerHTML = `
     <button class="x" onclick="${overlay?'closeOverlay()':'closeModal()'}" aria-label="Закрыть">✕</button>
     <button class="bm-btn${isBookmarked(e.id)?' on':''}" data-bm="${e.id}" onclick="toggleBookmark('${e.id}')" aria-label="В закладки" title="В закладки">${BM_SVG}</button>
@@ -5048,12 +5058,12 @@ function openModal(id, overlay){
         </div>
         ${epi}
         ${rows?`<div class="dos-rows">${rows}</div>`:''}
-        ${e.body?`<div class="body" style="margin-top:12px">${esc(e.body)}</div>`:''}
+        ${showBody?`<div class="body" style="margin-top:12px">${esc(e.body)}</div>`:''}
       </div>
     </div>`:`
     <h2>${esc(e.title)}</h2>
     ${epi}
-    <div class="body">${esc(e.body)}</div>`}
+    ${showBody?`<div class="body">${esc(e.body)}</div>`:''}`}
     ${(e.sub==='deities'||e.sub==='bestiary')?deityStatHtml(e):''}
     ${archUI}
     ${subraceUI}
@@ -12003,6 +12013,12 @@ async function pushEnable(){
     const reg=await withTimeout(navigator.serviceWorker.ready, 4000);
     if(!reg){ toast('Уведомления недоступны: сервис-воркер не запущен'); pushRenderBtn(); return; }
     let sub=await reg.pushManager.getSubscription();
+    // подписка оформлена под другой серверный ключ (пара VAPID сменилась) — пересоздаём,
+    // иначе сервер шлёт, а push-служба молча отвергает
+    if(sub && sub.options && sub.options.applicationServerKey){
+      const cur=new Uint8Array(sub.options.applicationServerKey), want=urlB64ToU8(VAPID_PUBLIC);
+      if(cur.length!==want.length || cur.some((v,i)=>v!==want[i])){ try{ await pushRemoveSub(sub); await sub.unsubscribe(); }catch(_){} sub=null; }
+    }
     if(!sub) sub=await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:urlB64ToU8(VAPID_PUBLIC)});
     await pushSaveSub(sub); toast('Уведомления включены');
   }catch(e){ toast('Не удалось подписаться'); }
