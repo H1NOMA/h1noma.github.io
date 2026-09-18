@@ -3122,14 +3122,11 @@ html.dr-live body{overflow-x:clip}
   header::before{content:"";position:absolute;left:0;right:0;top:0;pointer-events:none;
     height:calc(env(safe-area-inset-top,0px) + 2px);background:linear-gradient(var(--bg2),transparent)}
   header .bar>*,header .proj-menu{pointer-events:auto}
+  /* Без backdrop-filter: Safari растягивает размытие с кнопки на весь блок sticky-шапки,
+     и под ней мылился весь верх страницы. Читаемость даёт плотная полупрозрачная подложка. */
   header .nav-burger-top,header .hdr-search{border-radius:999px;border:var(--hair) solid var(--line2);
-    background:var(--glass2);box-shadow:0 1px 6px rgba(0,0,0,.22);
-    backdrop-filter:blur(18px) saturate(160%);-webkit-backdrop-filter:blur(18px) saturate(160%)}
-  header .lock .project{background:var(--glass2);
-    backdrop-filter:blur(18px) saturate(160%);-webkit-backdrop-filter:blur(18px) saturate(160%)}
-  /* облегчённый режим (Android): без размытия — плотная подложка */
-  html.lite header .nav-burger-top,html.lite header .hdr-search,html.lite header .lock .project{
-    backdrop-filter:none;-webkit-backdrop-filter:none;background:var(--surface2)}
+    background:var(--glass2);box-shadow:0 1px 6px rgba(0,0,0,.28)}
+  header .lock .project{background:var(--glass2);box-shadow:0 1px 6px rgba(0,0,0,.28)}
 }
 .search-open .hdr-search{color:var(--red-ink);background:var(--surface2)}
 
