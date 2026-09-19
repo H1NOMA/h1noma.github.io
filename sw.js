@@ -2,7 +2,7 @@
    Стратегия stale-while-revalidate: отдаём страницу из кэша мгновенно,
    а в фоне тихо перекачиваем свежую — она подхватится на следующем заходе.
    Так первый экран открывается сразу, без ожидания сети, и остаётся актуальным. */
-const CACHE = 'comik-v259';
+const CACHE = 'comik-v260';
 // Статика (шрифты, иконки, данные, фоны) живёт в ОТДЕЛЬНОМ кэше, который не сбрасывается при смене
 // версии: раньше каждое обновление кода стирало и шрифты с картинками, и на телефоне первый запуск
 // новой версии шёл без них, пока всё не перекачается заново. Обновляются они сами (stale-while-revalidate).
@@ -17,7 +17,7 @@ const STATIC = 'comik-static-v1';
 const PRECACHE = ['manifest.webmanifest', 'fonts.css', 'supabase.js', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png',
   'img/logo-komik.png', 'img/team-1.jpg', 'img/team-2.jpg', 'img/team-3.jpg', 'img/team-4.jpg', 'img/team-5.jpg',
   'data/archive.json', 'data/news.json', 'data/hero.json', 'data/chrono.json',
-  ...['legacy','neverland','assimilation','terra','classic','skazki'].map(k => 'img/hero-' + k + '.jpg'),
+  ...['legacy','neverland','assimilation','terra','classic','skazki','gw'].map(k => 'img/hero-' + k + '.jpg'),
   ...['classic','terra','legacy','neverland','assimilation','komik','komikw','komikn'].map(k => 'manifest-' + k + '.webmanifest')];
 // сколько ждём сеть для самой страницы, прежде чем отдать копию из кэша.
 // В регионах, где канал до хостинга душат, ожидание сети — это и есть «сайт не открывается»:
