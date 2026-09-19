@@ -6972,8 +6972,10 @@ function updateDevUI(){
   const ce=document.getElementById('chronoEntry'); if(ce) ce.hidden=!(isDev() && CUR_PROJECT!=='classic');
   const nm=document.getElementById('navMusic'); if(nm) nm.hidden=!isDev();   // музыка — только разработчикам и ГМ
   updateArchLock();
-  // вышел из аккаунта, находясь в закрытом сеттинге (ASSIMILATION, GW) — уводим в доступный
-  if(!projectVisible(CUR_PROJECT)) setProject(fallbackProject());
+  // вышел из аккаунта, находясь в закрытом сеттинге (ASSIMILATION, GW) — уводим в доступный.
+  // До чтения сессии (запуск, preboot) проверка мягкая: иначе сохранённый GW сбрасывался в «Классику»
+  // ещё до логина, и сброс перезаписывал сохранённый выбор — заставка GW не играла ни разу
+  if(!projectVisible(CUR_PROJECT, true)) setProject(fallbackProject());
   const tv=document.getElementById('view-combat');
   if(tv && tv.classList.contains('active')) renderToolsPage();
 }
