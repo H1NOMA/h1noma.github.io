@@ -2939,6 +2939,18 @@
   .gm-cre-stat p{margin:0 0 7px}
   .gm-cre-feat{font-size:.85rem;line-height:1.5;color:var(--dim);white-space:pre-wrap}
   .gm-cre-b .opt{margin-top:12px;padding-top:12px;border-top:var(--hair) solid var(--line2);color:var(--muted);font-size:.85rem}
+  .gm-cre-more{margin-top:8px}
+  .gm-cre-more .btn{width:100%}
+  .gm-sb{margin-top:12px;padding-top:12px;border-top:var(--hair) solid var(--line2)}
+  .gm-act{display:flex;flex-direction:column;gap:7px}
+  .gm-act-r{background:rgba(255,255,255,.04);border:var(--hair) solid rgba(255,255,255,.08);border-radius:10px;padding:8px 10px}
+  .gm-act-n{font-family:var(--f-disp);font-weight:600;font-size:.88rem;margin-bottom:7px}
+  .gm-act-b{display:flex;gap:7px;flex-wrap:wrap}
+  .gm-rb{min-height:40px;padding:8px 12px;border-radius:10px;font-family:var(--f-mono);font-size:.76rem;background:rgba(255,255,255,.03);border:var(--hair) solid rgba(255,255,255,.14);color:var(--txt);cursor:pointer;transition:transform .12s var(--spring)}
+  .gm-rb:active{transform:scale(.96)}
+  .gm-rb b{font-weight:700}
+  .gm-rb.hit{color:#7ee29a;border-color:rgba(62,207,106,.45)}
+  .gm-rb.dmg{color:#ff8f93;border-color:rgba(255,90,95,.45)}
   .gm-cre-b .tm-sec{margin-top:14px;padding-top:12px;border-top:var(--hair) solid var(--line2)}
   .gm-cre-b .tm-sec-h{font-family:var(--f-mono);font-size:.6rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:9px}
   .gm-cre-b .tm-atk{display:flex;flex-direction:column;gap:6px}
@@ -12742,18 +12754,107 @@ function gmCreaturePanel(x,i){
         <button class="tm-btn heal" onclick="gmHpPrompt(${i},'heal')">＋ Лечить</button>
         <div class="gm-cre-init"><span>Иниц</span><input inputmode="numeric" value="${esc(String(x.init??0))}" onchange="trkSet(${i},'init',this.value)"></div>
       </div>
-      ${gmCreatureBody(x)}
+      ${isFoeCard(x)?`<div class="gm-cre-more"><button class="btn ghost sm" onclick="gmCreDup(${i})">＋ ещё такой же</button></div>`:''}
+      ${gmCreatureBody(x,i)}
     </div>`:''}
   </div>`;
 }
-function gmCreatureBody(x){
+/* карточка бестиария, из которой взят монстр: srcId пишет trkAddBeast, у старых карточек
+   и ручных врагов ищем по имени (без хвостового номера — «Гоблин 2» это тот же гоблин) */
+function gmBaseName(n){ return String(n||'').replace(/\s+\d+$/,'').trim(); }
+function gmBeastOf(x){
+  if(!x) return null;
+  if(x.srcId){ const e=ARCHIVE.find(a=>a && a.id===x.srcId)||CORE.find(a=>a && a.id===x.srcId); if(e) return e; }
+  return beastCardByName(x.name) || beastCardByName(gmBaseName(x.name));
+}
+/* Действия существа: строки досье и разделов, где есть бонус атаки или кубы урона.
+   Ядро пишет «Рукопашная атака оружием: +4 к попаданию … Попадание: 5 (1к6+2) рубящего урона» —
+   вытаскиваем ровно эти два числа, остальное остаётся в полном досье. */
+const BEAST_DICE_RE=/\(\s*(\d+\s*[кkd]\s*\d+(?:\s*[+−–-]\s*\d+)?)\s*\)/i;   // «(1к6+2)» и «(2d6)» — в ядре встречаются обе записи
+function beastActions(e){
+  if(!e) return [];
+  const out=[], seen=new Set();
+  const add=(name,txt,pri)=>{
+    if(!txt) return;
+    const t=String(txt);
+    const a=t.match(/([+−–-]\s*\d+)\s*к\s*попаданию/i);
+    const d=t.match(BEAST_DICE_RE);
+    if(!a && !d) return;
+    const key=(name||'')+'|'+(a?a[1]:'')+'|'+(d?d[1]:''); if(seen.has(key)) return; seen.add(key);
+    out.push({ name:(String(name||'Атака').trim()||'Атака'), pri:pri||0,
+      atk:a?parseInt(a[1].replace(/[−–]/g,'-').replace(/\s+/g,''),10):null,
+      dmg:d?diceNorm(d[1]):'' });
+  };
+  (e.sections||[]).forEach(s=>{ if(!s) return; const h=String(s.h||'');
+    add(h.includes('·')?h.split('·').pop():h, s.t, /действие|реакци|атак/i.test(h)?0:1); });
+  // строки статблока («Хиты: 7 (2d6)», «КД») в действия не берём — они уже в сетке выше
+  (e.dossier||[]).forEach(d=>{ if(d && !BEAST_STAT_DOS.has((d.k||'').trim())) add(d.k, d.v, 1); });
+  if(!out.length) add(e.title, e.body, 1);   // самодельные карточки ГМа: атака может быть прямо в описании
+  // сначала действия и реакции, потом особенности с кубами (у древних драконов их два десятка) — и не больше восьми
+  return out.sort((a,b)=>a.pri-b.pri).slice(0,8);
+}
+/* Компактный статблок: КД, скорость, опасность и характеристики с модификаторами — сеткой как в досье */
+function gmBeastStatHtml(e){
+  const st=beastStat(e)||{};
+  const lbl=k=>((DEITY_STAT_FIELDS.find(f=>f[0]===k)||[])[1]||k);
+  const cell=(l,v)=>`<div class="dstat"><label>${esc(l)}</label><div class="dsv">${esc(v)}</div></div>`;
+  const cells=[];
+  if(st.ac) cells.push(cell('КД', (String(st.ac).match(/\d+/)||[String(st.ac)])[0]));     // «15 (кожаный доспех, щит)» → 15: в пульте важно число
+  if(st.speed) cells.push(cell('Скорость', String(st.speed).split(',')[0]));
+  if(st.cr) cells.push(cell('Опасность', st.cr));
+  STAT_ABIL.forEach(k=>{ const sc=st[k]; if(sc==null || sc==='') return;
+    const mn=statMod(sc);
+    cells.push(`<div class="dstat abil"><label>${esc(lbl(k))}</label><div class="dsv">${esc(String(sc))}${mn!=null?` <span class="dsmod">${fmtBonus(mn)}</span>`:''}</div></div>`); });
+  return cells.length?`<div class="gm-sb"><div class="dstat-grid">${cells.join('')}</div></div>`:'';
+}
+function gmActionsHtml(i, acts){
+  if(!acts.length) return '';
+  return `<div class="gm-sb"><div class="dstat-head">Действия</div><div class="gm-act">${acts.map((a,ai)=>`<div class="gm-act-r">
+      <div class="gm-act-n">${esc(a.name)}</div>
+      <div class="gm-act-b">${a.atk!=null?`<button class="gm-rb hit" onclick="gmCreRoll(${i},${ai},'hit')">🎲 попадание <b>${fmtBonus(a.atk)}</b></button>`:''}${a.dmg?`<button class="gm-rb dmg" onclick="gmCreRoll(${i},${ai},'dmg')">🎲 урон <b>${esc(a.dmg)}</b></button>`:''}</div>
+    </div>`).join('')}</div></div>`;
+}
+/* бросок прямо с доски: результат в тост (ГМ смотрит на пульт) и в журнал (видно, что было в бою) */
+function gmCreRoll(i, ai, kind){
+  const x=TRK.list[i]; if(!x) return;
+  const e=gmBeastOf(x); if(!e) return;
+  const a=(beastActions(e)||[])[ai]; if(!a) return;
+  const expr=(kind==='hit') ? ('d20'+fmtBonus(a.atk||0)) : a.dmg;
+  const r=rollDice(expr); if(!r){ toast('Не разобрал кубы'); return; }
+  let s=(x.name||e.title||'Существо')+' · '+a.name+': '+(kind==='hit'?'попадание ':'урон ')+r.txt;
+  if(kind==='hit' && r.rolls[0]===20) s+=' — крит!';
+  else if(kind==='hit' && r.rolls[0]===1) s+=' — провал';
+  trkLog('roll', s);
+  toast(s, {ms:3600});
+}
+/* «＋ ещё такой же»: второй гоблин к первому — те же статы и статблок, свой uid и номер в имени.
+   Хиты бросаем по кубам из бестиария («7 (2к6)»), иначе вся стая будет с одинаковым ХП. */
+function gmCreDup(i){
+  if(!ADMIN) return;
+  const x=TRK.list[i]; if(!x || x.charId) return;
+  const base=gmBaseName(x.name)||'Существо';
+  let n=1;
+  TRK.list.forEach(r=>{ if(!r || r.charId || gmBaseName(r.name)!==base) return;
+    const m=String(r.name||'').match(/\s+(\d+)$/); n=Math.max(n, m?(parseInt(m[1],10)||1):1); });
+  const max=parseInt(x.max,10)||0;
+  const c={name:base+' '+(n+1), init:parseInt(x.init,10)||0, hp:max||(parseInt(x.hp,10)||0), max,
+    ac:x.ac||'', ava:x.ava||'', foe:true, uid:uid()};
+  if(x.srcId) c.srcId=x.srcId;
+  if(x.dexMod!=null) c.dexMod=x.dexMod;
+  const e=gmBeastOf(x);
+  const hd=e?String((beastStat(e)||{}).hp||'').match(BEAST_DICE_RE):null;
+  if(hd){ const r=rollDice(hd[1]); if(r && r.total>0){ c.hp=r.total; c.max=r.total; } }   // свой максимум, иначе полоска ХП врала бы
+  TRK.list.push(c);
+  trkLog('add','ГМ добавил существо: '+c.name+' ('+c.hp+' ХП)');
+  trkSave(); trkRedraw(true); renderGmManage();
+}
+function gmCreatureBody(x,i){
   if(x.charId){
     const c=(CHARS_ALL[CUR_PROJECT]||[]).find(k=>k && k.id===x.charId);
     if(c) return gmSheetRef(c);
   }
-  const bc=beastCardByName(x.name);
-  if(bc){ const e=ARCHIVE.find(a=>a.id===bc.id)||CORE.find(a=>a.id===bc.id)||bc;
-    return `${e.body?`<div class="gm-cre-stat">${esc(e.body)}</div>`:''}<button class="btn ghost sm" style="margin-top:8px" onclick="openModal('${bc.id}')">Открыть полное досье</button>`; }
+  const e=gmBeastOf(x);
+  if(e){ return `${e.body?`<div class="gm-cre-stat">${esc(e.body)}</div>`:''}${gmBeastStatHtml(e)}${gmActionsHtml(i, beastActions(e))}<button class="btn ghost sm" style="margin-top:10px" onclick="openModal('${esc(e.id)}')">Открыть полное досье</button>`; }
   return '<div class="opt">Статблока нет — доступно только управление ХП.</div>';
 }
 function gmSheetRef(c){
@@ -12907,8 +13008,28 @@ function calcRoll(){
   r.classList.add('show');
   if(crit) triggerGlitch();
 }
+/* ── Кубы строкой: общий помощник ──
+   rollDice('2d6+3') / rollDice('1к6+2') / rollDice('d20+4') → {c,sides,mod,rolls,total,norm,txt}.
+   Ядро бестиария пишет кубы русской «к» («5 (1к6+2) рубящего урона»), поэтому понимаем обе буквы;
+   числовой вызов rollDice(20) — прежние кнопки кубов в шапке, с анимацией и записью в журнал. */
+function diceNorm(s){ return String(s==null?'':s).replace(/\s+/g,'').replace(/[−–—]/g,'-').replace(/[кk]/gi,'d'); }
+function parseDice(s){
+  const m=diceNorm(s).match(/^(\d*)d(\d+)([+-]\d+)?$/);
+  if(!m) return null;
+  const c=Math.min(30, Math.max(1, parseInt(m[1]||'1',10)||1)), sides=parseInt(m[2],10)||0;
+  if(sides<2 || sides>1000) return null;   // «1d0» и прочий мусор из досье не бросаем
+  return {c, sides, mod:parseInt(m[3]||'0',10)||0};
+}
+function rollExpr(s){
+  const p=parseDice(s); if(!p) return null;
+  const rolls=[]; let sum=0;
+  for(let i=0;i<p.c;i++){ const v=1+Math.floor(Math.random()*p.sides); rolls.push(v); sum+=v; }
+  const total=sum+p.mod, norm=diceNorm(s);
+  return {c:p.c, sides:p.sides, mod:p.mod, rolls, total, norm, txt:norm+' = '+total};
+}
 let diceT;
 function rollDice(n){
+  if(typeof n==='string') return rollExpr(n);   // бросок по формуле: без анимации кубов в шапке, результат возвращаем вызвавшему
   const v=1+Math.floor(Math.random()*n);
   const crit=(n===20&&(v===1||v===20)) && CUR_PROJECT==='assimilation';
   const r=document.getElementById('diceResult');
