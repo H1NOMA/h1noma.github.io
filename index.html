@@ -11861,6 +11861,7 @@ function trkRestoreInputs(keep){
     try{ if(String(el.value)!==String(k.v)) el.value=k.v; if(k.f && document.activeElement!==el){ el.focus({preventScroll:true}); if(k.s!=null && el.setSelectionRange && /^(text|search|tel|url|password)$/.test(el.type||'text')) el.setSelectionRange(k.s, k.e); } }catch(e){} });
 }
 function renderTracker(){
+  TRK_DEFER=false;   // полная отрисовка состоялась — отложенной больше нет (поле могло исчезнуть без focusout)
   const keep=trkKeepInputs();
   try{ renderTrackerCore(); } finally{ if(keep.length) trkRestoreInputs(keep); }
 }
@@ -12333,7 +12334,9 @@ document.addEventListener('focusout', e=>{ if(TRK_DEFER && e.target && e.target.
    поменялись, нужна полная отрисовка, а не точечный патч */
 function trkRedraw(force){
   const box=document.getElementById('trkBox'); if(!box) return false;
-  if(trkTyping()){ TRK_DEFER=true; if(force) box.dataset.trkSig=''; return false; }
+  // Пока палец/кнопка прижаты — тоже ждём: Chrome шлёт change по нажатию на другой элемент ещё ДО blur
+  // (activeElement уже body), и полная перерисовка пересобирала пульт под указателем — тап по кнопке терялся
+  if(trkTyping() || TRK_PTR){ TRK_DEFER=true; if(force) box.dataset.trkSig=''; if(TRK_PTR && !trkTyping()) trkDeferReplay(1); return false; }
   renderTracker(); return true;
 }
 function trkLiveApply(){
