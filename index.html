@@ -1355,6 +1355,26 @@
   .tbp-c{font-family:var(--f-mono);font-size:.66rem;padding:6px 9px;border-radius:8px;background:var(--bg2);border:var(--hair) solid var(--line2);color:var(--dim);cursor:pointer}
   .tbp-c.on{background:rgba(217,86,78,.18);border-color:rgba(217,86,78,.55);color:#e79a94}
   .tbp-c.buff.on{background:rgba(120,196,107,.18);border-color:rgba(120,196,107,.55);color:#9bd490}
+  /* состояния на себя: игрок вешает их сам — вкладка пульта на десктопе и секция панели под доской на телефоне.
+     Раньше стили жили только в десктопном блоке (≥1180px), и на телефоне чипы были голыми кнопками */
+  .pd-conds{display:flex;flex-wrap:wrap;gap:7px}
+  .pd-conds .tbp-c{font-family:var(--f-mono);font-size:.7rem;letter-spacing:.04em;min-height:40px;display:inline-flex;align-items:center;
+    background:var(--surface2);border:var(--hair) solid var(--line2);border-radius:999px;
+    padding:7px 13px;color:var(--dim);cursor:pointer;transition:color .15s,border-color .15s,background .15s}   /* ≥40px — цель под палец */
+  .pd-conds .tbp-c:hover{color:var(--txt)}
+  .pd-conds .tbp-c.on{color:var(--red-ink);border-color:rgba(var(--accent-rgb),.6);
+    background:rgba(var(--accent-rgb),.14)}
+  .pd-conds .tbp-c.buff.on{color:#84c97a;border-color:rgba(132,201,122,.55);background:rgba(132,201,122,.12)}
+  .pd-h{font-family:var(--f-mono);font-size:.64rem;letter-spacing:.18em;text-transform:uppercase;
+    color:var(--muted);margin:0 0 9px}
+  /* секция «Состояния» в панели игрока: активные чипы + «＋» (summary) раскрывают полный список внутри <details> */
+  .tm-cond .tm-cmore>summary{list-style:none;cursor:pointer}
+  .tm-cond .tm-cmore>summary::-webkit-details-marker{display:none}
+  .tm-cond .tm-cadd{min-width:40px;justify-content:center;font-size:1.05rem;line-height:1;padding:7px 10px}
+  .tm-cond .tm-cadd::before{content:"＋"}
+  .tm-cond .tm-cmore[open] .tm-cadd::before{content:"－"}
+  .tm-cond .tm-cmore>.pd-conds{margin-top:10px}
+  .tm-cond .tm-cmore>.pd-h{margin:14px 0 9px}
   /* ── Инвентарь и деньги персонажа ── */
   .tm-inv .tm-sec-h{margin-bottom:2px}
   .tm-inv .im-inv{margin-top:6px;padding-top:6px;border-top:var(--hair) solid var(--line)}
@@ -12239,8 +12259,38 @@ function playerCharBlock(vp, my){
     <button class="tm-rest-b short" onclick="trkRest('${c.id}','short')"><span class="zzz"><i>z</i></span> Быстрый отдых</button>
     <button class="tm-rest-b long" onclick="trkRest('${c.id}','long')"><span class="zzz"><i>z</i><i>z</i><i>z</i></span> Длительный отдых</button>
   </div>`;
-  return atkHtml + spHtml + slotHtml + restHtml + invMoneyBoard(c, charGame(c), canEdit(c));
+  return atkHtml + spHtml + slotHtml + playerCondsHtml(my) + restHtml + invMoneyBoard(c, charGame(c), canEdit(c));
 }
+/* секция «Состояния» панели игрока (телефон/планшет; на десктопе пульт уносит её во вкладку «Состояния»):
+   активные чипы + «＋» — summary <details> с полным списком; тап по чипу — pdCondToggle. Раскрытость помним
+   между перерисовками (после тапа по чипу панель рисуется заново — список не должен схлопываться) */
+let PC_COND_OPEN=false;
+function playerCondsHtml(my){
+  const have={}; (my.conds||[]).forEach(c=>{ if(c) have[c.t]=1; });
+  const chip=(n,b)=>`<button class="tbp-c${b?' buff':''}${have[n]?' on':''}" onclick="pdCondToggle('${esc(n)}',${b?1:0})">${esc(n)}</button>`;
+  const cur=(my.conds||[]).filter(c=>c && c.t).map(c=>chip(c.t,c.b?1:0)).join('');
+  return `<div class="tm-sec tm-cond"><div class="tm-sec-h">Состояния</div>
+    <details class="tm-cmore"${PC_COND_OPEN?' open':''} ontoggle="if(!this.closest('#pdock')) PC_COND_OPEN=this.open">
+      <summary class="pd-conds">${cur}<span class="tbp-c tm-cadd" role="button" aria-label="Все состояния"></span></summary>
+      <div class="pd-conds">${TRK_CONDS.map(n=>chip(n,0)).join('')}</div>
+      <div class="pd-h">Благословения</div>
+      <div class="pd-conds">${TRK_BUFFS.map(n=>chip(n,1)).join('')}</div>
+    </details></div>`;
+}
+/* игрок вешает и снимает состояния на СВОЕГО персонажа сам: раньше это мог только ГМ, а по столу это первое,
+   что нужно под рукой. Жило внутри десктопного пульта — теперь общее для панели на телефоне и вкладки пульта */
+function pdCondToggle(name, buff){
+  const vp=trkActiveForPlayer(); if(!vp) return;
+  const my=playerMyCard(vp); if(!my) return;
+  my.conds=my.conds||[];
+  const at=my.conds.findIndex(c=>c && c.t===name), had=at>=0;
+  if(had) my.conds.splice(at,1); else my.conds.push(buff?{t:name,b:1}:{t:name});
+  const s=TRK_SHARED[vp]; if(s) s.at=Date.now();
+  trkRedraw(true);   // состав чипов — структурная правка (conds входит в trkComboSig); при зажатом пальце/вводе — дорисуется после
+  trkCloudCardPatch(vp, trkCardKey(my), {conds:my.conds});
+  trkLog('cond',(my.name||'Игрок')+(had?' снял':' навесил')+' «'+name+'»');
+}
+window.pdCondToggle=pdCondToggle;
 /* игрок тратит/возвращает ячейку прямо с доски — правка своего листа */
 function trkSlotTap(charId,lvl,idx){
   const c=(CHARS_ALL[CUR_PROJECT]||[]).find(x=>x && x.id===charId); if(!c||!canEdit(c)) return;
@@ -14212,17 +14262,9 @@ function openInstallHelp(){
   .trk-pside .trk-me .tx-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:6px}
   .trk-pside .trk-me .tx-row .tx-note{grid-column:1 / -1}
   .trk-pside .trk-me .tx-row select,.trk-pside .trk-me .tx-row input{width:100%;min-width:0}
-  /* состояния — своей вкладкой: игрок вешает их на себя сам */
-  .pd-conds{display:flex;flex-wrap:wrap;gap:7px}
-  .pd-conds .tbp-c{font-family:var(--f-mono);font-size:.7rem;letter-spacing:.04em;
-    background:var(--surface2);border:var(--hair) solid var(--line2);border-radius:999px;
-    padding:7px 13px;color:var(--dim);cursor:pointer;transition:color .15s,border-color .15s,background .15s}
-  .pd-conds .tbp-c:hover{color:var(--txt)}
-  .pd-conds .tbp-c.on{color:var(--red-ink);border-color:rgba(var(--accent-rgb),.6);
-    background:rgba(var(--accent-rgb),.14)}
-  .pd-conds .tbp-c.buff.on{color:#84c97a;border-color:rgba(132,201,122,.55);background:rgba(132,201,122,.12)}
-  .pd-h{font-family:var(--f-mono);font-size:.64rem;letter-spacing:.18em;text-transform:uppercase;
-    color:var(--muted);margin:0 0 9px}
+  /* состояния — своей вкладкой: чипы .pd-conds/.tbp-c описаны в общих стилях (панель на телефоне их тоже рисует);
+     в пульте места хватает — строка «активные + ＋» не нужна, полный список раскрыт (pdSync ставит open) */
+  .pd-panel-in .tm-cond .tm-cmore>summary{display:none}
 
   /* подвал и плавающие кнопки уступают пульту его полосу */
   html.pdock-on #view-combat{padding-bottom:calc(var(--pdock-h) + 14px)}
@@ -14280,7 +14322,7 @@ function openInstallHelp(){
       else if(n.classList.contains('tm-rest')) k='rest';
       else if(n.classList.contains('tm-sec')){
         var h=(n.querySelector('.tm-sec-h')||{}).textContent||'';
-        k = /атак/i.test(h) ? 'atk' : /ячейк/i.test(h) ? 'slots' : /заклин/i.test(h) ? 'sp' : 'inv';
+        k = /атак/i.test(h) ? 'atk' : /ячейк/i.test(h) ? 'slots' : /заклин/i.test(h) ? 'sp' : /состоян/i.test(h) ? 'cond' : 'inv';
       }
       n.setAttribute('data-pd', k);
       if(k!=='hide') have[k]=true;
@@ -14288,20 +14330,8 @@ function openInstallHelp(){
     return have;
   }
 
-  /* игрок вешает и снимает состояния на СВОЕГО персонажа сам:
-     раньше это мог только ГМ, а по столу это первое, что нужно под рукой */
-  window.pdCondToggle=function(name, buff){
-    var vp=trkActiveForPlayer(); if(!vp) return;
-    var my=playerMyCard(vp); if(!my) return;
-    my.conds=my.conds||[];
-    var at=-1;
-    for(var i=0;i<my.conds.length;i++){ if(my.conds[i] && my.conds[i].t===name){ at=i; break; } }
-    if(at>=0) my.conds.splice(at,1); else my.conds.push(buff?{t:name,b:1}:{t:name});
-    var s=TRK_SHARED[vp]; if(s) s.at=Date.now();
-    if(typeof trkRedraw==='function') trkRedraw(true); else renderTracker();
-    try{ trkCloudCardPatch(vp, trkCardKey(my), {conds:my.conds}); }catch(e){}
-  };
-
+  /* pdCondToggle (игрок вешает состояния на себя) переехал наверх, к playerInitSet: он нужен и панели на телефоне.
+     condsNode — запасной вариант для листа без секции «Состояния» (при 0 ХП вместо playerCharBlock — спасброски) */
   function condsNode(my){
     var have={}; (my.conds||[]).forEach(function(c){ if(c) have[c.t]=1; });
     var chip=function(n,b){ return '<button class="tbp-c'+(b?' buff':'')+(have[n]?' on':'')+
@@ -14349,7 +14379,8 @@ function openInstallHelp(){
     pin.innerHTML='';                     // прошлый снимок панели уходит целиком
     pin.appendChild(me);                  // свежий — переезжает как есть
     var have=mark(me);
-    me.appendChild(condsNode(my)); have.cond=true;
+    if(have.cond){ var dt=me.querySelector('.tm-cond details'); if(dt) dt.open=true; }   // секция уже в панели — второй не добавляем, список раскрыт
+    else { me.appendChild(condsNode(my)); have.cond=true; }
 
     var maxHp=playerMaxHp(vp, my.charId), hp=parseInt(my.hp,10)||0;
     var pct = maxHp ? Math.max(0,Math.min(100,Math.round(hp/maxHp*100))) : (hp>0?100:0);
