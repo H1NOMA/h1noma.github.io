@@ -11683,7 +11683,11 @@ function trkLoad(){
 }
 /* TRK.at — когда состав правили на ЭТОМ устройстве: по нему trkPullCloud решает, не старее ли
    локальный снимок облачной доски (ключ в облако не уходит — trkSnap его не берёт) */
-function trkSaveLocal(){ if(TRK) TRK.at=Date.now(); try{ localStorage.setItem('comik:tracker:v2', JSON.stringify(TRK_ALL)); }catch(e){} }
+function trkSaveLocal(){ if(TRK) TRK.at=Date.now();
+  // враг, у которого хиты когда-либо были больше нуля, отмечается «был жив»: только такого
+  // потом считаем поверженным при hp 0 (монстр, добавленный одним именем, живёт с нулём и ход получает)
+  try{ (TRK&&TRK.list||[]).forEach(x=>{ if(x && !x.wasHit && isFoeCard(x) && (parseInt(x.hp,10)||0)>0) x.wasHit=1; }); }catch(e){}
+  try{ localStorage.setItem('comik:tracker:v2', JSON.stringify(TRK_ALL)); }catch(e){} }
 function trkSave(){ trkSaveLocal(); trkPublish(); }
 /* персонажи выбранной партии (заявки) автоматически попадают в список: имя, хиты и КД — из листа */
 function trkSyncParty(replace){
@@ -11739,7 +11743,12 @@ const TRK_BUFFS=['Благословение','Вдохновение','Уско
 function trkOrder(list){ return (list||[]).map((x,i)=>({x,i}))
   .sort((a,b)=>((b.x.init||0)-(a.x.init||0))||((b.x.dexMod||0)-(a.x.dexMod||0))||(a.i-b.i)).map(o=>o.x); }
 /* карточка выбыла из боя: враг на нуле ХП либо персонаж с тремя провалами спасбросков */
-function trkOutOfFight(x){ if(!x) return false; return isFoeCard(x) ? ((parseInt(x.hp,10)||0)<=0) : !!(x.ds && (x.ds.f||0)>=3); }
+/* выбыл из боя: враг с нулевыми хитами (но только если хиты у него вообще были — монстр,
+   которого ГМ добавил одним именем, живёт с hp 0 и ход получать должен) либо персонаж с тремя провалами */
+function trkOutOfFight(x){ if(!x) return false;
+  if(!isFoeCard(x)) return !!(x.ds && (x.ds.f||0)>=3);
+  const hp=parseInt(x.hp,10)||0, mx=parseInt(x.max,10)||0;
+  return hp<=0 && (mx>0 || !!x.wasHit); }
 /* настройка ГМа «пропускать павших» — своя на каждом устройстве, по умолчанию включена */
 function trkSkipDead(){ try{ return localStorage.getItem('comik:trk:skipdead')!=='0'; }catch(e){ return true; } }
 function trkSkipDeadToggle(){ try{ localStorage.setItem('comik:trk:skipdead', trkSkipDead()?'0':'1'); }catch(e){} trkRedraw(true); }
