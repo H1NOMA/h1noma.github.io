@@ -178,17 +178,40 @@ do $$ begin
   alter publication supabase_realtime add table public.kv;
 exception when duplicate_object then null; end $$;
 
+-- рекурсивное слияние jsonb: объекты сливаются вглубь, массивы и скаляры заменяются, null удаляет ключ
+create or replace function public.jsonb_deep_merge(a jsonb, b jsonb)
+returns jsonb language sql immutable as $$
+  select case
+    when jsonb_typeof(a)='object' and jsonb_typeof(b)='object' then
+      (select coalesce(jsonb_object_agg(k, v), '{}'::jsonb) from (
+         select k, case when a ? k and b ? k then public.jsonb_deep_merge(a->k, b->k)
+                        when b ? k then b->k else a->k end as v
+         from (select jsonb_object_keys(a) as k union select jsonb_object_keys(b)) ks
+         where not (b ? k and jsonb_typeof(b->k)='null')) t)
+    else b end;
+$$;
+
+-- deep-merge патча в строку kv (раньше здесь было плоское `||`: правка карты затирала доску целиком)
 create or replace function public.kv_deep_merge(p_key text, p_patch jsonb)
 returns void language sql security definer set search_path = public as $$
   insert into public.kv(key, value) values (p_key, p_patch)
-  on conflict (key) do update set value = kv.value || excluded.value;
+  on conflict (key) do update set value = public.jsonb_deep_merge(kv.value, excluded.value);
 $$;
 
+-- патч одной карточки доски: карточки лежат МАССИВОМ value[board].list, ключ — 'c:'+charId либо 'u:'+uid
 create or replace function public.trk_card_patch(p_key text, p_board text, p_cardkey text, p_patch jsonb)
 returns void language plpgsql security definer set search_path = public as $$
+declare cur jsonb; idx int := -1; i int; el jsonb; k text;
 begin
-  update public.kv set value = jsonb_set(value, array[p_board,'cards',p_cardkey],
-    coalesce(value#>array[p_board,'cards',p_cardkey],'{}'::jsonb) || p_patch, true)
+  cur := (select value#>array[p_board,'list'] from public.kv where key=p_key);
+  if cur is null or jsonb_typeof(cur)<>'array' then return; end if;
+  for i in 0..jsonb_array_length(cur)-1 loop
+    el := cur->i;
+    k := case when el ? 'charId' then 'c:'||(el->>'charId') else 'u:'||coalesce(el->>'uid','') end;
+    if k = p_cardkey then idx := i; exit; end if;
+  end loop;
+  if idx < 0 then return; end if;
+  update public.kv set value = jsonb_set(value, array[p_board,'list',idx::text], public.jsonb_deep_merge(cur->idx, p_patch), false)
   where key = p_key;
 end $$;
 
@@ -202,7 +225,7 @@ begin
     cur := (select jsonb_agg(e) from (select e from jsonb_array_elements(cur) e
             offset jsonb_array_length(cur)-p_cap) t);
   end if;
-  update public.kv set value = jsonb_set(value, array[p_board,'log'], cur, true) where key=p_key;
+  update public.kv set value = jsonb_set(coalesce(value,'{}'::jsonb), array[p_board], public.jsonb_deep_merge(coalesce(value->p_board,'{}'::jsonb), jsonb_build_object('log', cur)), true) where key=p_key;
 end $$;
 
 -- RPC пишут в обход RLS (security definer) — анониму их звать нельзя

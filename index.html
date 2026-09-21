@@ -1355,18 +1355,24 @@
   .tm-inv .im-inv{margin-top:6px;padding-top:6px;border-top:var(--hair) solid var(--line)}
   .im-list:empty{margin-bottom:0}
   .im-bal{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px}
-  .im-coin{font-family:var(--f-mono);font-size:.8rem;color:var(--dim);background:var(--bg2);border:var(--hair) solid var(--line2);border-radius:8px;padding:5px 10px}
-  .im-coin b{font-family:var(--f-disp);color:var(--red-ink);font-size:.95rem;margin-right:2px}
+  /* пилюли валют одной ширины, число и код на одной базовой линии — раньше «107 RUB» был шире соседей, а код сидел ниже */
+  .im-coin{flex:1 1 0;min-width:76px;display:inline-flex;align-items:baseline;justify-content:center;gap:5px;
+    font-family:var(--f-mono);font-size:.78rem;line-height:1;color:var(--dim);background:var(--bg2);border:var(--hair) solid var(--line2);border-radius:8px;padding:9px 8px;white-space:nowrap}
+  .im-coin b{font-family:var(--f-disp);color:var(--red-ink);font-size:.98rem;line-height:1}
   .tx-form{border:var(--hair) solid var(--line2);border-radius:12px;padding:9px;background:var(--surface);margin-bottom:8px}
   .tx-row{display:flex;gap:6px;margin-bottom:7px;flex-wrap:wrap}
   .tx-cur{flex:0 0 auto;min-width:76px}
   .tx-amt{flex:0 1 90px;min-width:70px}
   .tx-note{flex:1 1 120px;min-width:100px}
-  .tx-form select,.tx-form input{background:var(--bg2);border:var(--hair) solid var(--line2);border-radius:9px;color:var(--txt);padding:8px 9px;font-family:var(--f-body);font-size:.85rem}
+  /* одна высота у списка валют и полей: select и input по умолчанию разной высоты, строка «плясала» */
+  .tx-form select,.tx-form input{box-sizing:border-box;height:38px;background:var(--bg2);border:var(--hair) solid var(--line2);border-radius:9px;color:var(--txt);padding:0 10px;font-family:var(--f-body);font-size:.85rem;line-height:36px;-webkit-appearance:none;appearance:none}
+  .tx-form select{padding-right:26px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center;background-size:14px}
+  .tx-form input[type=number]{-moz-appearance:textfield}
+  .tx-form input::-webkit-outer-spin-button,.tx-form input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
   .tx-form select:focus,.tx-form input:focus{outline:none;border-color:var(--red)}
   .tx-btns{display:flex;gap:6px}
-  .tx-btns button{flex:1;border-radius:9px;padding:9px;font-family:var(--f-disp);font-weight:600;font-size:.82rem;cursor:pointer;border:var(--hair) solid var(--line2);background:var(--bg2)}
-  .tx-out{color:var(--hp-low,#d9564e)} .tx-in{color:var(--hp-ok,#78c46b)}
+  .tx-btns button{flex:1 1 0;min-width:0;min-height:38px;display:inline-flex;align-items:center;justify-content:center;border-radius:9px;padding:0 9px;font-family:var(--f-disp);font-weight:600;font-size:.82rem;line-height:1.2;cursor:pointer;border:var(--hair) solid var(--line2);background:var(--bg2);color:var(--txt);opacity:1;visibility:visible;text-indent:0;white-space:nowrap}
+  .tx-spend{color:var(--hp-low,#d9564e)} .tx-earn{color:var(--hp-ok,#78c46b)}
   .im-led{margin-top:4px}
   .im-led summary{font-family:var(--f-mono);font-size:.66rem;letter-spacing:.06em;color:var(--muted);cursor:pointer;padding:5px 0}
   .im-le{display:flex;align-items:baseline;gap:8px;padding:5px 0;border-top:1px solid var(--line);font-size:.78rem}
@@ -6766,12 +6772,13 @@ async function gamePlayed(id){
     const t=TRK_ALL[proj]; if(!(t && t.party===id)) return;
     t.party=''; t.list=[];
   });
-  // гасим общие столы, чья партия — эта игра (и каноничный ключ сеттинга, и `сеттинг::тег` Мастера)
-  Object.keys(TRK_SHARED).forEach(k=>{
-    const sh=TRK_SHARED[k]; if(sh && sh.party===id) TRK_SHARED[k]={list:[], party:'', at:Date.now(), active:false};
-  });
+  // гасим общие столы, чья партия — эта игра (и каноничный ключ сеттинга, и `сеттинг::тег` Мастера).
+  // Мутация встаёт в очередь ДО публикации из trkSave: та уже не увидит партию и не оставила бы доску активной
+  const ownBk=gmBoardKey(), ownWas=!!(TRK_SHARED[ownBk] && TRK_SHARED[ownBk].party===id);
+  const boardsOff=v=>{ Object.keys(v).forEach(k=>{ const sh=v[k];
+    if(sh && typeof sh==='object' && !Array.isArray(sh) && (sh.party===id || (ownWas && k===ownBk))) v[k]={list:[], party:'', at:Date.now(), active:false, owner:sh.owner||currentTag(), round:1, activeKey:'', log:sh.log||[], mapPos:{}, mapBg:sh.mapBg||'', mapCols:sh.mapCols||TRK_MAPCOLS}; }); };
+  trkWrite(boardsOff, 'active:'+ownBk);
   trkSave();
-  sset(KEY_TRKSHARED, TRK_SHARED, true).catch(()=>{});
   // экран обновляем до ответа облака: пока шёл сетевой раунд, удалённая игра висела в расписании и баннере
   openSchedule(); renderNews(); toast('Сессия завершена и удалена');
   await persistGames();
@@ -7477,8 +7484,9 @@ setInterval(async ()=>{
     // живой «стол» ГМа для игроков на странице инструментов
     const tv=document.getElementById('view-combat');
     if(tv && tv.classList.contains('active') && !ADMIN){
-      await trkFetchShared();
-      renderTracker();
+      // раньше здесь была полная перерисовка: она пересоздавала поле ввода под пальцами, и на телефоне
+      // исчезала клавиатура. Теперь — тот же бережный путь, что у Realtime (с отсрочкой при вводе)
+      if(await trkFetchShared()) trkLiveApply();
     }
   }catch(e){}
 }, 40000);
@@ -8780,13 +8788,13 @@ function invMoneyHtml(c, G, own){
         <input id="txAmt" class="tx-amt" type="number" inputmode="numeric" min="0" placeholder="Сумма">
         <input id="txNote" class="tx-note" maxlength="60" placeholder="За что (необязательно)">
       </div>
-      <div class="tx-btns"><button class="tx-out" onclick="charMoneyTx('${c.id}',-1)">− Потратить</button><button class="tx-in" onclick="charMoneyTx('${c.id}',1)">＋ Получить</button></div>
+      <div class="tx-btns"><button class="tx-spend" onclick="charMoneyTx('${c.id}',-1,this)">− Потратить</button><button class="tx-earn" onclick="charMoneyTx('${c.id}',1,this)">＋ Получить</button></div>
     </div>`:'';
   const led=(c.ledger||[]).slice(-8).reverse();
   const ledHtml = led.length?`<details class="im-led"><summary>История операций · ${(c.ledger||[]).length}</summary>${led.map(e=>`<div class="im-le ${e.sign<0?'out':'in'}"><span class="a">${e.sign<0?'−':'+'}${esc(String(e.amt))} ${esc(coinShort(cur,e.cur))}</span><span class="n">${esc(e.note||'—')}</span><span class="t">${esc(fmtDate(e.at))}</span></div>`).join('')}</details>`:'';
   const inv=(c.inv||[]);
-  const invRows = inv.length?inv.map((it,i)=>`<div class="im-item"><span class="q">${esc(String(it.q||1))}×</span><span class="n">${esc(it.n||'')}</span>${own?`<span class="im-iq"><button onclick="charInvQty('${c.id}',${i},-1)" aria-label="Меньше">−</button><button onclick="charInvQty('${c.id}',${i},1)" aria-label="Больше">+</button><button class="d" onclick="charInvDel('${c.id}',${i})" aria-label="Убрать">✕</button></span>`:''}</div>`).join(''):'';
-  const invAdd = own?`<div class="inv-add"><input id="invName" maxlength="60" placeholder="Добавить предмет"><input id="invQty" type="number" inputmode="numeric" min="1" value="1"><button onclick="charInvAdd('${c.id}')">＋</button></div>`:'';
+  const invRows = inv.length?inv.map((it,i)=>`<div class="im-item"><span class="q">${esc(String(it.q||1))}×</span><span class="n">${esc(it.n||'')}</span>${own?`<span class="im-iq"><button onclick="charInvQty('${c.id}',${i},-1,this)" aria-label="Меньше">−</button><button onclick="charInvQty('${c.id}',${i},1,this)" aria-label="Больше">+</button><button class="d" onclick="charInvDel('${c.id}',${i},this)" aria-label="Убрать">✕</button></span>`:''}</div>`).join(''):'';
+  const invAdd = own?`<div class="inv-add"><input id="invName" maxlength="60" placeholder="Добавить предмет"><input id="invQty" type="number" inputmode="numeric" min="1" value="1"><button onclick="charInvAdd('${c.id}',this)">＋</button></div>`:'';
   return `<div class="im-money">
       <div class="im-bal">${bal}</div>${txForm}${ledHtml}</div>
     <div class="im-inv">
@@ -8799,22 +8807,26 @@ function invMoneyBoard(c, G, own){
 }
 /* точечная перерисовка: меняем только модуль инвентаря/денег этого персонажа,
    не пересобирая всю доску/лист (быстрее и без мигания аватаров/полей) */
-function charInvRerender(id){
+function charInvRerender(id, from){
   const c=charFind(id);
-  const node=c && document.querySelector('.tm-inv[data-inv="'+(window.CSS&&CSS.escape?CSS.escape(id):id)+'"]');
+  // блок, в котором нажали кнопку: на странице могут жить два модуля одного персонажа (лист в шторке и доска)
+  const node=c && ((from && from.closest && from.closest('.tm-inv')) || document.querySelector('.tm-inv[data-inv="'+(window.CSS&&CSS.escape?CSS.escape(id):id)+'"]'));
   if(c && node){ node.outerHTML = invMoneyBoard(c, charGame(c), canEdit(c)); return; }
   // фолбэк — полная перерисовка, если модуль на экране не найден
   const cv=document.getElementById('view-combat');
-  if(cv && cv.classList.contains('active') && document.getElementById('trkBox')){ renderTracker(); return; }
+  if(cv && cv.classList.contains('active') && document.getElementById('trkBox')){ trkRedraw(true); return; }
   const scr=document.getElementById('scrim');
   if(scr && scr.classList.contains('open')) openPlayer(id);
 }
-function charMoneyTx(id, sign){
+/* значение поля из того же блока, где нажали кнопку (иначе document.getElementById мог взять
+   одноимённое поле из другого, скрытого модуля — и сумма «не читалась») */
+function blockVal(from, sel, id){ const f=from&&from.closest?from.closest(sel):null; const e=f?f.querySelector('#'+id):pf(id); return e?String(e.value).trim():''; }
+function charMoneyTx(id, sign, from){
   const c=charFind(id); if(!c||!canEdit(c)) return;
   const G=charGame(c), cur=moneyCurr(G);
-  const k=pval('txCur')||cur[0][0];
-  const amt=Math.abs(parseInt(pval('txAmt'),10)||0); if(!amt){ toast('Укажите сумму'); return; }
-  const note=(pval('txNote')||'').trim();
+  const k=blockVal(from,'.tx-form','txCur')||cur[0][0];
+  const amt=Math.abs(parseInt(blockVal(from,'.tx-form','txAmt'),10)||0); if(!amt){ toast('Укажите сумму'); return; }
+  const note=(blockVal(from,'.tx-form','txNote')||'').trim();
   c.coins=c.coins||{};
   const bal=parseInt(c.coins[k],10)||0;
   if(sign<0 && amt>bal){ const lbl=(cur.find(x=>x[0]===k)||[,''])[1].split(' ').pop(); toast('Недостаточно средств: на счету '+bal+' '+lbl); return; }
@@ -8823,25 +8835,25 @@ function charMoneyTx(id, sign){
   if(c.ledger.length>200) c.ledger=c.ledger.slice(-200);
   const clbl=(cur.find(x=>x[0]===k)||[,''])[1].split(' ').pop();
   trkLog('money',(c.name||'Игрок')+(sign<0?' потратил ':' получил ')+amt+' '+clbl+(note?' · '+note:''));
-  c.updatedAt=Date.now(); persistChars(); charInvRerender(id);
+  c.updatedAt=Date.now(); persistChars(); charInvRerender(id, from);
 }
-function charInvAdd(id){
+function charInvAdd(id, from){
   const c=charFind(id); if(!c||!canEdit(c)) return;
-  const n=(pval('invName')||'').trim(); if(!n){ toast('Название предмета'); return; }
-  const q=Math.max(1,parseInt(pval('invQty'),10)||1);
+  const n=(blockVal(from,'.inv-add','invName')||'').trim(); if(!n){ toast('Название предмета'); return; }
+  const q=Math.max(1,parseInt(blockVal(from,'.inv-add','invQty'),10)||1);
   c.inv=c.inv||[]; const ex=c.inv.find(x=>(x.n||'').toLowerCase()===n.toLowerCase());
   if(ex) ex.q=(parseInt(ex.q,10)||1)+q; else c.inv.push({n,q});
-  c.updatedAt=Date.now(); persistChars(); charInvRerender(id);
+  c.updatedAt=Date.now(); persistChars(); charInvRerender(id, from);
 }
-function charInvQty(id, i, d){
+function charInvQty(id, i, d, from){
   const c=charFind(id); if(!c||!canEdit(c)||!c.inv||!c.inv[i]) return;
   const q=(parseInt(c.inv[i].q,10)||1)+d;
   if(q<=0) c.inv.splice(i,1); else c.inv[i].q=q;
-  c.updatedAt=Date.now(); persistChars(); charInvRerender(id);
+  c.updatedAt=Date.now(); persistChars(); charInvRerender(id, from);
 }
-function charInvDel(id, i){
+function charInvDel(id, i, from){
   const c=charFind(id); if(!c||!canEdit(c)||!c.inv||!c.inv[i]) return;
-  c.inv.splice(i,1); c.updatedAt=Date.now(); persistChars(); charInvRerender(id);
+  c.inv.splice(i,1); c.updatedAt=Date.now(); persistChars(); charInvRerender(id, from);
 }
 /* Воля (TERRA): числовой счётчик прямо в просмотре листа — владелец меняет тапом */
 function willAdj(id,d){
@@ -10641,7 +10653,10 @@ function renderToolsPage(){
   renderTrkLog();
   // подтягиваем «стол» и заметки из облака, затем перерисовываем
   Promise.all([trkFetchShared(), gmNotesLoad()]).then(()=>{
-    if(document.getElementById('trkBox')){ renderTracker(); renderGmNotes(); renderTrkLog(); }
+    if(!document.getElementById('trkBox')) return;
+    renderGmNotes();                       // сама не трогает textarea, если партия та же (см. renderGmNotes)
+    if(!trkRedraw(true)) return;           // игрок уже печатает в поле — дорисуем по focusout, а не под пальцем
+    renderTrkLog();
   });
   trkLiveStart(); // мгновенное обновление доски (Realtime + запасной опрос)
 }
@@ -10777,8 +10792,12 @@ function renderGmNotes(){
     box.innerHTML='<div class="empty">Выбери партию в трекере — заметки привяжутся к ней.</div>';
     return;
   }
+  // textarea той же партии уже на экране — не пересоздаём (иначе у ГМа на телефоне пропадала клавиатура
+  // при каждой фоновой перерисовке); текст подтягиваем, только если поле не в фокусе
+  const ta=document.getElementById('gmNoteText');
+  if(ta && ta.dataset.party===TRK.party){ const v=GMNOTES[TRK.party]||''; if(document.activeElement!==ta && ta.value!==v) ta.value=v; return; }
   box.innerHTML=`
-    <textarea id="gmNoteText" maxlength="8000" rows="6" placeholder="Завязки, секреты, награды — игроки этого не видят." oninput="gmNoteAuto(this.value)">${esc(GMNOTES[TRK.party]||'')}</textarea>`;
+    <textarea id="gmNoteText" data-party="${esc(TRK.party)}" maxlength="8000" rows="6" placeholder="Завязки, секреты, награды — игроки этого не видят." oninput="gmNoteAuto(this.value)">${esc(GMNOTES[TRK.party]||'')}</textarea>`;
 }
 
 /* --- перенос отдельного персонажа: экспорт/импорт JSON-листа ---
@@ -11145,16 +11164,16 @@ function trkAva(x, proj){
   return beastImgByName(x.name);
 }
 function stripAva(x){ const o=Object.assign({}, x); delete o.ava; return o; }   // для отправки в облако
-function trkMergedList(freshMap){
+function trkMergedList(freshMap, list){
   const prev=TRK_SHARED[gmBoardKey()]||{};
   const m=freshMap||{}; if(!freshMap){ (Array.isArray(prev.list)?prev.list:[]).forEach(p=>{ if(p) m[trkCardKey(p)]=p; }); }
-  return TRK.list.map(x=>{
+  return (list||TRK.list).map(x=>{
     // враги/NPC ГМа: их боевые значения ведёт ГМ — берём из локального списка.
     // игроки: ХП/инициатива/спасброски принадлежат игроку — берём из общего стола, чтобы
     // публикация ГМа не откатывала и не «воскрешала» умирающего игрока (спасброски независимы).
     if(isFoeCard(x)) return stripAva(x);
     const p=m[trkCardKey(x)];
-    return stripAva(p?{...x, hp:p.hp, init:p.init, ds:p.ds}:x);
+    return stripAva(p?{...x, hp:p.hp, init:p.init, ds:p.ds, conds:Array.isArray(p.conds)?p.conds:(x.conds||[]), conc:(p.conc!=null?!!p.conc:!!x.conc)}:x);
   });
 }
 /* ГМ подтягивает «живые» правки игроков (ХП/инициатива/спасброски) из общего стола
@@ -11168,106 +11187,189 @@ function trkAbsorbShared(){
     if(p.hp!=null) x.hp=p.hp;
     if(p.init!=null) x.init=p.init;
     if(p.ds) x.ds=p.ds; else delete x.ds;
+    if(Array.isArray(p.conds)) x.conds=p.conds;   // состояния игрок вешает на себя сам — публикация ГМа их не снимает
+    if(p.conc!=null) x.conc=!!p.conc;
   });
 }
+/* Сборка своей доски для облака из СВЕЖЕЙ копии prev (вызывается внутри мутации CAS):
+   боевые значения игроков (ХП/иниц/спасброски) — из prev, врагов — из локального списка ГМа;
+   журнал, карта и флаг активности — из prev, если явно не переключаем. */
+function trkBoardBuild(prev, opts){
+  prev=(prev&&typeof prev==='object')?prev:{}; opts=opts||{};
+  const sn=opts.snap||trkSnap();   // состав/партия/раунд — с момента действия ГМа, а не с момента отложенной записи
+  const fm={}; (Array.isArray(prev.list)?prev.list:[]).forEach(c=>{ if(c) fm[trkCardKey(c)]=c; });
+  if(opts.finish) return {list:[], party:'', at:Date.now(), active:false, owner:currentTag(), round:1, activeKey:'',
+    log:prev.log||[], mapPos:{}, mapBg:(prev.mapBg!=null?prev.mapBg:''), mapCols:prev.mapCols||sn.mapCols||TRK_MAPCOLS};
+  // фон карты: из облака; если там пусто, а у ГМа он задан локально (доска ещё не публиковалась) — берём локальный
+  const bg=(prev.mapBg!=null && prev.mapBg!=='')?prev.mapBg:(sn.mapBg||'');
+  return {list:trkMergedList(fm, sn.list), party:sn.party, at:Date.now(), active:(opts.active!=null)?!!opts.active:!!prev.active,
+    owner:currentTag(), round:sn.round||1, activeKey:sn.activeKey||'',
+    log:prev.log||[], mapPos:prev.mapPos||{}, mapBg:bg, mapCols:prev.mapCols||sn.mapCols||TRK_MAPCOLS};
+}
+/* снимок локального стола на момент действия: мутация выполнится позже (очередь, бэкофф), а ГМ мог уже сменить сеттинг */
+function trkSnap(){ return {list:(TRK.list||[]).map(x=>stripAva(x)), party:TRK.party||'', round:TRK.round||1, activeKey:TRK.activeKey||'', mapCols:TRK.mapCols||0, mapBg:TRK.mapBg||''}; }
 function trkPublish(){
   if(!ADMIN) return;
-  (async()=>{
-    // перед публикацией подтягиваем самые свежие боевые значения игроков из облака,
-    // чтобы наша запись не затёрла чужие спасброски/ХП. Локальный active/party (намерение
-    // ГМа) и карточки врагов берём из своего состояния — их ведёт ГМ.
-    const bk=gmBoardKey();
-    let freshList=null, fresh=null;
-    try{ const v=await withTimeout(cloudGet(KEY_TRKSHARED),3500);
-      if(v && typeof v==='object'){ TRK_SHARED=v; fresh=v[bk]; if(fresh && Array.isArray(fresh.list)) freshList=fresh.list; }
-    }catch(e){}
-    const prev=TRK_SHARED[bk]||{}; const meta=fresh||prev;
-    if(!freshList) freshList=Array.isArray(prev.list)?prev.list:[];
-    const fm={}; freshList.forEach(p=>{ if(p) fm[trkCardKey(p)]=p; });
-    // карта (позиции фишек/фон/размер сетки) — сохраняем из свежего облака, публикация их не должна стирать
-    TRK_SHARED[bk]={list:trkMergedList(fm), party:TRK.party, at:Date.now(), active:!!prev.active, owner:currentTag(), round:TRK.round||1, activeKey:TRK.activeKey||'',
-      log:meta.log||prev.log||[], mapPos:meta.mapPos||prev.mapPos||{}, mapBg:(meta.mapBg!=null?meta.mapBg:(prev.mapBg||'')), mapCols:meta.mapCols||prev.mapCols||TRK.mapCols||TRK_MAPCOLS};
-    { const {log:_lg, ...pub}=TRK_SHARED[bk]; await trkCloudBoardMerge(bk, pub); }   // атомарно, только свою доску; журнал не трогаем (его ведёт дозапись)
-  })();
+  const bk=gmBoardKey(), snap=trkSnap();
+  // одна отложенная публикация на доску: частые правки ГМа схлопываются в последнюю (снимок — последней)
+  trkWrite(v=>{ v[bk]=trkBoardBuild(v[bk], {snap}); }, 'board:'+bk);
 }
 async function trkFetchShared(){
-  try{ const v=await withTimeout(cloudGet(KEY_TRKSHARED),4000); if(v && typeof v==='object') TRK_SHARED=v; }catch(e){}
+  try{
+    // сначала дёшево спрашиваем только версию: не изменилась — всю строку (с картой и журналами) не качаем
+    if(TRK_REV && !TRK_PENDING.length){
+      const r=await withTimeout(supa.from('kv').select('rev:value->>rev').eq('key',KEY_TRKSHARED).maybeSingle(), 5000);
+      if(r && !r.error && r.data && (parseInt(r.data.rev,10)||0)===TRK_REV) return false;
+    }
+    const v=await withTimeout(cloudGet(KEY_TRKSHARED),8000);
+    if(v && typeof v==='object'){ const before=JSON.stringify(TRK_SHARED); if(trkAdopt(v,'poll')) return JSON.stringify(TRK_SHARED)!==before; }
+  }catch(e){}
+  return false;
 }
-/* Точечная запись игрока в общий стол: применяем изменение оптимистично, затем сливаем
-   самое свежее облако и повторяем ТОЛЬКО свою правку — так правка одной карточки (моё ХП,
-   мои спасброски) не воскрешает и не откатывает чужие. applyFn обязана заново находить
-   нужную карточку в TRK_SHARED и менять её (без случайностей — их вычисляем заранее). */
-function trkShareApply(applyFn){
-  applyFn(); renderTracker();                                  // оптимистично — сразу видно
-  (async()=>{
-    try{ const v=await withTimeout(cloudGet(KEY_TRKSHARED),3500); if(v && typeof v==='object') TRK_SHARED=v; }catch(e){}
-    applyFn();                                                 // та же правка поверх свежего облака
-    try{ await sset(KEY_TRKSHARED, TRK_SHARED, true); }catch(e){}
-    renderTracker();
-  })();
+/* ══ Единый канал записи общего стола ══════════════════════════════════════════
+   Раньше правки шли тремя путями: серверные RPC, «прочитать весь blob → переписать весь blob»
+   и прямые sset всей строки. На своём облаке RPC оказались с другой моделью данных: kv_deep_merge
+   сливал только верхний уровень (правка карты/журнала ЗАТИРАЛА доску целиком — у игроков
+   «Мастер не ведёт игру»), а trk_card_patch писал в несуществующий `cards` вместо `list`
+   (ХП/инициатива никогда не долетали и «откатывались» следующим снимком). Прямые записи всего
+   blob'а с устаревшей копией добивали остальное.
+   Теперь любая правка — это мутация mut(v), которая идемпотентно применяет ОДНО намерение к
+   значению строки (находит доску/карточку по ключу и ставит абсолютные значения). Она:
+   1) сразу применяется к локальной копии (экран не ждёт сеть);
+   2) ложится в очередь TRK_PENDING, пока облако её не подтвердит;
+   3) уходит в облако через CAS: свежее чтение → все ожидающие мутации → запись с проверкой
+      версии value.rev. Кто-то успел раньше — перечитываем и повторяем свои правки.
+   Входящие снимки (Realtime/опрос) принимаются через trkAdopt: поверх них снова накладываются
+   ожидающие мутации, поэтому своё изменение не мигает назад, пока летит в облако. */
+let TRK_PENDING=[];                                   // [{key, mut}] — key схлопывает одинаковые намерения (последнее побеждает)
+let TRK_FLUSHING=false, TRK_FLUSH_AGAIN=false, TRK_FLUSH_T=null, TRK_FLUSH_AT=0, TRK_FLUSH_FAIL=0, TRK_REV=0, TRK_FLUSH_REFRESHED=false;
+function trkWrite(mut, key, delayMs){
+  if(typeof mut!=='function') return;
+  if(key) TRK_PENDING=TRK_PENDING.filter(p=>p.key!==key);
+  TRK_PENDING.push({key:key||null, mut});
+  try{ mut(TRK_SHARED); }catch(e){}
+  trkFlushSoon(delayMs||0);
 }
-/* ── Вариант C: атомарные правки общего стола на сервере (Supabase RPC) ──
-   Конкурентные записи с разных устройств больше не теряют друг друга: правка одного
-   поля/карточки применяется внутри одной транзакции с блокировкой строки (FOR UPDATE),
-   а не через «прочитать весь blob → переписать весь blob». Если RPC ещё не установлен
-   в БД или нет сети — безопасный откат на прежний read-modify-write, поведение прежнее. */
-let TRK_RPC_OFF=false;   // RPC не установлен в БД — не долбим его на каждой записи, сразу RMW-откат (до перезагрузки)
-async function cloudRpc(fn, params){ if(!supa) throw new Error('offline'); const {data,error}=await supa.rpc(fn, params);
-  if(error){ if(String(error.code||'')==='PGRST202' || /function|does not exist|not find/i.test(error.message||'')) TRK_RPC_OFF=true; throw error; }
-  return data; }
+function trkFlushSoon(ms){
+  const at=Date.now()+(ms||0);
+  if(TRK_FLUSH_T && TRK_FLUSH_AT<=at) return;        // уже запланировано не позже
+  clearTimeout(TRK_FLUSH_T); TRK_FLUSH_AT=at;
+  TRK_FLUSH_T=setTimeout(()=>{ TRK_FLUSH_T=null; trkFlush(); }, ms||0);
+}
+function trkApplyPending(v){ TRK_PENDING.forEach(p=>{ try{ p.mut(v); }catch(e){} }); return v; }
+async function trkFlush(){
+  if(!TRK_PENDING.length) return;
+  if(!supa){ return; }                                 // без облака правки живут локально
+  if(TRK_FLUSHING){ TRK_FLUSH_AGAIN=true; return; }
+  TRK_FLUSHING=true;
+  const batch=TRK_PENDING.slice();
+  try{
+    const v=await kvCasUpdate(KEY_TRKSHARED, cur=>{ batch.forEach(p=>{ try{ p.mut(cur); }catch(e){} }); });
+    TRK_PENDING=TRK_PENDING.filter(p=>batch.indexOf(p)<0);   // подтверждено ровно то, что ушло
+    TRK_FLUSH_FAIL=0; TRK_FLUSH_REFRESHED=false;
+    trkAdopt(v,'write'); trkLiveApply();
+  }catch(e){
+    const code=e&&(e.code||e.status);
+    if((code==='PGRST301' || code===401) && !TRK_FLUSH_REFRESHED){   // токен протух, пока вкладка спала — обновим сессию и повторим
+      TRK_FLUSH_REFRESHED=true;
+      try{ if(supa.auth && supa.auth.refreshSession) await supa.auth.refreshSession(); }catch(e2){}
+      trkFlushSoon(300); return;
+    }
+    if(code==='noperm' || code===401 || code===403 || code==='42501' || code==='PGRST301'){
+      TRK_FLUSH_REFRESHED=false;
+      // нет прав на запись (гость / протухшая сессия): повторять бессмысленно — снимаем правки с экрана и говорим прямо
+      TRK_PENDING=TRK_PENDING.filter(p=>batch.indexOf(p)<0); TRK_FLUSH_FAIL=0;
+      toast('⚠ Правка не сохранилась: нет прав на запись. Войдите в аккаунт заново');
+      trkLiveCatchup(true); return;
+    }
+    TRK_FLUSH_FAIL++;                                  // сеть/конфликты — правки остаются в очереди, повторим с паузой
+    if(TRK_FLUSH_FAIL===2) toast('⚠ Облако не отвечает — правки доски дошлём, когда связь вернётся');
+    trkFlushSoon(Math.min(30000, 1500*Math.pow(2, Math.min(4,TRK_FLUSH_FAIL-1))));
+  }finally{
+    TRK_FLUSHING=false;
+    if(TRK_FLUSH_AGAIN){ TRK_FLUSH_AGAIN=false; if(!TRK_FLUSH_FAIL) trkFlushSoon(0); }
+  }
+}
+/* Принять снимок строки (Realtime/опрос/собственная запись). Эхо старее уже виденной версии
+   отбрасываем; поверх снимка снова кладём свои неподтверждённые правки. */
+function trkAdopt(v, src){
+  if(!v || typeof v!=='object' || Array.isArray(v)) return false;
+  const rev=parseInt(v.rev,10)||0;
+  if(rev && TRK_REV && rev<TRK_REV){
+    if(src!=='write' && TRK_REV-rev<=5) return false;   // запоздавшее эхо — отбрасываем
+    TRK_REV=rev;                                          // версия «уехала назад» (строку пересоздали / писал старый клиент) — принимаем и живём дальше
+  }
+  if(rev>TRK_REV) TRK_REV=rev;
+  TRK_SHARED=v; trkApplyPending(TRK_SHARED);
+  return true;
+}
+/* Compare-and-swap для строки kv: свежее чтение → mutate → value.rev+1 → UPDATE с условием
+   «rev не изменился» (фильтр PostgREST по json-пути). Ноль обновлённых строк — кто-то успел
+   раньше: короткая пауза, перечитать, повторить. Без удачного чтения не пишем никогда. */
+async function kvCasUpdate(key, mutate, tries){
+  tries=tries||8;
+  let lastErr=null, prevRev=-1, sameRev=0;
+  for(let i=0;i<tries;i++){
+    const cur=await withTimeout(cloudGet(key), 6000);
+    if(cur===undefined){ lastErr=new Error('read timeout'); continue; }
+    const missing=(cur===null);
+    const v=(cur && typeof cur==='object' && !Array.isArray(cur))?cur:{};
+    const rev=parseInt(v.rev,10)||0;
+    // строка не менялась, а наш UPDATE «не нашёл» её — это не гонка, а RLS молча отфильтровал запись
+    // (нет прав/протухший токен). Иначе крутились бы бесконечно с полной нагрузкой на облако
+    if(i>0 && rev===prevRev){ if(++sameRev>=2){ const pe=new Error('no write permission'); pe.code='noperm'; throw pe; } } else sameRev=0;
+    prevRev=rev;
+    mutate(v);
+    v.rev=rev+1; v.at=Date.now();
+    if(missing){                                       // строки ещё нет — создаём; гонка двух создателей решится повтором
+      const r=await withTimeout(supa.from('kv').insert({key, value:v}), 8000);
+      if(r && !r.error) return v;
+      lastErr=(r&&r.error)||new Error('insert timeout'); continue;
+    }
+    let q=supa.from('kv').update({value:v}).eq('key',key);
+    q = rev ? q.eq('value->>rev', String(rev)) : q.is('value->>rev', null);
+    const r=await withTimeout(q.select('key'), 8000);
+    if(r && r.error){ lastErr=r.error; throw r.error; }  // ошибка сервера/прав — не наша гонка, наверх
+    if(r && Array.isArray(r.data) && r.data.length) return v;
+    await new Promise(res=>setTimeout(res, 120+Math.random()*380));
+  }
+  throw lastErr||new Error('cas conflict');
+}
 function deepAssign(dst, patch){ for(const k in patch){ const v=patch[k];
   if(v && typeof v==='object' && !Array.isArray(v) && dst[k] && typeof dst[k]==='object' && !Array.isArray(dst[k])) deepAssign(dst[k], v);
   else if(v===null) delete dst[k]; else dst[k]=v; } return dst; }
-/* атомарный патч одной карточки (по boardKey + trkCardKey). ds:null → снять спасброски */
-async function trkCloudCardPatch(boardKey, cardKey, patch){
-  if(!supa) return;
-  if(!TRK_RPC_OFF){ try{ await cloudRpc('trk_card_patch', {p_key:KEY_TRKSHARED, p_board:boardKey, p_cardkey:cardKey, p_patch:patch}); return; }catch(e){} }
-  try{ const v=await withTimeout(cloudGet(KEY_TRKSHARED),3500); if(v&&typeof v==='object') TRK_SHARED=v; }catch(e){}
-  const s=TRK_SHARED[boardKey]; if(s&&Array.isArray(s.list)){ const t=s.list.find(r=>trkCardKey(r)===cardKey); if(t){ deepAssign(t,patch); s.at=Date.now(); try{ await sset(KEY_TRKSHARED,TRK_SHARED,true); }catch(e){} } }
+/* патч одной карточки доски (по boardKey + trkCardKey); ds:null → снять спасброски.
+   Ключ очереди включает набор полей: быстрые тапы по ХП схлопываются в последнее значение */
+function trkCloudCardPatch(boardKey, cardKey, patch){
+  const p=JSON.parse(JSON.stringify(patch||{}));
+  trkWrite(v=>{ const s=v[boardKey]; if(!s||!Array.isArray(s.list)) return;
+    const t=s.list.find(r=>r && trkCardKey(r)===cardKey); if(!t) return;
+    deepAssign(t,p); s.at=Date.now(); }, 'card:'+boardKey+':'+cardKey+':'+Object.keys(p).sort().join(','));
 }
-/* атомарный deep-merge полей одной доски (раунд/ход/карта или доска целиком) */
-async function trkCloudBoardMerge(boardKey, fields){
-  if(!supa) return;
-  const patch={}; patch[boardKey]=Object.assign({}, fields, {at:Date.now()});
-  if(!TRK_RPC_OFF){ try{ await cloudRpc('kv_deep_merge', {p_key:KEY_TRKSHARED, p_patch:patch}); return; }catch(e){} }
-  try{ const v=await withTimeout(cloudGet(KEY_TRKSHARED),3500); if(v&&typeof v==='object') TRK_SHARED=v; }catch(e){}
-  let s=TRK_SHARED[boardKey]; if(!s) s=TRK_SHARED[boardKey]={}; deepAssign(s, patch[boardKey]);
-  try{ await sset(KEY_TRKSHARED,TRK_SHARED,true); }catch(e){}
+/* глубокое слияние полей одной доски (позиция фишки, размер сетки, фон, журнал) */
+function trkCloudBoardMerge(boardKey, fields, key){
+  const f=JSON.parse(JSON.stringify(fields||{}));
+  trkWrite(v=>{ let s=v[boardKey]; if(!s||typeof s!=='object'||Array.isArray(s)) s=v[boardKey]={};
+    deepAssign(s, f); s.at=Date.now(); }, key||null);
 }
 /* ── Журнал действий (только у ГМа): привязан к доске выбранной игры ──
    Записи копятся в TRK_SHARED[boardKey].log; игроки в него ПИШУТ свои действия
    (урон, спасброски, деньги), но НЕ видят его — панель есть только у ГМа. */
 const TRK_LOG_CAP=80;
-function trkLogBoardKey(){ return ADMIN ? gmBoardKey() : trkActiveForPlayer(); }
+/* доска, куда игрок вправе писать: только та, где стоит его персонаж (для просмотра подходит любая активная) */
+function trkMyBoardKey(){ const k=trkActiveForPlayer(); return (k && playerMyCard(k)) ? k : null; }
+function trkLogBoardKey(){ return ADMIN ? gmBoardKey() : trkMyBoardKey(); }
 function trkActorName(){ if(ADMIN) return 'ГМ'; const vp=trkActiveForPlayer(); if(vp){ const my=playerMyCard(vp); if(my && my.name) return my.name; } return SESSION||'Игрок'; }
-let TRK_LOG_PENDING=[], trkLogFlushT=null;
 function trkLog(kind, text){
   const bk=trkLogBoardKey(); if(!bk || !text) return;
   const entry={at:Date.now(), k:kind||'', t:String(text).slice(0,160)};
-  let s=TRK_SHARED[bk]; if(!s) s=TRK_SHARED[bk]={};   // журнал живёт, даже если стол ещё не опубликован
-  s.log=Array.isArray(s.log)?s.log:[]; s.log.push(entry); if(s.log.length>TRK_LOG_CAP) s.log=s.log.slice(-TRK_LOG_CAP); s.at=Date.now();
+  // дозапись идемпотентна (по времени и тексту): повторное наложение поверх снимка запись не дублирует
+  trkWrite(v=>{ let s=v[bk];
+    if(!s||typeof s!=='object'||Array.isArray(s)){ if(!ADMIN) return; s=v[bk]={}; }   // игрок не создаёт доску-призрак записью в журнал
+    s.log=Array.isArray(s.log)?s.log:[];
+    if(!s.log.some(x=>x && x.at===entry.at && x.t===entry.t)) s.log.push(entry);
+    if(s.log.length>TRK_LOG_CAP) s.log=s.log.slice(-TRK_LOG_CAP); s.at=Date.now(); }, null, 1200);   // пачкой: броски/урон не флудят запись
   if(ADMIN) renderTrkLog();
-  // в облако — пачкой с дебаунсом: частые действия (броски/урон/деньги) не флудят запись
-  TRK_LOG_PENDING.push({bk, entry});
-  clearTimeout(trkLogFlushT); trkLogFlushT=setTimeout(trkLogFlush, 1200);
-}
-async function trkLogFlush(){
-  const pend=TRK_LOG_PENDING; TRK_LOG_PENDING=[]; if(!pend.length || !supa) return;
-  const byBoard={}; pend.forEach(p=>{ (byBoard[p.bk]=byBoard[p.bk]||[]).push(p.entry); });
-  if(!TRK_RPC_OFF){                                   // RPC установлен — атомарная дозапись (сервер сериализует)
-    try{
-      for(const bk of Object.keys(byBoard)) for(const e of byBoard[bk])
-        await cloudRpc('trk_log_push', {p_key:KEY_TRKSHARED, p_board:bk, p_entry:e, p_cap:TRK_LOG_CAP});
-      return;
-    }catch(err){ /* RPC отсутствует/сбой — дошлём всё одним RMW ниже */ }
-  }
-  // фолбэк без RPC: ОДИН read-modify-write на доску — дозаписываем всю пачку к свежему облачному логу
-  try{ const v=await withTimeout(cloudGet(KEY_TRKSHARED),3500); if(v&&typeof v==='object') TRK_SHARED=v; }catch(e){}
-  for(const bk of Object.keys(byBoard)){
-    let s=TRK_SHARED[bk]; if(!s) s=TRK_SHARED[bk]={};
-    s.log=Array.isArray(s.log)?s.log:[]; s.log.push(...byBoard[bk]); if(s.log.length>TRK_LOG_CAP) s.log=s.log.slice(-TRK_LOG_CAP); s.at=Date.now();
-  }
-  try{ await sset(KEY_TRKSHARED,TRK_SHARED,true); }catch(e){}
 }
 function trkLogIcon(k){ return ({combat:'⚔️',add:'➕',del:'➖',dmg:'🩸',heal:'✚',death:'💀',roll:'🎲',money:'🪙',cond:'✨',round:'⏱️',turn:'▸'})[k]||'•'; }
 function trkLogTime(at){ try{ return new Date(at).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}); }catch(e){ return ''; } }
@@ -11282,7 +11384,7 @@ function renderTrkLog(){
 }
 function trkLogClear(){
   if(!ADMIN) return; const bk=gmBoardKey(); const s=TRK_SHARED[bk]; if(s){ s.log=[]; s.at=Date.now(); }
-  renderTrkLog(); if(bk) trkCloudBoardMerge(bk, {log:[]});
+  renderTrkLog(); if(bk) trkCloudBoardMerge(bk, {log:[]}, 'logclear:'+bk);
 }
 /* приватные заметки ГМ: просто поле к выбранной партии, живёт только на этом устройстве
    и стирается по «Игра сыграна» — никуда не синхронизируется */
@@ -11309,7 +11411,8 @@ function trkSyncParty(replace){
   const s=(GAMES||[]).find(g=>g && g.id===TRK.party);
   // pin-записи (созданные ГМом NPC и добавленные вручную листы) синхронизация партии не трогает
   if(!s){ if(replace) TRK.list=TRK.list.filter(x=>x.pin || !x.charId); return; }
-  const wanted=(s.players||[]).filter(p=>p && p.charId);
+  const skip=TRK.skip||{};
+  const wanted=(s.players||[]).filter(p=>p && p.charId && !skip[p.charId]);   // убранных ГМом вручную не возвращаем
   if(replace) TRK.list=TRK.list.filter(x=>x.pin || !x.charId || wanted.some(p=>p.charId===x.charId));
   wanted.forEach(p=>{
     if(TRK.list.some(x=>x.charId===p.charId)) return;
@@ -11321,7 +11424,7 @@ function trkSyncParty(replace){
       ava:(c&&c.ava)||'', charId:p.charId });
   });
 }
-function trkPartyPick(id){ TRK.party=id; trkSyncParty(true); trkSave(); renderTracker(); renderGmNotes(); }
+function trkPartyPick(id){ TRK.party=id; TRK.skip={}; trkSyncParty(true); trkSave(); renderTracker(); renderGmNotes(); }
 /* игрок меняет хиты только собственного персонажа — правка уходит в общий стол */
 function trkPlayerHp(charId,d){
   const vp=(!ADMIN)?trkActiveForPlayer():gmBoardKey();
@@ -11329,9 +11432,10 @@ function trkPlayerHp(charId,d){
   const mine=(CHARS_ALL[boardProj(vp)]||[]).some(c=>c && c.id===charId && !c.deleted && SESSION && normTag(c.owner||'')===currentTag());
   if(!mine){ toast('Менять хиты можно только своему персонажу'); return; }
   const x=shared.list.find(r=>r && r.charId===charId); if(!x) return;
-  x.hp=Math.max(0,(parseInt(x.hp,10)||0)+d);
-  sset(KEY_TRKSHARED, TRK_SHARED, true).catch(()=>{});
+  const hp=Math.max(0,(parseInt(x.hp,10)||0)+d);
+  x.hp=hp; shared.at=Date.now();
   renderTracker();
+  trkCloudCardPatch(vp, 'c:'+charId, {hp});
 }
 const trkHead=edit=>`<div class="trk-head"><span class="th-av"></span><span class="th-in">ИН</span><span class="th-nm">Участник</span><span class="th-hp">ХП</span><span class="th-ac">КД</span>${edit?'<span class="th-del"></span>':''}</div>`;
 /* имена, которые не влезают в карточку, «плавают» туда-сюда: меряем переполнение и включаем анимацию */
@@ -11389,6 +11493,7 @@ function trkHpQuick(i,mode){
   if(!ADMIN) return; const x=TRK.list[i]; if(!x) return;
   hpAmountPrompt(mode==='dmg'?'Урон · '+(x.name||''):'Лечение · '+(x.name||''), mode==='dmg'?'#d9564e':'#78c46b', v=>{
     const n=Math.abs(parseInt(v,10)||0); if(!n) return;
+    if(!isFoeCard(x)){ const sh=TRK_SHARED[gmBoardKey()]; const t=sh&&Array.isArray(sh.list)&&sh.list.find(r=>r&&trkCardKey(r)===trkCardKey(x)); if(t&&t.hp!=null) x.hp=t.hp; }   // база — живое значение игрока
     const cur=parseInt(x.hp,10)||0;
     if(mode==='dmg' && trkMassiveDeath(x, cur, n, CUR_PROJECT)){
       x.hp=0; x.ds={s:0,f:3};
@@ -11470,7 +11575,7 @@ function trkRowHtml(x,o){
   const conds=showConds?(x.conds||[]).map(c=>`<span class="tb-cond${c.b?' buff':''}">${esc(c.t)}</span>`).join(''):'';
   const condAdd=o.edit?`<button class="tb-cond add" onclick="trkCondPick(${o.idx})">＋ состояние</button>`:'';
   let right;
-  if(dead && !foe){ const ds=x.ds||{s:0,f:0};
+  if(!foe && (dead || hp<=0)){ const ds=x.ds||{s:0,f:0};   // при 0 ХП ГМ видит ход спасбросков, а не только итог
     right=`<div class="tb-ds"><div>${[0,1,2].map(k=>`<span class="p ${((ds.s||0)>k)?'s':''}"></span>`).join('')}</div><div>${[0,1,2].map(k=>`<span class="p ${((ds.f||0)>k)?'f':''}"></span>`).join('')}</div></div>`;
   } else if(foe && o.playerView){ right=`<div class="tb-ac hid">КД —</div>`;
   } else if(o.edit){ right=`<div class="tb-ac"><input class="tb-ac-in" value="${esc(String(x.ac||''))}" placeholder="КД" onchange="trkSet(${o.idx},'ac',this.value)"></div>`;
@@ -11593,15 +11698,16 @@ function trkMapSet(key,x,y){
     s.mapPos=s.mapPos||{}; s.mapPos[key]={x,y}; s.at=Date.now();
     trkCloudBoardMerge(bk, {mapPos:{[key]:{x,y}}});   // атомарно: сливается только эта фишка
   } else {
-    const vp=trkActiveForPlayer(); if(!vp) return;
+    const vp=trkMyBoardKey(); if(!vp) return;
     const s=TRK_SHARED[vp]; if(s){ s.mapPos=s.mapPos||{}; s.mapPos[key]={x,y}; s.at=Date.now(); }
-    renderTracker();
+    trkRedraw();
     trkCloudBoardMerge(vp, {mapPos:{[key]:{x,y}}});
   }
 }
 /* единый источник данных доски (для живого патча без пересоздания картинок) */
 function trkSource(){
   if(ADMIN){
+    trkAbsorbShared();   // живые ХП/иниц/спасброски игроков — и при точечном обновлении, не только при полной отрисовке
     const order=trkOrder(TRK.list);
     if(order.length && !order.some(x=>trkCardKey(x)===TRK.activeKey)) TRK.activeKey=trkCardKey(order[0]);
     return {order, round:TRK.round||1, activeKey:TRK.activeKey||'', proj:CUR_PROJECT, playerView:false};
@@ -11613,20 +11719,26 @@ function trkSource(){
 /* структурная «подпись»: если совпадает — обновляем только числа/подсветку, иначе полная отрисовка */
 function trkComboSig(src, view){
   if(!src) return '';
+  let extra='';
+  if(view==='map'){ try{ extra='|cols:'+trkMapColsOf(src)+'|bg:'+String(trkMapBgOf(src)||'').length; }catch(e){} }   // сетка/фон карты меняются — перерисовать
   return view+'|'+src.order.map(x=>{
-    const foe=isFoeCard(x), foeHidden=src.playerView&&foe;
-    const dead=foe?((parseInt(x.hp,10)||0)<=0):(x.ds&&(x.ds.f||0)>=3);
-    return [trkCardKey(x), x.name||'', x.ava||beastImgByName(x.name)||'', (x.conds||[]).map(c=>c.t+(c.b?'+':'')).join(','), x.conc?1:0, dead?1:0, foeHidden?1:0].join('~');
-  }).join('||');
+    const foe=isFoeCard(x), foeHidden=src.playerView&&foe, hp=parseInt(x.hp,10)||0;
+    const dead=foe?(hp<=0):(x.ds&&(x.ds.f||0)>=3);
+    const dying=(!foe && hp<=0)?1:0, ds=(!foe && x.ds)?((x.ds.s||0)+'/'+(x.ds.f||0)):'';   // панель спасбросков и её точки
+    return [trkCardKey(x), x.name||'', x.ava||beastImgByName(x.name)||'', (x.conds||[]).map(c=>c.t+(c.b?'+':'')).join(','), x.conc?1:0, dead?1:0, foeHidden?1:0, dying, ds].join('~');
+  }).join('||')+extra;
 }
 function trkSetSig(){ const box=document.getElementById('trkBox'); if(box){ try{ box.dataset.trkSig=trkComboSig(trkSource(), trkViewMode()); }catch(e){} } }
 /* живое обновление БЕЗ мелькания: если состав/аватары те же — патчим только ХП/иниц/ход/раунд */
 function trkRefresh(){
   const box=document.getElementById('trkBox'); if(!box) return;
   if(TRK_DRAGGING) return;                                         // не мешаем перетаскиванию фишки
-  if(document.activeElement && box.contains(document.activeElement)) return; // не сбиваем ввод
   const src=trkSource();
-  if(!src || box.dataset.trkSig!==trkComboSig(src, trkViewMode())){ renderTracker(); return; }
+  if(!src || box.dataset.trkSig!==trkComboSig(src, trkViewMode())){
+    if(trkTyping()){ TRK_DEFER=true; return; }                      // полную перерисовку — только когда поле отпустят
+    renderTracker(); return;
+  }
+  // точечный патч чисел безопасен и во время ввода: поле в фокусе он не трогает
   const esc2=k=>(window.CSS&&CSS.escape)?CSS.escape(k):k;
   // карта: двигаем только позиции фишек и подсветку активного — картинки не пересоздаём
   if(trkViewMode()==='map'){
@@ -11668,7 +11780,23 @@ function trkRefresh(){
     }
   }
 }
+/* полная отрисовка пересоздаёт поля ввода: что игрок уже набрал (сумма, предмет, поиск ГМа) — сохраняем и возвращаем */
+const TRK_KEEP_IDS=['txAmt','txNote','invName','invQty','trk-add'];
+function trkKeepInputs(){
+  const keep=[]; const ae=document.activeElement;
+  TRK_KEEP_IDS.forEach(id=>{ const el=document.getElementById(id); if(!el || !el.closest || !el.closest('#trkBox, #pdock, #toolsPage')) return;
+    const def=(id==='invQty')?'1':''; if(String(el.value)!==def || el===ae) keep.push({id, v:el.value, f:el===ae, s:el.selectionStart, e:el.selectionEnd}); });
+  return keep;
+}
+function trkRestoreInputs(keep){
+  (keep||[]).forEach(k=>{ const el=document.getElementById(k.id); if(!el) return;
+    try{ if(String(el.value)!==String(k.v)) el.value=k.v; if(k.f && document.activeElement!==el){ el.focus({preventScroll:true}); if(k.s!=null && el.setSelectionRange && /^(text|search|tel|url|password)$/.test(el.type||'text')) el.setSelectionRange(k.s, k.e); } }catch(e){} });
+}
 function renderTracker(){
+  const keep=trkKeepInputs();
+  try{ renderTrackerCore(); } finally{ if(keep.length) trkRestoreInputs(keep); }
+}
+function renderTrackerCore(){
   const box=document.getElementById('trkBox'); if(!box) return;
   const _tt=document.getElementById('trkTitle'); if(_tt) _tt.style.display='';   // по умолчанию заголовок «Доска ходов» виден; прячем только на «простое»
   const view=trkViewMode();
@@ -11850,7 +11978,7 @@ function trkSet(i,field,val){
   else x[field]=parseInt(val,10)||0;
   // карточка игрока: ХП/инициатива авторитетны в столе — пишем туда напрямую, без републикации,
   // иначе публикация возьмёт прежнее облачное значение и правка ГМа откатится
-  if((field==='hp'||field==='init') && x.charId){ trkSharedCardSet(x, field, x[field]); renderTracker(); renderGmManage(); return; }
+  if((field==='hp'||field==='init') && x.charId){ trkSharedCardSet(x, field, x[field]); trkRedraw(true); return; }
   // враг: мгновенно зеркалим в память, публикация возьмёт значение из локального списка
   if(field==='hp' || field==='init'){
     const s=TRK_SHARED[gmBoardKey()];
@@ -11858,7 +11986,8 @@ function trkSet(i,field,val){
   }
   trkSave();
   // порядок по инициативе, полоса ХП, 💀 и «N ХП» в панели управления — сразу, не дожидаясь стороннего перерендера
-  renderTracker(); renderGmManage();
+  // (renderTracker у ГМ сам перерисовывает панель управления; пока поле в фокусе — откладываем)
+  trkRedraw(true);
 }
 function trkPlayerHpSet(charId,val){
   const vp=trkActiveForPlayer(); if(!vp) return;
@@ -11866,7 +11995,7 @@ function trkPlayerHpSet(charId,val){
   if(!mine){ toast('Менять хиты можно только своему персонажу'); return; }
   const hp=Math.max(0,parseInt(val,10)||0);
   const s=TRK_SHARED[vp]; if(s&&Array.isArray(s.list)){ const x=s.list.find(r=>r && r.charId===charId); if(x){ x.hp=hp; if(hp>=1 && x.ds) delete x.ds; s.at=Date.now(); } }
-  renderTracker();
+  trkRedraw(true);
   const patch={hp}; if(hp>=1) patch.ds=null;
   trkCloudCardPatch(vp, 'c:'+charId, patch);
 }
@@ -11901,7 +12030,7 @@ function playerMePanel(vp){
 }
 /* блок управления своим персонажем прямо на доске: атаки, заклинания, ячейки, отдых */
 function playerCharBlock(vp, my){
-  const c=(CHARS_ALL[vp]||[]).find(x=>x && x.id===my.charId && !x.deleted);
+  const c=(CHARS_ALL[boardProj(vp)]||[]).find(x=>x && x.id===my.charId && !x.deleted);   // доска «сеттинг::тег» → листы сеттинга
   if(!c) return '';
   // атаки (оружие из листа)
   const wpns=(c.weapons||[]).filter(w=>w && (w.n||w.d||w.b));
@@ -11940,7 +12069,7 @@ function trkSlotTap(charId,lvl,idx){
   const c=(CHARS_ALL[CUR_PROJECT]||[]).find(x=>x && x.id===charId); if(!c||!canEdit(c)) return;
   const s=c.slots&&c.slots[lvl]; if(!s) return;
   s.used = (idx < (s.used||0)) ? idx : idx+1;   // тап по потраченной — вернуть, по свободной — потратить
-  c.updatedAt=Date.now(); persistChars(); renderTracker();
+  c.updatedAt=Date.now(); persistChars(); trkRedraw(true);
 }
 /* отдых с доски: длительный — ХП в максимум, ячейки/спасброски/истощение восстанавливаются;
    быстрый — ячейки договора (Колдун) восстанавливаются */
@@ -11952,7 +12081,7 @@ function trkRest(charId, kind){
     if(c.death){ c.death.s=0; c.death.f=0; }
     const ex=parseInt(c.exh,10)||0; if(ex>0) c.exh=ex-1;
     const maxHp=playerMaxHp(vp,charId);
-    if(vp && maxHp){ const m=playerMyCard(vp); if(m){ m.hp=maxHp; if(m.ds) delete m.ds; const s=TRK_SHARED[vp]; if(s) s.at=Date.now(); renderTracker(); trkCloudCardPatch(vp, trkCardKey(m), {hp:maxHp, ds:null}); } }
+    if(vp && maxHp){ const m=playerMyCard(vp); if(m){ m.hp=maxHp; if(m.ds) delete m.ds; const s=TRK_SHARED[vp]; if(s) s.at=Date.now(); trkCloudCardPatch(vp, trkCardKey(m), {hp:maxHp, ds:null}); } }
     c.updatedAt=Date.now(); persistChars();
     toast('Длительный отдых: ХП и ячейки восстановлены');
   } else {
@@ -11962,7 +12091,7 @@ function trkRest(charId, kind){
     // короткий отдых восстанавливает только «короткие» ресурсы (ячейки Колдуна); ХП/ячейки остальных — в длительный
     toast(warlock?'Короткий отдых: ячейки договора Колдуна восстановлены':'Короткий отдых: у этого класса нет ресурсов на короткий отдых — ХП и ячейки восстанавливает длительный');
   }
-  renderTracker();
+  trkRedraw(true);
 }
 function deathSavesHtml(my){
   const ds=my.ds||{s:0,f:0}; const s=Math.min(3,ds.s||0), f=Math.min(3,ds.f||0);
@@ -11982,7 +12111,7 @@ function playerInitSet(val){
   if(!playerMyCard(vp)) return;
   const iv=parseInt(val,10)||0;
   const my=playerMyCard(vp); if(!my) return; my.init=iv; const s=TRK_SHARED[vp]; if(s) s.at=Date.now();
-  renderTracker();   // своя строка и порядок хода — сразу, как при смене ХП
+  trkRedraw();   // своя строка и порядок хода — сразу; если поле ещё в фокусе (change от тапа по кнопке) — по focusout
   trkCloudCardPatch(vp, trkCardKey(my), {init:iv});
 }
 function rollDeathSave(){
@@ -12000,7 +12129,7 @@ function rollDeathSave(){
   const patch = stabilized ? {hp:1, ds:null} : {ds:{s,f}};    // три успеха — 1 ХП, панель уходит; иначе — новые спасброски
   if(stabilized){ my.hp=1; delete my.ds; } else { my.ds={s,f}; }
   const st=TRK_SHARED[vp]; if(st) st.at=Date.now();
-  renderTracker();
+  trkRedraw(true);
   trkCloudCardPatch(vp, trkCardKey(my), patch);
   const tag = f>=3 ? 'Смерть' : stabilized ? 'Стабилизация' : roll===20 ? 'крит' : roll===1 ? 'провал' : (roll>=10 ? 'успех' : 'провал');
   trkLog(f>=3?'death':'roll',(my.name||'Игрок')+' — спасбросок от смерти: d20='+roll+' ('+tag+')');
@@ -12013,6 +12142,7 @@ function playerHpAdjust(mode){
   hpAmountPrompt(dmg?'Получить урон':'Восполнить ХП', dmg?'#ff5a5f':'#3ecf6a', v=>{
     const n=Math.abs(parseInt(v,10)||0); if(!n) return;
     const my=playerMyCard(vp); if(!my) return;
+    if(!dmg && my.ds && (my.ds.f||0)>=3){ toast('Персонаж мёртв — вернуть его может только Мастер'); return; }
     const cur=parseInt(my.hp,10)||0;
     const patch={}; let died=false;
     if(dmg){
@@ -12024,7 +12154,7 @@ function playerHpAdjust(mode){
       if(patch.hp>=1) patch.ds=null;
     }
     deepAssign(my, patch); const s=TRK_SHARED[vp]; if(s) s.at=Date.now();   // оптимистично локально
-    renderTracker();
+    trkRedraw(true);
     trkCloudCardPatch(vp, trkCardKey(my), patch);
     trkLog(dmg?'dmg':'heal',(my.name||'Игрок')+(dmg?' получает '+n+' урона ('+patch.hp+' ХП)':' восполняет '+n+' ХП ('+patch.hp+')'));
     if(died){ trkLog('death',(my.name||'Персонаж')+' погибает от смертельного урона'); toast('Смертельный урон — персонаж погибает без спасбросков'); }
@@ -12105,31 +12235,42 @@ function trkToggleActive(){
   } else {
     trkLog('combat','Доска активна — бой начался');
   }
-  const build=(base)=>{ const prev=base||{}; const fm={}; (Array.isArray(prev.list)?prev.list:[]).forEach(p=>{ if(p) fm[trkCardKey(p)]=p; });
-    if(finish) return {list:[], party:'', at:Date.now(), active:false, owner:currentTag(), round:1, activeKey:'',
-      log:prev.log||[], mapPos:{}, mapBg:(prev.mapBg!=null?prev.mapBg:''), mapCols:prev.mapCols||TRK.mapCols||TRK_MAPCOLS};
-    return {list:trkMergedList(fm), party:TRK.party, at:Date.now(), active:!cur, owner:currentTag(), round:TRK.round||1, activeKey:TRK.activeKey||'',
-      log:prev.log||[], mapPos:prev.mapPos||{}, mapBg:(prev.mapBg!=null?prev.mapBg:''), mapCols:prev.mapCols||TRK.mapCols||TRK_MAPCOLS}; };
-  // оптимистично показываем новое состояние сразу
-  TRK_SHARED[bk]=build(TRK_SHARED[bk]); renderTracker();
-  const tok=(trkToggleActive._n=(trkToggleActive._n||0)+1);   // повторное переключение до ответа облака отменяет этот хвост
-  (async()=>{
-    // затем подтягиваем свежее облако (живые ХП/инициатива/спасброски игроков, чужие доски)
-    // и переписываем ТОЛЬКО свой стол — чтобы переключение не откатывало правки игроков
-    let fresh=null;
-    try{ const v=await withTimeout(cloudGet(KEY_TRKSHARED),3500); if(v && typeof v==='object'){ TRK_SHARED=v; fresh=v[bk]; } }catch(e){}
-    if(tok!==trkToggleActive._n) return;   // состояние уже переключили ещё раз — устаревший снимок не применяем
-    TRK_SHARED[bk]=build(fresh||TRK_SHARED[bk]);
-    { const {log:_lg, ...pub}=TRK_SHARED[bk]; await trkCloudBoardMerge(bk, pub); }   // журнал не перезаписываем
-    renderTracker();
-  })();
+  const opts={finish, active:!cur};
+  // оптимистично показываем новое состояние сразу, в облако — мутацией над свежей копией:
+  // переключение не откатывает живые правки игроков и не трогает чужие доски
+  TRK_SHARED[bk]=trkBoardBuild(TRK_SHARED[bk], opts); renderTracker();
+  const snap=trkSnap();
+  trkWrite(v=>{ v[bk]=trkBoardBuild(v[bk], Object.assign({snap}, opts)); }, 'active:'+bk);   // свой ключ: публикация следом его не вытеснит
 }
 /* мгновенное обновление доски: Supabase Realtime + лёгкий опрос как запасной путь */
 let trkRT=null, trkPollT=null, trkRTok=false, trkRTtries=0, trkLiveBound=false;
+/* человек печатает в доске или в пульте — перерисовку откладываем до конца ввода (focusout),
+   иначе поле пересоздаётся под пальцами, а на телефоне вместе с ним пропадает клавиатура */
+let TRK_DEFER=false;
+function trkTyping(){
+  const ae=document.activeElement; if(!ae || ae===document.body) return false;
+  const tag=ae.tagName; if(tag!=='INPUT' && tag!=='TEXTAREA' && !ae.isContentEditable) return false;   // select не «печатают» — его перерисовка ничего не теряет
+  return !!(ae.closest && ae.closest('#trkBox, #pdock, #gmManageBox'));                                  // только то, что полная отрисовка пересоздаёт
+}
+let TRK_PTR=false;   // палец/кнопка мыши сейчас прижаты — отложенную перерисовку ещё чуть подождём, чтобы не выдернуть кнопку из-под тапа
+document.addEventListener('pointerdown', ()=>{ TRK_PTR=true; }, true);
+document.addEventListener('pointerup', ()=>{ TRK_PTR=false; }, true);
+document.addEventListener('pointercancel', ()=>{ TRK_PTR=false; }, true);
+function trkDeferReplay(n){
+  setTimeout(()=>{ if(!TRK_DEFER) return; if(trkTyping()) return; if(TRK_PTR && (n||0)<6){ trkDeferReplay((n||0)+1); return; } TRK_DEFER=false; trkLiveApply(); }, (n||0)?150:320);
+}
+document.addEventListener('focusout', e=>{ if(TRK_DEFER && e.target && e.target.closest && e.target.closest('#trkBox, #pdock, #gmManageBox')) trkDeferReplay(0); }, true);
+/* перерисовка по своему действию: если сейчас печатают в поле доски (например, change прилетел
+   от тапа по соседней кнопке) — не сносим DOM под пальцем, дорисуем по focusout. force — состав/ячейки
+   поменялись, нужна полная отрисовка, а не точечный патч */
+function trkRedraw(force){
+  const box=document.getElementById('trkBox'); if(!box) return false;
+  if(trkTyping()){ TRK_DEFER=true; if(force) box.dataset.trkSig=''; return false; }
+  renderTracker(); return true;
+}
 function trkLiveApply(){
   const box=document.getElementById('trkBox'); if(!box) return;
-  if(document.activeElement && box.contains(document.activeElement)) return; // не сбиваем ввод
-  trkRefresh();   // патчим на месте (без пересоздания аватаров → не мелькает)
+  trkRefresh();   // сам решает: патч на месте (можно и при вводе) или полная отрисовка (отложится до focusout)
   if(ADMIN) renderTrkLog();   // журнал: подхватываем действия игроков вживую
 }
 /* (пере)подписка на Realtime: сокет на десктопе с долго открытой вкладкой рвётся —
@@ -12139,49 +12280,56 @@ function trkRTSubscribe(){
   try{ if(trkRT) supa.removeChannel(trkRT); }catch(e){}
   trkRT=null; trkRTok=false;
   try{
-    trkRT=supa.channel('trk-shared-'+Date.now())
-      .on('postgres_changes',{event:'*',schema:'public',table:'kv',filter:'key=eq.'+KEY_TRKSHARED},payload=>{
-        try{ let v=payload.new && payload.new.value; if(v==null) return; if(typeof v==='string') v=JSON.parse(v); if(v && typeof v==='object'){ TRK_SHARED=v; trkLiveApply(); } }catch(e){}
+    const ch=supa.channel('trk-shared-'+Date.now()); trkRT=ch;
+    ch.on('postgres_changes',{event:'*',schema:'public',table:'kv',filter:'key=eq.'+KEY_TRKSHARED},payload=>{
+        try{
+          if(ch!==trkRT) return;                       // событие от уже заменённого канала
+          // слишком большая строка (фон карты) → Realtime присылает событие без значения и с errors: дочитываем сами
+          if((payload && Array.isArray(payload.errors) && payload.errors.length) || !payload || !payload.new || payload.new.value==null){ trkLiveCatchup(true); return; }
+          let v=payload.new.value; if(typeof v==='string') v=JSON.parse(v);
+          if(trkAdopt(v,'rt')) trkLiveApply();
+        }catch(e){}
       })
       .subscribe(status=>{
+        if(ch!==trkRT) return;                         // статус старого канала (мы сами его закрыли) — не повод переподписываться
         if(status==='SUBSCRIBED'){ trkRTok=true; trkRTtries=0; }
         else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'||status==='CLOSED'){
           trkRTok=false;
           const d=Math.min(30000, 1500*Math.pow(2, Math.min(4,trkRTtries++)));   // бэкофф до 30с
-          setTimeout(trkRTSubscribe, d);
+          setTimeout(()=>{ if(ch===trkRT) trkRTSubscribe(); }, d);
         }
       });
   }catch(e){ trkRTok=false; setTimeout(trkRTSubscribe, 5000); }
 }
 /* немедленно подтянуть свежий стол (при возврате на вкладку / восстановлении сети) */
-async function trkLiveCatchup(){
+async function trkLiveCatchup(force){
   const tp=document.getElementById('view-combat');
-  if(!(tp && tp.classList.contains('active')) || !document.getElementById('trkBox')) return;
-  const before=JSON.stringify(TRK_SHARED);
-  await trkFetchShared();
-  if(JSON.stringify(TRK_SHARED)!==before) trkLiveApply();
+  if(!force && (!(tp && tp.classList.contains('active')) || !document.getElementById('trkBox'))) return;
+  if(await trkFetchShared()) trkLiveApply();
 }
 function trkLiveStart(){
-  trkRTSubscribe();
+  if(!(trkRT && trkRTok)) trkRTSubscribe();   // живой канал не пересоздаём при каждом заходе на доску
   clearInterval(trkPollT);
+  // опрос — запасной путь: при живом Realtime раз в 5 с, без него — раз в 2,5 с; заодно дожимаем очередь правок
+  let tick=0;
   trkPollT=setInterval(async ()=>{
     if(document.hidden) return;
+    if(TRK_PENDING.length && !TRK_FLUSHING && !TRK_FLUSH_T) trkFlushSoon(0);
     const tp=document.getElementById('view-combat');
     if(!(tp && tp.classList.contains('active')) || !document.getElementById('trkBox')) return;
-    const before=JSON.stringify(TRK_SHARED);
-    await trkFetchShared();
-    if(JSON.stringify(TRK_SHARED)!==before) trkLiveApply();
-  }, 5000);
+    tick++; if(trkRTok && (tick%2)) return;
+    if(await trkFetchShared()) trkLiveApply();
+  }, 2500);
   if(!trkLiveBound){
     trkLiveBound=true;
     // вернулись на вкладку / сеть восстановилась — чиним канал и сразу догоняем состояние
     document.addEventListener('visibilitychange', ()=>{ if(!document.hidden){ if(!trkRTok) trkRTSubscribe(); trkLiveCatchup(); } });
-    window.addEventListener('online', ()=>{ trkRTSubscribe(); trkLiveCatchup(); });
+    window.addEventListener('online', ()=>{ if(!trkRTok) trkRTSubscribe(); trkLiveCatchup(); });
   }
 }
 function trkHp(i,d){ const x=TRK.list[i]; if(!x) return; x.hp=Math.max(0,(parseInt(x.hp,10)||0)+d); trkSave(); renderTracker(); }
-function trkDel(i){ const x=TRK.list[i]; if(x){ trkLog('del','ГМ убрал: '+(x.name||'участник')); TRK_SEL.delete(trkCardKey(x)); } TRK.list.splice(i,1); trkSave(); renderTracker(); }
-function trkClear(){ TRK.list=[]; TRK.party=''; TRK.round=1; TRK.activeKey=''; TRK_SEL.clear(); trkSave(); renderTracker(); }
+function trkDel(i){ const x=TRK.list[i]; if(x){ trkLog('del','ГМ убрал: '+(x.name||'участник')); TRK_SEL.delete(trkCardKey(x)); if(x.charId && !x.pin){ TRK.skip=TRK.skip||{}; TRK.skip[x.charId]=1; } } TRK.list.splice(i,1); trkSave(); renderTracker(); }
+function trkClear(){ TRK.list=[]; TRK.party=''; TRK.round=1; TRK.activeKey=''; TRK.skip={}; TRK_SEL.clear(); trkSave(); renderTracker(); }
 function trkSort(){ TRK.list.sort((a,b)=>(b.init||0)-(a.init||0)); trkSave(); renderTracker(); }
 function trkAddManual(){
   const el=document.getElementById('trk-add'); const v=el?el.value.trim():'';
@@ -12270,7 +12418,7 @@ function gmCreaturePanel(x,i){
       <div class="gm-cre-ctrl">
         <button class="tm-btn dmg" onclick="gmHpPrompt(${i},'dmg')">− Урон</button>
         <button class="tm-btn heal" onclick="gmHpPrompt(${i},'heal')">＋ Лечить</button>
-        <div class="gm-cre-init"><span>Иниц</span><input inputmode="numeric" value="${esc(String(x.init??0))}" onchange="trkSet(${i},'init',this.value);renderGmManage()"></div>
+        <div class="gm-cre-init"><span>Иниц</span><input inputmode="numeric" value="${esc(String(x.init??0))}" onchange="trkSet(${i},'init',this.value)"></div>
       </div>
       ${gmCreatureBody(x)}
     </div>`:''}
@@ -12315,6 +12463,7 @@ function gmManageToggle(i){
 // ХП существа ГМа: враги — ведёт ГМ (локальный список); NPC-листы живут в общем столе — правим там
 function gmManageHp(i,delta){
   const x=TRK.list[i]; if(!x) return;
+  if(!isFoeCard(x)){ const sh=TRK_SHARED[gmBoardKey()]; const t=sh&&Array.isArray(sh.list)&&sh.list.find(r=>r&&trkCardKey(r)===trkCardKey(x)); if(t&&t.hp!=null) x.hp=t.hp; }
   const cur0=parseInt(x.hp,10)||0;
   const nv=Math.max(0,cur0+delta);
   x.hp=nv;
@@ -12573,7 +12722,7 @@ if('serviceWorker' in navigator){
    Если человек посреди правки листа или в модалке — ждём, пока он свернёт приложение
    или закроет окно, и перезапускаем тогда (правки к этому моменту уже автосохранены) */
 let SW_UPDATE_PENDING=false;
-function swUpdateBusy(){ return !!(document.querySelector('.scrim.open') || (typeof INLINE_ID!=='undefined' && INLINE_ID) || document.querySelector('.hp-prompt')); }
+function swUpdateBusy(){ return !!(document.querySelector('.scrim.open') || (typeof INLINE_ID!=='undefined' && INLINE_ID) || document.querySelector('.hp-prompt') || (typeof trkTyping==='function' && trkTyping())); }
 function swUpdateReady(){
   if(SW_UPDATE_PENDING) return; SW_UPDATE_PENDING=true;
   const go=()=>{ try{ if(typeof flushInlineSave==='function') flushInlineSave(); }catch(e){} location.reload(); };
@@ -13726,6 +13875,9 @@ function openInstallHelp(){
   .hdr-proj:hover{opacity:.9;background:var(--surface2)}
   .hdr-proj.cur{opacity:1;background:var(--surface2);border-color:var(--line2)}
   .hdr-proj i{font-style:normal}
+  /* «РУССКИЕ СКАЗКИ»: у Ruslan Display капитель сидит выше соседей — опускаем только надпись (асимметричный
+     отступ: 10+4 = 7+7, высота чипа и подсветка .cur остаются вровень с остальными) */
+  #projRow .hdr-proj.pm-skazki{padding-top:10px;padding-bottom:4px}
   /* поиск стоял на 50 px левее правого края — место под кнопку закладок,
      которой на десктопе давно нет в шапке */
   .search-float{right:calc(var(--edge) + 4px) !important}
@@ -13856,6 +14008,14 @@ function openInstallHelp(){
   /* заклинания, снаряжение и состояния занимают всю ширину панели */
   #pdock[data-tab="sp"] .trk-me,#pdock[data-tab="inv"] .trk-me,
   #pdock[data-tab="cond"] .trk-me,#pdock[data-tab="death"] .trk-me{grid-template-columns:1fr}
+  .pd-panel-in .trk-me > .tm-inv{grid-column:1 / -1;min-width:0}
+  .pd-panel-in .tm-inv .tx-row{flex-wrap:nowrap}
+  .pd-panel-in .tm-inv .tx-note{flex:1 1 auto}
+  /* узкая боковая колонка (320–420px): [валюта][сумма] / [за что] сеткой, а не «переносом как получится»,
+     из-за которого поле «За что» уезжало на отдельную строку и выглядело пустым ящиком */
+  .trk-pside .trk-me .tx-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:6px}
+  .trk-pside .trk-me .tx-row .tx-note{grid-column:1 / -1}
+  .trk-pside .trk-me .tx-row select,.trk-pside .trk-me .tx-row input{width:100%;min-width:0}
   /* состояния — своей вкладкой: игрок вешает их на себя сам */
   .pd-conds{display:flex;flex-wrap:wrap;gap:7px}
   .pd-conds .tbp-c{font-family:var(--f-mono);font-size:.7rem;letter-spacing:.04em;
@@ -13942,7 +14102,7 @@ function openInstallHelp(){
     for(var i=0;i<my.conds.length;i++){ if(my.conds[i] && my.conds[i].t===name){ at=i; break; } }
     if(at>=0) my.conds.splice(at,1); else my.conds.push(buff?{t:name,b:1}:{t:name});
     var s=TRK_SHARED[vp]; if(s) s.at=Date.now();
-    renderTracker();
+    if(typeof trkRedraw==='function') trkRedraw(true); else renderTracker();
     try{ trkCloudCardPatch(vp, trkCardKey(my), {conds:my.conds}); }catch(e){}
   };
 
@@ -14084,12 +14244,28 @@ function openInstallHelp(){
       return r;
     };
   }
+  /* Перерисовываем доску только когда окно реально пересекло порог десктопа. Раньше это делалось
+     на КАЖДЫЙ resize — а на телефоне resize приходит при открытии клавиатуры: поле ввода
+     пересоздавалось, и клавиатура тут же исчезала. Под активным вводом не трогаем вовсе. */
+  var lastDesk=DESK(), deskPending=null;
+  function typingNow(){ var ae=document.activeElement; return !!(ae && (ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'||ae.tagName==='SELECT')); }
+  function applyDesk(now){
+    if(!now){ pdOff(); if(onCombat() && typeof renderTracker==='function') renderTracker(); }   // панель персонажа уехала вместе с пультом — вернуть её под доску
+    else if(onCombat() && typeof renderTracker==='function') renderTracker();
+  }
+  // перерисовка только при смене режима (порог 1180px), а не на каждый resize: на телефонах
+  // открытие клавиатуры даёт resize, и полная перерисовка сносила поле ввода вместе с клавиатурой
   addEventListener('resize', function(){
     try{
-      if(!DESK()){ pdOff(); if(onCombat() && typeof renderTracker==='function') renderTracker(); }   // панель персонажа уехала вместе с пультом — вернуть её под доску
-      else if(onCombat() && typeof renderTracker==='function') renderTracker();
+      var now=DESK(); if(now===lastDesk) return; lastDesk=now;
+      if(typingNow()){ deskPending=now; return; }        // порог пересекли посреди ввода — применим, когда поле отпустят
+      deskPending=null; applyDesk(now);
     }catch(e){}
   });
+  document.addEventListener('focusout', function(){
+    if(deskPending===null) return;
+    setTimeout(function(){ if(deskPending===null || typingNow()) return; var n=deskPending; deskPending=null; try{ applyDesk(n); }catch(e){} }, 150);
+  }, true);
 
   /* ═══ 4. Раздел «Игрок»: круглый «+» вместо верхней кнопки ═══ */
   function addFab(){
@@ -14359,7 +14535,8 @@ select:focus-visible,summary:focus-visible,[tabindex]:focus-visible,
     var hp=0; if(b) for(var i=0;i<b.list.length;i++) hp+=parseInt(b.list[i].hp,10)||0;
     /* className несёт и текущий раздел (view-*), и режим ГМ (is-gm):
        смена любого из них меняет то, что показывает полка */
-    return [b?b.key:'', b?b.round:'', b?b.activeKey:'', b?b.list.length:'', hp,
+    var keys=''; if(b) for(var j=0;j<b.list.length;j++) keys+=(b.list[j]&&(b.list[j].charId||b.list[j].uid||b.list[j].name))+',';
+    return [b?b.key:'', b?b.round:'', b?b.activeKey:'', b?b.list.length:'', hp, keys,
             l?l.at:'', m?m.name:'', m?m.paused:'', dockOpen?1:0, R.className].join('|');
   }
 
