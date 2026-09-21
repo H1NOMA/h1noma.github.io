@@ -4588,6 +4588,12 @@ async function sget(key, shared=SHARED){
    эти пятнадцать секунд, и закрытая раньше вкладка теряла её совсем.
    Возвращаем по-прежнему судьбу ОБЛАЧНОЙ записи: на устройстве к этому моменту
    всё уже лежит. */
+/* Отказ RLS (нет прав на ключ): PostgREST отдаёт код Postgres 42501 (HTTP 403, анониму — 401).
+   Это не сеть: «облако недоступно» зовёт подождать, а ждать нечего. SSET_LAST_ERR — причина последнего
+   сбоя облачной записи ('noperm' | 'net' | 'timeout' | ''): по ней persistChars/persistGames не обещают
+   «отправим, когда связь вернётся» там, где связь ни при чём */
+let SSET_LAST_ERR='', SSET_NOPERM_AT=0;
+function cloudNoPerm(e){ const c=e&&(e.code||e.status); return c==='42501' || c===403 || c==='403' || /row-level security|permission denied/i.test(String((e&&e.message)||'')); }
 async function sset(key,val, shared=SHARED, quiet){
   if(supa && shared){
     await ssetLocal(key,val,shared);   // мгновенно и независимо от сети
@@ -4596,10 +4602,16 @@ async function sset(key,val, shared=SHARED, quiet){
       const r = await withTimeout(cloudSet(key,val), CLOUD_TMO);
       // withTimeout по тайм-ауту РЕЗОЛВИТСЯ значением undefined, а не падает,
       // поэтому молчание сети сюда, в catch, не попадает — ловим отдельно
-      if(r===undefined){ if(!quiet) toast('⚠ Облако не ответило — сохранено на этом устройстве'); }
-      else cloudOk = r!==false;
+      if(r===undefined){ SSET_LAST_ERR='timeout'; if(!quiet) toast('⚠ Облако не ответило — сохранено на этом устройстве'); }
+      else { cloudOk = r!==false; SSET_LAST_ERR=''; }
     }
-    catch(e){ if(!quiet) toast('⚠ Облако недоступно — сохранено локально'); }   // quiet — фоновая досылка: не дёргаем человека каждые 40 с
+    catch(e){                                          // quiet — фоновая досылка: не дёргаем человека каждые 40 с
+      SSET_LAST_ERR = cloudNoPerm(e) ? 'noperm' : 'net';
+      if(!quiet){
+        if(SSET_LAST_ERR!=='noperm') toast('⚠ Облако недоступно — сохранено локально');
+        else if(Date.now()-SSET_NOPERM_AT>8000){ SSET_NOPERM_AT=Date.now(); toast('⚠ Нет прав на запись — в облако не сохранено'); }   // серия правок → один тост
+      }
+    }
     return cloudOk;
   }
   return ssetLocal(key,val,shared); // личные данные не уходят в облако
@@ -6518,7 +6530,7 @@ async function persistGames(){
       }
     }
     const ok=await sset(KEY_GAMES, GAMES, true);
-    if(!ok && supa) toast('⚠ Облако недоступно — сохранено локально');
+    if(!ok && supa && SSET_LAST_ERR!=='noperm') toast('⚠ Облако недоступно — сохранено локально');   // при отказе в правах sset уже сказал «Нет прав на запись»
   }catch(e){}
   try{ renderNews(); }catch(e){} // обновить баннер «Ближайшая игра» и кнопку записи сразу после изменения игр
 }
@@ -7513,7 +7525,7 @@ async function persistChars(retry){
       });
       const ok=await sset('comik:chars:'+tag, mine, true, !!retry);   // фоновая досылка — без тостов внутри sset
       CHARS_DIRTY=!ok;                                   // не дошло — дошлём при возврате сети / очередным фоновым тиком
-      if(!ok && supa && !CHARS_DIRTY_TOLD){ CHARS_DIRTY_TOLD=true; toast('⚠ Облако недоступно — сохранено локально, отправим, когда связь вернётся'); }
+      if(!ok && supa && !CHARS_DIRTY_TOLD && SSET_LAST_ERR!=='noperm'){ CHARS_DIRTY_TOLD=true; toast('⚠ Облако недоступно — сохранено локально, отправим, когда связь вернётся'); }   // при отказе в правах sset уже сказал «Нет прав на запись»
       if(ok) CHARS_DIRTY_TOLD=false;
       return !!ok;
     } else {
