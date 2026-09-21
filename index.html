@@ -1236,6 +1236,10 @@
   .tb-check{display:flex;align-items:center;justify-content:center}
   .tb-check input{width:19px;height:19px;accent-color:var(--red);cursor:pointer}
   .tb-selall{margin-bottom:10px}
+  /* нижний ряд панели боя (только ГМ): бросок инициативы и переключатель «пропускать павших» */
+  .tb-tools{display:flex;flex-wrap:wrap;gap:7px;border-top:var(--hair) solid var(--line);padding-top:10px}
+  .tb-tool{border:var(--hair) solid var(--line2);background:var(--surface);color:var(--dim);font-family:var(--f-mono);font-size:.64rem;letter-spacing:.04em;padding:9px 11px;border-radius:10px;cursor:pointer;min-height:38px}
+  .tb-tool.on{color:var(--red-ink);border-color:rgba(var(--accent-rgb),.5);background:rgba(var(--accent-rgb),.1)}
   .tb-mass{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin-bottom:12px;padding:10px 12px;border:var(--hair) solid rgba(var(--accent-rgb),.5);border-radius:12px;background:rgba(var(--accent-rgb),.09)}
   .tb-mass-n{font-family:var(--f-mono);font-size:.68rem;letter-spacing:.06em;color:var(--red-ink);margin-right:2px}
   .tb-mass button{border:var(--hair) solid var(--line2);background:var(--surface);color:var(--dim);font-family:var(--f-mono);font-size:.68rem;padding:7px 10px;border-radius:9px;cursor:pointer}
@@ -11320,7 +11324,7 @@ function trkMassHp(mode){
   });
 }
 function trkMassClearConds(){ if(!ADMIN||!TRK_SEL.size) return; trkSelApply(x=>{ if(isFoeCard(x)){ x.conds=[]; x.conc=false; } }); trkSave(); renderTracker(); }
-function trkMassDelete(){ if(!ADMIN||!TRK_SEL.size) return; TRK.list=TRK.list.filter(x=>!(TRK_SEL.has(trkCardKey(x)) && isFoeCard(x))); TRK_SEL.clear(); trkSave(); renderTracker(); }
+function trkMassDelete(){ if(!ADMIN||!TRK_SEL.size) return; trkKeepOnly(x=>!(TRK_SEL.has(trkCardKey(x)) && isFoeCard(x))); TRK_SEL.clear(); trkSave(); renderTracker(); }
 function trkSelAllFoes(){ if(!ADMIN) return; const all=TRK.list.filter(isFoeCard).map(trkCardKey); const on=all.length&&all.every(k=>TRK_SEL.has(k)); if(on) all.forEach(k=>TRK_SEL.delete(k)); else all.forEach(k=>TRK_SEL.add(k)); renderTracker(); }
 /* общий «стол»: ГМ публикует свой трекер в облако, игроки смотрят вживую */
 const KEY_TRKSHARED='comik:tracker:shared:v1';
@@ -11685,15 +11689,15 @@ function trkSave(){ trkSaveLocal(); trkPublish(); }
 function trkSyncParty(replace){
   const s=(GAMES||[]).find(g=>g && g.id===TRK.party);
   // pin-записи (созданные ГМом NPC и добавленные вручную листы) синхронизация партии не трогает
-  if(!s){ if(replace) TRK.list=TRK.list.filter(x=>x.pin || !x.charId); return; }
+  if(!s){ if(replace) trkKeepOnly(x=>x.pin || !x.charId); return; }
   const skip=TRK.skip||{};
   const wanted=(s.players||[]).filter(p=>p && p.charId && !skip[p.charId]);   // убранных ГМом вручную не возвращаем
-  if(replace) TRK.list=TRK.list.filter(x=>x.pin || !x.charId || wanted.some(p=>p.charId===x.charId));
+  if(replace) trkKeepOnly(x=>x.pin || !x.charId || wanted.some(p=>p.charId===x.charId));
   wanted.forEach(p=>{
     if(TRK.list.some(x=>x.charId===p.charId)) return;
     const c=(CHARS_ALL[s.game]||[]).find(x=>x && x.id===p.charId && !x.deleted);
     TRK.list.push({
-      name:(c&&c.name)||p.charName||p.name||'Игрок', init:0,
+      name:(c&&c.name)||p.charName||p.name||'Игрок', init:parseInt((c&&c.init),10)||0,   // инициатива из листа, как в trkAddChar
       hp:parseInt(String((c&&c.hp)||'').match(/\d+/)||'0',10),
       ac:(String((c&&c.ac)||'').match(/\d+/)||[''])[0],
       ava:(c&&c.ava)||'', charId:p.charId });
@@ -11730,7 +11734,69 @@ function trkViewSet(m){ try{ localStorage.setItem('comik:trk:view', m); }catch(e
 function trkDeskGM(){ try{ return !!ADMIN && window.matchMedia('(min-width:1000px)').matches; }catch(e){ return false; } }
 const TRK_CONDS=['Отравлен','Ослеплён','Оглушён','Ошеломлён','Испуган','Опутан','Схвачен','Обездвижен','Недееспособен','Невидим','Очарован','Парализован','Окаменел','Без сознания','Ничком','Истощение'];
 const TRK_BUFFS=['Благословение','Вдохновение','Ускорение','Сопротивление','Помощь','Щит'];
-function trkOrder(list){ return (list||[]).map((x,i)=>({x,i})).sort((a,b)=>((b.x.init||0)-(a.x.init||0))||(a.i-b.i)).map(o=>o.x); }
+/* порядок хода: инициатива вниз, при равной — модификатор Ловкости (правило книги),
+   и только потом исходный номер в списке: без него равные инициативы «перетасовывались» */
+function trkOrder(list){ return (list||[]).map((x,i)=>({x,i}))
+  .sort((a,b)=>((b.x.init||0)-(a.x.init||0))||((b.x.dexMod||0)-(a.x.dexMod||0))||(a.i-b.i)).map(o=>o.x); }
+/* карточка выбыла из боя: враг на нуле ХП либо персонаж с тремя провалами спасбросков */
+function trkOutOfFight(x){ if(!x) return false; return isFoeCard(x) ? ((parseInt(x.hp,10)||0)<=0) : !!(x.ds && (x.ds.f||0)>=3); }
+/* настройка ГМа «пропускать павших» — своя на каждом устройстве, по умолчанию включена */
+function trkSkipDead(){ try{ return localStorage.getItem('comik:trk:skipdead')!=='0'; }catch(e){ return true; } }
+function trkSkipDeadToggle(){ try{ localStorage.setItem('comik:trk:skipdead', trkSkipDead()?'0':'1'); }catch(e){} trkRedraw(true); }
+/* модификатор Ловкости карточки: trkAddBeast кладёт его при добавлении, у старых карточек
+   выводим из бестиария (по srcId, иначе по имени) и запоминаем, чтобы не искать каждый бросок */
+function trkDexMod(x){
+  if(!x) return 0;
+  if(x.dexMod!=null) return parseInt(x.dexMod,10)||0;
+  const c=(x.srcId?(ARCHIVE.find(k=>k&&k.id===x.srcId)||CORE.find(k=>k&&k.id===x.srcId)):null) || beastCardByName(x.name);
+  const m=c?statMod((beastStat(c)||{}).dex):null;
+  if(m==null) return 0;
+  x.dexMod=m; return m;
+}
+/* Бросок инициативы за всех врагов без инициативы: d20 + ЛОВ. Одинаковым существам
+   (тот же статблок или имя) — ОДИН бросок на всех: за столом их водят одной пачкой.
+   Персонажам игроков не бросаем (инициативу ставят сами), но пустую подтягиваем из листа. */
+function trkRollInit(){
+  if(!ADMIN) return;
+  const rolls={}, said=[]; let n=0, seeded=0;
+  (TRK.list||[]).forEach(x=>{
+    if(!x || (parseInt(x.init,10)||0)!==0) return;
+    if(!isFoeCard(x)){
+      const c=x.charId?(CHARS_ALL[CUR_PROJECT]||[]).find(k=>k && k.id===x.charId):null;
+      const v=parseInt((c&&c.init),10)||0; if(!v) return;
+      x.init=v; seeded++;
+      trkSharedCardPatch(x, {init:v});   // инициатива игрока живёт в общем столе — публикация ГМа взяла бы оттуда старый ноль
+      return;
+    }
+    const g='g:'+(x.srcId||(x.name||'').trim().toLowerCase());
+    const mod=trkDexMod(x);
+    if(rolls[g]==null){ rolls[g]=1+Math.floor(Math.random()*20); said.push((x.name||'существо')+' '+(rolls[g]+mod)); }
+    x.init=rolls[g]+mod; n++;
+  });
+  if(!n && !seeded){ toast('Инициатива уже у всех расставлена'); return; }
+  trkLog('roll','Инициатива: '+(said.length?said.join(', ')+' (одинаковым — один бросок)':'по листам персонажей'));
+  trkSave(); trkRedraw(true);
+}
+/* Убираем карточки с доски: если среди них та, что сейчас ходит, ход заранее переводим
+   на следующую по порядку — иначе activeKey теряется и круг откатывается к началу списка.
+   Раунд не трогаем: круг не завершён, просто выбыл участник. */
+function trkActiveBeforeRemove(gone){
+  if(!TRK.activeKey || !gone || !gone.length || gone.indexOf(TRK.activeKey)<0) return;
+  const keys=trkOrder(TRK.list).map(trkCardKey);
+  const i=keys.indexOf(TRK.activeKey); if(i<0) return;
+  for(let k=1;k<=keys.length;k++){
+    const nk=keys[(i+k)%keys.length];
+    if(gone.indexOf(nk)<0){ TRK.activeKey=nk; return; }
+  }
+  TRK.activeKey='';   // убрали всех до одного
+}
+/* единственный способ выкинуть карточки из TRK.list: сохраняет корректный ход (см. выше) */
+function trkKeepOnly(keep){
+  const gone=(TRK.list||[]).filter(x=>!keep(x)).map(trkCardKey);
+  if(!gone.length) return;
+  trkActiveBeforeRemove(gone);
+  TRK.list=TRK.list.filter(keep);
+}
 function trkMaxHp(x, proj){
   if(x && x.charId){ const c=(CHARS_ALL[proj||CUR_PROJECT]||[]).find(k=>k && k.id===x.charId); const m=parseInt(String((c&&c.hp)||'').match(/\d+/)||'0',10); if(m) return m; }
   return parseInt(x&&x.max,10)||0;
@@ -11753,10 +11819,17 @@ function trkStep(d){
   TRK.round=TRK.round||1;
   let idx=order.findIndex(x=>trkCardKey(x)===TRK.activeKey);
   if(idx<0) idx = d>0 ? -1 : 0;
-  let next=idx+d;
   const prevRound=TRK.round;
-  if(next>=order.length){ next=0; TRK.round++; }
-  else if(next<0){ next=order.length-1; TRK.round=Math.max(1,TRK.round-1); }
+  // «пропускать павших»: перешагиваем выбывших из боя. Круг ровно один (guard), поэтому
+  // раунд за одно нажатие меняется не больше чем на единицу, а если живых не осталось —
+  // встаём на следующую карточку, как раньше (единственного оставшегося не пропускаем никогда)
+  const skip=trkSkipDead();
+  let next=idx, guard=order.length;
+  do{
+    next+=d;
+    if(next>=order.length){ next=0; TRK.round++; }
+    else if(next<0){ next=order.length-1; TRK.round=Math.max(1,TRK.round-1); }
+  } while(skip && trkOutOfFight(order[next]) && --guard>0);
   TRK.activeKey=trkCardKey(order[next]);
   if(TRK.round!==prevRound) trkLog('round','Раунд '+TRK.round);
   const who=order[next]; if(who) trkLog('turn','Ход: '+(who.name||''));
@@ -11895,6 +11968,10 @@ function trkCombatBar(o){
       </div>
     </div>
     <div class="tb-turn">${nav}</div>
+    ${gm?`<div class="tb-tools">
+      <button class="tb-tool" onclick="trkRollInit()" title="Бросок d20 + ЛОВ всем врагам без инициативы">🎲 Инициатива</button>
+      <button class="tb-tool${trkSkipDead()?' on':''}" onclick="trkSkipDeadToggle()" title="Не давать ход выбывшим из боя">💀 Пропускать павших</button>
+    </div>`:''}
     <div class="tb-sync ${sync.cls}" id="trkSync">${sync.txt}</div>
   </div>`;
 }
@@ -12810,7 +12887,7 @@ function trkLiveStart(){
   }
 }
 function trkHp(i,d){ const x=TRK.list[i]; if(!x) return; x.hp=Math.max(0,(parseInt(x.hp,10)||0)+d); trkSave(); renderTracker(); }
-function trkDel(i){ const x=TRK.list[i]; if(x){ trkLog('del','ГМ убрал: '+(x.name||'участник')); TRK_SEL.delete(trkCardKey(x)); if(x.charId && !x.pin){ TRK.skip=TRK.skip||{}; TRK.skip[x.charId]=1; } } TRK.list.splice(i,1); trkSave(); renderTracker(); }
+function trkDel(i){ const x=TRK.list[i]; if(x){ trkLog('del','ГМ убрал: '+(x.name||'участник')); TRK_SEL.delete(trkCardKey(x)); trkActiveBeforeRemove([trkCardKey(x)]); if(x.charId && !x.pin){ TRK.skip=TRK.skip||{}; TRK.skip[x.charId]=1; } } TRK.list.splice(i,1); trkSave(); renderTracker(); }
 function trkClear(){ TRK.list=[]; TRK.party=''; TRK.round=1; TRK.activeKey=''; TRK.skip={}; TRK_SEL.clear(); trkSave(); renderTracker(); }
 function trkSort(){ TRK.list.sort((a,b)=>(b.init||0)-(a.init||0)); trkSave(); renderTracker(); }
 function trkAddManual(){
@@ -14381,7 +14458,9 @@ function openInstallHelp(){
      Было три этажа: раунд и вкладки сверху, «сейчас ходит» — отдельной
      строкой ниже, между ними 1100 px пустоты. display:contents поднимает
      детей обеих строк в один ряд, порядок задаём order. */
-  #trkBox .tb-bar{flex-direction:row;align-items:center;gap:18px;padding:10px 14px}
+  #trkBox .tb-bar{flex-direction:row;flex-wrap:wrap;align-items:center;gap:18px;padding:10px 14px}
+  /* ряд инструментов — отдельной строкой под шапкой, чтобы не ломать её однострочность */
+  #trkBox .tb-tools{order:7;flex-basis:100%;border-top:none;padding-top:0;gap:8px}
   #trkBox .tb-bar > .tb-top,#trkBox .tb-bar > .tb-turn{display:contents}
   #trkBox .tb-round{order:1}
   #trkBox .tb-turn .tb-tbtn:not(.main){order:2}
