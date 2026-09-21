@@ -1,1 +1,4 @@
 brandbook.html
+
+# локальные рабочие копии агентов (git worktree) — не часть сайта
+.claude/worktrees/
