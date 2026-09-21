@@ -164,7 +164,8 @@ done
 [ -n "$GW_OK" ] || { warn "шлюз :8000 не отвечает — смотри docker compose logs api-gw rest"; exit 1; }
 echo "стек поднят ✓"
 
-say "7/9 · Схема БД (таблица kv, политики, realtime, RPC доски ходов)"
+say "7/9 · Схема БД (таблица kv, политики записи по ролям, realtime)"
+# Конечное состояние совпадает с migrate/2026-09-21-rls.sql — правь их вместе.
 docker exec -i supabase-db psql -v ON_ERROR_STOP=1 -U postgres -d postgres <<'SQL'
 create table if not exists public.kv (key text primary key, value jsonb);
 alter table public.kv enable row level security;
@@ -172,69 +173,48 @@ do $$ begin
   create policy kv_read  on public.kv for select using (true);
 exception when duplicate_object then null; end $$;
 do $$ begin
-  create policy kv_write on public.kv for all to authenticated using (true) with check (true);
-exception when duplicate_object then null; end $$;
-do $$ begin
   alter publication supabase_realtime add table public.kv;
 exception when duplicate_object then null; end $$;
 
--- рекурсивное слияние jsonb: объекты сливаются вглубь, массивы и скаляры заменяются, null удаляет ключ
-create or replace function public.jsonb_deep_merge(a jsonb, b jsonb)
-returns jsonb language sql immutable as $$
-  select case
-    when jsonb_typeof(a)='object' and jsonb_typeof(b)='object' then
-      (select coalesce(jsonb_object_agg(k, v), '{}'::jsonb) from (
-         select k, case when a ? k and b ? k then public.jsonb_deep_merge(a->k, b->k)
-                        when b ? k then b->k else a->k end as v
-         from (select jsonb_object_keys(a) as k union select jsonb_object_keys(b)) ks
-         where not (b ? k and jsonb_typeof(b->k)='null')) t)
-    else b end;
+-- RPC прежних версий (security definer в обход RLS): клиент их не зовёт — убираем и при повторном запуске
+drop function if exists public.kv_deep_merge(text, jsonb);
+drop function if exists public.trk_card_patch(text, text, text, jsonb);
+drop function if exists public.trk_log_push(text, text, jsonb, integer);
+drop function if exists public.jsonb_deep_merge(jsonb, jsonb);
+
+-- разработчики (DEV_TAGS из index.html) пишут любой ключ; таблица через API только для чтения —
+-- без RLS любой с anon-ключом дописал бы свой тег (дефолтные привилегии Supabase: all on tables)
+create table if not exists public.devs (tag text primary key);
+insert into public.devs(tag) values ('hinoma'), ('herr_teo'), ('arlissss') on conflict do nothing;
+alter table public.devs enable row level security;
+revoke insert, update, delete, truncate on public.devs from anon, authenticated;
+grant select on public.devs to anon, authenticated;
+drop policy if exists devs_read on public.devs;
+create policy devs_read on public.devs for select using (true);
+
+-- тег пользователя — локальная часть e-mail из JWT (<тег>@komikdnd.ru, нижний регистр)
+create or replace function public.my_tag() returns text
+language sql stable as $$
+  select lower(split_part(coalesce(auth.jwt()->>'email',''),'@',1))
 $$;
+grant execute on function public.my_tag() to authenticated, service_role;
 
--- deep-merge патча в строку kv (раньше здесь было плоское `||`: правка карты затирала доску целиком)
-create or replace function public.kv_deep_merge(p_key text, p_patch jsonb)
-returns void language sql security definer set search_path = public as $$
-  insert into public.kv(key, value) values (p_key, p_patch)
-  on conflict (key) do update set value = public.jsonb_deep_merge(kv.value, excluded.value);
-$$;
-
--- патч одной карточки доски: карточки лежат МАССИВОМ value[board].list, ключ — 'c:'+charId либо 'u:'+uid
-create or replace function public.trk_card_patch(p_key text, p_board text, p_cardkey text, p_patch jsonb)
-returns void language plpgsql security definer set search_path = public as $$
-declare cur jsonb; idx int := -1; i int; el jsonb; k text;
-begin
-  cur := (select value#>array[p_board,'list'] from public.kv where key=p_key);
-  if cur is null or jsonb_typeof(cur)<>'array' then return; end if;
-  for i in 0..jsonb_array_length(cur)-1 loop
-    el := cur->i;
-    k := case when el ? 'charId' then 'c:'||(el->>'charId') else 'u:'||coalesce(el->>'uid','') end;
-    if k = p_cardkey then idx := i; exit; end if;
-  end loop;
-  if idx < 0 then return; end if;
-  update public.kv set value = jsonb_set(value, array[p_board,'list',idx::text], public.jsonb_deep_merge(cur->idx, p_patch), false)
-  where key = p_key;
-end $$;
-
-create or replace function public.trk_log_push(p_key text, p_board text, p_entry jsonb, p_cap int default 80)
-returns void language plpgsql security definer set search_path = public as $$
-declare cur jsonb;
-begin
-  cur := coalesce((select value#>array[p_board,'log'] from public.kv where key=p_key), '[]'::jsonb);
-  cur := cur || jsonb_build_array(p_entry);
-  if jsonb_array_length(cur) > p_cap then
-    cur := (select jsonb_agg(e) from (select e from jsonb_array_elements(cur) e
-            offset jsonb_array_length(cur)-p_cap) t);
-  end if;
-  update public.kv set value = jsonb_set(coalesce(value,'{}'::jsonb), array[p_board], public.jsonb_deep_merge(coalesce(value->p_board,'{}'::jsonb), jsonb_build_object('log', cur)), true) where key=p_key;
-end $$;
-
--- RPC пишут в обход RLS (security definer) — анониму их звать нельзя
-revoke execute on function public.kv_deep_merge(text,jsonb) from public, anon;
-revoke execute on function public.trk_card_patch(text,text,text,jsonb) from public, anon;
-revoke execute on function public.trk_log_push(text,text,jsonb,int) from public, anon;
-grant execute on function public.kv_deep_merge(text,jsonb) to authenticated, service_role;
-grant execute on function public.trk_card_patch(text,text,text,jsonb) to authenticated, service_role;
-grant execute on function public.trk_log_push(text,text,jsonb,int) to authenticated, service_role;
+-- запись: разработчик — всё; игрок — доска, расписание, реестр логинов, пуш-подписки и свои листы/закладки
+drop policy if exists kv_write on public.kv;
+drop policy if exists kv_write_dev on public.kv;
+create policy kv_write_dev on public.kv for all to authenticated
+  using      (exists (select 1 from public.devs d where d.tag = public.my_tag()))
+  with check (exists (select 1 from public.devs d where d.tag = public.my_tag()));
+drop policy if exists kv_write_player on public.kv;
+create policy kv_write_player on public.kv for all to authenticated
+  using (
+       key in ('comik:tracker:shared:v1', 'comik:games:v1', 'comik:users:v1', 'push:subs')
+    or (public.my_tag() <> '' and key in ('comik:chars:' || public.my_tag(), 'comik:bm:' || public.my_tag()))
+  )
+  with check (
+       key in ('comik:tracker:shared:v1', 'comik:games:v1', 'comik:users:v1', 'push:subs')
+    or (public.my_tag() <> '' and key in ('comik:chars:' || public.my_tag(), 'comik:bm:' || public.my_tag()))
+  );
 SQL
 echo "схема применена ✓"
 

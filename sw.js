@@ -27,7 +27,7 @@ const PRECACHE = ['manifest.webmanifest', 'fonts.css', 'supabase.js', 'icon-192.
 // сколько ждём сеть для самой страницы, прежде чем отдать копию из кэша.
 // В регионах, где канал до хостинга душат, ожидание сети — это и есть «сайт не открывается»:
 // повторный заход обязан открыться мгновенно из кэша, а свежая версия догрузится фоном.
-const NAV_TIMEOUT = 3500;
+const NAV_TIMEOUT = 2500;
 
 self.addEventListener('install', e => {
   self.skipWaiting();
