@@ -2229,6 +2229,10 @@
   .toast{position:fixed;bottom:calc(var(--botnav-h) + 14px + env(safe-area-inset-bottom));left:0;right:0;margin:0 auto;width:fit-content;transform:translateY(16px) scale(.94);z-index:130;background:var(--glass2);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border:var(--hair) solid var(--line2);border-radius:999px;box-shadow:0 8px 28px rgba(0,0,0,.4);padding:9px 26px;color:var(--txt);font-family:var(--f-mono);font-weight:700;font-size:.82rem;letter-spacing:.02em;display:flex;align-items:center;gap:9px;opacity:0;pointer-events:none;transition:transform .35s var(--spring),opacity .25s;max-width:94vw}
   .toast.show{opacity:1;transform:translateY(0) scale(1)}
   .toast .ic{color:var(--red-ink)}
+  /* тост с действием («↶ Отменить»): кликабельна только кнопка, сам тост по-прежнему пропускает касания; цель ≥44px */
+  .toast.act{padding:5px 6px 5px 22px}
+  .toast .tact{appearance:none;border:none;margin:0 0 0 4px;padding:0 14px;min-height:44px;border-radius:999px;background:rgba(255,255,255,.1);color:var(--txt);font:inherit;letter-spacing:.02em;cursor:pointer;pointer-events:auto;white-space:nowrap;transition:transform .12s var(--spring)}
+  .toast .tact:active{transform:scale(.95)}
 
   /* ── соцкнопки на новостной странице (Boosty / Telegram) — обведённые «пилюли» с фирменным цветом ── */
   .news-socials{display:none}                 /* по умолчанию скрыты; в мобилке соцсети живут в подвале */
@@ -2923,6 +2927,11 @@
   .hp-prompt .hp-t{font-family:var(--f-disp);font-weight:700;font-size:1.1rem;text-align:center;margin-bottom:12px}
   .hp-prompt .hp-in{width:100%;text-align:center;font-family:var(--f-disp);font-weight:700;font-size:1.6rem;padding:12px;border-radius:12px;background:var(--bg2);border:var(--hair) solid var(--line2);color:var(--txt)}
   .hp-prompt .hp-in:focus{outline:none;border-color:var(--red)}
+  /* чипы 1 2 3 5 10 / «Все»: урон и лечение одним тапом без клавиатуры; цель ≥44px */
+  .hp-prompt .hp-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+  .hp-prompt .hp-chip{flex:1 1 38px;min-height:44px;padding:0 4px;border-radius:11px;background:var(--bg2);border:var(--hair) solid var(--line2);color:inherit;font-family:var(--f-disp);font-weight:700;font-size:1rem;cursor:pointer;transition:transform .12s var(--spring),background .12s}
+  .hp-prompt .hp-chip:active{transform:scale(.93);background:rgba(255,255,255,.08)}
+  .hp-prompt .hp-chip.all{font-family:var(--f-mono);font-size:.7rem;letter-spacing:.05em;text-transform:uppercase}
   /* кликабельное название плитки (истощение → таблица) */
   .cs-tile-info{background:none;border:none;color:inherit;font:inherit;cursor:pointer;display:inline-flex;align-items:center;gap:4px;padding:0}
   .cs-tile-info:active{opacity:.6}
@@ -3889,7 +3898,7 @@ if(/Android/i.test(navigator.userAgent||'')) d.classList.add('lite');}catch(e){}
   </div>
 </div>
 
-<div class="toast" id="toast"><span class="ic">▮</span><span id="toastMsg"></span></div>
+<div class="toast" id="toast"><span class="ic">▮</span><span id="toastMsg"></span><button class="tact" id="toastAct" type="button" hidden></button></div>
 
 <script id="chrono-data" type="application/json"></script>
 <script id="core-data" type="application/json"></script>
@@ -8878,7 +8887,10 @@ function charInvRerender(id, from){
   const c=charFind(id);
   // блок, в котором нажали кнопку: на странице могут жить два модуля одного персонажа (лист в шторке и доска)
   const node=c && ((from && from.closest && from.closest('.tm-inv')) || document.querySelector('.tm-inv[data-inv="'+(window.CSS&&CSS.escape?CSS.escape(id):id)+'"]'));
-  if(c && node){ node.outerHTML = invMoneyBoard(c, charGame(c), canEdit(c)); return; }
+  if(c && node){
+    // без `from` (отмена из тоста) обновляем все модули этого персонажа — их может быть два (шторка и доска)
+    const nodes=from ? [node] : [...document.querySelectorAll('.tm-inv[data-inv="'+(window.CSS&&CSS.escape?CSS.escape(id):id)+'"]')];
+    nodes.forEach(nd=>{ nd.outerHTML = invMoneyBoard(c, charGame(c), canEdit(c)); }); return; }
   // фолбэк — полная перерисовка, если модуль на экране не найден
   const cv=document.getElementById('view-combat');
   if(cv && cv.classList.contains('active') && document.getElementById('trkBox')){ trkRedraw(true); return; }
@@ -8898,11 +8910,24 @@ function charMoneyTx(id, sign, from){
   const bal=parseInt(c.coins[k],10)||0;
   if(sign<0 && amt>bal){ const lbl=(cur.find(x=>x[0]===k)||[,''])[1].split(' ').pop(); toast('Недостаточно средств: на счету '+bal+' '+lbl); return; }
   c.coins[k]=String(sign<0?bal-amt:bal+amt);
-  c.ledger=c.ledger||[]; c.ledger.push({at:Date.now(), cur:k, amt, sign, note});
+  const entry={at:Date.now(), cur:k, amt, sign, note};
+  c.ledger=c.ledger||[]; c.ledger.push(entry);
   if(c.ledger.length>200) c.ledger=c.ledger.slice(-200);
   const clbl=(cur.find(x=>x[0]===k)||[,''])[1].split(' ').pop();
   trkLog('money',(c.name||'Игрок')+(sign<0?' потратил ':' получил ')+amt+' '+clbl+(note?' · '+note:''));
   c.updatedAt=Date.now(); persistChars(); charInvRerender(id, from);
+  toast((sign<0?'−':'+')+amt+' '+clbl+' · '+c.coins[k], {action:{label:'↶ Отменить', fn:()=>charMoneyUndo(id, entry, clbl)}, ms:6000});
+}
+/* отмена операции с деньгами: запись вычёркивается из истории, баланс возвращается (запись ищем по полям —
+   после синхронизации листа объект может быть другим) */
+function charMoneyUndo(id, e, clbl){
+  const c=charFind(id); if(!c||!canEdit(c)) return;
+  const L=c.ledger||[], i=L.findIndex(x=>x && x.at===e.at && x.cur===e.cur && x.amt===e.amt && x.sign===e.sign);
+  if(i<0){ toast('Операцию уже изменили'); return; }
+  L.splice(i,1); c.coins=c.coins||{};
+  const bal=parseInt(c.coins[e.cur],10)||0; c.coins[e.cur]=String(Math.max(0, e.sign<0?bal+e.amt:bal-e.amt));
+  trkLog('money',(c.name||'Игрок')+' отменяет: '+(e.sign<0?'−':'+')+e.amt+' '+(clbl||''));
+  c.updatedAt=Date.now(); persistChars(); charInvRerender(id, null); toast('Отменено · '+c.coins[e.cur]+' '+(clbl||''));
 }
 function charInvAdd(id, from){
   const c=charFind(id); if(!c||!canEdit(c)) return;
@@ -8920,7 +8945,12 @@ function charInvQty(id, i, d, from){
 }
 function charInvDel(id, i, from){
   const c=charFind(id); if(!c||!canEdit(c)||!c.inv||!c.inv[i]) return;
-  c.inv.splice(i,1); c.updatedAt=Date.now(); persistChars(); charInvRerender(id, from);
+  const it=c.inv.splice(i,1)[0]; c.updatedAt=Date.now(); persistChars(); charInvRerender(id, from);
+  // «↶ Вернуть» (6 с): предмет встаёт на своё место; `from` уже перерисован — модуль ищем заново
+  toast('Убрано: '+(it.n||''), {action:{label:'↶ Вернуть', fn:()=>{
+    const c2=charFind(id); if(!c2||!canEdit(c2)) return;
+    c2.inv=c2.inv||[]; c2.inv.splice(Math.min(i,c2.inv.length),0,it);
+    c2.updatedAt=Date.now(); persistChars(); charInvRerender(id, null); toast('Вернули: '+(it.n||'')); }}, ms:6000});
 }
 /* Воля (TERRA): числовой счётчик прямо в просмотре листа — владелец меняет тапом */
 function willAdj(id,d){
@@ -11413,11 +11443,14 @@ function deepAssign(dst, patch){ for(const k in patch){ const v=patch[k];
   if(v && typeof v==='object' && !Array.isArray(v) && dst[k] && typeof dst[k]==='object' && !Array.isArray(dst[k])) deepAssign(dst[k], v);
   else if(v===null) delete dst[k]; else dst[k]=v; } return dst; }
 /* патч одной карточки доски (по boardKey + trkCardKey); ds:null → снять спасброски.
-   Ключ очереди включает набор полей: быстрые тапы по ХП схлопываются в последнее значение */
-function trkCloudCardPatch(boardKey, cardKey, patch){
+   Ключ очереди включает набор полей: быстрые тапы по ХП схлопываются в последнее значение.
+   when(t) — условие на свежей карточке (отмена урона: только если ХП никто не тронул) —
+   проверяется и локально, и на значении из облака перед CAS-записью */
+function trkCloudCardPatch(boardKey, cardKey, patch, when){
   const p=JSON.parse(JSON.stringify(patch||{}));
   trkWrite(v=>{ const s=v[boardKey]; if(!s||!Array.isArray(s.list)) return;
     const t=s.list.find(r=>r && trkCardKey(r)===cardKey); if(!t) return;
+    if(when && !when(t)) return;
     deepAssign(t,p); s.at=Date.now(); }, 'card:'+boardKey+':'+cardKey+':'+Object.keys(p).sort().join(','));
 }
 /* глубокое слияние полей одной доски (позиция фишки, размер сетки, фон, журнал) */
@@ -11565,10 +11598,10 @@ function trkRoundReset(){ if(!ADMIN) return; TRK.round=1; const o=trkOrder(TRK.l
 /* быстрый урон/лечение врагу/NPC (карточки ГМа) */
 function trkHpQuick(i,mode){
   if(!ADMIN) return; const x=TRK.list[i]; if(!x) return;
+  const cur0=trkLiveHp(x), mx0=trkMaxHp(x, CUR_PROJECT);   // подсказка чипу «Все»
   hpAmountPrompt(mode==='dmg'?'Урон · '+(x.name||''):'Лечение · '+(x.name||''), mode==='dmg'?'#d9564e':'#78c46b', v=>{
     const n=Math.abs(parseInt(v,10)||0); if(!n) return;
-    if(!isFoeCard(x)){ const sh=TRK_SHARED[gmBoardKey()]; const t=sh&&Array.isArray(sh.list)&&sh.list.find(r=>r&&trkCardKey(r)===trkCardKey(x)); if(t&&t.hp!=null) x.hp=t.hp; }   // база — живое значение игрока
-    const cur=parseInt(x.hp,10)||0;
+    const cur=trkLiveHp(x);   // база — живое значение игрока (могло измениться, пока окно было открыто)
     if(mode==='dmg' && trkMassiveDeath(x, cur, n, CUR_PROJECT)){
       x.hp=0; x.ds={s:0,f:3};
       trkSharedCardPatch(x, {hp:0, ds:x.ds});
@@ -11580,7 +11613,12 @@ function trkHpQuick(i,mode){
     trkLog(mode==='dmg'?'dmg':'heal','ГМ: '+(x.name||'')+(mode==='dmg'?' −':' +')+n+' ХП ('+nv+')');
     if(mode==='dmg' && isFoeCard(x) && cur>0 && nv<=0) trkLog('death',(x.name||'существо')+' повержено');
     trkSet(i,'hp', nv);
-  });
+  }, {max: mode==='dmg'?cur0:Math.max(0,mx0-cur0)});
+}
+/* живое ХП карточки ГМа: игроки/NPC ведут ХП в общем столе — читаем оттуда (и подтягиваем в локальную карточку) */
+function trkLiveHp(x){
+  if(!isFoeCard(x)){ const sh=TRK_SHARED[gmBoardKey()]; const t=sh&&Array.isArray(sh.list)&&sh.list.find(r=>r&&trkCardKey(r)===trkCardKey(x)); if(t&&t.hp!=null) x.hp=t.hp; }
+  return parseInt(x.hp,10)||0;
 }
 function trkConcToggle(i){ if(!ADMIN) return; const x=TRK.list[i]; if(!x) return; x.conc=!x.conc; if(x.charId) trkSharedCardSet(x,'conc',x.conc); else trkSave(); renderTracker(); }
 function trkCondPick(i){
@@ -12221,13 +12259,15 @@ function rollDeathSave(){
 }
 function playerHpAdjust(mode){
   const vp=trkActiveForPlayer(); if(!vp) return;
-  if(!playerMyCard(vp)){ toast('Вашего персонажа нет на доске'); return; }
+  const my0=playerMyCard(vp); if(!my0){ toast('Вашего персонажа нет на доске'); return; }
   const dmg = mode==='dmg';
+  const cur0=parseInt(my0.hp,10)||0, max0=playerMaxHp(vp,my0.charId);   // подсказка для чипа «Все»: весь ХП / до максимума
   hpAmountPrompt(dmg?'Получить урон':'Восполнить ХП', dmg?'#ff5a5f':'#3ecf6a', v=>{
     const n=Math.abs(parseInt(v,10)||0); if(!n) return;
     const my=playerMyCard(vp); if(!my) return;
     if(!dmg && my.ds && (my.ds.f||0)>=3){ toast('Персонаж мёртв — вернуть его может только Мастер'); return; }
     const cur=parseInt(my.hp,10)||0;
+    const prev={hp:cur, ds:my.ds?JSON.parse(JSON.stringify(my.ds)):null};   // для «↶ Отменить» (копия: deepAssign правит ds на месте)
     const patch={}; let died=false;
     if(dmg){
       patch.hp=Math.max(0,cur-n);
@@ -12241,26 +12281,46 @@ function playerHpAdjust(mode){
     trkRedraw(true);
     trkCloudCardPatch(vp, trkCardKey(my), patch);
     trkLog(dmg?'dmg':'heal',(my.name||'Игрок')+(dmg?' получает '+n+' урона ('+patch.hp+' ХП)':' восполняет '+n+' ХП ('+patch.hp+')'));
-    if(died){ trkLog('death',(my.name||'Персонаж')+' погибает от смертельного урона'); toast('Смертельный урон — персонаж погибает без спасбросков'); }
-  });
+    if(died) trkLog('death',(my.name||'Персонаж')+' погибает от смертельного урона');
+    const key=trkCardKey(my), set=patch.hp, mx=playerMaxHp(vp,my.charId);
+    toast((dmg?'−':'+')+n+' ХП · '+set+(mx?'/'+mx:'')+(died?' · смертельный урон, без спасбросков':''),
+      {action:{label:'↶ Отменить', fn:()=>playerHpUndo(vp, key, set, prev, n, dmg)}, ms:6000});
+  }, {max: dmg?cur0:Math.max(0,max0-cur0)});
 }
-/* мини-модалка ввода значения ХП */
-function hpAmountPrompt(title, color, cb){
+/* отмена своего урона/лечения (кнопка в тосте, 6 с): возвращаем ХП и спасброски, какими они были,
+   но только если ХП всё ещё равно тому, что мы записали — иначе кто-то (ГМ, второй тап) уже успел */
+function playerHpUndo(vp, key, set, prev, n, dmg){
+  const s=TRK_SHARED[vp]; const my=s&&Array.isArray(s.list)&&s.list.find(r=>r&&trkCardKey(r)===key);
+  if(!my || (parseInt(my.hp,10)||0)!==set){ toast('ХП уже изменили'); return; }
+  // то же условие — и на свежем значении из облака: правку ГМа, которую мы ещё не успели получить, не затираем
+  trkCloudCardPatch(vp, key, {hp:prev.hp, ds:prev.ds||null}, t=>(parseInt(t.hp,10)||0)===set);
+  trkRedraw(true);
+  trkLog(dmg?'heal':'dmg',(my.name||'Игрок')+' отменяет '+(dmg?'урон ':'лечение ')+n+' ('+prev.hp+' ХП)');
+  toast('Отменено · '+prev.hp+' ХП');
+}
+/* мини-модалка ввода значения ХП. opts: {presets:[1,2,3,5,10], max:N} — чипы срабатывают одним тапом
+   (cb(n) и закрытие), «Все» появляется, когда вызывающий передал max (весь текущий ХП / до максимума);
+   поле остаётся для других значений, Enter подтверждает. Фокус — синхронно после appendChild:
+   iOS открывает клавиатуру только внутри стека жеста, из setTimeout — нет */
+function hpAmountPrompt(title, color, cb, opts){
+  const o=opts||{}, presets=Array.isArray(o.presets)?o.presets:[1,2,3,5,10], all=Math.max(0,parseInt(o.max,10)||0);
   const ov=document.createElement('div'); ov.className='hp-prompt';
   ov.innerHTML=`<div class="hp-box">
     <div class="hp-t" style="color:${color}">${esc(title)}</div>
+    <div class="hp-chips" style="color:${color}">${presets.map(n=>`<button type="button" class="hp-chip" data-n="${n}">${n}</button>`).join('')}${all?`<button type="button" class="hp-chip all" data-n="${all}" title="${all}">Все</button>`:''}</div>
     <input class="hp-in" type="number" inputmode="numeric" min="0" placeholder="0">
     <div class="hp-acts">
       <button class="btn ghost" data-x>Отмена</button>
       <button class="btn primary" data-ok style="background:${color};border-color:${color};color:#0b0b0e">ОК</button>
     </div></div>`;
   document.body.appendChild(ov);
-  const inp=ov.querySelector('.hp-in'); setTimeout(()=>{try{inp.focus();}catch(e){}},60);
+  const inp=ov.querySelector('.hp-in'); try{ inp.focus(); }catch(e){}
   const close=()=>{ try{ov.remove();}catch(e){} };
   const ok=()=>{ const v=inp.value; close(); cb(v); };
   ov.querySelector('[data-x]').onclick=close;
   ov.querySelector('[data-ok]').onclick=ok;
-  inp.onkeydown=e=>{ if(e.key==='Enter') ok(); else if(e.key==='Escape') close(); };
+  ov.querySelectorAll('.hp-chip').forEach(b=>{ b.onclick=()=>{ const v=b.getAttribute('data-n'); close(); cb(v); }; });
+  inp.onkeydown=e=>{ if(e.key==='Enter'){ e.preventDefault(); ok(); } else if(e.key==='Escape') close(); };
   ov.onclick=e=>{ if(e.target===ov) close(); };
 }
 /* активная доска для игрока — только его текущего сеттинга: у каждой игры своя доска,
@@ -12579,10 +12639,11 @@ function gmManageHp(i,delta){
 function gmHpPrompt(i,mode){
   const x=TRK.list[i]; if(!x) return;
   const dmg=mode==='dmg';
+  const cur0=trkLiveHp(x), mx0=trkMaxHp(x, CUR_PROJECT);   // подсказка чипу «Все»
   hpAmountPrompt((dmg?'Урон · ':'Лечение · ')+(x.name||''), dmg?'#ff5a5f':'#3ecf6a', v=>{
     const n=Math.abs(parseInt(v,10)||0); if(!n) return;
     gmManageHp(i, dmg?-n:n);
-  });
+  }, {max: dmg?cur0:Math.max(0,mx0-cur0)});
 }
 /* ГМ жмёт по карточке на доске: игрок/NPC — открываем его лист, монстр — сводку из бестиария.
    Всё открывается поверх доски (модалка), доска остаётся под ней и возвращается по закрытию */
@@ -12703,10 +12764,17 @@ function triggerGlitch(){
   if(pane){ pane.classList.remove('shake'); void pane.offsetWidth; pane.classList.add('shake'); }
   setTimeout(()=>{ g.classList.remove('on'); if(pane) pane.classList.remove('shake'); },1300);
 }
-let toastT;
-function toast(msg){
+let toastT, TOAST_ACT=null;
+/* toast(msg) — как раньше; toast(msg, {action:{label,fn}, ms}) — с кнопкой действия (отмена урона/удаления):
+   кнопка живёт, пока виден тост (по умолчанию 6 с), следующий тост без действия её прячет */
+function toast(msg, opts){
   const t=document.getElementById('toast'); document.getElementById('toastMsg').textContent=msg;
-  t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),2600);
+  const o=opts||{}, a=o.action; TOAST_ACT=(a && typeof a.fn==='function') ? a : null;
+  const b=document.getElementById('toastAct');
+  if(b){ b.hidden=!TOAST_ACT; if(TOAST_ACT){ b.textContent=a.label||'Отменить'; b.onclick=()=>{ const f=TOAST_ACT; TOAST_ACT=null; b.hidden=true; t.classList.remove('show','act'); clearTimeout(toastT); try{ f.fn(); }catch(e){ console.warn('toast action', e); } }; } }
+  t.classList.toggle('act', !!TOAST_ACT);
+  t.classList.add('show'); clearTimeout(toastT);
+  toastT=setTimeout(()=>{ t.classList.remove('show','act'); TOAST_ACT=null; if(b) b.hidden=true; }, o.ms || (TOAST_ACT?6000:2600));
 }
 
 /* ====================== Push-уведомления ======================
