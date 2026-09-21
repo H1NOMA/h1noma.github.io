@@ -11388,9 +11388,10 @@ function trkBoardBuild(prev, opts){
   prev=(prev&&typeof prev==='object')?prev:{}; opts=opts||{};
   const sn=opts.snap||trkSnap();   // состав/партия/раунд — с момента действия ГМа, а не с момента отложенной записи
   const fm={}; (Array.isArray(prev.list)?prev.list:[]).forEach(c=>{ if(c) fm[trkCardKey(c)]=c; });
-  // бой завершён — фон снимается вместе с доской; саму картинку из её строки убирает trkBgDrop
+  // бой завершён: состав и фишки уходят, а карта остаётся — её ставят на сеттинг, а не на один бой
+  // (картинка лежит отдельной строкой и доску не раздувает; совсем её убирает «Игра сыграна»)
   if(opts.finish) return {list:[], party:'', at:Date.now(), active:false, owner:currentTag(), round:1, activeKey:'',
-    log:prev.log||[], mapPos:{}, mapBgRev:'', mapCols:prev.mapCols||sn.mapCols||TRK_MAPCOLS};
+    log:prev.log||[], mapPos:{}, mapBgRev:(prev.mapBgRev!=null?prev.mapBgRev:''), mapCols:prev.mapCols||sn.mapCols||TRK_MAPCOLS};
   // метка фона: из облака; если там пусто, а у ГМа фон задан локально (доска ещё не публиковалась) — его метка.
   // Самой картинки в строке доски нет: старая копия (mapBg) не переносится и исчезает при первой же публикации
   const bgRev=(prev.mapBgRev!=null && prev.mapBgRev!=='')?String(prev.mapBgRev):(sn.mapBgRev||'');
@@ -12632,8 +12633,7 @@ function trkToggleActive(){
     // партию тоже снимаем (как «Очистить»): иначе trkSyncParty при следующей перерисовке
     // вернёт персонажей партии на пустую доску, а выделение висело бы на несуществующих участниках
     TRK.list=[]; TRK.party=''; TRK.round=1; TRK.activeKey=''; TRK.mapPos={}; TRK_SEL.clear();
-    trkBgDrop(bk);   // и фон карты: его строка живёт отдельно и сама бы не исчезла
-    trkSave();
+    trkSave();   // фон карты оставляем: следующий бой в этом сеттинге чаще всего идёт по той же карте
   } else {
     trkLog('combat','Доска активна — бой начался');
   }

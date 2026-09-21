@@ -51,6 +51,9 @@ create policy kv_write_dev on public.kv for all to authenticated
 --   comik:users:v1           реестр логинов при входе          push:subs       пуш-подписки
 --   comik:chars:<тег>        свои листы персонажей (persistChars)
 --   comik:bm:<тег>           свои закладки (toggleBookmark, bmCloudSync)
+-- Фон карты (comik:trk:bg:<доска>) пишет только ГМ, а ГМ — это dev-тег (ADMIN выставляется из isDev),
+-- поэтому отдельного разрешения игрокам не нужно: строку покрывает политика kv_write_dev.
+-- Если когда-нибудь вернётся режим «игрок-ГМ», сюда добавится и этот префикс.
 drop policy if exists kv_write_player on public.kv;
 create policy kv_write_player on public.kv for all to authenticated
   using (
