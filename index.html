@@ -4553,19 +4553,51 @@ async function cloudGetPrefix(prefix){
   if(error) throw error;
   return data || [];
 }
+// точечное чтение нескольких строк — фоновый тик перечитывает только листы, у которых сменился штамп записи
+async function cloudGetKeys(keys){
+  const {data,error} = await supa.from('kv').select('key,value').in('key', keys);
+  if(error) throw error;
+  return data || [];
+}
 // собрать все листы персонажей из облака: легаси-блоб comik:chars:v1 + все пер-юзерные comik:chars:<тег>
-async function fetchCloudChars(){
-  const merged=emptyGames();
+// (keys — только эти строки: остальные не менялись, см. fetchCloudCharsChanged)
+let CHARS_SEEN_AT={};   // ключ → штамп записи value.at (persistChars), чьи листы уже слиты в CHARS_ALL
+async function fetchCloudChars(keys){
+  const merged=emptyGames(), stamps={};
   let rows;
-  try{ rows=await cloudGetPrefix('comik:chars:'); }catch(e){ return null; }
+  try{ rows=keys ? await cloudGetKeys(keys) : await cloudGetPrefix('comik:chars:'); }catch(e){ return null; }
   if(!Array.isArray(rows)) return null;
+  // свой тег: стартовое чтение идёт раньше, чем boot() присвоит SESSION, — берём его из локальной сессии
+  let tg=currentTag();
+  if(!tg && !SESSION_READY){ try{ const s=await sgetLocal(KEY_SESSION, false); if(s) tg=normTag(s); }catch(e){} }
+  const own='comik:chars:'+(tg||'');
   rows.forEach(r=>{
     let v=r && r.value; if(typeof v==='string'){ try{ v=JSON.parse(v); }catch(e){ return; } }
     if(!v || typeof v!=='object') return;
+    // свою строку зеркалим на устройство: старт без сети покажет свои листы, даже если на этом устройстве
+    // их ни разу не сохраняли (чужие не зеркалим — портреты всех игроков в квоту localStorage не влезут)
+    if(r.key===own){ try{ ssetLocal(r.key, r.value, true); }catch(e){} }
+    // штамп — в том же виде, что отдаёт зонд value->>at (текст; у старых строк без штампа — пусто)
+    if(r.key) stamps[r.key]=(r.value && typeof r.value==='object' && r.value.at!=null) ? String(r.value.at) : '';
     const rm=normGameMap(v);
     ALL_GAMES.forEach(g=>{ merged[g]=mergeChars(merged[g], rm[g]); });
   });
+  // штампы едут вместе с картой, а запоминает их тот, кто слил карту в CHARS_ALL (charsSeen):
+  // чтение, брошенное по тайм-ауту, не должно пометить непринятые листы как виденные
+  Object.defineProperty(merged, 'stamps', {value:stamps});
   return merged;
+}
+const charsSeen=m=>{ if(m && m.stamps) Object.assign(CHARS_SEEN_AT, m.stamps); };
+/* Фоновый тик раньше качал листы ВСЕХ игроков (с портретами) каждые 40 с на каждом клиенте.
+   Теперь сначала дешёвый зонд — только ключи и штамп записи; полные строки читаем лишь для тех,
+   у кого штамп сменился (или его ещё нет: старые строки без штампа читаем один раз, дальше считаем
+   виденными). Зонд не ответил — читаем всё, как раньше. null — ничего нового (или сбой чтения). */
+async function fetchCloudCharsChanged(){
+  let r=null;
+  try{ r=await withTimeout(supa.from('kv').select('key,at:value->>at').like('key','comik:chars:%'), 8000); }catch(e){}
+  if(!r || r.error || !Array.isArray(r.data)) return fetchCloudChars();
+  const keys=r.data.filter(x=>x && x.key && CHARS_SEEN_AT[x.key]!==(x.at==null?'':String(x.at))).map(x=>x.key);
+  return keys.length ? fetchCloudChars(keys) : null;
 }
 
 // облачные данные бывают тяжёлыми (архив/листы с картинками) — на телефоне 4 c мало и чтение
@@ -4577,7 +4609,13 @@ async function sget(key, shared=SHARED){
   if(supa && shared){
     try{
       const v = await withTimeout(cloudGet(key), CLOUD_TMO);
-      if(v!==undefined) return v;  // undefined = таймаут → локальный кэш
+      if(v!==undefined){   // undefined = таймаут → локальный кэш
+        // зеркалим прочитанное на устройство: старт без сети покажет последнее облачное состояние,
+        // а не то, что лежало здесь с последней СВОЕЙ записи. Отсутствующую строку (null) не зеркалим —
+        // пустое облако (переезд, сброс) не должно стирать локальную копию
+        if(v!==null){ try{ ssetLocal(key, v, shared); }catch(e){} }
+        return v;
+      }
     }catch(e){ /* облако молчит — локальный кэш */ }
   }
   return sgetLocal(key, shared);
@@ -4624,12 +4662,14 @@ let ARCHIVE_ALL=emptyGames();
 let CHARS_ALL=emptyGames();
 let ARCHIVE=ARCHIVE_ALL.assimilation, CHARS=CHARS_ALL.assimilation, USERS=[], SESSION=null, activeCat='all', activeSub=null;
 let SESSION_READY=false;   // сессия прочитана при загрузке: до этого закрытые сеттинги из сохранённого выбора не сбрасываем
-/* старый формат (просто массив) считаем данными ASSIMILATION */
+/* старый формат (просто массив) считаем данными ASSIMILATION. Берём только массивы игр:
+   служебные поля рядом с ними (штамп записи at из persistChars) в карту игр не попадают */
 function normGameMap(v){
   const empty=emptyGames();
   if(!v) return empty;
   if(Array.isArray(v)) return Object.assign(empty,{assimilation:v});
-  return Object.assign(empty, v);
+  Object.keys(v).forEach(k=>{ if(Array.isArray(v[k])) empty[k]=v[k]; });
+  return empty;
 }
 const CORE_GAMES=['legacy','neverland','terra','classic','skazki'];   // D&D-сеттинги с ядром SRD (ASSIMILATION — без ядра)
 function isCore(id){ return !!id && CORE.some(c=>c.id===id); }
@@ -4810,9 +4850,11 @@ async function boot(){
   // через десятки секунд, хотя лежат прямо в файле.
   const D=startDataLoad();   // файлы данных качаются с preboot; облако читаем параллельно с ними
   await initSupa();
-  // все ключи читаются параллельно: быстрее и один таймаут не тянет за собой остальные
+  // все ключи читаются параллельно: быстрее и один таймаут не тянет за собой остальные.
+  // Легаси-блоб листов comik:chars:v1 в облаке заморожен и приходит вместе с пер-юзерными строками
+  // (fetchCloudChars, префикс comik:chars:) — отдельно читаем его только без облака, с устройства
   const cloudP = Promise.all([
-    sget(KEY_ARCHIVE, true), sget(KEY_CHARS, true), sget(KEY_USERS, true), sget(KEY_SESSION, false), sget(KEY_CHRONO, true), sget(KEY_DIRTY, false), sget(KEY_NEWS, true), sget(KEY_ACCESS, false), sget(KEY_HERO, true)
+    sget(KEY_ARCHIVE, true), supa ? null : sgetLocal(KEY_CHARS, true), sget(KEY_USERS, true), sget(KEY_SESSION, false), sget(KEY_CHRONO, true), sget(KEY_DIRTY, false), sget(KEY_NEWS, true), sget(KEY_ACCESS, false), sget(KEY_HERO, true)
   ]);
   try{ CORE = (await D.core) || CORE || []; }catch(e){ CORE=CORE||[]; }
   gwSeedInto(CORE);   // стартовые карточки GALACTIC WAR — тем же механизмом правок/скрытий, что и ядро
@@ -4868,7 +4910,7 @@ async function boot(){
   if(supa){
     try{
       const perUser=await withTimeout(fetchCloudChars(), CLOUD_TMO);
-      if(perUser) ALL_GAMES.forEach(g=>{ CHARS_ALL[g]=mergeChars(CHARS_ALL[g], perUser[g]); });
+      if(perUser){ ALL_GAMES.forEach(g=>{ CHARS_ALL[g]=mergeChars(CHARS_ALL[g], perUser[g]); }); charsSeen(perUser); }
       else bootMiss=true;   // листы не дочитались — на доске у игрока не будет его персонажа, пока не дочитаем
     }catch(e){ bootMiss=true; }
   }
@@ -4966,9 +5008,10 @@ async function boot(){
   try{ ssetLocal('comik:backup:auto', {at:Date.now(), chars:CHARS_ALL, games:GAMES, news:NEWS}); }catch(e){}
   // офлайн-режим: сервис-воркер кэширует сайт целиком
   if('serviceWorker' in navigator && location.protocol==='https:'){ try{ navigator.serviceWorker.register('sw.js'); }catch(e){} }
-  // страховка от «отвалившегося» первого чтения: дотягиваем облако при возврате/сети и раз через 6 с
+  // страховка от «отвалившегося» первого чтения: дотягиваем облако при возврате/сети, а если стартовые
+  // чтения не дошли — ещё раз через 6 с (при удачном старте это было лишним полным чтением)
   cloudRepullBind();
-  setTimeout(()=>cloudRepull('boot-safety'), 6000);
+  if(bootMiss) setTimeout(()=>cloudRepull('boot-safety'), 6000);
 }
 /* Бестиарий (~7 МБ) парсится после первого рендера — сайт становится интерактивным раньше.
    Вызывается в начале boot(), до облачных запросов, поэтому монстры появляются даже если облако недоступно. */
@@ -6148,7 +6191,7 @@ async function cloudRepull(reason){
     }
     let charsChanged=false;
     if(perUser){ const fp=g=>(CHARS_ALL[g]||[]).map(c=>c&&(c.id+':'+(c.updatedAt||0))).join(','); const before=ALL_GAMES.map(fp).join('|');
-      ALL_GAMES.forEach(g=>{ CHARS_ALL[g]=mergeChars(CHARS_ALL[g], perUser[g]); }); changed=true; charsChanged=ALL_GAMES.map(fp).join('|')!==before; }
+      ALL_GAMES.forEach(g=>{ CHARS_ALL[g]=mergeChars(CHARS_ALL[g], perUser[g]); }); charsSeen(perUser); changed=true; charsChanged=ALL_GAMES.map(fp).join('|')!==before; }
     if(Array.isArray(nws)){ NEWS=mergeChars(NEWS, nws).filter(n=>n && !(n.deleted && (Date.now()-(n.updatedAt||0))>90*864e5)); changed=true; }
     if(changed){
       bindGameData();
@@ -7499,6 +7542,7 @@ async function persistChars(retry){
             // надгробия старше 90 дней вычищаем — облако к этому времени везде синхронизировано
             CHARS_ALL[g]=CHARS_ALL[g].filter(c=>!(c && c.deleted && (Date.now()-(c.updatedAt||0))>90*864e5));
           });
+          charsSeen(cloud);
           bindGameData();
         }
       }catch(e){}
@@ -7511,10 +7555,11 @@ async function persistChars(retry){
         mine[g]=(CHARS_ALL[g]||[]).filter(c=>{ if(!c) return false;
           const o=normTag(c.owner||''); return !o || o===tag; });
       });
+      mine.at=Date.now();   // штамп записи: по нему фоновый тик у других решает, перечитывать ли строку (fetchCloudCharsChanged)
       const ok=await sset('comik:chars:'+tag, mine, true, !!retry);   // фоновая досылка — без тостов внутри sset
       CHARS_DIRTY=!ok;                                   // не дошло — дошлём при возврате сети / очередным фоновым тиком
       if(!ok && supa && !CHARS_DIRTY_TOLD){ CHARS_DIRTY_TOLD=true; toast('⚠ Облако недоступно — сохранено локально, отправим, когда связь вернётся'); }
-      if(ok) CHARS_DIRTY_TOLD=false;
+      if(ok){ CHARS_DIRTY_TOLD=false; CHARS_SEEN_AT['comik:chars:'+tag]=String(mine.at); }   // свою запись перечитывать незачем
       return !!ok;
     } else {
       // не залогинен или без облака — сохраняем ТОЛЬКО локально;
@@ -7533,15 +7578,17 @@ setInterval(async ()=>{
     if(scrim && scrim.classList.contains('open')) return;
     if(CHARS_DIRTY && currentTag()){ try{ await persistChars(true); }catch(e){} }   // лист, не ушедший в облако офлайн, — дошлём до чтения (тихо), иначе облачная копия его перекроет
     const [ch,gm]=await Promise.all([
-      withTimeout(fetchCloudChars(), CLOUD_TMO).catch(()=>null),
+      withTimeout(fetchCloudCharsChanged(), CLOUD_TMO).catch(()=>null),   // зонд по штампам: полные строки — только изменившиеся
       withTimeout(cloudGet(KEY_GAMES),4000).catch(()=>null)
     ]);
     let chChanged=false, gmChanged=false;
     if(ch && typeof ch==='object'){
+      const fp=a=>(a||[]).map(c=>c&&(c.id+':'+(c.updatedAt||0))).join(',');   // отпечаток id:updatedAt (как в cloudRepull) вместо JSON.stringify всего массива
       ALL_GAMES.forEach(g=>{
         const merged=mergeChars(CHARS_ALL[g], ch[g]);
-        if(JSON.stringify(merged)!==JSON.stringify(CHARS_ALL[g])){ CHARS_ALL[g]=merged; chChanged=true; }
+        if(fp(merged)!==fp(CHARS_ALL[g])){ CHARS_ALL[g]=merged; chChanged=true; }
       });
+      charsSeen(ch);
     }
     if(Array.isArray(gm) && JSON.stringify(gm)!==JSON.stringify(GAMES)){
       const ids=new Set(GAMES.map(x=>x&&x.id));
@@ -12448,7 +12495,8 @@ async function trkLiveCatchup(force){
 function trkLiveStart(){
   if(!(trkRT && trkRTok)) trkRTSubscribe();   // живой канал не пересоздаём при каждом заходе на доску
   clearInterval(trkPollT);
-  // опрос — запасной путь: при живом Realtime раз в 5 с, без него — раз в 2,5 с; заодно дожимаем очередь правок
+  // опрос — запасной путь: при живом Realtime раз в 20 с (правки и так приходят по каналу, опрос лишь
+  // страхует от потерянного события), без него — раз в 2,5 с; заодно дожимаем очередь правок
   let tick=0;
   trkPollT=setInterval(async ()=>{
     if(document.hidden) return;
@@ -12458,7 +12506,7 @@ function trkLiveStart(){
     if(TRK_PENDING.length && !TRK_FLUSHING && !TRK_FLUSH_T) trkFlushSoon(0);
     const tp=document.getElementById('view-combat');
     if(!(tp && tp.classList.contains('active')) || !document.getElementById('trkBox')) return;
-    if(!offline && trkRTok && (tick%2)) return;
+    if(!offline && trkRTok && (tick%8)) return;   // при живом Realtime опрос — лишь страховка: раз в 20 с, а не в 5
     if(await trkFetchShared(false, offline)) trkLiveApply();   // и в «офлайне» сначала дешёвая проверка версии, а не вся строка
   }, 2500);
   if(!trkLiveBound){
