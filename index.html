@@ -4464,29 +4464,69 @@ const SUPA_URL = CLOUD.url;
 const SUPA_KEY = CLOUD.key;
 let supa = null;
 
+function supaMake(){
+  if(supa) return true;
+  if(!window.supabase) return false;
+  // auth.lock: полностью отключаем navigator.locks (просто выполняем операцию сразу).
+  // На десктопе (PWA + вкладка браузера, либо застрявший фоновый refresh токена) вход
+  // зависал на глобальном межтабовом замке Web Locks до таймаута → «Облако не отвечает».
+  // No-op замок исключает и это зависание, и любую сериализацию/дедлок: signIn стартует мгновенно.
+  const noLock = (name, acquireTimeout, fn) => fn();
+  supa = window.supabase.createClient(SUPA_URL, SUPA_KEY, {
+    auth: { persistSession:true, autoRefreshToken:true, detectSessionInUrl:false, lock: noLock }
+  });
+  return true;
+}
+/* Библиотека облака (supabase.js, ~180 КБ) грузится отдельным файлом. Раньше на неё давалось
+   5 секунд, и на медленной мобильной сети приложение навсегда уходило в «работаем локально»:
+   доска у игрока так и оставалась «Мастер не ведёт игру», правки никуда не уходили — до перезагрузки.
+   Теперь запуск ждёт те же 5 секунд (чтобы не тормозить старт), а если файл дошёл позже —
+   клиент создаётся в этот момент и приложение само дочитывает облако (см. supaLateInit).
+   Если файл не загрузился вовсе (обрыв) — пробуем ещё раз с паузой и при возврате сети. */
+let SUPA_LATE=false, SUPA_LOAD_TRIES=0;
+function supaLoadLib(){
+  return new Promise((res,rej)=>{
+    if(window.supabase){ res(true); return; }
+    const sc=document.createElement('script');
+    sc.src='supabase.js';  // вшито локально — без обращения к jsdelivr
+    sc.onload=()=>res(true); sc.onerror=()=>rej(new Error('load'));
+    document.head.appendChild(sc);
+  });
+}
+function supaLoadRetry(){
+  if(supa || SUPA_LOAD_TRIES>=6) return;
+  const d=Math.min(60000, 3000*Math.pow(2, SUPA_LOAD_TRIES++));
+  setTimeout(()=>{ if(supa) return; supaLoadLib().then(()=>{ if(supaMake() && SUPA_LATE) supaLateInit(); }).catch(()=>supaLoadRetry()); }, d);
+}
 async function initSupa(){
   if(!SUPA_URL || !SUPA_KEY) return false;
+  const lib=supaLoadLib().then(()=>supaMake()).catch(()=>{ supaLoadRetry(); return false; });
+  // файл дошёл после того, как запуск перестал его ждать — подключаемся с опозданием
+  lib.then(ok=>{ if(ok && SUPA_LATE) supaLateInit(); });
   try{
-    await Promise.race([
-      new Promise((res,rej)=>{
-        const sc=document.createElement('script');
-        sc.src='supabase.js';  // вшито локально — без обращения к jsdelivr
-        sc.onload=res; sc.onerror=rej;
-        document.head.appendChild(sc);
-      }),
-      new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')), 5000))
-    ]);
-    if(!window.supabase) throw new Error('no lib');
-    // auth.lock: полностью отключаем navigator.locks (просто выполняем операцию сразу).
-    // На десктопе (PWA + вкладка браузера, либо застрявший фоновый refresh токена) вход
-    // зависал на глобальном межтабовом замке Web Locks до таймаута → «Облако не отвечает».
-    // No-op замок исключает и это зависание, и любую сериализацию/дедлок: signIn стартует мгновенно.
-    const noLock = (name, acquireTimeout, fn) => fn();
-    supa = window.supabase.createClient(SUPA_URL, SUPA_KEY, {
-      auth: { persistSession:true, autoRefreshToken:true, detectSessionInUrl:false, lock: noLock }
-    });
+    const ok=await Promise.race([lib, new Promise(res=>setTimeout(()=>res('timeout'), 5000))]);
+    if(ok==='timeout'){ SUPA_LATE=true; console.warn('Supabase: библиотека ещё грузится — стартуем локально, подключимся, когда дойдёт'); return false; }
+    if(!ok){ console.warn('Supabase недоступен, работаем локально'); supa=null; return false; }
     return true;
   }catch(e){ console.warn('Supabase недоступен, работаем локально', e); supa=null; return false; }
+}
+/* Позднее подключение облака: сессия, аккаунт, листы/архив/новости/игры, живая доска —
+   всё, что при запуске прочиталось из локального кэша, дочитываем из облака */
+let SUPA_LATE_DONE=false;
+async function supaLateInit(){
+  if(SUPA_LATE_DONE || !supa) return; SUPA_LATE_DONE=true;
+  try{ console.info('[КОМИК] облако подключилось с опозданием — дочитываем данные'); }catch(_){}
+  try{
+    const gs=await authTimeout(supa.auth.getSession(), 8000);
+    const u=gs && gs.data && gs.data.session ? gs.data.session.user : null;
+    if(u){ SESSION=emailToLogin(u.email); ssetLocal(KEY_SESSION, SESSION, false); if(!USERS.some(x=>normTag(x.tag)===normTag(SESSION))) USERS.push({tag:normTag(SESSION), createdAt:Date.now()}); }
+  }catch(e){}
+  try{ refreshAdmin(); }catch(e){}
+  try{ const gm=await withTimeout(cloudGet(KEY_GAMES), CLOUD_TMO); if(Array.isArray(gm)) GAMES=gm; }catch(e){}
+  CLOUD_REPULL_AT=0; try{ await cloudRepull('late'); }catch(e){}
+  try{ afterAuthChange(); }catch(e){}          // аккаунт, листы, настройки, а на «Доске ходов» — переподписка и дочитывание стола
+  try{ if(document.getElementById('trkBox')){ trkLiveStart(); trkLiveCatchup(true); } }catch(e){}
+  cloudRetryLater(0);
 }
 
 /* Облачные аналоги sget/sset: одна таблица kv (key text pk, value jsonb) */
@@ -4774,6 +4814,7 @@ async function boot(){
   // диагностика синхронизации: видно в консоли браузера (F12 → Console). Если облако не читается —
   // supa:false ИЛИ значения null при живом supa → проблема со связью/доступом, а не с кодом.
   try{ console.info('[КОМИК] облако', {supa:!!supa, архив:arc!=null, листы:chars!=null, новости:nws!=null, аккаунты:users!=null}); }catch(_){}
+  let bootMiss = !!supa && (arc==null || nws==null || users==null);   // что-то не дочиталось (тайм-аут) — дочитаем позже (см. ниже, после листов)
   await loadChronoEmbedded();
   if(chr) CHRONO_DATA = Object.assign(CHRONO_DATA, chr);
   // миграция веток хронологии: Мир/Путешествие/Гости → единственная ветка «Приключения»
@@ -4821,8 +4862,10 @@ async function boot(){
     try{
       const perUser=await withTimeout(fetchCloudChars(), CLOUD_TMO);
       if(perUser) ALL_GAMES.forEach(g=>{ CHARS_ALL[g]=mergeChars(CHARS_ALL[g], perUser[g]); });
-    }catch(e){}
+      else bootMiss=true;   // листы не дочитались — на доске у игрока не будет его персонажа, пока не дочитаем
+    }catch(e){ bootMiss=true; }
   }
+  if(bootMiss) cloudRetryLater(0);
   const [chid, cov] = await Promise.all([sget(KEY_COREHID, true), sget(KEY_COREOVER, true)]);
   // миграция: раньше правки хранились отдельно по играм — сливаем в общие
   if(Array.isArray(chid)) CORE_HIDDEN = chid.slice();
@@ -6096,7 +6139,9 @@ async function cloudRepull(reason){
       });
       changed=true;
     }
-    if(perUser){ ALL_GAMES.forEach(g=>{ CHARS_ALL[g]=mergeChars(CHARS_ALL[g], perUser[g]); }); changed=true; }
+    let charsChanged=false;
+    if(perUser){ const fp=g=>(CHARS_ALL[g]||[]).map(c=>c&&(c.id+':'+(c.updatedAt||0))).join(','); const before=ALL_GAMES.map(fp).join('|');
+      ALL_GAMES.forEach(g=>{ CHARS_ALL[g]=mergeChars(CHARS_ALL[g], perUser[g]); }); changed=true; charsChanged=ALL_GAMES.map(fp).join('|')!==before; }
     if(Array.isArray(nws)){ NEWS=mergeChars(NEWS, nws).filter(n=>n && !(n.deleted && (Date.now()-(n.updatedAt||0))>90*864e5)); changed=true; }
     if(changed){
       bindGameData();
@@ -6104,9 +6149,25 @@ async function cloudRepull(reason){
       if(v==='view-world'){ renderCats(); renderCards(); }
       else if(v==='view-players' && typeof renderPlayers==='function') renderPlayers();
       else if(v==='view-news' && typeof renderNews==='function') renderNews();
+      // на доске состав/панель игрока зависят от листов — дорисовать бережно, и только если листы изменились
+      if(charsChanged && document.getElementById('trkBox') && typeof trkRedraw==='function') trkRedraw(true);
     }
-  }catch(e){}
+    return changed;
+  }catch(e){ return false; }
   finally{ CLOUD_REPULLING=false; }
+}
+/* Стартовые чтения облака на медленной сети упираются в тайм-аут и остаются локальным кэшем:
+   у игрока на доске тогда нет его листа (нет панели персонажа). Дочитываем позже с растущей паузой. */
+let CLOUD_RETRY_T=null;
+function cloudRetryLater(n){
+  n=n||0; if(!supa || n>5) return;
+  clearTimeout(CLOUD_RETRY_T);
+  CLOUD_RETRY_T=setTimeout(async ()=>{
+    if(document.hidden){ cloudRetryLater(n); return; }
+    CLOUD_REPULL_AT=0;
+    const ok=await cloudRepull('retry'+n);
+    if(!ok) cloudRetryLater(n+1);
+  }, Math.min(90000, 8000*Math.pow(2, n)));
 }
 let CLOUD_REPULL_BOUND=false;
 function cloudRepullBind(){
@@ -11716,11 +11777,19 @@ function trkSource(){
   const sh=TRK_SHARED[vp]||{};
   return {order:trkOrder(sh.list||[]), round:sh.round||1, activeKey:sh.activeKey||'', proj:boardProj(vp), playerView:true, vp};
 }
+/* фишки на всех картах страницы — по актуальным позициям (без пересоздания картинок) */
+function trkMapPatch(src){
+  const toks=document.querySelectorAll('.mp-tok[data-key]'); if(!toks.length) return;
+  const cols=trkMapColsOf(src), pos=trkMapPosFor(src);
+  toks.forEach(tok=>{ const k=tok.getAttribute('data-key'); const pp=pos[k];
+    if(pp && !tok.classList.contains('dragging')){ tok.style.left=(pp.x+0.5)/cols*100+'%'; tok.style.top=(pp.y+0.5)/cols*100+'%'; }
+    tok.classList.toggle('on', k===src.activeKey); });
+}
 /* структурная «подпись»: если совпадает — обновляем только числа/подсветку, иначе полная отрисовка */
 function trkComboSig(src, view){
   if(!src) return '';
   let extra='';
-  if(view==='map'){ try{ extra='|cols:'+trkMapColsOf(src)+'|bg:'+String(trkMapBgOf(src)||'').length; }catch(e){} }   // сетка/фон карты меняются — перерисовать
+  try{ extra='|cols:'+trkMapColsOf(src)+'|bg:'+String(trkMapBgOf(src)||'').length; }catch(e){}   // сетка/фон карты меняются — перерисовать (карта есть и в списке: окно ГМа, колонка игрока)
   return view+'|'+src.order.map(x=>{
     const foe=isFoeCard(x), foeHidden=src.playerView&&foe, hp=parseInt(x.hp,10)||0;
     const dead=foe?(hp<=0):(x.ds&&(x.ds.f||0)>=3);
@@ -11740,12 +11809,11 @@ function trkRefresh(){
   }
   // точечный патч чисел безопасен и во время ввода: поле в фокусе он не трогает
   const esc2=k=>(window.CSS&&CSS.escape)?CSS.escape(k):k;
-  // карта: двигаем только позиции фишек и подсветку активного — картинки не пересоздаём
+  // карта: двигаем только позиции фишек и подсветку активного — картинки не пересоздаём.
+  // Карт на странице может быть несколько (основная колонка, окно ГМа справа, колонка игрока на
+  // десктопе) — двигаем фишки во всех, иначе окно ГМа не видело ходов игроков до полной перерисовки
+  trkMapPatch(src);
   if(trkViewMode()==='map'){
-    const cols=trkMapColsOf(src), pos=trkMapPosFor(src);
-    src.order.forEach(x=>{ const k=trkCardKey(x), tok=box.querySelector('.mp-tok[data-key="'+esc2(k)+'"]'); if(!tok) return;
-      const pp=pos[k]; if(pp && !tok.classList.contains('dragging')){ tok.style.left=(pp.x+0.5)/cols*100+'%'; tok.style.top=(pp.y+0.5)/cols*100+'%'; }
-      tok.classList.toggle('on', k===src.activeKey); });
     const rn=box.querySelector('.tb-round .n'); if(rn) rn.textContent=src.round;
     const act=src.order.find(x=>trkCardKey(x)===src.activeKey)||src.order[0];
     const who=box.querySelector('.tb-now .who'); if(who) who.textContent=(act&&act.name)||'—';
