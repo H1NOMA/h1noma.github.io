@@ -6173,7 +6173,7 @@ let CLOUD_REPULL_BOUND=false;
 function cloudRepullBind(){
   if(CLOUD_REPULL_BOUND) return; CLOUD_REPULL_BOUND=true;
   document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) cloudRepull('visible'); });
-  window.addEventListener('online', ()=>cloudRepull('online'));
+  window.addEventListener('online', ()=>{ if(CHARS_DIRTY && typeof persistChars==='function') persistChars().catch(()=>{}); cloudRepull('online'); });
 }
 /* Правки/скрытия карточек ядра — тем же слиянием (свежее чужое подхватываем, своё в приоритете) */
 async function persistCoreOver(){
@@ -7478,6 +7478,7 @@ async function logout(){
 
 /* ====================== Игроки / персонажи ====================== */
 // сохранение персонажей с защитой от гонки: подтягиваем свежую облачную карту и сливаем по id
+let CHARS_DIRTY=false, CHARS_DIRTY_TOLD=false;   // лист не ушёл в облако (офлайн) — ждёт повторной отправки
 async function persistChars(){
   try{
     const tag=currentTag();
@@ -7504,7 +7505,9 @@ async function persistChars(){
           const o=normTag(c.owner||''); return !o || o===tag; });
       });
       const ok=await sset('comik:chars:'+tag, mine, true);
-      if(!ok && supa) toast('⚠ Облако недоступно — сохранено локально');
+      CHARS_DIRTY=!ok;                                   // не дошло — дошлём при возврате сети / очередным фоновым тиком
+      if(!ok && supa && !CHARS_DIRTY_TOLD){ CHARS_DIRTY_TOLD=true; toast('⚠ Облако недоступно — сохранено локально, отправим, когда связь вернётся'); }
+      if(ok) CHARS_DIRTY_TOLD=false;
       return !!ok;
     } else {
       // не залогинен или без облака — сохраняем ТОЛЬКО локально;
@@ -7517,9 +7520,10 @@ async function persistChars(){
 /* живая синхронизация: раз в 40с подтягиваем персонажей и заявки, пока вкладка видима и модалки закрыты */
 setInterval(async ()=>{
   try{
-    if(!supa || document.hidden) return;
+    if(!supa || document.hidden || navigator.onLine===false) return;
     const scrim=document.getElementById('scrim');
     if(scrim && scrim.classList.contains('open')) return;
+    if(CHARS_DIRTY){ try{ await persistChars(); }catch(e){} }   // лист, не ушедший в облако офлайн, — дошлём до чтения, иначе облачная копия его перекроет
     const [ch,gm]=await Promise.all([
       withTimeout(fetchCloudChars(), CLOUD_TMO).catch(()=>null),
       withTimeout(cloudGet(KEY_GAMES),4000).catch(()=>null)
@@ -11275,16 +11279,21 @@ function trkPublish(){
   // одна отложенная публикация на доску: частые правки ГМа схлопываются в последнюю (снимок — последней)
   trkWrite(v=>{ v[bk]=trkBoardBuild(v[bk], {snap}); }, 'board:'+bk);
 }
-async function trkFetchShared(){
+let TRK_FETCHING=false;
+async function trkFetchShared(full){
+  if(!supa || TRK_FETCHING || navigator.onLine===false) return false;   // без сети и поверх незавершённого чтения не стучимся
+  TRK_FETCHING=true;
   try{
     // сначала дёшево спрашиваем только версию: не изменилась — всю строку (с картой и журналами) не качаем
-    if(TRK_REV && !TRK_PENDING.length){
+    // (full — читать строку обязательно: после отклонённой записи экран надо вернуть к облаку, хотя версия та же)
+    if(TRK_REV && !full){
       const r=await withTimeout(supa.from('kv').select('rev:value->>rev').eq('key',KEY_TRKSHARED).maybeSingle(), 5000);
       if(r && !r.error && r.data && (parseInt(r.data.rev,10)||0)===TRK_REV) return false;
     }
     const v=await withTimeout(cloudGet(KEY_TRKSHARED),8000);
     if(v && typeof v==='object'){ const before=JSON.stringify(TRK_SHARED); if(trkAdopt(v,'poll')) return JSON.stringify(TRK_SHARED)!==before; }
   }catch(e){}
+  finally{ TRK_FETCHING=false; }
   return false;
 }
 /* ══ Единый канал записи общего стола ══════════════════════════════════════════
@@ -11372,7 +11381,7 @@ async function kvCasUpdate(key, mutate, tries){
   let lastErr=null, prevRev=-1, sameRev=0;
   for(let i=0;i<tries;i++){
     const cur=await withTimeout(cloudGet(key), 6000);
-    if(cur===undefined){ lastErr=new Error('read timeout'); continue; }
+    if(cur===undefined){ const te=new Error('read timeout'); te.code='timeout'; throw te; }   // сеть молчит: не крутим 8×6 с — trkFlush повторит с растущей паузой
     const missing=(cur===null);
     const v=(cur && typeof cur==='object' && !Array.isArray(cur))?cur:{};
     const rev=parseInt(v.rev,10)||0;
@@ -12376,7 +12385,7 @@ function trkRTSubscribe(){
 async function trkLiveCatchup(force){
   const tp=document.getElementById('view-combat');
   if(!force && (!(tp && tp.classList.contains('active')) || !document.getElementById('trkBox'))) return;
-  if(await trkFetchShared()) trkLiveApply();
+  if(await trkFetchShared(force===true)) trkLiveApply();
 }
 function trkLiveStart(){
   if(!(trkRT && trkRTok)) trkRTSubscribe();   // живой канал не пересоздаём при каждом заходе на доску
@@ -12384,7 +12393,7 @@ function trkLiveStart(){
   // опрос — запасной путь: при живом Realtime раз в 5 с, без него — раз в 2,5 с; заодно дожимаем очередь правок
   let tick=0;
   trkPollT=setInterval(async ()=>{
-    if(document.hidden) return;
+    if(document.hidden || navigator.onLine===false) return;
     if(TRK_PENDING.length && !TRK_FLUSHING && !TRK_FLUSH_T) trkFlushSoon(0);
     const tp=document.getElementById('view-combat');
     if(!(tp && tp.classList.contains('active')) || !document.getElementById('trkBox')) return;
@@ -12395,7 +12404,7 @@ function trkLiveStart(){
     trkLiveBound=true;
     // вернулись на вкладку / сеть восстановилась — чиним канал и сразу догоняем состояние
     document.addEventListener('visibilitychange', ()=>{ if(!document.hidden){ if(!trkRTok) trkRTSubscribe(); trkLiveCatchup(); } });
-    window.addEventListener('online', ()=>{ if(!trkRTok) trkRTSubscribe(); trkLiveCatchup(); });
+    window.addEventListener('online', ()=>{ if(!trkRTok) trkRTSubscribe(); TRK_FLUSH_FAIL=0; if(TRK_PENDING.length) trkFlushSoon(0); trkLiveCatchup(); });   // связь вернулась — очередь правок уходит сразу
   }
 }
 function trkHp(i,d){ const x=TRK.list[i]; if(!x) return; x.hp=Math.max(0,(parseInt(x.hp,10)||0)+d); trkSave(); renderTracker(); }
