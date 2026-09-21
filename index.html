@@ -10844,6 +10844,7 @@ function renderToolsPage(){
   // подтягиваем «стол» и заметки из облака, затем перерисовываем
   Promise.all([trkFetchShared(), gmNotesLoad()]).then(()=>{
     if(!document.getElementById('trkBox')) return;
+    trkCloudRestore();                     // свой ключ доски и состав из облака — если ГМ пришёл с другого устройства
     renderGmNotes();                       // сама не трогает textarea, если партия та же (см. renderGmNotes)
     if(!trkRedraw(true)) return;           // игрок уже печатает в поле — дорисуем по focusout, а не под пальцем
     renderTrkLog();
@@ -11326,10 +11327,13 @@ const KEY_TRKSHARED='comik:tracker:shared:v1';
 let TRK_SHARED={};
 /* игрок сам выбирает, за какой из идущих сессий следить (ключ сеттинга опубликованного трекера) */
 let TRK_VIEW='';
-/* ключ общего стола. Разработчик держит каноничную доску сеттинга (ключ = сеттинг).
-   Игрок-ГМ (только «Классика») получает СВОЮ доску `сеттинг::тег`, чтобы столы разных
-   Мастеров не затирали друг друга. Игрок видит ту доску, где стоит его персонаж. */
-function gmBoardKey(){ return (typeof isDev==='function' && isDev()) ? CUR_PROJECT : (CUR_PROJECT+'::'+(currentTag()||'gm')); }
+/* ключ общего стола: у КАЖДОГО Мастера свой — `сеттинг::тег`. Раньше разработчики держали
+   «каноничную» доску сеттинга (ключ = сеттинг): двое из DEV_TAGS, ведущих игру в одной
+   кампании, писали в одну строку и затирали состав друг друга, а у игроков доска прыгала.
+   Игрок видит ту доску, где стоит его персонаж (см. trkActiveForPlayer). */
+function gmBoardKey(){ return CUR_PROJECT+'::'+(currentTag()||'gm'); }
+/* прежний ключ (одна доска на сеттинг) — с него один раз переезжаем, см. trkMigrateBoardKey */
+function gmLegacyBoardKey(){ return CUR_PROJECT; }
 /* из ключа доски достаём сеттинг для поиска персонажей (`classic::tag` → `classic`) */
 function boardProj(k){ return String(k||'').split('::')[0] || CUR_PROJECT; }
 function trkSessionLabel(g){
@@ -11401,13 +11405,72 @@ function trkBoardBuild(prev, opts){
 }
 /* снимок локального стола на момент действия: мутация выполнится позже (очередь, бэкофф), а ГМ мог уже сменить сеттинг */
 function trkSnap(){ return {list:(TRK.list||[]).map(x=>stripAva(x)), party:TRK.party||'', round:TRK.round||1, activeKey:TRK.activeKey||'', mapCols:TRK.mapCols||0, mapBgRev:TRK.mapBgRev||''}; }
+/* пустой состав поверх живой доски = состав этого браузера ещё не сверен с облаком
+   (другое устройство, чистка PWA): публиковать его нельзя — у игроков исчезнет бой */
+let TRK_RESTORED={}, TRK_EMPTY_WARNED=false;   // сверка сделана (по ключу доски) / предупреждали ли уже
+function trkEmptyOver(prev, bk){ return !TRK_RESTORED[bk] && !!(prev && prev.active && Array.isArray(prev.list) && prev.list.length); }
 function trkPublish(){
   if(!ADMIN) return;
   const bk=gmBoardKey();
   trkBgMigrate(bk);              // доска прошлой версии: картинка уезжает в свою строку ДО снимка — метка попадёт в публикацию
   const snap=trkSnap();
+  if(!snap.list.length && trkEmptyOver(TRK_SHARED[bk], bk)){
+    if(!TRK_EMPTY_WARNED){ TRK_EMPTY_WARNED=true; toast('⚠ Состав доски ещё не подтянут из облака — пустая доска не опубликована'); }
+    return;
+  }
   // одна отложенная публикация на доску: частые правки ГМа схлопываются в последнюю (снимок — последней)
-  trkWrite(v=>{ v[bk]=trkBoardBuild(v[bk], {snap}); }, 'board:'+bk);
+  // проверку повторяем ВНУТРИ мутации: она выполняется над свежей копией строки, а не над той, что была при вызове
+  trkWrite(v=>{ if(!snap.list.length && trkEmptyOver(v[bk], bk)) return; v[bk]=trkBoardBuild(v[bk], {snap}); }, 'board:'+bk);
+}
+/* ── Доска приезжает из облака (только ГМ, ровно один раз на ключ доски) ──────────────
+   Вызывается, когда раздел открыт и строка общего стола уже прочитана: сначала переезд
+   со старого ключа, затем подъём состава, если локального нет или он старее облачного. */
+function trkCloudRestore(){
+  if(!ADMIN || !TRK_FETCHED) return false;
+  const bk=gmBoardKey(); if(TRK_RESTORED[bk]) return false;
+  TRK_RESTORED[bk]=1;
+  const moved=trkMigrateBoardKey();
+  return trkPullCloud()||moved;
+}
+/* (1) Молчаливый переезд доски `сеттинг` → `сеттинг::тег`. Переносим только СВОЮ активную
+   доску (owner === тег): чужую перевезёт её Мастер сам, иначе два разработчика растащили бы
+   один стол. Одна CAS-мутация — игрок видит либо старый ключ, либо новый, и на обоих стоит
+   его персонаж, поэтому trkActiveForPlayer не теряет стол посреди переезда. */
+function trkMigrateBoardKey(){
+  const bk=gmBoardKey(), old=gmLegacyBoardKey();
+  if(bk===old) return false;
+  const mine=s=>!!(s && typeof s==='object' && !Array.isArray(s) && s.active && Array.isArray(s.list) && s.list.length && normTag(s.owner||'')===currentTag());
+  const busy=s=>!!(s && typeof s==='object' && !Array.isArray(s) && Array.isArray(s.list) && s.list.length);
+  if(!mine(TRK_SHARED[old]) || busy(TRK_SHARED[bk])) return false;
+  trkWrite(v=>{ if(!mine(v[old]) || busy(v[bk])) return;
+    v[bk]=Object.assign({}, v[old], {at:Date.now()}); delete v[old]; }, 'migrate:'+bk);
+  return true;
+}
+/* (2) Состав ГМа живёт в localStorage одного браузера: на другом устройстве (или после чистки
+   PWA) он пуст, и первая же публикация стёрла бы живой бой. Берём доску из облака, если
+   локально пусто либо облачная свежее локального снимка (TRK.at) и держит карточки, которых
+   у нас нет. Враги — как есть, игроки — той копией, что ведут они сами (в общей доске уже
+   живые ХП/инициатива/спасброски/состояния). */
+function trkPullCloud(){
+  const s=TRK_SHARED[gmBoardKey()];
+  if(!(s && typeof s==='object' && !Array.isArray(s) && Array.isArray(s.list) && s.list.length)) return false;
+  const have={}; (TRK.list||[]).forEach(x=>{ if(x) have[trkCardKey(x)]=1; });
+  const differs=s.list.some(x=>x && !have[trkCardKey(x)]);
+  const newer=(parseInt(s.at,10)||0)>(parseInt(TRK.at,10)||0);
+  if((TRK.list||[]).length && !(differs && newer)) return false;
+  TRK.list=s.list.map(x=>Object.assign({}, x));
+  TRK.party=s.party||''; TRK.round=parseInt(s.round,10)||1; TRK.activeKey=s.activeKey||'';
+  TRK.mapPos=Object.assign({}, s.mapPos||{});
+  if(s.mapCols) TRK.mapCols=s.mapCols;
+  if(s.mapBgRev!=null) TRK.mapBgRev=s.mapBgRev;   // картинка лежит в своей строке — тянем её по метке (trkMapBgOf), а не из доски
+  if(s.mapBg!=null) TRK.mapBg=s.mapBg;            // доска прошлой версии: картинка ещё внутри — подхватываем и её
+  // кого ГМ убирал с доски вручную — помним по составу, иначе trkSyncParty вернёт их обратно
+  const g=(GAMES||[]).find(x=>x && x.id===TRK.party), skip={};
+  if(g) (g.players||[]).forEach(p=>{ if(p && p.charId && !TRK.list.some(x=>x && x.charId===p.charId)) skip[p.charId]=1; });
+  TRK.skip=skip;
+  trkSaveLocal();   // без публикации: состав только что оттуда и взят
+  toast('Доска восстановлена из облака');
+  return true;
 }
 let TRK_FETCHING=false, TRK_FETCH_FULL_AGAIN=false, TRK_FETCHED=false;   // TRK_FETCHED — хоть одно чтение строки завершилось (для подписи «Подключаемся к облаку…»)
 async function trkFetchShared(full, ignoreOnline){
@@ -11614,7 +11677,10 @@ function trkLoad(){
   // миграция: у каждого монстра/NPC без charId должен быть свой uid, иначе одинаковые имена «слипаются»
   (TRK.list||[]).forEach(x=>{ if(x && !x.charId && !x.uid) x.uid=uid(); });
 }
-function trkSave(){ try{ localStorage.setItem('comik:tracker:v2', JSON.stringify(TRK_ALL)); }catch(e){} trkPublish(); }
+/* TRK.at — когда состав правили на ЭТОМ устройстве: по нему trkPullCloud решает, не старее ли
+   локальный снимок облачной доски (ключ в облако не уходит — trkSnap его не берёт) */
+function trkSaveLocal(){ if(TRK) TRK.at=Date.now(); try{ localStorage.setItem('comik:tracker:v2', JSON.stringify(TRK_ALL)); }catch(e){} }
+function trkSave(){ trkSaveLocal(); trkPublish(); }
 /* персонажи выбранной партии (заявки) автоматически попадают в список: имя, хиты и КД — из листа */
 function trkSyncParty(replace){
   const s=(GAMES||[]).find(g=>g && g.id===TRK.party);
@@ -12680,6 +12746,7 @@ function trkRedraw(force){
 }
 function trkLiveApply(){
   const box=document.getElementById('trkBox'); if(!box) return;
+  if(ADMIN) trkCloudRestore();   // первый снимок мог прийти позже открытия раздела; сама функция срабатывает один раз на доску
   trkRefresh();   // сам решает: патч на месте (можно и при вводе) или полная отрисовка (отложится до focusout)
   if(ADMIN) renderTrkLog();   // журнал: подхватываем действия игроков вживую
 }
