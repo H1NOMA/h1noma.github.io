@@ -40,6 +40,11 @@
 <meta name="apple-mobile-web-app-title" content="KOMIK">
 <!-- Шрифты вшиты локально (fonts/) — сайт открывается без VPN, без обращений к Google -->
 <link href="fonts.css" rel="stylesheet">
+<!-- Библиотека облака (supabase.js, ~200 КБ) начинает качаться сразу, не дожидаясь разбора 1,2 МБ HTML:
+     сама страница подключает её скриптом только на старте (supaLoadLib), и без preload она стартовала
+     последней. Свой домен (CSP script-src 'self'), crossorigin не нужен; после fonts.css — чтобы не
+     отодвигать стили. -->
+<link rel="preload" href="supabase.js" as="script">
 <style>
   :root{
     --bg:#191b23; --bg2:#20232c; --surface:#282b36; --surface2:#333744;
