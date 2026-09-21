@@ -6173,7 +6173,7 @@ let CLOUD_REPULL_BOUND=false;
 function cloudRepullBind(){
   if(CLOUD_REPULL_BOUND) return; CLOUD_REPULL_BOUND=true;
   document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) cloudRepull('visible'); });
-  window.addEventListener('online', ()=>{ if(CHARS_DIRTY && typeof persistChars==='function') persistChars(true).catch(()=>{}); cloudRepull('online'); });
+  window.addEventListener('online', ()=>{ if(CHARS_DIRTY && typeof currentTag==='function' && currentTag() && typeof persistChars==='function') persistChars(true).catch(()=>{}); cloudRepull('online'); });
 }
 /* Правки/скрытия карточек ядра — тем же слиянием (свежее чужое подхватываем, своё в приоритете) */
 async function persistCoreOver(){
@@ -7512,8 +7512,7 @@ async function persistChars(retry){
     } else {
       // не залогинен или без облака — сохраняем ТОЛЬКО локально;
       // легаси-блоб comik:chars:v1 в облако больше не пишем (ключ заморожен)
-      CHARS_DIRTY=false;                                 // досылать некуда и нечем — не гоняем фоновую попытку после выхода из аккаунта
-      await ssetLocal(KEY_CHARS, CHARS_ALL, true);
+      await ssetLocal(KEY_CHARS, CHARS_ALL, true);   // CHARS_DIRTY не трогаем: после повторного входа неотправленный лист дошлётся
       return true;          // без облака «сохранено» значит сохранено на устройстве
     }
   }catch(e){ return false; }
@@ -7525,7 +7524,7 @@ setInterval(async ()=>{
     if(navigator.onLine===false && (Date.now()%3)) return;   // «офлайн» по мнению браузера — пробуем всё же примерно раз в 2 минуты
     const scrim=document.getElementById('scrim');
     if(scrim && scrim.classList.contains('open')) return;
-    if(CHARS_DIRTY){ try{ await persistChars(true); }catch(e){} }   // лист, не ушедший в облако офлайн, — дошлём до чтения (тихо), иначе облачная копия его перекроет
+    if(CHARS_DIRTY && currentTag()){ try{ await persistChars(true); }catch(e){} }   // лист, не ушедший в облако офлайн, — дошлём до чтения (тихо), иначе облачная копия его перекроет
     const [ch,gm]=await Promise.all([
       withTimeout(fetchCloudChars(), CLOUD_TMO).catch(()=>null),
       withTimeout(cloudGet(KEY_GAMES),4000).catch(()=>null)
@@ -11282,10 +11281,10 @@ function trkPublish(){
   trkWrite(v=>{ v[bk]=trkBoardBuild(v[bk], {snap}); }, 'board:'+bk);
 }
 let TRK_FETCHING=false, TRK_FETCH_FULL_AGAIN=false;
-async function trkFetchShared(full){
+async function trkFetchShared(full, ignoreOnline){
   if(!supa) return false;
   if(TRK_FETCHING){ if(full) TRK_FETCH_FULL_AGAIN=true; return false; }   // поверх незавершённого чтения не стучимся; полное — повторим после него
-  if(navigator.onLine===false && !full) return false;                    // onLine — подсказка, не запрет: принудительное чтение идёт всегда
+  if(navigator.onLine===false && !full && !ignoreOnline) return false;    // onLine — подсказка, не запрет: принудительное и «контрольное» чтение идут всегда
   TRK_FETCHING=true;
   try{
     // сначала дёшево спрашиваем только версию: не изменилась — всю строку (с картой и журналами) не качаем
@@ -12413,7 +12412,7 @@ function trkLiveStart(){
     const tp=document.getElementById('view-combat');
     if(!(tp && tp.classList.contains('active')) || !document.getElementById('trkBox')) return;
     if(!offline && trkRTok && (tick%2)) return;
-    if(await trkFetchShared(offline)) trkLiveApply();
+    if(await trkFetchShared(false, offline)) trkLiveApply();   // и в «офлайне» сначала дешёвая проверка версии, а не вся строка
   }, 2500);
   if(!trkLiveBound){
     trkLiveBound=true;
