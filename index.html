@@ -6831,14 +6831,17 @@ async function gamePlayed(id){
   // а общий стол её сеттинга гасится и обнуляется, чтобы доска исчезла и у игроков
   Object.keys(TRK_ALL).forEach(proj=>{
     const t=TRK_ALL[proj]; if(!(t && t.party===id)) return;
-    t.party=''; t.list=[];
+    t.party=''; t.list=[]; t.mapBg=''; t.mapBgRev='';
   });
   // гасим общие столы, чья партия — эта игра (и каноничный ключ сеттинга, и `сеттинг::тег` Мастера).
   // Мутация встаёт в очередь ДО публикации из trkSave: та уже не увидит партию и не оставила бы доску активной
   const ownBk=gmBoardKey(), ownWas=!!(TRK_SHARED[ownBk] && TRK_SHARED[ownBk].party===id);
+  const offKeys=Object.keys(TRK_SHARED).filter(k=>{ const sh=TRK_SHARED[k];
+    return !!(sh && typeof sh==='object' && !Array.isArray(sh) && (sh.party===id || (ownWas && k===ownBk))); });
   const boardsOff=v=>{ Object.keys(v).forEach(k=>{ const sh=v[k];
-    if(sh && typeof sh==='object' && !Array.isArray(sh) && (sh.party===id || (ownWas && k===ownBk))) v[k]={list:[], party:'', at:Date.now(), active:false, owner:sh.owner||currentTag(), round:1, activeKey:'', log:sh.log||[], mapPos:{}, mapBg:sh.mapBg||'', mapCols:sh.mapCols||TRK_MAPCOLS}; }); };
+    if(sh && typeof sh==='object' && !Array.isArray(sh) && (sh.party===id || (ownWas && k===ownBk))) v[k]={list:[], party:'', at:Date.now(), active:false, owner:sh.owner||currentTag(), round:1, activeKey:'', log:sh.log||[], mapPos:{}, mapBgRev:'', mapCols:sh.mapCols||TRK_MAPCOLS}; }); };
   trkWrite(boardsOff, 'active:'+ownBk);
+  offKeys.forEach(k=>trkBgDrop(k));   // картинки фонов лежат отдельными строками — гасим их вместе с досками
   trkSave();
   // экран обновляем до ответа облака: пока шёл сетевой раунд, удалённая игра висела в расписании и баннере
   openSchedule(); renderNews(); toast('Сессия завершена и удалена');
@@ -11265,19 +11268,23 @@ function trkBoardBuild(prev, opts){
   prev=(prev&&typeof prev==='object')?prev:{}; opts=opts||{};
   const sn=opts.snap||trkSnap();   // состав/партия/раунд — с момента действия ГМа, а не с момента отложенной записи
   const fm={}; (Array.isArray(prev.list)?prev.list:[]).forEach(c=>{ if(c) fm[trkCardKey(c)]=c; });
+  // бой завершён — фон снимается вместе с доской; саму картинку из её строки убирает trkBgDrop
   if(opts.finish) return {list:[], party:'', at:Date.now(), active:false, owner:currentTag(), round:1, activeKey:'',
-    log:prev.log||[], mapPos:{}, mapBg:(prev.mapBg!=null?prev.mapBg:''), mapCols:prev.mapCols||sn.mapCols||TRK_MAPCOLS};
-  // фон карты: из облака; если там пусто, а у ГМа он задан локально (доска ещё не публиковалась) — берём локальный
-  const bg=(prev.mapBg!=null && prev.mapBg!=='')?prev.mapBg:(sn.mapBg||'');
+    log:prev.log||[], mapPos:{}, mapBgRev:'', mapCols:prev.mapCols||sn.mapCols||TRK_MAPCOLS};
+  // метка фона: из облака; если там пусто, а у ГМа фон задан локально (доска ещё не публиковалась) — его метка.
+  // Самой картинки в строке доски нет: старая копия (mapBg) не переносится и исчезает при первой же публикации
+  const bgRev=(prev.mapBgRev!=null && prev.mapBgRev!=='')?String(prev.mapBgRev):(sn.mapBgRev||'');
   return {list:trkMergedList(fm, sn.list), party:sn.party, at:Date.now(), active:(opts.active!=null)?!!opts.active:!!prev.active,
     owner:currentTag(), round:sn.round||1, activeKey:sn.activeKey||'',
-    log:prev.log||[], mapPos:prev.mapPos||{}, mapBg:bg, mapCols:prev.mapCols||sn.mapCols||TRK_MAPCOLS};
+    log:prev.log||[], mapPos:prev.mapPos||{}, mapBgRev:bgRev, mapCols:prev.mapCols||sn.mapCols||TRK_MAPCOLS};
 }
 /* снимок локального стола на момент действия: мутация выполнится позже (очередь, бэкофф), а ГМ мог уже сменить сеттинг */
-function trkSnap(){ return {list:(TRK.list||[]).map(x=>stripAva(x)), party:TRK.party||'', round:TRK.round||1, activeKey:TRK.activeKey||'', mapCols:TRK.mapCols||0, mapBg:TRK.mapBg||''}; }
+function trkSnap(){ return {list:(TRK.list||[]).map(x=>stripAva(x)), party:TRK.party||'', round:TRK.round||1, activeKey:TRK.activeKey||'', mapCols:TRK.mapCols||0, mapBgRev:TRK.mapBgRev||''}; }
 function trkPublish(){
   if(!ADMIN) return;
-  const bk=gmBoardKey(), snap=trkSnap();
+  const bk=gmBoardKey();
+  trkBgMigrate(bk);              // доска прошлой версии: картинка уезжает в свою строку ДО снимка — метка попадёт в публикацию
+  const snap=trkSnap();
   // одна отложенная публикация на доску: частые правки ГМа схлопываются в последнюю (снимок — последней)
   trkWrite(v=>{ v[bk]=trkBoardBuild(v[bk], {snap}); }, 'board:'+bk);
 }
@@ -11694,9 +11701,89 @@ function trkCombatBar(o){
 const TRK_MAPCOLS=12;
 let TRK_DRAGGING=false;
 /* размер сетки и фон карты берём из общего стола (для GM — из своей доски, для игрока — из активной) */
-function trkMapBoard(src){ const k=ADMIN?gmBoardKey():(src&&src.vp); return (k&&TRK_SHARED[k])||null; }
+function trkMapBgKey(src){ return (ADMIN?gmBoardKey():(src&&src.vp))||''; }
+function trkMapBoard(src){ const k=trkMapBgKey(src); return (k&&TRK_SHARED[k])||null; }
 function trkMapColsOf(src){ const s=trkMapBoard(src); return (s&&parseInt(s.mapCols,10)) || (ADMIN&&parseInt(TRK.mapCols,10)) || TRK_MAPCOLS; }
-function trkMapBgOf(src){ const s=trkMapBoard(src); return (s&&s.mapBg)||(ADMIN&&TRK.mapBg)||''; }
+/* ── Фон карты живёт в СВОЕЙ строке kv, а не внутри строки доски ──
+   Строку доски перечитывает и переписывает каждый тап по ХП любого игрока в любом сеттинге, а
+   Realtime перестаёт отдавать значение примерно с мегабайта: картинка 1600 px внутри неё ломала
+   всю живую синхронизацию. В доске остаётся только метка mapBgRev (время установки, '' — фона нет),
+   картинка — в строке 'comik:trk:bg:<ключ доски>', которую пишет один человек: ГМ этой доски.
+   Клиенты держат её в памяти и дочитывают, когда метка доски разошлась с меткой их копии. */
+const TRK_BG_MAX=700000;                        // длиннее этого data-URL в облако не отдаём — пережимаем мельче
+function trkBgKey(bk){ return 'comik:trk:bg:'+bk; }
+let TRK_BG={}, TRK_BG_BUSY={}, TRK_BG_WAIT={};  // {доска:{rev,src}} в памяти; по одному чтению на доску; пауза после неудачи
+/* дочитать картинку доски: одно чтение на доску за раз и пауза после неудачи —
+   иначе опрос раз в 2.5 с превратил бы недоступную строку в шторм запросов */
+async function trkBgFetch(bk, rev){
+  if(!supa || !bk || TRK_BG_BUSY[bk]) return;
+  if(Date.now() < (TRK_BG_WAIT[bk]||0)) return;
+  TRK_BG_BUSY[bk]=true;
+  try{
+    const v=await withTimeout(cloudGet(trkBgKey(bk)), CLOUD_TMO);
+    if(v===undefined) throw new Error('timeout');
+    // запоминаем ТУ метку, ради которой читали: иначе при любом расхождении меток чтение шло бы по кругу
+    TRK_BG[bk]={rev:String(rev||''), src:(v&&typeof v==='object'&&v.src)?String(v.src):''};
+    TRK_BG_WAIT[bk]=0;
+    if(document.getElementById('trkBox')) trkRedraw(true);   // картинка дошла — перерисовать карту (отложится, если печатают/держат палец)
+  }catch(e){ TRK_BG_WAIT[bk]=Date.now()+8000; }
+  finally{ TRK_BG_BUSY[bk]=false; }
+}
+/* ГМ: картинка — в свою строку, в доску уходит только метка; заодно стираем старую копию внутри доски */
+async function trkBgPublish(bk, src){
+  if(!ADMIN || !bk) return;
+  const rev=src?String(Date.now()):'', was=TRK.mapBgRev||'';
+  const s=TRK_SHARED[bk], live=!!(s && Array.isArray(s.list));
+  const wasRev=live?((s.mapBgRev!=null)?String(s.mapBgRev):''):'', wasInline=live?s.mapBg:undefined;
+  TRK.mapBgRev=rev;                               // снимок стола (trkSnap) должен увидеть метку СРАЗУ, не дожидаясь облака
+  if(src) TRK_BG[bk]={rev, src}; else delete TRK_BG[bk];
+  TRK_BG_WAIT[bk]=0; delete TRK_BG_MIG[bk];
+  // метку в своей доске ставим тоже сразу: иначе, пока запись летит, карта ГМа видит «в доске прошлая
+  // метка, а в памяти новая» и уходит перечитывать из облака свою же, ещё не отправленную картинку
+  if(live){ s.mapBgRev=rev; delete s.mapBg; s.at=Date.now(); }
+  try{ localStorage.setItem('comik:tracker:v2', JSON.stringify(TRK_ALL)); }catch(e){}
+  let ok=false; try{ ok=!!(await sset(trkBgKey(bk), src?{rev, src}:null, true)); }catch(e){}
+  // строка не легла (сеть/права) — возвращаем всё как было, в том числе старую копию внутри доски:
+  // иначе доска сослалась бы на несуществующую строку, а картинка пропала бы у всех разом
+  if(!ok && supa){
+    TRK.mapBgRev=was; if(src) delete TRK_BG[bk];
+    const s2=TRK_SHARED[bk];
+    if(s2 && Array.isArray(s2.list)){ s2.mapBgRev=wasRev; if(wasInline!=null) s2.mapBg=wasInline; }
+    try{ localStorage.setItem('comik:tracker:v2', JSON.stringify(TRK_ALL)); }catch(e){}
+    if(document.getElementById('trkBox')) trkRedraw(true);
+    return;
+  }
+  if(TRK_SHARED[bk] && Array.isArray(TRK_SHARED[bk].list)) trkCloudBoardMerge(bk, {mapBgRev:rev, mapBg:null}, 'bg:'+bk);   // mapBg:null — стираем старую копию в доске
+}
+/* Тихий перенос: доска ещё несёт картинку внутри себя (её поставил клиент прошлой версии) —
+   при первой же записи ГМа она уезжает в свою строку. До этого обе стороны показывают её как раньше. */
+let TRK_BG_MIG={};
+function trkBgMigrate(bk){
+  if(!ADMIN || !bk || TRK_BG_MIG[bk]) return;
+  const s=TRK_SHARED[bk], old=s&&s.mapBg; if(!old) return;
+  TRK_BG_MIG[bk]=1;
+  if(!TRK.mapBg) TRK.mapBg=old;                   // ГМ мог сесть за другое устройство: локальной копии там нет
+  trkBgPublish(bk, old);
+}
+/* фон снят вместе с доской (бой завершён, игра сыграна) — убираем и строку с картинкой */
+function trkBgDrop(bk){
+  if(!bk) return;
+  delete TRK_BG[bk]; delete TRK_BG_MIG[bk]; TRK_BG_WAIT[bk]=0;
+  if(!ADMIN) return;
+  if(bk===gmBoardKey()){ TRK.mapBg=''; TRK.mapBgRev=''; try{ localStorage.setItem('comik:tracker:v2', JSON.stringify(TRK_ALL)); }catch(e){} }
+  Promise.resolve(sset(trkBgKey(bk), null, true, true)).catch(()=>{});   // тихо: гасим сразу несколько досок, тост на каждую ни к чему
+}
+function trkMapBgRevOf(src){ const s=trkMapBoard(src); return (s&&s.mapBgRev!=null)?String(s.mapBgRev):''; }
+function trkMapBgOf(src){
+  const k=trkMapBgKey(src), s=(k&&TRK_SHARED[k])||null;
+  // доска прошлой версии несёт картинку внутри: считаем её текущей (и кэшируем), пока ГМ не перенёс
+  if(s && s.mapBg){ if(k && (!TRK_BG[k] || TRK_BG[k].src!==s.mapBg)) TRK_BG[k]={rev:String(s.mapBgRev||''), src:s.mapBg}; return s.mapBg; }
+  const rev=s?((s.mapBgRev!=null)?String(s.mapBgRev):''):'';
+  if(!rev){ if(k && !ADMIN) delete TRK_BG[k]; return (ADMIN&&TRK.mapBg)||''; }   // у ГМа фон работает и до публикации, и без сети
+  const c=k&&TRK_BG[k];
+  if(!c || c.rev!==rev) trkBgFetch(k, rev);
+  return (c&&c.src) || (ADMIN&&TRK.mapBg) || '';   // пока картинка летит — показываем прежнюю, а не пустую сетку
+}
 function trkMapPosFor(src){
   if(ADMIN){ const s=TRK_SHARED[gmBoardKey()]; if(s){ s.mapPos=s.mapPos||{}; return s.mapPos; } TRK.mapPos=TRK.mapPos||{}; return TRK.mapPos; }
   const s=TRK_SHARED[src.vp]; return (s&&(s.mapPos=s.mapPos||{}))||{};
@@ -11734,16 +11821,23 @@ function trkMapHtml(src){
 function trkMapMeta(obj){
   if(!ADMIN) return;
   if(obj.mapCols!=null) TRK.mapCols=obj.mapCols;
-  if(obj.mapBg!=null) TRK.mapBg=obj.mapBg;
+  const bk=gmBoardKey();
+  // картинка в доску не попадает никогда: она уходит в свою строку, оттуда её дочитают клиенты
+  if(obj.mapBg!=null){ TRK.mapBg=obj.mapBg; trkBgPublish(bk, obj.mapBg); }
+  else trkBgMigrate(bk);   // любая другая правка карты — повод вынести картинку прошлой версии из строки доски
+  const fields={}; if(obj.mapCols!=null) fields.mapCols=obj.mapCols;
   try{ localStorage.setItem('comik:tracker:v2', JSON.stringify(TRK_ALL)); }catch(e){}
-  const bk=gmBoardKey(), s=TRK_SHARED[bk];
-  if(!s||!Array.isArray(s.list)){ trkPublish(); return; }     // доски ещё нет — полная публикация
-  Object.assign(s, obj); s.at=Date.now(); renderTracker();    // оптимистично
-  trkCloudBoardMerge(bk, obj);
+  const s=TRK_SHARED[bk];
+  if(!s||!Array.isArray(s.list)){ trkPublish(); return; }     // доски ещё нет — полная публикация (метку фона она возьмёт из снимка)
+  Object.assign(s, fields); s.at=Date.now(); renderTracker(); // оптимистично
+  if(Object.keys(fields).length) trkCloudBoardMerge(bk, fields);
 }
 function trkMapColsAdj(d){ const c=Math.max(6,Math.min(30,trkMapColsOf(null)+d)); trkMapMeta({mapCols:c}); }
 function trkMapBgPick(){ const f=document.getElementById('mpBgFile'); if(f) f.click(); }
-function trkMapBgSet(inp){ const f=inp.files&&inp.files[0]; if(!f) return; toast('Загрузка фона…'); compressImage(f,1600,0.78).then(src=>trkMapMeta({mapBg:src})).catch(()=>toast('⚠ Не удалось обработать фото')); inp.value=''; }
+function trkMapBgSet(inp){ const f=inp.files&&inp.files[0]; if(!f) return; toast('Загрузка фона…');
+  // даже в своей строке мегабайтная картинка тянется на телефоне вечность — пережимаем мельче
+  compressImage(f,1600,0.78).then(src=>(src.length>TRK_BG_MAX?compressImage(f,1200,0.7):src))
+    .then(src=>trkMapMeta({mapBg:src})).catch(()=>toast('⚠ Не удалось обработать фото')); inp.value=''; }
 function trkMapBgClear(){ trkMapMeta({mapBg:''}); }
 function trkMapBind(){
   const grid=document.getElementById('mpGrid'); if(!grid) return;
@@ -11804,7 +11898,9 @@ function trkMapPatch(src){
 function trkComboSig(src, view){
   if(!src) return '';
   let extra='';
-  try{ extra='|cols:'+trkMapColsOf(src)+'|bg:'+String(trkMapBgOf(src)||'').length; }catch(e){}   // сетка/фон карты меняются — перерисовать (карта есть и в списке: окно ГМа, колонка игрока)
+  // сетка/фон карты меняются — перерисовать (карта есть и в списке: окно ГМа, колонка игрока).
+  // Фон — по метке доски и по тому, дошла ли картинка: сама картинка в строке доски больше не лежит
+  try{ extra='|cols:'+trkMapColsOf(src)+'|bg:'+trkMapBgRevOf(src)+(trkMapBgOf(src)?':1':':0'); }catch(e){}
   return view+'|'+src.order.map(x=>{
     const foe=isFoeCard(x), foeHidden=src.playerView&&foe, hp=parseInt(x.hp,10)||0;
     const dead=foe?(hp<=0):(x.ds&&(x.ds.f||0)>=3);
@@ -12303,6 +12399,7 @@ function trkToggleActive(){
   // доски независимы: переключаем активность только своего стола, чужие не трогаем
   const bk=gmBoardKey();
   const cur=!!(TRK_SHARED[bk]&&TRK_SHARED[bk].active);
+  if(!cur) trkBgMigrate(bk);   // включаем доску: картинку из строки прошлой версии сперва переносим в свою
   /* Выключение доски = игра завершена. Дальше состав никому не нужен: у ГМа
      он висел бы до следующей сессии, а игроки видели бы мёртвый бой. Поэтому
      доска очищается сама — и у ГМа, и в общем столе. Снимок кладём в
@@ -12315,6 +12412,7 @@ function trkToggleActive(){
     // партию тоже снимаем (как «Очистить»): иначе trkSyncParty при следующей перерисовке
     // вернёт персонажей партии на пустую доску, а выделение висело бы на несуществующих участниках
     TRK.list=[]; TRK.party=''; TRK.round=1; TRK.activeKey=''; TRK.mapPos={}; TRK_SEL.clear();
+    trkBgDrop(bk);   // и фон карты: его строка живёт отдельно и сама бы не исчезла
     trkSave();
   } else {
     trkLog('combat','Доска активна — бой начался');
