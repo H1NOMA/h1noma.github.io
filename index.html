@@ -4506,7 +4506,7 @@ async function initSupa(){
   try{
     const ok=await Promise.race([lib, new Promise(res=>setTimeout(()=>res('timeout'), 5000))]);
     if(ok==='timeout'){ SUPA_LATE=true; console.warn('Supabase: библиотека ещё грузится — стартуем локально, подключимся, когда дойдёт'); return false; }
-    if(!ok){ console.warn('Supabase недоступен, работаем локально'); supa=null; return false; }
+    if(!ok){ SUPA_LATE=true; console.warn('Supabase недоступен, работаем локально — попробуем догрузить библиотеку позже'); supa=null; return false; }
     return true;
   }catch(e){ console.warn('Supabase недоступен, работаем локально', e); supa=null; return false; }
 }
@@ -4581,7 +4581,7 @@ async function sget(key, shared=SHARED){
    эти пятнадцать секунд, и закрытая раньше вкладка теряла её совсем.
    Возвращаем по-прежнему судьбу ОБЛАЧНОЙ записи: на устройстве к этому моменту
    всё уже лежит. */
-async function sset(key,val, shared=SHARED){
+async function sset(key,val, shared=SHARED, quiet){
   if(supa && shared){
     await ssetLocal(key,val,shared);   // мгновенно и независимо от сети
     let cloudOk=false;
@@ -4589,10 +4589,10 @@ async function sset(key,val, shared=SHARED){
       const r = await withTimeout(cloudSet(key,val), CLOUD_TMO);
       // withTimeout по тайм-ауту РЕЗОЛВИТСЯ значением undefined, а не падает,
       // поэтому молчание сети сюда, в catch, не попадает — ловим отдельно
-      if(r===undefined) toast('⚠ Облако не ответило — сохранено на этом устройстве');
+      if(r===undefined){ if(!quiet) toast('⚠ Облако не ответило — сохранено на этом устройстве'); }
       else cloudOk = r!==false;
     }
-    catch(e){ toast('⚠ Облако недоступно — сохранено локально'); }
+    catch(e){ if(!quiet) toast('⚠ Облако недоступно — сохранено локально'); }   // quiet — фоновая досылка: не дёргаем человека каждые 40 с
     return cloudOk;
   }
   return ssetLocal(key,val,shared); // личные данные не уходят в облако
@@ -6152,7 +6152,7 @@ async function cloudRepull(reason){
       // на доске состав/панель игрока зависят от листов — дорисовать бережно, и только если листы изменились
       if(charsChanged && document.getElementById('trkBox') && typeof trkRedraw==='function') trkRedraw(true);
     }
-    return changed;
+    return changed && !!perUser;   // «успех» для повторов — когда дошли и листы: без них у игрока нет панели персонажа
   }catch(e){ return false; }
   finally{ CLOUD_REPULLING=false; }
 }
@@ -6173,7 +6173,7 @@ let CLOUD_REPULL_BOUND=false;
 function cloudRepullBind(){
   if(CLOUD_REPULL_BOUND) return; CLOUD_REPULL_BOUND=true;
   document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) cloudRepull('visible'); });
-  window.addEventListener('online', ()=>{ if(CHARS_DIRTY && typeof persistChars==='function') persistChars().catch(()=>{}); cloudRepull('online'); });
+  window.addEventListener('online', ()=>{ if(CHARS_DIRTY && typeof persistChars==='function') persistChars(true).catch(()=>{}); cloudRepull('online'); });
 }
 /* Правки/скрытия карточек ядра — тем же слиянием (свежее чужое подхватываем, своё в приоритете) */
 async function persistCoreOver(){
@@ -7479,7 +7479,7 @@ async function logout(){
 /* ====================== Игроки / персонажи ====================== */
 // сохранение персонажей с защитой от гонки: подтягиваем свежую облачную карту и сливаем по id
 let CHARS_DIRTY=false, CHARS_DIRTY_TOLD=false;   // лист не ушёл в облако (офлайн) — ждёт повторной отправки
-async function persistChars(){
+async function persistChars(retry){
   try{
     const tag=currentTag();
     if(supa && tag){
@@ -7504,7 +7504,7 @@ async function persistChars(){
         mine[g]=(CHARS_ALL[g]||[]).filter(c=>{ if(!c) return false;
           const o=normTag(c.owner||''); return !o || o===tag; });
       });
-      const ok=await sset('comik:chars:'+tag, mine, true);
+      const ok=await sset('comik:chars:'+tag, mine, true, !!retry);   // фоновая досылка — без тостов внутри sset
       CHARS_DIRTY=!ok;                                   // не дошло — дошлём при возврате сети / очередным фоновым тиком
       if(!ok && supa && !CHARS_DIRTY_TOLD){ CHARS_DIRTY_TOLD=true; toast('⚠ Облако недоступно — сохранено локально, отправим, когда связь вернётся'); }
       if(ok) CHARS_DIRTY_TOLD=false;
@@ -7512,6 +7512,7 @@ async function persistChars(){
     } else {
       // не залогинен или без облака — сохраняем ТОЛЬКО локально;
       // легаси-блоб comik:chars:v1 в облако больше не пишем (ключ заморожен)
+      CHARS_DIRTY=false;                                 // досылать некуда и нечем — не гоняем фоновую попытку после выхода из аккаунта
       await ssetLocal(KEY_CHARS, CHARS_ALL, true);
       return true;          // без облака «сохранено» значит сохранено на устройстве
     }
@@ -7520,10 +7521,11 @@ async function persistChars(){
 /* живая синхронизация: раз в 40с подтягиваем персонажей и заявки, пока вкладка видима и модалки закрыты */
 setInterval(async ()=>{
   try{
-    if(!supa || document.hidden || navigator.onLine===false) return;
+    if(!supa || document.hidden) return;
+    if(navigator.onLine===false && (Date.now()%3)) return;   // «офлайн» по мнению браузера — пробуем всё же примерно раз в 2 минуты
     const scrim=document.getElementById('scrim');
     if(scrim && scrim.classList.contains('open')) return;
-    if(CHARS_DIRTY){ try{ await persistChars(); }catch(e){} }   // лист, не ушедший в облако офлайн, — дошлём до чтения, иначе облачная копия его перекроет
+    if(CHARS_DIRTY){ try{ await persistChars(true); }catch(e){} }   // лист, не ушедший в облако офлайн, — дошлём до чтения (тихо), иначе облачная копия его перекроет
     const [ch,gm]=await Promise.all([
       withTimeout(fetchCloudChars(), CLOUD_TMO).catch(()=>null),
       withTimeout(cloudGet(KEY_GAMES),4000).catch(()=>null)
@@ -7544,7 +7546,7 @@ setInterval(async ()=>{
       });
       gmChanged=true;
     }
-    if(chChanged){ bindGameData(); renderPlayers(); }
+    if(chChanged){ bindGameData(); renderPlayers(); if(document.getElementById('trkBox') && typeof trkRedraw==='function') trkRedraw(true); }   // листы дошли — доска игрока получает панель
     if(gmChanged){ const nv=document.getElementById('view-news'); if(nv && nv.classList.contains('active') && typeof renderNews==='function') renderNews(); }
     // живой «стол» ГМа для игроков на странице инструментов
     const tv=document.getElementById('view-combat');
@@ -11279,9 +11281,11 @@ function trkPublish(){
   // одна отложенная публикация на доску: частые правки ГМа схлопываются в последнюю (снимок — последней)
   trkWrite(v=>{ v[bk]=trkBoardBuild(v[bk], {snap}); }, 'board:'+bk);
 }
-let TRK_FETCHING=false;
+let TRK_FETCHING=false, TRK_FETCH_FULL_AGAIN=false;
 async function trkFetchShared(full){
-  if(!supa || TRK_FETCHING || navigator.onLine===false) return false;   // без сети и поверх незавершённого чтения не стучимся
+  if(!supa) return false;
+  if(TRK_FETCHING){ if(full) TRK_FETCH_FULL_AGAIN=true; return false; }   // поверх незавершённого чтения не стучимся; полное — повторим после него
+  if(navigator.onLine===false && !full) return false;                    // onLine — подсказка, не запрет: принудительное чтение идёт всегда
   TRK_FETCHING=true;
   try{
     // сначала дёшево спрашиваем только версию: не изменилась — всю строку (с картой и журналами) не качаем
@@ -11293,7 +11297,7 @@ async function trkFetchShared(full){
     const v=await withTimeout(cloudGet(KEY_TRKSHARED),8000);
     if(v && typeof v==='object'){ const before=JSON.stringify(TRK_SHARED); if(trkAdopt(v,'poll')) return JSON.stringify(TRK_SHARED)!==before; }
   }catch(e){}
-  finally{ TRK_FETCHING=false; }
+  finally{ TRK_FETCHING=false; if(TRK_FETCH_FULL_AGAIN){ TRK_FETCH_FULL_AGAIN=false; setTimeout(()=>trkLiveCatchup(true), 0); } }
   return false;
 }
 /* ══ Единый канал записи общего стола ══════════════════════════════════════════
@@ -11791,7 +11795,9 @@ function trkMapPatch(src){
   const toks=document.querySelectorAll('.mp-tok[data-key]'); if(!toks.length) return;
   const cols=trkMapColsOf(src), pos=trkMapPosFor(src);
   toks.forEach(tok=>{ const k=tok.getAttribute('data-key'); const pp=pos[k];
-    if(pp && !tok.classList.contains('dragging')){ tok.style.left=(pp.x+0.5)/cols*100+'%'; tok.style.top=(pp.y+0.5)/cols*100+'%'; }
+    if(pp && !tok.classList.contains('dragging')){   // как при полной отрисовке: после уменьшения сетки фишка остаётся у края, а не уезжает за него
+      const x=Math.min(cols-1,Math.max(0,pp.x||0)), y=Math.min(cols-1,Math.max(0,pp.y||0));
+      tok.style.left=(x+0.5)/cols*100+'%'; tok.style.top=(y+0.5)/cols*100+'%'; }
     tok.classList.toggle('on', k===src.activeKey); });
 }
 /* структурная «подпись»: если совпадает — обновляем только числа/подсветку, иначе полная отрисовка */
@@ -12330,10 +12336,15 @@ function trkTyping(){
   const tag=ae.tagName; if(tag!=='INPUT' && tag!=='TEXTAREA' && !ae.isContentEditable) return false;   // select не «печатают» — его перерисовка ничего не теряет
   return !!(ae.closest && ae.closest('#trkBox, #pdock, #gmManageBox'));                                  // только то, что полная отрисовка пересоздаёт
 }
-let TRK_PTR=false;   // палец/кнопка мыши сейчас прижаты — отложенную перерисовку ещё чуть подождём, чтобы не выдернуть кнопку из-под тапа
-document.addEventListener('pointerdown', ()=>{ TRK_PTR=true; }, true);
-document.addEventListener('pointerup', ()=>{ TRK_PTR=false; }, true);
-document.addEventListener('pointercancel', ()=>{ TRK_PTR=false; }, true);
+let TRK_PTR=false, TRK_PTR_T=null;   // палец/кнопка мыши прижаты (или тап ещё «долетает») — перерисовку ещё чуть подождём, чтобы не выдернуть кнопку из-под пальца
+function trkPtrDrop(){ clearTimeout(TRK_PTR_T); TRK_PTR_T=null; TRK_PTR=false; }
+document.addEventListener('pointerdown', ()=>{ clearTimeout(TRK_PTR_T); TRK_PTR_T=null; TRK_PTR=true; }, true);
+// на сенсорных экранах pointerup приходит вместе с touchend, а синтетические mousedown → change → click — ПОСЛЕ него:
+// если снять флаг сразу, change-перерисовка пересоберёт кнопку до click и тап пропадёт. Держим флаг ~400 мс, click снимает раньше
+document.addEventListener('pointerup', e=>{ if(e.pointerType==='touch'){ clearTimeout(TRK_PTR_T); TRK_PTR_T=setTimeout(trkPtrDrop, 400); } else trkPtrDrop(); }, true);
+document.addEventListener('pointercancel', trkPtrDrop, true);
+let TRK_CLICKING=false;   // идёт доставка click: обработчик кнопки уже получил событие, перерисовывать можно сразу (задержка нужна только до click)
+document.addEventListener('click', ()=>{ TRK_CLICKING=true; setTimeout(()=>{ TRK_CLICKING=false; if(TRK_PTR_T) trkPtrDrop(); }, 0); }, true);
 function trkDeferReplay(n){
   setTimeout(()=>{ if(!TRK_DEFER) return; if(trkTyping()) return; if(TRK_PTR && (n||0)<6){ trkDeferReplay((n||0)+1); return; } TRK_DEFER=false; trkLiveApply(); }, (n||0)?150:320);
 }
@@ -12345,7 +12356,8 @@ function trkRedraw(force){
   const box=document.getElementById('trkBox'); if(!box) return false;
   // Пока палец/кнопка прижаты — тоже ждём: Chrome шлёт change по нажатию на другой элемент ещё ДО blur
   // (activeElement уже body), и полная перерисовка пересобирала пульт под указателем — тап по кнопке терялся
-  if(trkTyping() || TRK_PTR){ TRK_DEFER=true; if(force) box.dataset.trkSig=''; if(TRK_PTR && !trkTyping()) trkDeferReplay(1); return false; }
+  const held=TRK_PTR && !TRK_CLICKING;   // палец прижат, а click ещё не пришёл (change/blur перед ним) — вот когда нельзя рисовать
+  if(trkTyping() || held){ TRK_DEFER=true; if(force) box.dataset.trkSig=''; if(held && !trkTyping()) trkDeferReplay(1); return false; }
   renderTracker(); return true;
 }
 function trkLiveApply(){
@@ -12393,12 +12405,15 @@ function trkLiveStart(){
   // опрос — запасной путь: при живом Realtime раз в 5 с, без него — раз в 2,5 с; заодно дожимаем очередь правок
   let tick=0;
   trkPollT=setInterval(async ()=>{
-    if(document.hidden || navigator.onLine===false) return;
+    if(document.hidden) return;
+    tick++;
+    // navigator.onLine — подсказка, а не запрет (VPN/виртуальные адаптеры врут): без сети опрашиваем редко, раз в 20 с
+    const offline=(navigator.onLine===false); if(offline && (tick%8)) return;
     if(TRK_PENDING.length && !TRK_FLUSHING && !TRK_FLUSH_T) trkFlushSoon(0);
     const tp=document.getElementById('view-combat');
     if(!(tp && tp.classList.contains('active')) || !document.getElementById('trkBox')) return;
-    tick++; if(trkRTok && (tick%2)) return;
-    if(await trkFetchShared()) trkLiveApply();
+    if(!offline && trkRTok && (tick%2)) return;
+    if(await trkFetchShared(offline)) trkLiveApply();
   }, 2500);
   if(!trkLiveBound){
     trkLiveBound=true;
