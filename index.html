@@ -1213,6 +1213,11 @@
   .tb-now .cap{font-family:var(--f-mono);font-size:.5rem;letter-spacing:.2em;text-transform:uppercase;color:var(--red-ink)}
   .tb-now .who{font-family:var(--f-disp);font-weight:700;font-size:1rem;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:52vw}
   .tb-tbtn{width:40px;height:40px;flex:none;border-radius:12px;border:var(--hair) solid var(--line2);background:var(--surface);color:var(--dim);font-size:1.05rem;display:flex;align-items:center;justify-content:center;cursor:pointer}
+  /* статус синхронизации (см. trkSyncBadge): тонкая строчка под панелью, в тон подписи «раунд» */
+  .tb-sync{font-family:var(--f-mono);font-size:.55rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);text-align:right;line-height:1;margin-top:-3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tb-sync:empty{display:none}
+  .tb-sync.warn{color:var(--red-ink)}
+  .tb-sync.busy{color:var(--dim)}
   .tb-tbtn.main{width:auto;padding:0 16px;background:var(--red);color:#0b0b0e;border:none;font-family:var(--f-disp);font-weight:700;letter-spacing:.06em;font-size:.82rem;box-shadow:0 4px 16px rgba(var(--accent-rgb),.35)}
   /* СПИСОК */
   .tb-list{display:flex;flex-direction:column;gap:8px}
@@ -2679,6 +2684,8 @@
   .trk-idle{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:46px 20px 42px;text-align:center}
   .trk-emblem{width:96px;height:96px;color:var(--red-ink);filter:drop-shadow(0 0 16px rgba(var(--accent-rgb),.4))}
   .trk-idle-cap{font-family:var(--f-disp);font-weight:600;font-size:.95rem;letter-spacing:.1em;text-transform:uppercase;color:var(--red-ink)}
+  /* подпись над чужой доской (своего персонажа на ней нет / не вошёл) — доска ниже только для чтения */
+  .trk-note{font-family:var(--f-mono);font-size:.62rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);text-align:center;margin:0 0 10px}
   .tool-title{font-family:var(--f-mono);font-size:.72rem;letter-spacing:.18em;color:var(--red-ink);text-transform:uppercase;margin-bottom:10px}
   /* ── журнал действий ГМа ── */
   #trkLogBox .empty{padding:16px 6px;text-align:center;color:var(--muted);font-family:var(--f-mono);font-size:.7rem;line-height:1.7}
@@ -3889,7 +3896,7 @@ if(/Android/i.test(navigator.userAgent||'')) d.classList.add('lite');}catch(e){}
   </div>
 </div>
 
-<div class="toast" id="toast"><span class="ic">▮</span><span id="toastMsg"></span></div>
+<div class="toast" id="toast" role="status" aria-live="polite"><span class="ic">▮</span><span id="toastMsg"></span></div>
 
 <script id="chrono-data" type="application/json"></script>
 <script id="core-data" type="application/json"></script>
@@ -11280,7 +11287,7 @@ function trkPublish(){
   // одна отложенная публикация на доску: частые правки ГМа схлопываются в последнюю (снимок — последней)
   trkWrite(v=>{ v[bk]=trkBoardBuild(v[bk], {snap}); }, 'board:'+bk);
 }
-let TRK_FETCHING=false, TRK_FETCH_FULL_AGAIN=false;
+let TRK_FETCHING=false, TRK_FETCH_FULL_AGAIN=false, TRK_FETCHED=false;   // TRK_FETCHED — хоть одно чтение строки завершилось (для подписи «Подключаемся к облаку…»)
 async function trkFetchShared(full, ignoreOnline){
   if(!supa) return false;
   if(TRK_FETCHING){ if(full) TRK_FETCH_FULL_AGAIN=true; return false; }   // поверх незавершённого чтения не стучимся; полное — повторим после него
@@ -11294,7 +11301,9 @@ async function trkFetchShared(full, ignoreOnline){
       if(r && !r.error && r.data && (parseInt(r.data.rev,10)||0)===TRK_REV) return false;
     }
     const v=await withTimeout(cloudGet(KEY_TRKSHARED),8000);
-    if(v && typeof v==='object'){ const before=JSON.stringify(TRK_SHARED); if(trkAdopt(v,'poll')) return JSON.stringify(TRK_SHARED)!==before; }
+    const first=(v!==undefined && !TRK_FETCHED); if(v!==undefined) TRK_FETCHED=true;   // ответ пришёл (пусть и пустой) — «Подключаемся…» на простое пора сменить
+    if(v && typeof v==='object'){ const before=JSON.stringify(TRK_SHARED); if(trkAdopt(v,'poll')) return first || JSON.stringify(TRK_SHARED)!==before; }
+    if(first) return true;
   }catch(e){}
   finally{ TRK_FETCHING=false; if(TRK_FETCH_FULL_AGAIN){ TRK_FETCH_FULL_AGAIN=false; setTimeout(()=>trkLiveCatchup(true), 0); } }
   return false;
@@ -11324,6 +11333,7 @@ function trkWrite(mut, key, delayMs){
   trkFlushSoon(delayMs||0);
 }
 function trkFlushSoon(ms){
+  trkSyncBadge();                                    // в очереди появилась правка — значок «отправляем…» сразу
   const at=Date.now()+(ms||0);
   if(TRK_FLUSH_T && TRK_FLUSH_AT<=at) return;        // уже запланировано не позже
   clearTimeout(TRK_FLUSH_T); TRK_FLUSH_AT=at;
@@ -11334,7 +11344,7 @@ async function trkFlush(){
   if(!TRK_PENDING.length) return;
   if(!supa){ return; }                                 // без облака правки живут локально
   if(TRK_FLUSHING){ TRK_FLUSH_AGAIN=true; return; }
-  TRK_FLUSHING=true;
+  TRK_FLUSHING=true; trkSyncBadge();
   const batch=TRK_PENDING.slice();
   try{
     const v=await kvCasUpdate(KEY_TRKSHARED, cur=>{ batch.forEach(p=>{ try{ p.mut(cur); }catch(e){} }); });
@@ -11359,7 +11369,7 @@ async function trkFlush(){
     if(TRK_FLUSH_FAIL===2) toast('⚠ Облако не отвечает — правки доски дошлём, когда связь вернётся');
     trkFlushSoon(Math.min(30000, 1500*Math.pow(2, Math.min(4,TRK_FLUSH_FAIL-1))));
   }finally{
-    TRK_FLUSHING=false;
+    TRK_FLUSHING=false; trkSyncBadge();
     if(TRK_FLUSH_AGAIN){ TRK_FLUSH_AGAIN=false; if(!TRK_FLUSH_FAIL) trkFlushSoon(0); }
   }
 }
@@ -11367,6 +11377,7 @@ async function trkFlush(){
    отбрасываем; поверх снимка снова кладём свои неподтверждённые правки. */
 function trkAdopt(v, src){
   if(!v || typeof v!=='object' || Array.isArray(v)) return false;
+  TRK_FETCHED=true;   // снимок дошёл (Realtime/своя запись) — облако отвечает
   const rev=parseInt(v.rev,10)||0;
   if(rev && TRK_REV && rev<TRK_REV){
     if(src!=='write' && TRK_REV-rev<=5) return false;   // запоздавшее эхо — отбрасываем
@@ -11677,6 +11688,7 @@ function trkCombatBar(o){
        <div class="tb-now"><span class="cap">Сейчас ходит</span><span class="who">${esc(o.whoName||'—')}</span></div>
        <button class="tb-tbtn main" onclick="trkStep(1)">Ход ▸</button>`
     : `<div class="tb-now" style="margin:0 auto"><span class="cap">Сейчас ходит</span><span class="who">${esc(o.whoName||'—')}</span></div>`;
+  const sync=trkSyncState();
   return `<div class="tb-bar">
     <div class="tb-top">
       <button class="tb-round"${gm?' onclick="trkRoundReset()" title="Сбросить бой"':' disabled'}><span class="n">${round}</span><span class="l">раунд</span></button>
@@ -11687,7 +11699,25 @@ function trkCombatBar(o){
       </div>
     </div>
     <div class="tb-turn">${nav}</div>
+    <div class="tb-sync ${sync.cls}" id="trkSync">${sync.txt}</div>
   </div>`;
+}
+/* ── Статус синхронизации доски: строчка в панели боя. Без неё «правка не дошла» и «облако молчит»
+   выглядели одинаково — доска просто не менялась. Обновляется точечно (только этот узел), без перерисовки */
+function trkSyncState(){
+  const n=TRK_PENDING.length;
+  if(TRK_FLUSH_FAIL>0 || navigator.onLine===false){
+    const w=(n%10===1&&n%100!==11)?'правка':(n%10>=2&&n%10<=4&&(n%100<12||n%100>14))?'правки':'правок';
+    return {cls:'warn', txt:'⚠ офлайн'+(n?' · '+n+' '+w:'')};
+  }
+  if(n>0 || TRK_FLUSHING) return {cls:'busy', txt:'↻ отправляем…'};
+  return trkRTok ? {cls:'ok', txt:'● синхронизировано'} : {cls:'poll', txt:'○ опрос'};
+}
+function trkSyncBadge(){
+  const el=document.getElementById('trkSync'); if(!el) return;   // доска на простое / не открыта — показывать негде
+  const s=trkSyncState(), cls='tb-sync '+s.cls;
+  if(el.textContent!==s.txt) el.textContent=s.txt;
+  if(el.className!==cls) el.className=cls;
 }
 /* ── Карта боя: сетка с фишками участников, перетаскивание, синхронизация ── */
 const TRK_MAPCOLS=12;
@@ -11874,10 +11904,25 @@ function trkRestoreInputs(keep){
   (keep||[]).forEach(k=>{ const el=document.getElementById(k.id); if(!el) return;
     try{ if(String(el.value)!==String(k.v)) el.value=k.v; if(k.f && document.activeElement!==el){ el.focus({preventScroll:true}); if(k.s!=null && el.setSelectionRange && /^(text|search|tel|url|password)$/.test(el.type||'text')) el.setSelectionRange(k.s, k.e); } }catch(e){} });
 }
+/* подпись «простоя» у игрока: одно «Мастер не ведёт игру» не отличало «облако ещё не прочитано»
+   от «бой идёт, но в другом сеттинге» — игрок думал, что доска сломана */
+function trkIdleCaption(){
+  if(supa && !TRK_REV && !TRK_FETCHED) return 'Подключаемся к облаку…';   // первое чтение строки ещё не завершилось
+  let other=null;   // активная доска другого сеттинга (сначала — та, где стоит свой персонаж)
+  for(const k in TRK_SHARED){
+    const s=TRK_SHARED[k]; if(!(s && s.active && Array.isArray(s.list) && s.list.length)) continue;
+    const p=boardProj(k); if(p===CUR_PROJECT || !PROJECT_TITLES[p]) continue;
+    if(playerMyCard(k)){ other=p; break; }
+    if(!other) other=p;
+  }
+  if(other) return 'Идёт бой в '+PROJECT_TITLES[other].replace(/<[^>]*>/g,'');
+  return 'Мастер не ведёт игру';
+}
 function renderTracker(){
   TRK_DEFER=false;   // полная отрисовка состоялась — отложенной больше нет (поле могло исчезнуть без focusout)
   const keep=trkKeepInputs();
   try{ renderTrackerCore(); } finally{ if(keep.length) trkRestoreInputs(keep); }
+  trkSyncBadge();
 }
 function renderTrackerCore(){
   const box=document.getElementById('trkBox'); if(!box) return;
@@ -11894,11 +11939,13 @@ function renderTrackerCore(){
           <path d="M12 2l8.7 5v10L12 22l-8.7-5V7L12 2z"/>
           <path d="M12 2v4.6M3.3 7l8.7-.4 8.7.4M12 6.6L5.6 16.4h12.8L12 6.6M3.3 17l2.3-.6M20.7 17l-2.3-.6M12 22l-6.4-5.6M12 22l6.4-5.6"/>
         </svg>
-        <div class="trk-idle-cap">Мастер не ведёт игру</div>
+        <div class="trk-idle-cap">${trkIdleCaption()}</div>
       </div>`;
       return;
     }
     const shared=TRK_SHARED[vp]||{}; const vproj=boardProj(vp);
+    // доска есть, а своего персонажа на ней нет (нет листа / не вошёл): показываем её только для чтения и говорим почему
+    const note=playerMyCard(vp)?'':`<div class="trk-note">${SESSION?'Вашего персонажа нет на доске':'Войдите, чтобы участвовать'}</div>`;
     const order=trkOrder(shared.list||[]);
     const activeKey=shared.activeKey||'';
     const who=order.find(x=>trkCardKey(x)===activeKey)||order[0];
@@ -11914,7 +11961,7 @@ function renderTrackerCore(){
     const boardHtml = view==='map'?trkMapHtml({order, activeKey, proj:vproj, playerView:true, vp})
         :view==='cards'?`<div class="trk-grid tb2">${items||empty}</div>`
         :`<div class="tb-list">${items||empty}</div>`;
-    box.innerHTML=
+    box.innerHTML=note+
       trkCombatBar({round:shared.round||1, whoName:(who&&who.name)||'—', gm:false})+
       `<div class="trk-pcols"><div class="trk-pboard">${boardHtml}</div><div class="trk-pside">${playerMePanel(vp)}</div></div>`;
     trkSetSig();
@@ -12383,14 +12430,14 @@ function trkRTSubscribe(){
       })
       .subscribe(status=>{
         if(ch!==trkRT) return;                         // статус старого канала (мы сами его закрыли) — не повод переподписываться
-        if(status==='SUBSCRIBED'){ trkRTok=true; trkRTtries=0; }
+        if(status==='SUBSCRIBED'){ trkRTok=true; trkRTtries=0; trkSyncBadge(); }
         else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'||status==='CLOSED'){
-          trkRTok=false;
+          trkRTok=false; trkSyncBadge();
           const d=Math.min(30000, 1500*Math.pow(2, Math.min(4,trkRTtries++)));   // бэкофф до 30с
           setTimeout(()=>{ if(ch===trkRT) trkRTSubscribe(); }, d);
         }
       });
-  }catch(e){ trkRTok=false; setTimeout(trkRTSubscribe, 5000); }
+  }catch(e){ trkRTok=false; trkSyncBadge(); setTimeout(trkRTSubscribe, 5000); }
 }
 /* немедленно подтянуть свежий стол (при возврате на вкладку / восстановлении сети) */
 async function trkLiveCatchup(force){
@@ -12418,7 +12465,8 @@ function trkLiveStart(){
     trkLiveBound=true;
     // вернулись на вкладку / сеть восстановилась — чиним канал и сразу догоняем состояние
     document.addEventListener('visibilitychange', ()=>{ if(!document.hidden){ if(!trkRTok) trkRTSubscribe(); trkLiveCatchup(); } });
-    window.addEventListener('online', ()=>{ if(!trkRTok) trkRTSubscribe(); TRK_FLUSH_FAIL=0; if(TRK_PENDING.length) trkFlushSoon(0); trkLiveCatchup(); });   // связь вернулась — очередь правок уходит сразу
+    window.addEventListener('online', ()=>{ if(!trkRTok) trkRTSubscribe(); TRK_FLUSH_FAIL=0; if(TRK_PENDING.length) trkFlushSoon(0); trkSyncBadge(); trkLiveCatchup(); });   // связь вернулась — очередь правок уходит сразу
+    window.addEventListener('offline', trkSyncBadge);   // значок «офлайн» — сразу, не дожидаясь первой неудачной отправки
   }
 }
 function trkHp(i,d){ const x=TRK.list[i]; if(!x) return; x.hp=Math.max(0,(parseInt(x.hp,10)||0)+d); trkSave(); renderTracker(); }
@@ -12457,12 +12505,17 @@ function trkAddChar(id){
   trkSave(); renderTracker();
 }
 function trkAddBeast(id){
-  const c=CORE.find(x=>x.id===id); if(!c) return;
-  const d={}; (c.dossier||[]).forEach(r=>d[r.k]=r.v);
-  const hp=parseInt(((d['Хиты']||'').match(/\d+/)||['0'])[0],10);
-  const ac=((d['КД']||'').match(/\d+/)||[''])[0];
+  // подсказки (trkSuggest) берутся из ARCHIVE — облачный бестиарий сеттинга плюс ядро SRD, — а искали
+  // только в CORE: кнопка по самодельному чудищу ГМа молча ничего не делала
+  const c=ARCHIVE.find(x=>x && x.id===id) || CORE.find(x=>x && x.id===id); if(!c) return;
+  const st=beastStat(c)||{};   // e.stat у облачных карточек; у ядра — разбор досье («Хиты», «КД», «Характеристики»)
+  const hp=parseInt((String(st.hp||'').match(/\d+/)||['0'])[0],10);
+  const ac=(String(st.ac||'').match(/\d+/)||[''])[0];
+  const dexMod=statMod(st.dex);
   const el=document.getElementById('trk-add'); if(el) el.value='';
-  TRK.list.push({name:c.title, init:0, hp, max:hp, ac, ava:c.img||'', foe:true, uid:uid()});
+  const card={name:c.title, init:0, hp, max:hp, ac, ava:c.img||'', foe:true, uid:uid(), srcId:c.id};   // srcId — откуда взят статблок
+  if(dexMod!=null) card.dexMod=dexMod;   // модификатор Ловкости — для броска инициативы
+  TRK.list.push(card);
   trkLog('add','ГМ добавил существо: '+c.title);
   trkSave(); renderTracker();
 }
@@ -13988,6 +14041,7 @@ function openInstallHelp(){
   #trkBox .tb-turn .tb-tbtn.main{order:4}
   #trkBox .tb-view{order:5;margin-left:auto;flex:none}
   #trkBox .tb-bar .tb-turn{border-top:none;padding-top:0}
+  #trkBox .tb-sync{order:6;flex:none;margin-top:0}
   .tb-now{display:flex;align-items:baseline;gap:10px}
   .tb-now .cap{flex:none}
 
