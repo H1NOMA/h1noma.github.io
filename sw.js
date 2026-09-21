@@ -1,24 +1,29 @@
 /* КОМИК: офлайн-кэш + быстрые повторные заходы.
-   Стратегия stale-while-revalidate: отдаём страницу из кэша мгновенно,
-   а в фоне тихо перекачиваем свежую — она подхватится на следующем заходе.
-   Так первый экран открывается сразу, без ожидания сети, и остаётся актуальным. */
+   Сама страница — network-first: онлайн всегда свежий код, по таймауту (NAV_TIMEOUT) или без сети —
+   копия из версионного кэша, прогретая при установке. Статика (шрифты, библиотека облака, данные,
+   картинки) — stale-while-revalidate: мгновенно из кэша, а в фоне тихо перекачиваем свежую. */
 const CACHE = 'comik-v271';
 // Статика (шрифты, иконки, данные, фоны) живёт в ОТДЕЛЬНОМ кэше, который не сбрасывается при смене
 // версии: раньше каждое обновление кода стирало и шрифты с картинками, и на телефоне первый запуск
 // новой версии шёл без них, пока всё не перекачается заново. Обновляются они сами (stale-while-revalidate).
 const STATIC = 'comik-static-v1';
-// мелкие статические файлы прогреваем сразу при установке
+// мелкие статические файлы прогреваем сразу при установке (~1,3 МБ вместо прежних 4 МБ)
 // манифесты на каждую иконку приложения — чтобы установка PWA работала и из офлайн-кэша
-// данные сайта (data/*.json), фоны приветствий (img/hero-*.jpg), логотип и фото команды
-// вынесены из index.html: мелкие прогреваем сразу. Тяжёлые справочники — data/core.json (8 МБ)
-// и core-bestiary.json (11 МБ) — в прогрев НЕ входят: страница сама запрашивает их после
-// первого кадра, и они ложатся в этот же кэш при первом запросе. Раньше бестиарий качался
-// при установке воркера и на первом заходе отбирал канал у самой страницы.
+// Тяжёлое в прогрев НЕ входит: страница сама запрашивает это по ходу дела, и оно ложится в этот же
+// кэш при первом запросе через воркер (ветка stale-while-revalidate ниже): справочники data/core.json
+// (8 МБ) и core-bestiary.json (11 МБ), архив и новости (data/archive.json 1,5 МБ, data/news.json 0,8 МБ),
+// фоны приветствий img/hero-*.jpg (1 МБ на семь тем — пользователю нужен один). Раньше всё это
+// качалось при установке воркера и на первом заходе отбирало канал у самой страницы.
+// Шрифты — только файлы, которые страница реально запрашивает (проверено по сетевым запросам во всех
+// темах и разделах): подмножества latin и cyrillic; latin-ext/cyrillic-ext, Chakra Petch 500 и
+// Rajdhani 600 не грузятся вовсе. Без них офлайн-старт открывался системным шрифтом.
 const PRECACHE = ['manifest.webmanifest', 'fonts.css', 'supabase.js', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png',
   'img/logo-komik.png', 'img/chrono-gw.jpg', 'img/team-1.jpg', 'img/team-2.jpg', 'img/team-3.jpg', 'img/team-4.jpg', 'img/team-5.jpg',
-  'data/archive.json', 'data/news.json', 'data/hero.json', 'data/chrono.json',
-  ...['legacy','neverland','assimilation','terra','classic','skazki','gw'].map(k => 'img/hero-' + k + '.jpg'),
-  ...['classic','terra','legacy','neverland','assimilation','komik','komikw','komikn'].map(k => 'manifest-' + k + '.webmanifest')];
+  'data/hero.json', 'data/chrono.json',
+  ...['classic','terra','legacy','neverland','assimilation','komik','komikw','komikn'].map(k => 'manifest-' + k + '.webmanifest'),
+  ...['chakra-petch-400','chakra-petch-600','chakra-petch-700','cinzel-decorative-700','cinzel-decorative-900',
+      'rajdhani-500','share-tech-mono-400','uncial-antiqua-400'].map(k => 'fonts/' + k + '-normal-latin.woff2'),
+  ...['inter-400','inter-500','inter-600','ruslan-display-400'].flatMap(k => ['cyrillic','latin'].map(s => 'fonts/' + k + '-normal-' + s + '.woff2'))];
 // сколько ждём сеть для самой страницы, прежде чем отдать копию из кэша.
 // В регионах, где канал до хостинга душат, ожидание сети — это и есть «сайт не открывается»:
 // повторный заход обязан открыться мгновенно из кэша, а свежая версия догрузится фоном.
@@ -26,13 +31,30 @@ const NAV_TIMEOUT = 3500;
 
 self.addEventListener('install', e => {
   self.skipWaiting();
-  e.waitUntil(caches.open(STATIC).then(c => c.addAll(PRECACHE)).catch(() => {}));
+  e.waitUntil(Promise.all([
+    // Статика — по одному файлу и только недостающие: addAll работает «всё или ничего», и один пропавший
+    // файл (или обрыв на нём) раньше оставлял кэш пустым целиком; а то, что уже лежит в STATIC,
+    // при смене версии перекачивать незачем — оно обновляется само при первом запросе.
+    caches.open(STATIC).then(c => Promise.allSettled(PRECACHE.map(u => c.match(u).then(hit => hit || c.add(u))))),
+    // Сама страница — в ВЕРСИОННЫЙ кэш уже при установке. Первый заход воркер не перехватывает
+    // (он ещё не управляет страницей), и без этого офлайн-копия index.html появлялась лишь после
+    // второго онлайн-захода — офлайн работал с третьего. Запрос условный (no-cache): если HTML
+    // не менялся с момента загрузки страницы, придёт 304 и копия возьмётся из HTTP-кэша браузера
+    // без повторной закачки 1,2 МБ; если сайт обновился — в кэш ляжет свежая версия.
+    caches.open(CACHE).then(c => c.add(new Request('./', { cache: 'no-cache' }))),
+  ]).catch(() => {}));
 });
 
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys()
       .then(keys => Promise.all(keys.filter(k => k !== CACHE && k !== STATIC).map(k => caches.delete(k))))
+      // прежний воркер складывал копии самой страницы в STATIC (см. isNav ниже) — по 1,2 МБ на каждый
+      // вариант адреса; теперь страница живёт в версионном кэше, а эти копии только занимают место
+      .then(() => caches.open(STATIC).then(st => st.keys().then(ks => {
+        const root = new URL('./', self.location.href).pathname;
+        return Promise.all(ks.filter(r => [root, root + 'index.html'].includes(new URL(r.url).pathname)).map(r => st.delete(r)));
+      })).catch(() => {}))
       .then(() => self.clients.claim())
   );
 });
@@ -73,14 +95,20 @@ self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
   // кэшируем только свои GET; облако (Supabase) и внешние запросы — мимо
   if (e.request.method !== 'GET' || url.origin !== self.location.origin) return;
-  const isNav = e.request.mode === 'navigation';
+  // 'navigate' — именно так браузер помечает запрос самой страницы. Раньше здесь стояло 'navigation':
+  // такого значения у Request.mode нет, ветка ниже не срабатывала никогда, и страница шла по ветке
+  // статики (мгновенно из кэша, свежая — к следующему заходу); офлайн-старт при этом падал, если
+  // копии страницы не оказалось в STATIC.
+  const isNav = e.request.mode === 'navigate';
   e.respondWith(
     caches.open(CACHE).then(cache => {
       // Навигация (сама страница index.html) — NETWORK-FIRST: онлайн всегда отдаём свежий код,
       // кэш служит лишь офлайн-фолбэком. Иначе SW отдавал старый index.html из кэша и правки
       // «не доезжали» до пользователя до второй перезагрузки — казалось, что ничего не изменилось.
       if (isNav) {
-        const fromCache = () => cache.match(e.request).then(c => c || cache.match('/') || cache.match('index.html'));
+        // './' — тот же ключ, под которым страница прогрета при установке (относительно воркера, а не корня домена):
+        // сюда же попадает заход по ссылке с параметрами (?g=…), для которого точного совпадения в кэше нет
+        const fromCache = () => cache.match(e.request).then(c => c || cache.match('./') || cache.match('index.html'));
         // что отдали странице: 'net' — свежую с сети, 'cache' — копию по таймауту
         let served = null;
         const network = fetch(e.request).then(async res => {
