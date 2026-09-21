@@ -1294,6 +1294,14 @@
   .tb-ds div{display:flex;gap:3px}
   .tb-ds .p{width:9px;height:9px;border-radius:50%;border:1.4px solid var(--muted)}
   .tb-ds .p.s{background:var(--hp-ok);border-color:var(--hp-ok)} .tb-ds .p.f{background:var(--hp-low);border-color:var(--hp-low)}
+  /* у ГМа те же точки — кнопки: спасбросок игрока можно отметить и со стороны стола */
+  .tb-ds button.p{width:16px;height:16px;background:none;padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent}
+  .tb-ds.gm div{gap:4px}
+  /* точки-кнопки шире прежних точек: в такой строке полоса ХП отдаёт им свои 25 px (телефон ГМа) */
+  .tb-row.gmds .tb-hpbar{min-width:44px}
+  .tb-dsb{grid-column:1/-1;display:flex;gap:7px;justify-content:flex-end;margin-top:7px}
+  .tb-dsb button{min-height:32px;border:var(--hair) solid var(--line2);background:var(--bg2);color:var(--dim);font-family:var(--f-mono);font-size:.58rem;letter-spacing:.04em;padding:6px 11px;border-radius:9px;cursor:pointer;white-space:nowrap}
+  .tb-dsb button:active{transform:scale(.95)}
   /* КАРТОЧКИ v2 (scoped .tb2) — изображение во всю карточку, низ плавно растворяется в фоне */
   .tb2 .trk-card{position:relative;aspect-ratio:auto;display:flex;flex-direction:column;background:#141a14;overflow:hidden;border-radius:10px}
   .tb2 .trk-card.on-turn{border-color:var(--red);box-shadow:0 0 0 2px var(--red),0 0 24px rgba(var(--accent-rgb),.4)}
@@ -2881,12 +2889,22 @@
   .death-saves .ds-title{font-family:var(--f-mono);font-size:.6rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);text-align:center;margin-bottom:9px}
   .death-saves .ds-row{display:flex;align-items:center;gap:8px;margin-bottom:7px}
   .death-saves .ds-l{flex:0 0 52px;font-family:var(--f-mono);font-size:.62rem;letter-spacing:.06em;color:var(--dim);text-transform:uppercase}
-  .death-saves .ds-cells{display:flex;gap:8px}
-  .death-saves .dscell{width:20px;height:20px;border-radius:50%;border:2px solid rgba(255,255,255,.22);transition:background .15s}
-  .death-saves .dscell.s.on{background:#3ecf6a;border-color:#3ecf6a;box-shadow:0 0 8px rgba(62,207,106,.5)}
-  .death-saves .dscell.f.on{background:#ff5a5f;border-color:#ff5a5f;box-shadow:0 0 8px rgba(255,90,95,.5)}
+  .death-saves .ds-cells{display:flex;gap:2px}
+  /* кружок — кнопка: отметку ставит рука (кубик за столом настоящий), палец мимо не попадает — цель 40 px, сам кружок прежние 20 */
+  .death-saves .dscell{width:40px;height:40px;min-width:40px;padding:0;border:none;background:none;display:flex;align-items:center;justify-content:center;cursor:pointer;-webkit-tap-highlight-color:transparent}
+  .death-saves .dscell::before{content:'';width:20px;height:20px;border-radius:50%;border:2px solid rgba(255,255,255,.22);transition:background .15s,border-color .15s,box-shadow .15s,transform .12s}
+  .death-saves .dscell.s.on::before{background:#3ecf6a;border-color:#3ecf6a;box-shadow:0 0 8px rgba(62,207,106,.5)}
+  .death-saves .dscell.f.on::before{background:#ff5a5f;border-color:#ff5a5f;box-shadow:0 0 8px rgba(255,90,95,.5)}
+  .death-saves .dscell:active::before{transform:scale(.86)}
+  .death-saves.dead .dscell{cursor:default}
   .death-saves .ds-roll{width:100%;margin-top:11px;padding:13px;border-radius:11px;border:2px solid rgba(var(--accent-rgb),.6);background:rgba(var(--accent-rgb),.12);color:var(--red-ink);font-family:var(--f-disp);font-weight:700;font-size:.95rem;letter-spacing:.02em;cursor:pointer;transition:transform .12s var(--spring)}
   .death-saves .ds-roll:active{transform:scale(.97)}
+  /* результат броска виден в самом блоке несколько секунд: тост на телефоне часто уезжает под клавиатуру/палец */
+  .death-saves .ds-res{margin-top:10px;text-align:center;font-family:var(--f-disp);font-weight:700;font-size:1.02rem}
+  .death-saves .ds-res.ok{color:#7ee29a}
+  .death-saves .ds-res.bad{color:#ff8f93}
+  .death-saves .ds-stab{width:100%;margin-top:8px;min-height:44px;padding:11px;border-radius:11px;border:2px solid rgba(62,207,106,.45);background:rgba(62,207,106,.08);color:#7ee29a;font-family:var(--f-disp);font-weight:700;font-size:.9rem;cursor:pointer;transition:transform .12s var(--spring)}
+  .death-saves .ds-stab:active{transform:scale(.97)}
   .death-saves .ds-end{text-align:center;margin-top:11px;font-family:var(--f-disp);font-weight:700;font-size:1rem}
   .death-saves .ds-end.dead{color:#ff5a5f}
   .death-saves .ds-end.stable{color:#3ecf6a}
@@ -11908,7 +11926,8 @@ function trkRowHtml(x,o){
   const max=trkMaxHp(x,o.proj), hp=parseInt(x.hp,10)||0;
   const pct=max? Math.max(0,Math.min(100,Math.round(hp/max*100))) : (hp>0?100:0);
   const key0=trkCardKey(x), seld=TRK_SEL.has(key0);
-  const cls=['tb-row', foe?'foe':'pc', active?'on-turn':'', dead?'dead':'', o.edit?'gm':'', seld?'sel':''].filter(Boolean).join(' ');
+  const gmds=!!(o.edit && !foe && (dead || hp<=0));   // у ГМа справа встанут точки спасбросков и две команды — строке нужна колонка пошире
+  const cls=['tb-row', foe?'foe':'pc', active?'on-turn':'', dead?'dead':'', o.edit?'gm':'', gmds?'gmds':'', seld?'sel':''].filter(Boolean).join(' ');
   const check=o.edit?(foe?`<label class="tb-check"><input type="checkbox" ${seld?'checked':''} onchange="trkSelToggle('${esc(key0)}')" aria-label="Выбрать"></label>`:`<span class="tb-check"></span>`):'';
   const ini=o.edit
     ? `<input class="tb-ini-in" inputmode="numeric" value="${esc(String(x.init??0))}" onchange="trkSet(${o.idx},'init',this.value)">`
@@ -11936,9 +11955,16 @@ function trkRowHtml(x,o){
   const showConds = !o.playerView || foe || mine;
   const conds=showConds?(x.conds||[]).map(c=>`<span class="tb-cond${c.b?' buff':''}">${esc(c.t)}</span>`).join(''):'';
   const condAdd=o.edit?`<button class="tb-cond add" onclick="trkCondPick(${o.idx})">＋ состояние</button>`:'';
-  let right;
+  let right, dsCmd='';
   if(!foe && (dead || hp<=0)){ const ds=x.ds||{s:0,f:0};   // при 0 ХП ГМ видит ход спасбросков, а не только итог
-    right=`<div class="tb-ds"><div>${[0,1,2].map(k=>`<span class="p ${((ds.s||0)>k)?'s':''}"></span>`).join('')}</div><div>${[0,1,2].map(k=>`<span class="p ${((ds.f||0)>k)?'f':''}"></span>`).join('')}</div></div>`;
+    // у ГМа точки — кнопки: k-я ставит ровно k+1 отметку (повторный тап по последней снимает её),
+    // плюс две команды: поднять с 1 ХП и стабилизировать (0 ХП без спасбросков)
+    const pips=(cls,n)=>[0,1,2].map(k=>o.edit
+      ? `<button class="p${n>k?' '+cls:''}" data-k="${k}" onclick="trkGmDsTap(${o.idx},'${cls}',${k})" aria-label="${cls==='s'?'Успех':'Провал'} ${k+1}"></button>`
+      : `<span class="p${n>k?' '+cls:''}"></span>`).join('');
+    right=`<div class="tb-ds${o.edit?' gm':''}"><div class="ds-s">${pips('s',ds.s||0)}</div><div class="ds-f">${pips('f',ds.f||0)}</div></div>`;
+    // команды — отдельной полосой во всю ширину строки: в правой колонке они ужимали имя и полосу ХП до нечитаемого
+    if(o.edit) dsCmd=`<div class="tb-dsb"><button onclick="trkGmDsHeal(${o.idx})" title="Поднять с 1 ХП">✚1 ХП</button><button onclick="trkGmDsStab(${o.idx})" title="Снять спасброски, оставить 0 ХП">Стабилизирован</button></div>`;
   } else if(foe && o.playerView){ right=`<div class="tb-ac hid">КД —</div>`;
   } else if(o.edit){ right=`<div class="tb-ac"><input class="tb-ac-in" value="${esc(String(x.ac||''))}" placeholder="КД" onchange="trkSet(${o.idx},'ac',this.value)"></div>`;
   } else { right=`<div class="tb-ac"><b>${x.ac?esc(String(x.ac)):'—'}</b><span>КД</span></div>`; }
@@ -11956,6 +11982,7 @@ function trkRowHtml(x,o){
       <div class="tb-conds">${conds}${condAdd}</div>
     </div>
     <div class="tb-right">${right}${rc}</div>
+    ${dsCmd}
   </div>`;
 }
 /* верхняя панель боя */
@@ -12208,8 +12235,10 @@ function trkComboSig(src, view){
   return view+'|'+src.order.map(x=>{
     const foe=isFoeCard(x), foeHidden=src.playerView&&foe, hp=parseInt(x.hp,10)||0;
     const dead=foe?(hp<=0):(x.ds&&(x.ds.f||0)>=3);
-    const dying=(!foe && hp<=0)?1:0, ds=(!foe && x.ds)?((x.ds.s||0)+'/'+(x.ds.f||0)):'';   // панель спасбросков и её точки
-    return [trkCardKey(x), x.name||'', x.ava||beastImgByName(x.name)||'', (x.conds||[]).map(c=>c.t+(c.b?'+':'')).join(','), x.conc?1:0, dead?1:0, foeHidden?1:0, dying, ds].join('~');
+    // панель спасбросков и её ИТОГ (смерть/стабилизация меняют разметку); сами точки в подпись не входят —
+    // их патчит на месте trkRefresh, иначе отметка со стороны ГМа пересобирала бы блок под пальцем игрока
+    const dying=(!foe && hp<=0)?1:0, stab=(!foe && x.ds && (x.ds.s||0)>=3)?1:0;
+    return [trkCardKey(x), x.name||'', x.ava||beastImgByName(x.name)||'', (x.conds||[]).map(c=>c.t+(c.b?'+':'')).join(','), x.conc?1:0, dead?1:0, foeHidden?1:0, dying, stab].join('~');
   }).join('||')+extra;
 }
 function trkSetSig(){ const box=document.getElementById('trkBox'); if(box){ try{ box.dataset.trkSig=trkComboSig(trkSource(), trkViewMode()); }catch(e){} } }
@@ -12254,12 +12283,23 @@ function trkRefresh(){
     const iniIn=node.querySelector('.tb-ini-in');   // инициатива правится только в списке (на карточках её нет)
     if(iniIn){ if(document.activeElement!==iniIn) iniIn.value=x.init??0; }
     else { const t1=node.querySelector('.tb-ini .v'); if(t1) t1.textContent=x.init??0; }
+    // спасброски: точки заливаем на месте — отметка игрока доходит до ГМа (и обратно) за один опрос,
+    // не дожидаясь полной отрисовки, которая отложена, пока кто-то печатает или держит палец
+    if(!foe){ const dsw=node.querySelector('.tb-ds');
+      if(dsw){ const d=x.ds||{};
+        dsw.querySelectorAll('.ds-s .p').forEach((p,k)=>p.classList.toggle('s',(d.s||0)>k));
+        dsw.querySelectorAll('.ds-f .p').forEach((p,k)=>p.classList.toggle('f',(d.f||0)>k)); } }
   });
   if(src.playerView){
     const my=src.order.find(x=>x.charId && (CHARS_ALL[src.proj]||[]).some(c=>c&&c.id===x.charId&&!c.deleted&&SESSION&&normTag(c.owner||'')===currentTag()));
     if(my){
       const mi=box.querySelector('.trk-me .tm-in'); if(mi && document.activeElement!==mi) mi.value=my.init??0;
       const mh=box.querySelector('.trk-me .tm-st b.hp'); if(mh){ const mx=trkMaxHp(my,src.proj); mh.innerHTML=(parseInt(my.hp,10)||0)+(mx?'<i>/'+mx+'</i>':''); }
+      // на десктопе панель переезжает в нижний пульт — ищем блок спасбросков по странице, а не в #trkBox
+      const dsb=document.querySelector('#trkBox .death-saves, #pdock .death-saves');
+      if(dsb){ const d=my.ds||{};
+        dsb.querySelectorAll('.dscell').forEach(c=>{ const kind=c.classList.contains('s')?'s':'f';
+          c.classList.toggle('on', (d[kind]||0) > (parseInt(c.dataset.k,10)||0)); }); }
     }
   }
 }
@@ -12472,6 +12512,37 @@ function trkSharedCardPatch(x, patch){
 function trkMassiveDeath(x, cur, n, proj){
   const mx=trkMaxHp(x, proj); return !!(x && x.charId && mx>0 && (n-cur)>=mx);
 }
+/* ── Спасброски игрока со стороны ГМа ──
+   Спасброски принадлежат игроку, но за столом их часто отмечает ГМ (игрок без телефона,
+   кубик укатился). Пишем АБСОЛЮТНЫЕ значения одной правкой карточки: две стороны могут
+   отмечать одновременно, и последняя запись не «доливает» чужие отметки, а заменяет их. */
+function trkLiveDs(x){   // база — живое значение из стола (у ГМа список может быть на такт старше)
+  const sh=TRK_SHARED[gmBoardKey()]; const t=sh&&Array.isArray(sh.list)&&sh.list.find(r=>r&&trkCardKey(r)===trkCardKey(x));
+  const d=(t&&t.ds)||x.ds||{}; return {s:Math.min(3,d.s||0), f:Math.min(3,d.f||0)};
+}
+function trkGmDsTap(i, kind, k){
+  if(!ADMIN) return; const x=TRK.list[i]; if(!x || !x.charId || isFoeCard(x)) return;
+  const cur=trkLiveDs(x); let s=cur.s, f=cur.f, n=k+1;
+  if(kind==='s') s=(s===n)?k:n; else f=(f===n)?k:n;
+  x.ds={s,f};
+  trkSharedCardPatch(x, {ds:{s,f}});
+  trkLog(f>=3?'death':'roll','ГМ: спасброски '+(x.name||'')+' — '+s+' усп. / '+f+' пров.'+(f>=3?' (смерть)':''));
+  trkRedraw(true);
+}
+function trkGmDsHeal(i){   // поднять с 1 ХП: панель спасбросков у игрока уходит сама
+  if(!ADMIN) return; const x=TRK.list[i]; if(!x || !x.charId) return;
+  x.hp=1; delete x.ds;
+  trkSharedCardPatch(x, {hp:1, ds:null});
+  trkLog('heal','ГМ поднял: '+(x.name||'персонаж')+' — 1 ХП');
+  trkRedraw(true);
+}
+function trkGmDsStab(i){   // стабилизирован: спасброски сняты, ХП остаётся 0
+  if(!ADMIN) return; const x=TRK.list[i]; if(!x || !x.charId) return;
+  delete x.ds;
+  trkSharedCardPatch(x, {ds:null});
+  trkLog('heal','ГМ: '+(x.name||'персонаж')+' стабилизировался (0 ХП, спасброски сняты)');
+  trkRedraw(true);
+}
 function trkSet(i,field,val){
   const x=TRK.list[i]; if(!x) return;
   if(field==='name') x.name=val;
@@ -12624,18 +12695,67 @@ function trkRest(charId, kind){
   }
   trkRedraw(true);
 }
+/* результат последнего броска d20 живёт в блоке несколько секунд: за столом тост
+   успевает уехать (телефон в кармане, палец на экране), а отметку нужно сверить глазами */
+let DS_SHOW=null, DS_SHOW_T=null;
+function dsShowRoll(roll, tag, ok){
+  DS_SHOW={roll, tag, ok:!!ok};
+  clearTimeout(DS_SHOW_T);
+  DS_SHOW_T=setTimeout(()=>{ DS_SHOW=null; trkRedraw(); }, 6000);
+}
 function deathSavesHtml(my){
   const ds=my.ds||{s:0,f:0}; const s=Math.min(3,ds.s||0), f=Math.min(3,ds.f||0);
   const dead=f>=3, stable=s>=3;
-  const cells=(n,cls)=>[0,1,2].map(i=>`<span class="dscell ${cls}${i<n?' on':''}"></span>`).join('');
-  return `<div class="death-saves">
+  // кружки — кнопки: настоящий кубик бросают за столом, а в приложение отметку ставит палец.
+  // k-й кружок ставит ровно k+1 отметку, повторный тап по последней её снимает (промахнулся — исправил)
+  const cells=(n,cls)=>[0,1,2].map(i=>`<button class="dscell ${cls}${i<n?' on':''}" data-k="${i}" onclick="dsTap('${cls}',${i})" aria-label="${cls==='s'?'Успех':'Провал'} ${i+1}"></button>`).join('');
+  const res=DS_SHOW?`<div class="ds-res ${DS_SHOW.ok?'ok':'bad'}">${DS_SHOW.roll} — ${esc(DS_SHOW.tag)}</div>`:'';
+  return `<div class="death-saves${dead?' dead':''}">
     <div class="ds-title">Спасброски от смерти</div>
     <div class="ds-row"><span class="ds-l">Успех</span><div class="ds-cells">${cells(s,'s')}</div></div>
     <div class="ds-row"><span class="ds-l">Провал</span><div class="ds-cells">${cells(f,'f')}</div></div>
+    ${res}
     ${dead?`<div class="ds-end dead">Персонаж мёртв</div>`
       :stable?`<div class="ds-end stable">Стабилизирован</div>`
-      :`<button class="ds-roll" onclick="rollDeathSave()">🎲 Бой не окончен</button>`}
+      :`<button class="ds-roll" onclick="rollDeathSave()">🎲 Бросить d20</button>
+        <button class="ds-stab" onclick="dsStabilize()">Стабилизирован</button>`}
   </div>`;
+}
+/* применить НОВОЕ состояние спасбросков (значения абсолютные, не «+1»):
+   три успеха — персонаж стабилизировался и приходит в себя с 1 ХП, три провала — смерть */
+function dsApply(vp, my, s, f){
+  s=Math.max(0,Math.min(3,s|0)); f=Math.max(0,Math.min(3,f|0));
+  const stabilized = f<3 && s>=3;
+  const patch = stabilized ? {hp:1, ds:null} : {ds:{s,f}};
+  if(stabilized){ my.hp=1; delete my.ds; } else { my.ds={s,f}; }
+  const st=TRK_SHARED[vp]; if(st) st.at=Date.now();
+  trkRedraw(true);
+  trkCloudCardPatch(vp, trkCardKey(my), patch);
+  if(stabilized){ trkLog('heal',(my.name||'Персонаж')+' стабилизировался (три успеха) — 1 ХП'); toast('Три успеха — персонаж стабилизировался'); }
+  else if(f>=3){ trkLog('death',(my.name||'Персонаж')+' проваливает третий спасбросок — смерть'); toast('Три провала — персонаж мёртв'); }
+}
+/* тап по кружку: отмечает свой спасбросок только владелец карточки */
+function dsTap(kind, i){
+  const vp=trkActiveForPlayer(); if(!vp) return;
+  const my=playerMyCard(vp); if(!my) return;
+  if((parseInt(my.hp,10)||0)>0) return;                       // уже на ногах — спасбросков нет
+  const ds=my.ds||{s:0,f:0}; let s=Math.min(3,ds.s||0), f=Math.min(3,ds.f||0);
+  if(f>=3){ toast('Персонаж мёртв — вернуть его может только Мастер'); return; }   // отметку уже не снять
+  const n=i+1;
+  if(kind==='s') s=(s===n)?i:n; else f=(f===n)?i:n;
+  dsApply(vp, my, s, f);
+}
+/* «Стабилизирован»: кто-то помог (лечение словом, проверка Медицины) — спасброски сняты, ХП остаётся 0 */
+function dsStabilize(){
+  const vp=trkActiveForPlayer(); if(!vp) return;
+  const my=playerMyCard(vp); if(!my) return;
+  if((parseInt(my.hp,10)||0)>0) return;
+  if(my.ds && (my.ds.f||0)>=3){ toast('Персонаж мёртв — вернуть его может только Мастер'); return; }
+  delete my.ds; const st=TRK_SHARED[vp]; if(st) st.at=Date.now();
+  trkRedraw(true);
+  trkCloudCardPatch(vp, trkCardKey(my), {ds:null});
+  trkLog('heal',(my.name||'Персонаж')+' стабилизирован — 0 ХП, спасброски сняты');
+  toast('Стабилизирован: спасброски сняты');
 }
 function playerInitSet(val){
   const vp=trkActiveForPlayer(); if(!vp) return;
@@ -12656,15 +12776,12 @@ function rollDeathSave(){
   let s=ds.s||0, f=ds.f||0;
   if(roll===20) s+=2; else if(roll===1) f+=2; else if(roll>=10) s+=1; else f+=1;
   s=Math.min(3,s); f=Math.min(3,f);
-  const stabilized = f<3 && s>=3;
-  const patch = stabilized ? {hp:1, ds:null} : {ds:{s,f}};    // три успеха — 1 ХП, панель уходит; иначе — новые спасброски
-  if(stabilized){ my.hp=1; delete my.ds; } else { my.ds={s,f}; }
-  const st=TRK_SHARED[vp]; if(st) st.at=Date.now();
-  trkRedraw(true);
-  trkCloudCardPatch(vp, trkCardKey(my), patch);
-  const tag = f>=3 ? 'Смерть' : stabilized ? 'Стабилизация' : roll===20 ? 'крит' : roll===1 ? 'провал' : (roll>=10 ? 'успех' : 'провал');
+  const ok = roll>=10;
+  const tag = roll===20 ? 'крит. успех' : roll===1 ? 'крит. провал' : (ok ? 'успех' : 'провал');
+  dsShowRoll(roll, tag, ok);   // «14 — успех» остаётся в блоке; отрисует её trkRedraw внутри dsApply
   trkLog(f>=3?'death':'roll',(my.name||'Игрок')+' — спасбросок от смерти: d20='+roll+' ('+tag+')');
-  toast(roll + ' · ' + tag);
+  dsApply(vp, my, s, f);
+  toast(roll + ' — ' + tag);
 }
 function playerHpAdjust(mode){
   const vp=trkActiveForPlayer(); if(!vp) return;
@@ -14491,6 +14608,9 @@ function openInstallHelp(){
   #trkBox .tb-row .tb-mid{display:grid;
     grid-template-columns:minmax(172px,.9fr) minmax(210px,1.05fr) minmax(0,1.2fr);
     align-items:center;gap:18px}
+  /* строка умирающего игрока у ГМа: точки спасбросков стали кнопками и правая колонка шире —
+     имя и полоса ХП немного ужимаются, чтобы блок не наезжал (колонка ГМа узкая: справа карта и журнал) */
+  #trkBox .tb-row.gmds .tb-mid{grid-template-columns:minmax(140px,.85fr) minmax(178px,1fr) minmax(0,1fr);gap:14px}
   #trkBox .tb-row .tb-nm{margin:0}
   #trkBox .tb-row .tb-nm-t{font-size:1.02rem}
   #trkBox .tb-row .tb-hpwrap{margin:0}
