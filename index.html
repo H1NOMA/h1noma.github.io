@@ -1311,6 +1311,9 @@
   .tb-dsb{grid-column:1/-1;display:flex;gap:7px;justify-content:flex-end;margin-top:7px}
   .tb-dsb button{min-height:32px;border:var(--hair) solid var(--line2);background:var(--bg2);color:var(--dim);font-family:var(--f-mono);font-size:.58rem;letter-spacing:.04em;padding:6px 11px;border-radius:9px;cursor:pointer;white-space:nowrap}
   .tb-dsb button:active{transform:scale(.95)}
+  /* стабилизирован: отметок может не быть вовсе, поэтому состояние показываем рамкой и галочкой */
+  .tb-dsb button.on{color:#84c97a;border-color:rgba(132,201,122,.5);background:rgba(132,201,122,.08)}
+  .tb-ds.stab{outline:var(--hair) solid rgba(132,201,122,.45);outline-offset:3px;border-radius:7px}
   /* КАРТОЧКИ v2 (scoped .tb2) — изображение во всю карточку, низ плавно растворяется в фоне */
   .tb2 .trk-card{position:relative;aspect-ratio:auto;display:flex;flex-direction:column;background:#141a14;overflow:hidden;border-radius:10px}
   .tb2 .trk-card.on-turn{border-color:var(--red);box-shadow:0 0 0 2px var(--red),0 0 24px rgba(var(--accent-rgb),.4)}
@@ -4734,6 +4737,22 @@ async function sset(key,val, shared=SHARED, quiet){
     return cloudOk;
   }
   return ssetLocal(key,val,shared); // личные данные не уходят в облако
+}
+
+/* Запись ТОЛЬКО в облако, без локального зеркала. Нужна большим значениям, которые
+   локально никто не читает (картинка фона карты): зеркало в localStorage съедало бы
+   квоту вторым экземпляром, а при её исчерпании молча переставал бы сохраняться состав. */
+async function cloudSetOnly(key,val,quiet){
+  if(!supa) return false;
+  try{
+    const r = await withTimeout(cloudSet(key,val), CLOUD_TMO);
+    if(r===undefined){ SSET_LAST_ERR='timeout'; return false; }
+    SSET_LAST_ERR=''; return r!==false;
+  }catch(e){
+    SSET_LAST_ERR = cloudNoPerm(e) ? 'noperm' : 'net';
+    if(!quiet && SSET_LAST_ERR==='noperm' && Date.now()-SSET_NOPERM_AT>8000){ SSET_NOPERM_AT=Date.now(); toast('⚠ Нет прав на запись — в облако не сохранено'); }
+    return false;
+  }
 }
 
 async function sgetLocal(key, shared=SHARED){
@@ -11404,7 +11423,8 @@ function trkCardKey(x){ if(!x) return 'u:'; if(x.charId) return 'c:'+x.charId; i
 function trkAva(x, proj){
   if(!x) return '';
   if(x.ava) return x.ava;
-  if(x.charId){ const c=(CHARS_ALL[proj||CUR_PROJECT]||[]).find(k=>k && k.id===x.charId); if(c && c.ava) return c.ava; }
+  const cid=x.charId||x.avaId;   // avaId — копия NPC-листа: своего листа у неё нет, фото берём у источника
+  if(cid){ const c=(CHARS_ALL[proj||CUR_PROJECT]||[]).find(k=>k && k.id===cid); if(c && c.ava) return c.ava; }
   return beastImgByName(x.name);
 }
 function stripAva(x){ const o=Object.assign({}, x); delete o.ava; return o; }   // для отправки в облако
@@ -11455,7 +11475,7 @@ function trkBoardBuild(prev, opts){
     log:prev.log||[], mapPos:prev.mapPos||{}, mapBgRev:bgRev, mapCols:prev.mapCols||sn.mapCols||TRK_MAPCOLS};
 }
 /* снимок локального стола на момент действия: мутация выполнится позже (очередь, бэкофф), а ГМ мог уже сменить сеттинг */
-function trkSnap(){ return {list:(TRK.list||[]).map(x=>stripAva(x)), party:TRK.party||'', round:TRK.round||1, activeKey:TRK.activeKey||'', mapCols:TRK.mapCols||0, mapBgRev:TRK.mapBgRev||''}; }
+function trkSnap(){ return {list:(TRK.list||[]).map(x=>stripAva(x)), party:TRK.party||'', round:TRK.round||1, activeKey:TRK.activeKey||'', mapCols:TRK.mapCols||0, mapBgRev:trkBgRev(gmBoardKey())}; }
 /* пустой состав поверх живой доски = состав этого браузера ещё не сверен с облаком
    (другое устройство, чистка PWA): публиковать его нельзя — у игроков исчезнет бой */
 let TRK_RESTORED={}, TRK_EMPTY_WARNED=false;   // сверка сделана (по ключу доски) / предупреждали ли уже
@@ -11493,8 +11513,10 @@ function trkMigrateBoardKey(){
   const mine=s=>!!(s && typeof s==='object' && !Array.isArray(s) && s.active && Array.isArray(s.list) && s.list.length && normTag(s.owner||'')===currentTag());
   const busy=s=>!!(s && typeof s==='object' && !Array.isArray(s) && Array.isArray(s.list) && s.list.length);
   if(!mine(TRK_SHARED[old]) || busy(TRK_SHARED[bk])) return false;
+  // на прежнем ключе остаётся указатель, а не пустота: правка игрока, отправка которой ещё
+  // в очереди (сеть подвисла), догонит доску по нему — иначе мутация легла бы в никуда и урон пропал
   trkWrite(v=>{ if(!mine(v[old]) || busy(v[bk])) return;
-    v[bk]=Object.assign({}, v[old], {at:Date.now()}); delete v[old]; }, 'migrate:'+bk);
+    v[bk]=Object.assign({}, v[old], {at:Date.now()}); v[old]={movedTo:bk, at:Date.now()}; }, 'migrate:'+bk);
   return true;
 }
 /* (2) Состав ГМа живёт в localStorage одного браузера: на другом устройстве (или после чистки
@@ -11662,9 +11684,15 @@ function deepAssign(dst, patch){ for(const k in patch){ const v=patch[k];
    Ключ очереди включает набор полей: быстрые тапы по ХП схлопываются в последнее значение.
    when(t) — условие на свежей карточке (отмена урона: только если ХП никто не тронул) —
    проверяется и локально, и на значении из облака перед CAS-записью */
+/* доска могла переехать на ключ «сеттинг::тег», пока правка ждала в очереди — идём по указателю */
+function trkFollow(v, boardKey){
+  let s=v&&v[boardKey], hop=0;
+  while(s && typeof s==='object' && !Array.isArray(s) && s.movedTo && hop++<4) s=v[s.movedTo];
+  return s;
+}
 function trkCloudCardPatch(boardKey, cardKey, patch, when){
   const p=JSON.parse(JSON.stringify(patch||{}));
-  trkWrite(v=>{ const s=v[boardKey]; if(!s||!Array.isArray(s.list)) return;
+  trkWrite(v=>{ const s=trkFollow(v, boardKey); if(!s||!Array.isArray(s.list)) return;
     const t=s.list.find(r=>r && trkCardKey(r)===cardKey); if(!t) return;
     if(when && !when(t)) return;
     deepAssign(t,p); s.at=Date.now(); }, 'card:'+boardKey+':'+cardKey+':'+Object.keys(p).sort().join(','));
@@ -11672,7 +11700,8 @@ function trkCloudCardPatch(boardKey, cardKey, patch, when){
 /* глубокое слияние полей одной доски (позиция фишки, размер сетки, фон, журнал) */
 function trkCloudBoardMerge(boardKey, fields, key){
   const f=JSON.parse(JSON.stringify(fields||{}));
-  trkWrite(v=>{ let s=v[boardKey]; if(!s||typeof s!=='object'||Array.isArray(s)) s=v[boardKey]={};
+  trkWrite(v=>{ let s=trkFollow(v, boardKey);
+    if(!s||typeof s!=='object'||Array.isArray(s)) s=v[boardKey]={};
     deepAssign(s, f); s.at=Date.now(); }, key||null);
 }
 /* ── Журнал действий (только у ГМа): привязан к доске выбранной игры ──
@@ -11905,6 +11934,12 @@ function trkStep(d){
     if(next>=order.length){ next=0; TRK.round++; }
     else if(next<0){ next=order.length-1; TRK.round=Math.max(1,TRK.round-1); }
   } while(skip && trkOutOfFight(order[next]) && --guard>0);
+  // круг пройден, а живых нет: возвращаем раунд (полный круг «перевернул» его впустую)
+  // и просто встаём на соседнюю карточку — иначе «Ход ▸» стоял бы на месте, накручивая раунды
+  if(skip && guard<=0 && trkOutOfFight(order[next])){
+    TRK.round=prevRound;
+    next=((idx+d)%order.length+order.length)%order.length;
+  }
   TRK.activeKey=trkCardKey(order[next]);
   if(TRK.round!==prevRound) trkLog('round','Раунд '+TRK.round);
   const who=order[next]; if(who) trkLog('turn','Ход: '+(who.name||''));
@@ -12043,9 +12078,10 @@ function trkRowHtml(x,o){
     const pips=(cls,n)=>[0,1,2].map(k=>o.edit
       ? `<button class="p${n>k?' '+cls:''}" data-k="${k}" onclick="trkGmDsTap(${o.idx},'${cls}',${k})" aria-label="${cls==='s'?'Успех':'Провал'} ${k+1}"></button>`
       : `<span class="p${n>k?' '+cls:''}"></span>`).join('');
-    right=`<div class="tb-ds${o.edit?' gm':''}"><div class="ds-s">${pips('s',ds.s||0)}</div><div class="ds-f">${pips('f',ds.f||0)}</div></div>`;
+    const stab=!!(ds.st || (ds.s||0)>=3);
+    right=`<div class="tb-ds${o.edit?' gm':''}${stab?' stab':''}"${stab?' title="Стабилизирован"':''}><div class="ds-s">${pips('s',ds.s||0)}</div><div class="ds-f">${pips('f',ds.f||0)}</div></div>`;
     // команды — отдельной полосой во всю ширину строки: в правой колонке они ужимали имя и полосу ХП до нечитаемого
-    if(o.edit) dsCmd=`<div class="tb-dsb"><button onclick="trkGmDsHeal(${o.idx})" title="Поднять с 1 ХП">✚1 ХП</button><button onclick="trkGmDsStab(${o.idx})" title="Снять спасброски, оставить 0 ХП">Стабилизирован</button></div>`;
+    if(o.edit) dsCmd=`<div class="tb-dsb"><button onclick="trkGmDsHeal(${o.idx})" title="Поднять с 1 ХП">✚1 ХП</button><button class="${stab?'on':''}" onclick="trkGmDsStab(${o.idx})" title="Снять спасброски, оставить 0 ХП">${stab?'Стабилизирован ✓':'Стабилизирован'}</button></div>`;
   } else if(foe && o.playerView){ right=`<div class="tb-ac hid">КД —</div>`;
   } else if(o.edit){ right=`<div class="tb-ac"><input class="tb-ac-in" value="${esc(String(x.ac||''))}" placeholder="КД" onchange="trkSet(${o.idx},'ac',this.value)"></div>`;
   } else { right=`<div class="tb-ac"><b>${x.ac?esc(String(x.ac)):'—'}</b><span>КД</span></div>`; }
@@ -12125,6 +12161,11 @@ function trkMapColsOf(src){ const s=trkMapBoard(src); return (s&&parseInt(s.mapC
 const TRK_BG_MAX=700000;                        // длиннее этого data-URL в облако не отдаём — пережимаем мельче
 function trkBgKey(bk){ return 'comik:trk:bg:'+bk; }
 let TRK_BG={}, TRK_BG_BUSY={}, TRK_BG_WAIT={};  // {доска:{rev,src}} в памяти; по одному чтению на доску; пауза после неудачи
+/* Пока строка с картинкой ЛЕТИТ в облако, доска обязана нести ПРЕЖНЮЮ метку: иначе публикация,
+   случившаяся в эти секунды, увековечит ссылку на строку, которая может и не лечь (офлайн, права),
+   и фон пропадёт у всех разом. Здесь лежит последняя подтверждённая метка на время записи. */
+let TRK_BG_SENT={};
+function trkBgRev(bk){ const v=TRK_BG_SENT[bk]; return (v!=null)?String(v):String(TRK.mapBgRev||''); }
 /* дочитать картинку доски: одно чтение на доску за раз и пауза после неудачи —
    иначе опрос раз в 2.5 с превратил бы недоступную строку в шторм запросов */
 async function trkBgFetch(bk, rev){
@@ -12150,13 +12191,15 @@ async function trkBgPublish(bk, src){
   TRK.mapBgRev=rev;                               // снимок стола (trkSnap) должен увидеть метку СРАЗУ, не дожидаясь облака
   if(src) TRK_BG[bk]={rev, src}; else delete TRK_BG[bk];
   TRK_BG_WAIT[bk]=0; delete TRK_BG_MIG[bk];
+  TRK_BG_SENT[bk]=was;                            // в облако до ответа уходит прежняя метка, на экране — уже новая
   // метку в своей доске ставим тоже сразу: иначе, пока запись летит, карта ГМа видит «в доске прошлая
   // метка, а в памяти новая» и уходит перечитывать из облака свою же, ещё не отправленную картинку
   if(live){ s.mapBgRev=rev; delete s.mapBg; s.at=Date.now(); }
   try{ localStorage.setItem('comik:tracker:v2', JSON.stringify(TRK_ALL)); }catch(e){}
-  let ok=false; try{ ok=!!(await sset(trkBgKey(bk), src?{rev, src}:null, true)); }catch(e){}
+  let ok=false; try{ ok=!!(await cloudSetOnly(trkBgKey(bk), src?{rev, src}:null)); }catch(e){}
   // строка не легла (сеть/права) — возвращаем всё как было, в том числе старую копию внутри доски:
   // иначе доска сослалась бы на несуществующую строку, а картинка пропала бы у всех разом
+  delete TRK_BG_SENT[bk];
   if(!ok && supa){
     TRK.mapBgRev=was; if(src) delete TRK_BG[bk];
     const s2=TRK_SHARED[bk];
@@ -12172,9 +12215,21 @@ async function trkBgPublish(bk, src){
 let TRK_BG_MIG={};
 function trkBgMigrate(bk){
   if(!ADMIN || !bk || TRK_BG_MIG[bk]) return;
-  const s=TRK_SHARED[bk], old=s&&s.mapBg; if(!old) return;
+  const s=TRK_SHARED[bk];
+  // источников три, и все три встречаются при обновлении между сессиями:
+  //  1) картинка внутри строки НОВОГО ключа (доску уже перевезли, картинку — нет);
+  //  2) строка ПРЕЖНЕГО ключа (одна доска на сеттинг) — берём только свою: у чужой её перенесёт её Мастер;
+  //  3) локальная копия ГМа, когда метки нет нигде: прошлая версия держала картинку и в браузере.
+  const lk=gmLegacyBoardKey(), lg=(lk!==bk)?TRK_SHARED[lk]:null;
+  const legacyMine=!!(lg && typeof lg==='object' && !Array.isArray(lg) && lg.mapBg && normTag(lg.owner||'')===currentTag());
+  const noStamp=!(TRK.mapBgRev||'') && !(s && s.mapBgRev);
+  const old=(s&&s.mapBg) || (legacyMine?lg.mapBg:'') || (noStamp?(TRK.mapBg||''):'');
+  if(!old) return;
   TRK_BG_MIG[bk]=1;
   if(!TRK.mapBg) TRK.mapBg=old;                   // ГМ мог сесть за другое устройство: локальной копии там нет
+  // прежняя строка больше картинку не держит: иначе общий стол так и остался бы на мегабайт,
+  // а его перечитывает и переписывает целиком каждый тап по ХП в любом сеттинге
+  if(legacyMine) trkWrite(v=>{ const o=v[lk]; if(o && typeof o==='object' && !Array.isArray(o) && o.mapBg!=null){ delete o.mapBg; o.at=Date.now(); } }, 'bgold:'+lk);
   trkBgPublish(bk, old);
 }
 /* фон снят вместе с доской (бой завершён, игра сыграна) — убираем и строку с картинкой */
@@ -12183,7 +12238,7 @@ function trkBgDrop(bk){
   delete TRK_BG[bk]; delete TRK_BG_MIG[bk]; TRK_BG_WAIT[bk]=0;
   if(!ADMIN) return;
   if(bk===gmBoardKey()){ TRK.mapBg=''; TRK.mapBgRev=''; try{ localStorage.setItem('comik:tracker:v2', JSON.stringify(TRK_ALL)); }catch(e){} }
-  Promise.resolve(sset(trkBgKey(bk), null, true, true)).catch(()=>{});   // тихо: гасим сразу несколько досок, тост на каждую ни к чему
+  Promise.resolve(cloudSetOnly(trkBgKey(bk), null, true)).catch(()=>{});   // тихо: гасим сразу несколько досок, тост на каждую ни к чему
 }
 function trkMapBgRevOf(src){ const s=trkMapBoard(src); return (s&&s.mapBgRev!=null)?String(s.mapBgRev):''; }
 function trkMapBgOf(src){
@@ -12318,13 +12373,39 @@ function trkComboSig(src, view){
     const dead=foe?(hp<=0):(x.ds&&(x.ds.f||0)>=3);
     // панель спасбросков и её ИТОГ (смерть/стабилизация меняют разметку); сами точки в подпись не входят —
     // их патчит на месте trkRefresh, иначе отметка со стороны ГМа пересобирала бы блок под пальцем игрока
-    const dying=(!foe && hp<=0)?1:0, stab=(!foe && x.ds && (x.ds.s||0)>=3)?1:0;
+    const dying=(!foe && hp<=0)?1:0, stab=(!foe && x.ds && ((x.ds.s||0)>=3 || x.ds.st))?1:0;
     return [trkCardKey(x), x.name||'', x.ava||beastImgByName(x.name)||'', (x.conds||[]).map(c=>c.t+(c.b?'+':'')).join(','), x.conc?1:0, dead?1:0, foeHidden?1:0, dying, stab,
             parseInt(x.max,10)||0, trkThp(x)?1:0].join('~');   // максимум и появление/снятие щита меняют разметку строки
   }).join('||')+extra;
 }
 function trkSetSig(){ const box=document.getElementById('trkBox'); if(box){ try{ box.dataset.trkSig=trkComboSig(trkSource(), trkViewMode()); }catch(e){} } }
 /* живое обновление БЕЗ мелькания: если состав/аватары те же — патчим только ХП/иниц/ход/раунд */
+/* ── Отметки спасбросков патчим ОТДЕЛЬНО от остального ─────────────────────────────
+   Точки не входят в подпись trkComboSig (иначе отметка со стороны ГМа пересобирала бы
+   блок под пальцем игрока), поэтому полная отрисовка их не догонит: единственный, кто их
+   доводит до экрана — этот патч. Он обязан работать и в виде «Карта»: у ГМа на десктопе
+   список остаётся рядом с картой, а у игрока панель спасбросков висит в колонке/пульте. */
+function trkDsPatch(src, box){
+  if(!src || !box) return;
+  const esc2=k=>(window.CSS&&CSS.escape)?CSS.escape(k):k;
+  src.order.forEach(x=>{
+    if(isFoeCard(x)) return;
+    const node=box.querySelector('[data-key="'+esc2(trkCardKey(x))+'"]'); if(!node) return;
+    const dsw=node.querySelector('.tb-ds'); if(!dsw) return;
+    const d=x.ds||{};
+    dsw.querySelectorAll('.ds-s .p').forEach((p,k)=>p.classList.toggle('s',(d.s||0)>k));
+    dsw.querySelectorAll('.ds-f .p').forEach((p,k)=>p.classList.toggle('f',(d.f||0)>k));
+  });
+  if(!src.playerView) return;
+  const my=src.order.find(x=>x.charId && (CHARS_ALL[src.proj]||[]).some(c=>c&&c.id===x.charId&&!c.deleted&&SESSION&&normTag(c.owner||'')===currentTag()));
+  if(!my) return;
+  // блок живёт либо в доске, либо в пульте
+  const dsb=document.querySelector('#trkBox .death-saves, #pdock .death-saves');
+  if(!dsb) return;
+  const d=my.ds||{};
+  dsb.querySelectorAll('.dscell').forEach(c=>{ const kind=c.classList.contains('s')?'s':'f';
+    c.classList.toggle('on', (d[kind]||0) > (parseInt(c.dataset.k,10)||0)); });
+}
 function trkRefresh(){
   const box=document.getElementById('trkBox'); if(!box) return;
   if(TRK_DRAGGING) return;                                         // не мешаем перетаскиванию фишки
@@ -12343,6 +12424,7 @@ function trkRefresh(){
     const rn=box.querySelector('.tb-round .n'); if(rn) rn.textContent=src.round;
     const act=src.order.find(x=>trkCardKey(x)===src.activeKey)||src.order[0];
     const who=box.querySelector('.tb-now .who'); if(who) who.textContent=(act&&act.name)||'—';
+    trkDsPatch(src, box);   // список ГМа и панель игрока видны и при карте — точки не должны застывать
     return;
   }
   const rn=box.querySelector('.tb-round .n'); if(rn) rn.textContent=src.round;
@@ -12372,13 +12454,10 @@ function trkRefresh(){
     const iniIn=node.querySelector('.tb-ini-in');   // инициатива правится только в списке (на карточках её нет)
     if(iniIn){ if(document.activeElement!==iniIn) iniIn.value=x.init??0; }
     else { const t1=node.querySelector('.tb-ini .v'); if(t1) t1.textContent=x.init??0; }
-    // спасброски: точки заливаем на месте — отметка игрока доходит до ГМа (и обратно) за один опрос,
-    // не дожидаясь полной отрисовки, которая отложена, пока кто-то печатает или держит палец
-    if(!foe){ const dsw=node.querySelector('.tb-ds');
-      if(dsw){ const d=x.ds||{};
-        dsw.querySelectorAll('.ds-s .p').forEach((p,k)=>p.classList.toggle('s',(d.s||0)>k));
-        dsw.querySelectorAll('.ds-f .p').forEach((p,k)=>p.classList.toggle('f',(d.f||0)>k)); } }
   });
+  // спасброски: точки заливаем на месте — отметка игрока доходит до ГМа (и обратно) за один опрос,
+  // не дожидаясь полной отрисовки, которая отложена, пока кто-то печатает или держит палец
+  trkDsPatch(src, box);
   if(src.playerView){
     const my=src.order.find(x=>x.charId && (CHARS_ALL[src.proj]||[]).some(c=>c&&c.id===x.charId&&!c.deleted&&SESSION&&normTag(c.owner||'')===currentTag()));
     if(my){
@@ -12388,11 +12467,6 @@ function trkRefresh(){
       const mh=mp&&mp.querySelector('.tm-st b.hp'); if(mh){ const mx=trkMaxHp(my,src.proj), mt=trkThp(my);
         mh.innerHTML=(parseInt(my.hp,10)||0)+(mx?'<i>/'+mx+'</i>':'')+(mt?'<em class="thp">+'+mt+'</em>':''); }
       try{ if(window.pdPatch) pdPatch(my); }catch(e){}   // полоса пульта: ХП и иниц
-      // отметки спасбросков: блок живёт либо в доске, либо в пульте
-      const dsb=document.querySelector('#trkBox .death-saves, #pdock .death-saves');
-      if(dsb){ const d=my.ds||{};
-        dsb.querySelectorAll('.dscell').forEach(c=>{ const kind=c.classList.contains('s')?'s':'f';
-          c.classList.toggle('on', (d[kind]||0) > (parseInt(c.dataset.k,10)||0)); }); }
     }
   }
 }
@@ -12620,7 +12694,7 @@ function trkGmDsTap(i, kind, k){
   const cur=trkLiveDs(x); let s=cur.s, f=cur.f, n=k+1;
   if(kind==='s') s=(s===n)?k:n; else f=(f===n)?k:n;
   x.ds={s,f};
-  trkSharedCardPatch(x, {ds:{s,f}});
+  trkSharedCardPatch(x, {ds:{s,f,st:null}});
   trkLog(f>=3?'death':'roll','ГМ: спасброски '+(x.name||'')+' — '+s+' усп. / '+f+' пров.'+(f>=3?' (смерть)':''));
   trkRedraw(true);
 }
@@ -12633,8 +12707,8 @@ function trkGmDsHeal(i){   // поднять с 1 ХП: панель спасб�
 }
 function trkGmDsStab(i){   // стабилизирован: спасброски сняты, ХП остаётся 0
   if(!ADMIN) return; const x=TRK.list[i]; if(!x || !x.charId) return;
-  delete x.ds;
-  trkSharedCardPatch(x, {ds:null});
+  x.ds={s:0,f:0,st:1};
+  trkSharedCardPatch(x, {ds:{s:0,f:0,st:1}});
   trkLog('heal','ГМ: '+(x.name||'персонаж')+' стабилизировался (0 ХП, спасброски сняты)');
   trkRedraw(true);
 }
@@ -12800,7 +12874,9 @@ function dsShowRoll(roll, tag, ok){
 }
 function deathSavesHtml(my){
   const ds=my.ds||{s:0,f:0}; const s=Math.min(3,ds.s||0), f=Math.min(3,ds.f||0);
-  const dead=f>=3, stable=s>=3;
+  // стабилизация — ОТДЕЛЬНЫЙ признак ds.st, а не «отметок нет»: помощь приходит чаще всего
+  // в тот же круг, когда их ещё ноль, и «снять отметки» было бы записью, не меняющей ничего
+  const dead=f>=3, stable=(s>=3 || !!ds.st);
   // кружки — кнопки: настоящий кубик бросают за столом, а в приложение отметку ставит палец.
   // k-й кружок ставит ровно k+1 отметку, повторный тап по последней её снимает (промахнулся — исправил)
   const cells=(n,cls)=>[0,1,2].map(i=>`<button class="dscell ${cls}${i<n?' on':''}" data-k="${i}" onclick="dsTap('${cls}',${i})" aria-label="${cls==='s'?'Успех':'Провал'} ${i+1}"></button>`).join('');
@@ -12821,7 +12897,7 @@ function deathSavesHtml(my){
 function dsApply(vp, my, s, f){
   s=Math.max(0,Math.min(3,s|0)); f=Math.max(0,Math.min(3,f|0));
   const stabilized = f<3 && s>=3;
-  const patch = stabilized ? {hp:1, ds:null} : {ds:{s,f}};
+  const patch = stabilized ? {hp:1, ds:null} : {ds:{s,f,st:null}};   // st:null — снова бросают, признак стабилизации снят
   if(stabilized){ my.hp=1; delete my.ds; } else { my.ds={s,f}; }
   const st=TRK_SHARED[vp]; if(st) st.at=Date.now();
   trkRedraw(true);
@@ -12846,9 +12922,9 @@ function dsStabilize(){
   const my=playerMyCard(vp); if(!my) return;
   if((parseInt(my.hp,10)||0)>0) return;
   if(my.ds && (my.ds.f||0)>=3){ toast('Персонаж мёртв — вернуть его может только Мастер'); return; }
-  delete my.ds; const st=TRK_SHARED[vp]; if(st) st.at=Date.now();
+  my.ds={s:0,f:0,st:1}; const st=TRK_SHARED[vp]; if(st) st.at=Date.now();
   trkRedraw(true);
-  trkCloudCardPatch(vp, trkCardKey(my), {ds:null});
+  trkCloudCardPatch(vp, trkCardKey(my), {ds:{s:0,f:0,st:1}});
   trkLog('heal',(my.name||'Персонаж')+' стабилизирован — 0 ХП, спасброски сняты');
   toast('Стабилизирован: спасброски сняты');
 }
@@ -12865,7 +12941,7 @@ function rollDeathSave(){
   const my=playerMyCard(vp); if(!my) return;
   if((parseInt(my.hp,10)||0)>0) return;
   const ds=my.ds||{s:0,f:0};
-  if((ds.s||0)>=3 || (ds.f||0)>=3) return;
+  if((ds.s||0)>=3 || (ds.f||0)>=3 || ds.st) return;
   const roll=1+Math.floor(Math.random()*20);
   // новое состояние спасбросков вычисляем заранее (один бросок), затем идемпотентно применяем
   let s=ds.s||0, f=ds.f||0;
@@ -13233,12 +13309,26 @@ function beastActions(e){
     if(!txt) return;
     const t=String(txt);
     const a=t.match(/([+−–-]\s*\d+)\s*к\s*попаданию/i);
-    const d=t.match(BEAST_DICE_RE);
+    // кубов урона в строке бывает два: «17 (2к10+6) колющего урона ПЛЮС 3 (1к6) урона огнём».
+    // Второй берём только после «плюс»/«и ещё» — «или» (двуручным/метательным) означает выбор, а не добавку
+    const all=[...t.matchAll(new RegExp(BEAST_DICE_RE.source,'ig'))];
+    const d=all[0]||null;
+    let d2=null, d2t='';
+    for(let k=1;k<all.length;k++){
+      const gap=t.slice(all[k-1].index+all[k-1][0].length, all[k].index);
+      if(/\bили\b/i.test(gap)) break;
+      if(!/плюс|и ещё|и еще/i.test(gap)) continue;
+      d2=all[k];
+      const tail=t.slice(all[k].index+all[k][0].length, all[k].index+all[k][0].length+40);
+      const ty=tail.match(/\s*(?:урона\s+)?([А-Яа-яЁё]+(?:\s+энергией)?)/);   // «огнём», «кислотой», «некротической энергией»
+      d2t=ty?ty[1].replace(/^урон[аы]?$/i,''):'';
+      break;
+    }
     if(!a && !d) return;
-    const key=(name||'')+'|'+(a?a[1]:'')+'|'+(d?d[1]:''); if(seen.has(key)) return; seen.add(key);
+    const key=(name||'')+'|'+(a?a[1]:'')+'|'+(d?d[1]:'')+'|'+(d2?d2[1]:''); if(seen.has(key)) return; seen.add(key);
     out.push({ name:(String(name||'Атака').trim()||'Атака'), pri:pri||0,
       atk:a?parseInt(a[1].replace(/[−–]/g,'-').replace(/\s+/g,''),10):null,
-      dmg:d?diceNorm(d[1]):'' });
+      dmg:d?diceNorm(d[1]):'', dmg2:d2?diceNorm(d2[1]):'', dmg2t:d2t||'' });
   };
   (e.sections||[]).forEach(s=>{ if(!s) return; const h=String(s.h||'');
     add(h.includes('·')?h.split('·').pop():h, s.t, /действие|реакци|атак/i.test(h)?0:1); });
@@ -13266,7 +13356,7 @@ function gmActionsHtml(i, acts){
   if(!acts.length) return '';
   return `<div class="gm-sb"><div class="dstat-head">Действия</div><div class="gm-act">${acts.map((a,ai)=>`<div class="gm-act-r">
       <div class="gm-act-n">${esc(a.name)}</div>
-      <div class="gm-act-b">${a.atk!=null?`<button class="gm-rb hit" onclick="gmCreRoll(${i},${ai},'hit')">🎲 попадание <b>${fmtBonus(a.atk)}</b></button>`:''}${a.dmg?`<button class="gm-rb dmg" onclick="gmCreRoll(${i},${ai},'dmg')">🎲 урон <b>${esc(a.dmg)}</b></button>`:''}</div>
+      <div class="gm-act-b">${a.atk!=null?`<button class="gm-rb hit" onclick="gmCreRoll(${i},${ai},'hit')">🎲 попадание <b>${fmtBonus(a.atk)}</b></button>`:''}${a.dmg?`<button class="gm-rb dmg" onclick="gmCreRoll(${i},${ai},'dmg')">🎲 урон <b>${esc(a.dmg)}${a.dmg2?(' + '+a.dmg2):''}</b></button>`:''}</div>
     </div>`).join('')}</div></div>`;
 }
 /* бросок прямо с доски: результат в тост (ГМ смотрит на пульт) и в журнал (видно, что было в бою) */
@@ -13277,6 +13367,11 @@ function gmCreRoll(i, ai, kind){
   const expr=(kind==='hit') ? ('d20'+fmtBonus(a.atk||0)) : a.dmg;
   const r=rollDice(expr); if(!r){ toast('Не разобрал кубы'); return; }
   let s=(x.name||e.title||'Существо')+' · '+a.name+': '+(kind==='hit'?'попадание ':'урон ')+r.txt;
+  // добавочный урон статблока бросаем той же кнопкой: отдельной её никто бы не нажал, а в бою он есть всегда
+  if(kind==='dmg' && a.dmg2){
+    const r2=rollDice(a.dmg2);
+    if(r2) s+=' плюс '+r2.txt+(a.dmg2t?(' '+a.dmg2t):'')+' · всего '+((r.total||0)+(r2.total||0));
+  }
   if(kind==='hit' && r.rolls[0]===20) s+=' — крит!';
   else if(kind==='hit' && r.rolls[0]===1) s+=' — провал';
   trkLog('roll', s);
@@ -13286,14 +13381,17 @@ function gmCreRoll(i, ai, kind){
    Хиты бросаем по кубам из бестиария («7 (2к6)»), иначе вся стая будет с одинаковым ХП. */
 function gmCreDup(i){
   if(!ADMIN) return;
-  const x=TRK.list[i]; if(!x || x.charId) return;
+  const x=TRK.list[i]; if(!x) return;
   const base=gmBaseName(x.name)||'Существо';
   let n=1;
-  TRK.list.forEach(r=>{ if(!r || r.charId || gmBaseName(r.name)!==base) return;
+  TRK.list.forEach(r=>{ if(!r || gmBaseName(r.name)!==base) return;
     const m=String(r.name||'').match(/\s+(\d+)$/); n=Math.max(n, m?(parseInt(m[1],10)||1):1); });
   const max=parseInt(x.max,10)||0;
+  // у копии НЕТ charId: ключ карточки из него и состоит, два «c:<id>» на доске слились бы в один.
+  // Фото листа остаётся через avaId — его игроки достанут из того же листа, что и оригинал
   const c={name:base+' '+(n+1), init:parseInt(x.init,10)||0, hp:max||(parseInt(x.hp,10)||0), max,
     ac:x.ac||'', ava:x.ava||'', foe:true, uid:uid()};
+  const aid=x.charId||x.avaId; if(aid) c.avaId=aid;
   if(x.srcId) c.srcId=x.srcId;
   if(x.dexMod!=null) c.dexMod=x.dexMod;
   const e=gmBeastOf(x);
