@@ -11484,6 +11484,7 @@ function trkPublish(){
   if(!ADMIN) return;
   const bk=gmBoardKey();
   trkBgMigrate(bk);              // доска прошлой версии: картинка уезжает в свою строку ДО снимка — метка попадёт в публикацию
+  trkBgRetry(bk);                // а если прошлая закачка фона не легла — пробуем ещё раз: связь могла вернуться молча
   const snap=trkSnap();
   if(!snap.list.length && trkEmptyOver(TRK_SHARED[bk], bk)){
     if(!TRK_EMPTY_WARNED){ TRK_EMPTY_WARNED=true; toast('⚠ Состав доски ещё не подтянут из облака — пустая доска не опубликована'); }
@@ -11977,8 +11978,14 @@ function trkHpQuick(i,mode){
    extra — доп. поля карточки (например ds:null, когда боец поднялся с нуля). */
 function trkApplyHp(i, hp, thp, extra){
   const x=TRK.list[i]; if(!x) return;
-  hp=Math.max(0,parseInt(hp,10)||0); thp=Math.max(0,parseInt(thp,10)||0);
-  const patch=Object.assign({hp:hp, thp:thp||null}, extra||{});   // thp:null — deepAssign снимает поле совсем
+  thp=Math.max(0,parseInt(thp,10)||0);
+  // hp===null — поле ХП не трогаем совсем: «＋ВХ» спрашивает только щит, а класть туда СВОЮ копию
+  // хитов нельзя — она отстаёт на круг синхронизации и затирала бы урон, который игрок только что взял
+  const hpNum = (hp==null) ? null : Math.max(0,parseInt(hp,10)||0);
+  const patch=Object.assign({}, hpNum==null?null:{hp:hpNum}, {thp:thp||null},
+    // боец поднялся с нуля — спасброски снимаются вместе с хитами, включая признак «стабилизирован»
+    (hpNum!=null && hpNum>=1 && !isFoeCard(x)) ? {ds:null} : null,
+    extra||{});   // thp:null — deepAssign снимает поле совсем
   deepAssign(x, patch);
   if(x.charId){ trkSharedCardPatch(x, patch); trkRedraw(true); return; }
   const s=TRK_SHARED[gmBoardKey()];
@@ -11989,9 +11996,9 @@ function trkApplyHp(i, hp, thp, extra){
 function trkThpPrompt(i){
   if(!ADMIN) return; const x=TRK.list[i]; if(!x) return;
   hpAmountPrompt('Временные ХП · '+(x.name||''), '#6aa9ff', v=>{
-    const nv=Math.max(0,parseInt(v,10)||0), cur=trkLiveHp(x);
+    const nv=Math.max(0,parseInt(v,10)||0);
     trkLog('heal','ГМ: '+(x.name||'')+(nv?(' +'+nv+' временных ХП'):' — временные ХП сняты'));
-    trkApplyHp(i, cur, nv);
+    trkApplyHp(i, null, nv);   // только щит: ХП ведёт игрок, наша копия отстаёт
   }, {presets:[1,2,3,5,10]});
 }
 /* живое ХП карточки ГМа: игроки/NPC ведут ХП в общем столе — читаем оттуда (и подтягиваем в локальную карточку) */
@@ -12169,6 +12176,18 @@ let TRK_BG={}, TRK_BG_BUSY={}, TRK_BG_WAIT={};  // {доска:{rev,src}} в п�
    случившаяся в эти секунды, увековечит ссылку на строку, которая может и не лечь (офлайн, права),
    и фон пропадёт у всех разом. Здесь лежит последняя подтверждённая метка на время записи. */
 let TRK_BG_SENT={};
+let TRK_BG_RETRY={}, TRK_BG_RETRY_AT=0;              // {доска:картинка} — не легло в облако, дошлём при связи
+/* Досылка фона, который не лёг. Связь часто возвращается без события online (мобильный канал
+   «был, но не работал»), поэтому пробуем ещё и на любой записи ГМа в доску — но не чаще чем раз
+   в 10 с, чтобы серия тапов по ХП не превратилась в серию закачек картинки. */
+function trkBgRetry(bk){
+  if(!ADMIN || !supa) return;
+  const keys=bk?[bk]:Object.keys(TRK_BG_RETRY);
+  if(!keys.length || Date.now()-TRK_BG_RETRY_AT < 10000) return;
+  TRK_BG_RETRY_AT=Date.now();
+  keys.forEach(k=>{ if(!(k in TRK_BG_RETRY) || TRK_BG_BUSY[k]) return;
+    const src=TRK_BG_RETRY[k]; delete TRK_BG_RETRY[k]; trkBgPublish(k, src); });
+}
 function trkBgRev(bk){ const v=TRK_BG_SENT[bk]; return (v!=null)?String(v):String(TRK.mapBgRev||''); }
 /* дочитать картинку доски: одно чтение на доску за раз и пауза после неудачи —
    иначе опрос раз в 2.5 с превратил бы недоступную строку в шторм запросов */
@@ -12210,8 +12229,15 @@ async function trkBgPublish(bk, src){
     if(s2 && Array.isArray(s2.list)){ s2.mapBgRev=wasRev; if(wasInline!=null) s2.mapBg=wasInline; }
     try{ localStorage.setItem('comik:tracker:v2', JSON.stringify(TRK_ALL)); }catch(e){}
     if(document.getElementById('trkBox')) trkRedraw(true);
+    // ГМ видит фон у себя (локальная копия), а у игроков его нет — молчать тут нельзя.
+    // Картинку запоминаем и повторяем сами, когда связь вернётся
+    TRK_BG_RETRY[bk]=src||'';
+    toast(SSET_LAST_ERR==='noperm'
+      ? '⚠ Фон карты не сохранён: нет прав на запись'
+      : '⚠ Фон карты не ушёл в облако — у игроков его пока нет, дошлём при связи');
     return;
   }
+  delete TRK_BG_RETRY[bk];
   if(TRK_SHARED[bk] && Array.isArray(TRK_SHARED[bk].list)) trkCloudBoardMerge(bk, {mapBgRev:rev, mapBg:null}, 'bg:'+bk);   // mapBg:null — стираем старую копию в доске
 }
 /* Тихий перенос: доска ещё несёт картинку внутри себя (её поставил клиент прошлой версии) —
@@ -12235,8 +12261,11 @@ function trkBgMigrate(bk){
   if(!TRK.mapBg) TRK.mapBg=old;                   // ГМ мог сесть за другое устройство: локальной копии там нет
   // прежняя строка больше картинку не держит: иначе общий стол так и остался бы на мегабайт,
   // а его перечитывает и переписывает целиком каждый тап по ХП в любом сеттинге
-  if(legacyMine) trkWrite(v=>{ const o=v[lk]; if(o && typeof o==='object' && !Array.isArray(o) && o.mapBg!=null){ delete o.mapBg; o.at=Date.now(); } }, 'bgold:'+lk);
-  trkBgPublish(bk, old);
+  // ...но стираем её ТОЛЬКО после удачной публикации: при отказе сети/прав trkBgPublish откатывает
+  // метку, и убранная заранее копия была бы единственной пропавшей — картинки не осталось бы нигде
+  const drop=()=>{ if(!legacyMine || !TRK.mapBgRev) return;
+    trkWrite(v=>{ const o=v[lk]; if(o && typeof o==='object' && !Array.isArray(o) && o.mapBg!=null){ delete o.mapBg; o.at=Date.now(); } }, 'bgold:'+lk); };
+  Promise.resolve(trkBgPublish(bk, old)).then(drop, ()=>{});
 }
 /* фон снят вместе с доской (бой завершён, игра сыграна) — убираем и строку с картинкой */
 function trkBgDrop(bk){
@@ -12725,7 +12754,12 @@ function trkSet(i,field,val){
   else x[field]=parseInt(val,10)||0;
   // карточка игрока: ХП/инициатива авторитетны в столе — пишем туда напрямую, без републикации,
   // иначе публикация возьмёт прежнее облачное значение и правка ГМа откатится
-  if((field==='hp'||field==='init'||field==='thp') && x.charId){ trkSharedCardSet(x, field, x[field]); trkRedraw(true); return; }
+  if((field==='hp'||field==='init'||field==='thp') && x.charId){
+    // подняли выше нуля — спасброски снимаются тем же патчем: иначе признак «стабилизирован»
+    // пережил бы лечение и в следующий раз молча запретил бы игроку бросать кубик
+    if(field==='hp' && !isFoeCard(x) && (parseInt(x.hp,10)||0)>=1){ delete x.ds; trkSharedCardPatch(x, {hp:x.hp, ds:null}); }
+    else trkSharedCardSet(x, field, x[field]);
+    trkRedraw(true); return; }
   // враг: мгновенно зеркалим в память, публикация возьмёт значение из локального списка
   if(field==='hp' || field==='init' || field==='max' || field==='thp'){
     const s=TRK_SHARED[gmBoardKey()];
@@ -13183,7 +13217,10 @@ function trkLiveStart(){
     trkLiveBound=true;
     // вернулись на вкладку / сеть восстановилась — чиним канал и сразу догоняем состояние
     document.addEventListener('visibilitychange', ()=>{ if(!document.hidden){ if(!trkRTok) trkRTSubscribe(); trkLiveCatchup(); } });
-    window.addEventListener('online', ()=>{ if(!trkRTok) trkRTSubscribe(); TRK_FLUSH_FAIL=0; if(TRK_PENDING.length) trkFlushSoon(0); trkSyncBadge(); trkLiveCatchup(); });   // связь вернулась — очередь правок уходит сразу
+    window.addEventListener('online', ()=>{ if(!trkRTok) trkRTSubscribe(); TRK_FLUSH_FAIL=0; if(TRK_PENDING.length) trkFlushSoon(0); trkSyncBadge(); trkLiveCatchup();
+      // фон карты не лежит в очереди правок (он в своей строке) — досылаем его отдельно
+      TRK_BG_RETRY_AT=0; trkBgRetry();
+    });   // связь вернулась — очередь правок уходит сразу
     window.addEventListener('offline', trkSyncBadge);   // значок «офлайн» — сразу, не дожидаясь первой неудачной отправки
   }
 }
