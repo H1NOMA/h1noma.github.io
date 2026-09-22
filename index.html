@@ -15046,7 +15046,7 @@ function openInstallHelp(){
    они остаются внутри .pd-bar, переносить узлы нельзя — pdSync рисует полосу
    целиком), ящик раскрывается вверх. */
 @media(max-width:1179px){
-  :root{--pdock-h:64px; --pdtabs-h:42px}
+  :root{--pdock-h:64px; --pdtabs-h:48px}
   /* --pdock-kb — высота экранной клавиатуры (pdKb): на iOS fixed-элемент остаётся
      у низа ЛЭЙАУТА и уходит под клавиатуру вместе с полем «Иниц» */
   #pdock{left:0;right:0;bottom:var(--pdock-kb,0px)}
@@ -15066,10 +15066,12 @@ function openInstallHelp(){
     scrollbar-width:none;-webkit-overflow-scrolling:touch;
     background:var(--bg2);border-top:var(--hair) solid var(--line2)}
   .pd-tabs::-webkit-scrollbar{display:none}
-  .pd-tab{flex:none;padding:8px 11px;font-size:.62rem}
+  /* корешок — палец, а не курсор: 40×44 вместо 29 px по высоте, промахнуться нечем */
+  .pd-tab{flex:none;padding:0 12px;height:40px;min-width:44px;
+    display:inline-flex;align-items:center;justify-content:center;font-size:.62rem}
   /* «свернуть» прилипает к правому краю прокручиваемой строки, иначе за ним
      пришлось бы листать корешки до конца */
-  .pd-x{position:sticky;right:-10px;width:34px;height:34px;background:var(--bg2);
+  .pd-x{position:sticky;right:-10px;width:40px;height:40px;background:var(--bg2);
     box-shadow:-10px 0 10px var(--bg2)}
   /* ящик: над корешками, прокручивается, не выше 55vh */
   .pd-panel{display:block;margin-bottom:var(--pdtabs-h);border-radius:16px 16px 0 0}
