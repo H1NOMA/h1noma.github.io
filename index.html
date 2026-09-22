@@ -1210,7 +1210,7 @@
   .tb-round{display:flex;flex-direction:column;align-items:center;gap:1px;min-width:60px;background:none;border:none;cursor:pointer;padding:2px 6px;border-radius:10px}
   .tb-round .n{font-family:var(--f-disp);font-weight:700;font-size:1.5rem;color:var(--red-ink);line-height:1}
   .tb-round .l{font-family:var(--f-mono);font-size:.5rem;letter-spacing:.2em;text-transform:uppercase;color:var(--muted)}
-  .tb-view{display:flex;background:var(--surface);border:var(--hair) solid var(--line2);border-radius:11px;padding:3px;gap:2px}
+  .tb-view{display:flex;background:var(--surface);border:var(--hair) solid var(--line2);border-radius:11px;padding:3px;gap:2px;margin-left:auto}
   .tb-view button{border:none;background:none;color:var(--muted);font-family:var(--f-mono);font-size:.6rem;letter-spacing:.06em;text-transform:uppercase;padding:7px 11px;border-radius:8px;cursor:pointer}
   .tb-view button.on{background:var(--red-soft);color:var(--red-ink)}
   .tb-turn{display:flex;align-items:center;gap:10px;justify-content:space-between;border-top:var(--hair) solid var(--line);padding-top:11px}
@@ -1218,11 +1218,14 @@
   .tb-now .cap{font-family:var(--f-mono);font-size:.5rem;letter-spacing:.2em;text-transform:uppercase;color:var(--red-ink)}
   .tb-now .who{font-family:var(--f-disp);font-weight:700;font-size:1rem;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:52vw}
   .tb-tbtn{width:40px;height:40px;flex:none;border-radius:12px;border:var(--hair) solid var(--line2);background:var(--surface);color:var(--dim);font-size:1.05rem;display:flex;align-items:center;justify-content:center;cursor:pointer}
-  /* статус синхронизации (см. trkSyncBadge): тонкая строчка под панелью, в тон подписи «раунд» */
-  .tb-sync{font-family:var(--f-mono);font-size:.55rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);text-align:right;line-height:1;margin-top:-3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .tb-sync:empty{display:none}
-  .tb-sync.warn{color:var(--red-ink)}
-  .tb-sync.busy{color:var(--dim)}
+  /* статус синхронизации (см. trkSyncBadge): точка справа от переключателя вида.
+     Горит зелёным, когда всё дошло; гаснет, пока правки в очереди; краснеет без связи.
+     Полный текст остаётся в title — по наведению и для озвучки. */
+  .tb-sync{width:9px;height:9px;flex:none;border-radius:50%;background:var(--line2);
+    align-self:center;transition:background .25s ease, box-shadow .25s ease}
+  .tb-sync.ok,.tb-sync.poll{background:#84c97a;box-shadow:0 0 0 3px rgba(132,201,122,.15)}
+  .tb-sync.busy{background:var(--line2)}
+  .tb-sync.warn{background:var(--red-ink);box-shadow:0 0 0 3px var(--red-soft)}
   .tb-tbtn.main{width:auto;padding:0 16px;background:var(--red);color:#0b0b0e;border:none;font-family:var(--f-disp);font-weight:700;letter-spacing:.06em;font-size:.82rem;box-shadow:0 4px 16px rgba(var(--accent-rgb),.35)}
   /* СПИСОК */
   .tb-list{display:flex;flex-direction:column;gap:8px}
@@ -12158,13 +12161,13 @@ function trkCombatBar(o){
         <button class="${view==='cards'?'on':''}" onclick="trkViewSet('cards')">Карточки</button>
         <button class="tb-map-btn ${view==='map'?'on':''}" onclick="trkViewSet('map')">Карта</button>
       </div>
+      <span class="tb-sync ${sync.cls}" id="trkSync" title="${esc(sync.txt)}" aria-label="${esc(sync.txt)}" role="img"></span>
     </div>
     <div class="tb-turn">${nav}</div>
     ${gm?`<div class="tb-tools">
       <button class="tb-tool" onclick="trkRollInit()" title="Бросок d20 + ЛОВ всем врагам без инициативы">🎲 Инициатива</button>
       <button class="tb-tool${trkSkipDead()?' on':''}" onclick="trkSkipDeadToggle()" title="Не давать ход выбывшим из боя">💀 Пропускать павших</button>
     </div>`:''}
-    <div class="tb-sync ${sync.cls}" id="trkSync">${sync.txt}</div>
   </div>`;
 }
 /* ── Статус синхронизации доски: строчка в панели боя. Без неё «правка не дошла» и «облако молчит»
@@ -12181,8 +12184,8 @@ function trkSyncState(){
 function trkSyncBadge(){
   const el=document.getElementById('trkSync'); if(!el) return;   // доска на простое / не открыта — показывать негде
   const s=trkSyncState(), cls='tb-sync '+s.cls;
-  if(el.textContent!==s.txt) el.textContent=s.txt;
   if(el.className!==cls) el.className=cls;
+  if(el.title!==s.txt){ el.title=s.txt; el.setAttribute('aria-label', s.txt); }
 }
 /* ── Карта боя: сетка с фишками участников, перетаскивание, синхронизация ── */
 const TRK_MAPCOLS=12;
@@ -14932,9 +14935,6 @@ function openInstallHelp(){
   .pd-tab:hover{background:var(--surface2);color:var(--txt)}
   .pd-tab.on{background:var(--surface2);border-color:var(--line2);color:var(--red-ink)}
   .pd-tab i{font-style:normal;font-family:var(--f-mono);font-size:.6rem;color:var(--muted);margin-left:5px}
-  .pd-x{width:32px;height:32px;flex:none;border-radius:9px;border:0;background:none;color:var(--muted);
-    cursor:pointer;display:grid;place-items:center;font-size:.9rem}
-  .pd-x:hover{background:var(--surface2);color:var(--txt)}
 
   .pd-panel{display:none;background:var(--bg2);border-top:var(--hair) solid var(--line2);
     box-shadow:0 -14px 34px rgba(0,0,0,.45)}
@@ -15138,10 +15138,6 @@ function openInstallHelp(){
   /* корешок — палец, а не курсор: 40×44 вместо 29 px по высоте, промахнуться нечем */
   .pd-tab{flex:none;padding:0 12px;height:40px;min-width:44px;
     display:inline-flex;align-items:center;justify-content:center;font-size:.62rem}
-  /* «свернуть» прилипает к правому краю прокручиваемой строки, иначе за ним
-     пришлось бы листать корешки до конца */
-  .pd-x{position:sticky;right:-10px;width:40px;height:40px;background:var(--bg2);
-    box-shadow:-10px 0 10px var(--bg2)}
   /* ящик: над корешками, прокручивается, не выше 55vh */
   .pd-panel{display:block;margin-bottom:var(--pdtabs-h);border-radius:16px 16px 0 0}
   .pd-panel-in{max-height:55vh;padding:12px 14px 16px}
@@ -15159,10 +15155,8 @@ function openInstallHelp(){
   html.pdock-on .dice-calc{bottom:calc(80px + env(safe-area-inset-bottom) + var(--pdock-h) + var(--pdtabs-h))}
   html.pdock-on .toast{bottom:calc(var(--botnav-h) + 14px + env(safe-area-inset-bottom) + var(--pdock-h) + var(--pdtabs-h))}
   html.pdock-on .search-float{bottom:calc(22px + var(--botnav-h) + env(safe-area-inset-bottom) + var(--pdock-h) + var(--pdtabs-h))}
-  /* на месте уехавшей панели — короткая подсказка, куда она делась */
-  .trk-pnote{margin-top:12px;padding:11px 12px;border-radius:12px;background:var(--surface);
-    border:var(--hair) dashed var(--line2);font-family:var(--f-mono);font-size:.62rem;
-    letter-spacing:.1em;text-transform:uppercase;color:var(--muted);text-align:center}
+  /* колонка панели персонажа на телефоне пустеет — пульт стоит внизу экрана */
+  .trk-pside:empty{display:none}
   /* плавающий «+» на телефоне не нужен: кнопка «Добавить персонажа» — сверху страницы */
   #addCharFab{display:none !important}
   #projRow{display:none !important}
@@ -15246,9 +15240,8 @@ function openInstallHelp(){
     Array.prototype.slice.call(d.querySelectorAll('.pd-tab')).forEach(function(b){
       if(!b.hasAttribute('data-k')) return;            // корешок «Карта» не раскрывает ящик — его подсветку не трогаем
       b.classList.toggle('on', b.getAttribute('data-k')===PD_TAB); });
-    var x=d.querySelector('.pd-x'); if(x) x.style.display=PD_TAB?'grid':'none';
   };
-  window.pdClose=function(){ pdTab(PD_TAB); };
+  window.pdClose=function(){ if(PD_TAB) pdTab(PD_TAB); };   // раскрытый раздел сворачивается повторным тапом по его корешку
   /* «Карта» — корешок без своей группы в панели: на телефоне карта не помещается
      рядом с доской (на десктопе она постоянно справа), поэтому он переключает сам
      вид доски, а повторный тап возвращает список. */
@@ -15272,8 +15265,9 @@ function openInstallHelp(){
     var pin=d.querySelector('.pd-panel-in');
     pin.innerHTML='';                     // прошлый снимок панели уходит целиком
     pin.appendChild(me);                  // свежий — переезжает как есть
-    // на десктопе освободившуюся колонку займёт карта (sideMap), на телефоне — подсказка, куда уехала панель
-    if(!DESK()) side.innerHTML='<div class="trk-pnote">Панель персонажа — в пульте внизу ↓</div>';
+    // на десктопе освободившуюся колонку займёт карта (sideMap); на телефоне колонка просто пустеет —
+    // пульт с панелью и так прижат к низу экрана, подсказка о нём была лишней строкой
+    if(!DESK()) side.innerHTML='';
     var have=mark(me);
     if(have.cond){ var dt=me.querySelector('.tm-cond details'); if(dt) dt.open=true; }   // секция уже в панели — второй не добавляем, список раскрыт
     else { me.appendChild(condsNode(my)); have.cond=true; }
@@ -15309,7 +15303,6 @@ function openInstallHelp(){
                esc(TAB_NAMES[k])+n+'</button>'; }).join('')+
         // на десктопе карта и так стоит в правой колонке (sideMap) — корешок нужен только на телефоне
         (DESK()?'':'<button class="pd-tab'+(trkViewMode()==='map'?' on':'')+'" onclick="pdMapTab()">'+esc(TAB_NAMES.map)+'</button>')+
-        '<button class="pd-x" onclick="pdClose()" aria-label="Свернуть" style="display:'+(PD_TAB?'grid':'none')+'">▾</button>'+
       '</div>';
 
     d.setAttribute('data-tab', PD_TAB);
