@@ -11684,12 +11684,16 @@ function deepAssign(dst, patch){ for(const k in patch){ const v=patch[k];
    Ключ очереди включает набор полей: быстрые тапы по ХП схлопываются в последнее значение.
    when(t) — условие на свежей карточке (отмена урона: только если ХП никто не тронул) —
    проверяется и локально, и на значении из облака перед CAS-записью */
-/* доска могла переехать на ключ «сеттинг::тег», пока правка ждала в очереди — идём по указателю */
-function trkFollow(v, boardKey){
-  let s=v&&v[boardKey], hop=0;
-  while(s && typeof s==='object' && !Array.isArray(s) && s.movedTo && hop++<4) s=v[s.movedTo];
-  return s;
+/* доска могла переехать на ключ «сеттинг::тег», пока правка ждала в очереди — идём по указателю.
+   Возвращаем КЛЮЧ, на котором цепочка закончилась: по нему пишут и те, кто создаёт строку заново */
+function trkFollowKey(v, boardKey){
+  let k=boardKey, hop=0;
+  while(hop++<4){ const s=v&&v[k];
+    if(!(s && typeof s==='object' && !Array.isArray(s) && s.movedTo)) break;
+    k=s.movedTo; }
+  return k;
 }
+function trkFollow(v, boardKey){ return v && v[trkFollowKey(v, boardKey)]; }
 function trkCloudCardPatch(boardKey, cardKey, patch, when){
   const p=JSON.parse(JSON.stringify(patch||{}));
   trkWrite(v=>{ const s=trkFollow(v, boardKey); if(!s||!Array.isArray(s.list)) return;
@@ -11700,8 +11704,8 @@ function trkCloudCardPatch(boardKey, cardKey, patch, when){
 /* глубокое слияние полей одной доски (позиция фишки, размер сетки, фон, журнал) */
 function trkCloudBoardMerge(boardKey, fields, key){
   const f=JSON.parse(JSON.stringify(fields||{}));
-  trkWrite(v=>{ let s=trkFollow(v, boardKey);
-    if(!s||typeof s!=='object'||Array.isArray(s)) s=v[boardKey]={};
+  trkWrite(v=>{ const k=trkFollowKey(v, boardKey); let s=v[k];
+    if(!s||typeof s!=='object'||Array.isArray(s)) s=v[k]={};
     deepAssign(s, f); s.at=Date.now(); }, key||null);
 }
 /* ── Журнал действий (только у ГМа): привязан к доске выбранной игры ──
