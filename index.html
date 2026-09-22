@@ -1371,6 +1371,10 @@
   .mp-grid{position:relative;width:100%;aspect-ratio:1;background-color:#12160f;touch-action:pan-y;overflow:hidden}
   .mp-grid .mp-tok{touch-action:none}
   .mp-bg{position:absolute;inset:0;background-size:cover;background-position:center;z-index:0}
+  /* фон обещан меткой, но ещё не дочитан — подпись поверх сетки, а не молчаливая пустота */
+  .mp-wait{position:absolute;left:50%;top:10px;transform:translateX(-50%);z-index:3;pointer-events:none;
+    font-family:var(--f-mono);font-size:.52rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);
+    background:var(--glass2);border:var(--hair) solid var(--line2);border-radius:999px;padding:5px 12px;white-space:nowrap}
   .mp-grid::after{content:"";position:absolute;inset:0;z-index:1;pointer-events:none;
     background-image:linear-gradient(rgba(var(--accent-rgb),.18) 1px,transparent 1px),linear-gradient(90deg,rgba(var(--accent-rgb),.18) 1px,transparent 1px);
     background-size:calc(100%/var(--cols,12)) calc(100%/var(--cols,12))}
@@ -2647,6 +2651,7 @@
   /* «обложка»: эквалайзер из трёх полосок — пляшет, пока играет, и замирает на паузе */
   .music-bar .mb-art{flex:0 0 auto;width:38px;height:38px;border-radius:11px;border:var(--hair) solid var(--line2);
     background:var(--red-soft);cursor:pointer;display:flex;align-items:flex-end;justify-content:center;gap:3px;padding:10px 0}
+  .music-bar .mb-art.img{background-size:cover;background-position:center;padding:0}
   .music-bar .mb-art i{width:3px;height:6px;border-radius:2px;background:var(--red-ink);opacity:.85}
   .music-bar .mb-art.on i{animation:mb-eq .9s ease-in-out infinite}
   .music-bar .mb-art.on i:nth-child(2){animation-delay:.18s}
@@ -3343,6 +3348,44 @@ html.dr-live body{overflow-x:clip}
 .dr-sep{height:1px;background:var(--line);margin:10px 0 8px;border-radius:1px}  /* по одной линии с разделителем внизу */
 .dr-it.dr-music.active{color:var(--red-ink)}
 
+/* ── Прямоугольный плеер в левом рейле (над профилем и «Закладками») ──────
+   На десктопе музыка живёт здесь, а не плавающей плашкой снизу: рейл — это
+   и есть «левая часть сайта», и плашка там мешала кнопкам в углу. */
+.dr-player{display:none}
+.dr-player[hidden]{display:none !important}
+.dp-head{display:flex;align-items:center;gap:9px;min-width:0}
+.dp-art{flex:none;width:38px;height:38px;border-radius:10px;border:var(--hair) solid var(--line2);
+  background:var(--red-soft);display:flex;align-items:flex-end;justify-content:center;gap:3px;padding:10px 0;
+  background-size:cover;background-position:center}
+.dp-art.img{padding:0}
+.dp-art i{width:3px;height:6px;border-radius:2px;background:var(--red-ink);opacity:.85}
+.dp-art.on i{animation:mb-eq .9s ease-in-out infinite}
+.dp-art.on i:nth-child(2){animation-delay:.18s}
+.dp-art.on i:nth-child(3){animation-delay:.36s}
+@media (prefers-reduced-motion:reduce){ .dp-art.on i{animation:none;height:11px} }
+.dp-meta{flex:1;min-width:0}
+.dp-cap{font-family:var(--f-mono);font-size:.47rem;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dp-title{font-family:var(--f-disp);font-weight:700;font-size:.84rem;color:var(--txt);cursor:pointer;line-height:1.25;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.dp-title .dp-title-i{display:inline-block;max-width:100%}
+.dp-title.marquee{text-overflow:clip}
+.dp-title.marquee .dp-title-i{max-width:none;animation:tc-marq 10s ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){ .dp-title.marquee .dp-title-i{animation:none} .dp-title.marquee{text-overflow:ellipsis} }
+.dp-x{flex:none;width:22px;height:22px;border:0;background:none;color:var(--muted);cursor:pointer;
+  border-radius:50%;font-size:.66rem;display:grid;place-items:center}
+.dp-x:hover{background:rgba(255,255,255,.07);color:var(--txt)}
+.dp-prog{height:4px;border-radius:2px;background:rgba(255,255,255,.14);cursor:pointer;position:relative;overflow:hidden;touch-action:none;margin:10px 0 7px}
+.dp-prog i{position:absolute;left:0;top:0;bottom:0;width:0;background:var(--red);border-radius:2px}
+.dp-foot{display:flex;align-items:center;gap:8px}
+.dp-time{flex:1;min-width:0;font-family:var(--f-mono);font-size:.5rem;letter-spacing:.06em;color:var(--muted);white-space:nowrap}
+.dp-ctrl{flex:none;display:flex;align-items:center;gap:2px}
+.dp-ctrl button{width:30px;height:30px;border-radius:50%;border:none;background:transparent;color:var(--txt);
+  cursor:pointer;display:grid;place-items:center;padding:0}
+.dp-ctrl button svg{width:17px;height:17px;fill:currentColor}
+.dp-ctrl .dp-play{background:var(--red-soft);color:var(--red-ink)}
+.dp-ctrl button:active{transform:scale(.9)}
+
 /* низ шторки: аватар и «Закладки» на одной оптической линии */
 .dr-bottom{align-items:center}
 /* аватар профиля и «Закладки» — одной высоты и на одной горизонтали */
@@ -3393,6 +3436,16 @@ html.dr-live #appPane{box-shadow:-2px 0 0 0 var(--line2), 0 0 46px rgba(0,0,0,.5
 .mpg-row.playing .mpg-play{background:var(--red);color:#12130f;border-color:transparent}
 .mpg-play svg{width:15px;height:15px;fill:currentColor;stroke:none}
 .mpg-nm{flex:1;min-width:0;font-size:.94rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* обложка плейлиста: своя картинка или буква на своём цвете — чтобы списки различались взглядом */
+.mpg-ava,.mpl-ava{flex:none;display:grid;place-items:center;background-size:cover;background-position:center;
+  border-radius:9px;border:var(--hair) solid var(--line2);font-family:var(--f-disp);font-weight:700;color:#fff}
+.mpg-ava{width:34px;height:34px;font-size:.9rem}
+.mpl-ava{width:84px;height:84px;border-radius:14px;font-size:2rem}
+.mpg-ava.ph,.mpl-ava.ph{background:hsl(var(--plh,40) 42% 34%)}
+.mpl-edit{display:flex;align-items:center;gap:14px;margin:4px 0 6px}
+.mpl-ava-btn{flex:none;display:flex;flex-direction:column;align-items:center;gap:6px;background:none;border:0;padding:0;cursor:pointer}
+.mpl-ava-cap{font-family:var(--f-mono);font-size:.5rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.mpl-ava-btn:active .mpl-ava{transform:scale(.96)}
 .mpg-sub{font-family:var(--f-mono);font-size:.66rem;color:var(--muted)}
 .mpg-ic{width:34px;height:34px;flex:none;border-radius:10px;display:grid;place-items:center;cursor:pointer;
   color:var(--muted);background:none;border:0}
@@ -3521,6 +3574,7 @@ addEventListener('beforeinstallprompt', function(e){ e.preventDefault(); DEFERRE
     <a class="dr-logo" href="#" onclick="drNav(function(){rebootFX()});return false" aria-label="КОМИК"></a>
   </div>
   <div class="dr-list" id="drList"></div>
+  <div class="dr-player" id="drPlayer" hidden></div>
   <div class="dr-bottom">
     <button class="dr-ava" id="drAva" onclick="drNav(function(){openProfileCard()})" aria-label="Профиль">?</button>
     <button class="dr-pill" onclick="drNav(function(){openBookmarks()})">
@@ -5157,7 +5211,30 @@ async function boot(){
   // автокопия последнего состояния — страховка на случай проблем с облаком
   try{ ssetLocal('comik:backup:auto', {at:Date.now(), chars:CHARS_ALL, games:GAMES, news:NEWS}); }catch(e){}
   // офлайн-режим: сервис-воркер кэширует сайт целиком
-  if('serviceWorker' in navigator && location.protocol==='https:'){ try{ navigator.serviceWorker.register('sw.js'); }catch(e){} }
+  /* Регистрация воркера и — главное — ДОСТАВКА обновлений.
+     Раньше воркер регистрировался один раз и всё: открытая вкладка (а в приложении
+     она живёт неделями) больше никогда не спрашивала, нет ли новой версии, и человек
+     сидел на старой сборке. Теперь три недостающих звена:
+       1) периодическая проверка + проверка при возврате на вкладку и при возврате сети;
+       2) controllerchange — новый воркер взял управление, значит версия сменилась;
+       3) сам файл воркера читаем мимо HTTP-кэша браузера (GitHub Pages отдаёт его
+          с max-age, и «обновить страницу» первые минуты возвращало ту же сборку). */
+  if('serviceWorker' in navigator && location.protocol==='https:'){
+    try{
+      const hadCtrl=!!navigator.serviceWorker.controller;
+      navigator.serviceWorker.register('sw.js', {updateViaCache:'none'}).then(reg=>{
+        const check=()=>{ try{ reg.update(); }catch(e){} };
+        setInterval(check, 10*60*1000);
+        document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) check(); });
+        addEventListener('online', check);
+        setTimeout(check, 8000);            // первый заход после выкладки: не ждём 10 минут
+      }).catch(()=>{});
+      // новый воркер взял управление — страница всё ещё старая, перезапускаемся
+      navigator.serviceWorker.addEventListener('controllerchange', ()=>{
+        if(hadCtrl && typeof swUpdateReady==='function') swUpdateReady();
+      });
+    }catch(e){}
+  }
   // страховка от «отвалившегося» первого чтения: дотягиваем облако при возврате/сети, а если стартовые
   // чтения не дошли — ещё раз через 6 с (при удачном старте это было лишним полным чтением)
   cloudRepullBind();
@@ -6677,38 +6754,47 @@ function delNews(id){
    кнопкой «Записаться на игру» — имя + прикреплённый персонаж. */
 const KEY_GAMES='comik:games:v1';
 let GAMES=[], SCHED_GAME='terra';
+/* Слияние облачной записи на игру с локальной. Раньше жило только внутри
+   persistGames, а фоновый тик подменял ячейку целиком (GAMES[i]=r) — и чужая
+   копия могла стереть того, кто только что записался. Теперь путь один. */
+function gamesMergeRemote(remote){
+  if(!Array.isArray(remote)) return false;
+  let changed=false;
+  const byId=new Map(); GAMES.forEach(g=>{ if(g&&g.id) byId.set(g.id,g); });
+  remote.forEach(r=>{
+    if(!r || DELETED_GAMES.has(r.id)) return;
+    const mine=byId.get(r.id);
+    if(!mine){ GAMES.push(r); changed=true; return; }
+    // Сессия есть и там и там: сливаем записавшихся по тегу, а не берём
+    // чей-то список целиком. Раньше совпавшая ячейка отбрасывалась вместе
+    // со всеми, кто успел записаться, — второй записавшийся стирал первого.
+    const before=JSON.stringify(mine);
+    const seen=new Map();
+    (mine.players||[]).forEach(p=>{ if(p&&p.tag) seen.set(normTag(p.tag), p); });
+    (r.players||[]).forEach(p=>{
+      if(!p||!p.tag) return;
+      const k=normTag(p.tag);
+      // своя запись главнее: если человек только что снял себя, копия из
+      // облака не должна его воскрешать
+      if(SESSION && k===normTag(SESSION)) return;
+      const cur=seen.get(k);
+      if(!cur || (p.at||0)>(cur.at||0)) seen.set(k, p);
+    });
+    mine.players=[...seen.values()].sort((a,b)=>(a.at||0)-(b.at||0));
+    // саму ячейку (время, место, ведущий) берём более свежую, список — уже слитый
+    if((r.updatedAt||0)>(mine.updatedAt||0)){
+      const keep=mine.players; Object.assign(mine, r); mine.players=keep;
+    }
+    if(JSON.stringify(mine)!==before) changed=true;
+  });
+  return changed;
+}
 async function persistGames(){
   try{
     if(supa){
       let remote=null;
       try{ remote=await withTimeout(cloudGet(KEY_GAMES), 4000); }catch(e){}
-      if(Array.isArray(remote)){
-        const byId=new Map(); GAMES.forEach(g=>{ if(g&&g.id) byId.set(g.id,g); });
-        remote.forEach(r=>{
-          if(!r || DELETED_GAMES.has(r.id)) return;
-          const mine=byId.get(r.id);
-          if(!mine){ GAMES.push(r); return; }
-          // Сессия есть и там и там: сливаем записавшихся по тегу, а не берём
-          // чей-то список целиком. Раньше совпавшая ячейка отбрасывалась вместе
-          // со всеми, кто успел записаться, — второй записавшийся стирал первого.
-          const seen=new Map();
-          (mine.players||[]).forEach(p=>{ if(p&&p.tag) seen.set(normTag(p.tag), p); });
-          (r.players||[]).forEach(p=>{
-            if(!p||!p.tag) return;
-            const k=normTag(p.tag);
-            // своя запись главнее: если человек только что снял себя, копия из
-            // облака не должна его воскрешать
-            if(SESSION && k===normTag(SESSION)) return;
-            const cur=seen.get(k);
-            if(!cur || (p.at||0)>(cur.at||0)) seen.set(k, p);
-          });
-          mine.players=[...seen.values()].sort((a,b)=>(a.at||0)-(b.at||0));
-          // саму ячейку (время, место, ведущий) берём более свежую, список — уже слитый
-          if((r.updatedAt||0)>(mine.updatedAt||0)){
-            const keep=mine.players; Object.assign(mine, r); mine.players=keep;
-          }
-        });
-      }
+      gamesMergeRemote(remote);
     }
     const ok=await sset(KEY_GAMES, GAMES, true);
     if(!ok && supa && SSET_LAST_ERR!=='noperm') toast('⚠ Облако недоступно — сохранено локально');   // при отказе в правах sset уже сказал «Нет прав на запись»
@@ -7738,8 +7824,36 @@ async function persistChars(retry){
     }
   }catch(e){ return false; }
 }
-/* живая синхронизация: раз в 40с подтягиваем персонажей и заявки, пока вкладка видима и модалки закрыты */
-setInterval(async ()=>{
+/* ── Живая синхронизация листов и записи на игру ──────────────────────────────
+   Было: жёсткие 40 секунд на всё и всегда. За столом это долго — записался игрок,
+   а Мастер узнаёт через полминуты; поправил лист — соседи видят не сразу.
+   Стало: шаг зависит от того, чем человек сейчас занят.
+     • открыта «Доска ходов» — 10 с: именно там счёт идёт на секунды;
+     • открыты «Новости»/«Игроки» (расписание и листы на экране) — 20 с;
+     • любой другой раздел — 45 с: там ничего не меняется в реальном времени;
+     • вкладка в фоне — не опрашиваем вовсе, но догоняем сразу при возвращении.
+   Опрос остаётся дешёвым: листы — зонд по штампам (полные строки только у
+   изменившихся), запись на игру — одна маленькая строка. Целостность не страдает:
+   и листы, и запись сливаются по свежести, а не подменяются целиком. */
+const TICK_MS={combat:10000, active:20000, idle:45000};
+let TICK_T=null, TICK_BUSY=false;
+function tickDelay(){
+  if(document.hidden) return TICK_MS.idle;
+  const av=document.querySelector('.view.active'); const id=av?av.id.replace('view-',''):'';
+  if(id==='combat') return TICK_MS.combat;
+  return (id==='news'||id==='players') ? TICK_MS.active : TICK_MS.idle;
+}
+function tickSoon(ms){ clearTimeout(TICK_T); TICK_T=setTimeout(cloudTick, Math.max(1500, ms|0)); }
+async function cloudTick(){
+  if(TICK_BUSY){ tickSoon(tickDelay()); return; }
+  TICK_BUSY=true;
+  try{ await cloudTickOnce(); }catch(e){}
+  finally{ TICK_BUSY=false; tickSoon(tickDelay()); }
+}
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) tickSoon(600); });   // вернулись на вкладку — догоняем сразу
+document.addEventListener('komik-view-change', ()=>tickSoon(800));                            // сменили раздел — тоже
+tickSoon(TICK_MS.active);
+async function cloudTickOnce(){
   try{
     if(!supa || document.hidden) return;
     if(navigator.onLine===false && (Date.now()%3)) return;   // «офлайн» по мнению браузера — пробуем всё же примерно раз в 2 минуты
@@ -7759,15 +7873,7 @@ setInterval(async ()=>{
       });
       charsSeen(ch);
     }
-    if(Array.isArray(gm) && JSON.stringify(gm)!==JSON.stringify(GAMES)){
-      const ids=new Set(GAMES.map(x=>x&&x.id));
-      gm.forEach(r=>{
-        if(!r) return;
-        if(!ids.has(r.id)){ if(!DELETED_GAMES.has(r.id)) GAMES.push(r); }
-        else { const i=GAMES.findIndex(x=>x&&x.id===r.id); if(i>=0) GAMES[i]=r; }
-      });
-      gmChanged=true;
-    }
+    if(Array.isArray(gm)) gmChanged=gamesMergeRemote(gm);   // тот же аккуратный слив, что и при сохранении
     if(chChanged){ bindGameData(); renderPlayers(); if(document.getElementById('trkBox') && typeof trkRedraw==='function') trkRedraw(true); }   // листы дошли — доска игрока получает панель
     if(gmChanged){ const nv=document.getElementById('view-news'); if(nv && nv.classList.contains('active') && typeof renderNews==='function') renderNews();
       if(ADMIN) try{ await trkPartyCatchup(false); }catch(e){}   // записались по ходу партии — сажаем за стол и без стука
@@ -7780,7 +7886,7 @@ setInterval(async ()=>{
       if(await trkFetchShared()) trkLiveApply();
     }
   }catch(e){}
-}, 40000);
+}
 // простой хэш кода доступа (FNV-1a) — чтобы не хранить код открытым в общем хранилище
 function hashCode(str){
   let h = 2166136261 >>> 0;
@@ -10759,6 +10865,8 @@ function go(view, opts){
   if(_pv==='players' && view!=='players' && INLINE_ID) flushInlineSave();   // уходим с игроков — дописать правки
   const _nh=(window.NAV_HIST=window.NAV_HIST||[]);
   if(!(opts&&opts.noHist) && _pv && _pv!==view){ _nh.push(_pv); if(_nh.length>30) _nh.shift(); }
+  // сменили раздел — фоновая синхронизация подстраивает темп под то, что сейчас на экране
+  try{ setTimeout(()=>document.dispatchEvent(new CustomEvent('komik-view-change',{detail:view})),0); }catch(e){}
   ['news','world','players','combat','settings','chrono','music'].forEach(v=>{
     const el=document.getElementById('view-'+v); if(!el) return;
     el.classList.toggle('active', v===view);
@@ -12495,8 +12603,12 @@ function trkMapHtml(src){
       <span class="mp-gc">Сетка <button onclick="trkMapColsAdj(-1)" aria-label="Меньше">−</button><b>${cols}</b><button onclick="trkMapColsAdj(1)" aria-label="Больше">+</button></span>
       <input type="file" id="mpBgFile" accept="image/*" hidden onchange="trkMapBgSet(this)">
     </div>`:'';
+  // в доске стоит метка фона, а самой картинки на руках ещё нет: честно говорим об этом,
+  // иначе пустая сетка выглядит как «Мастер фон не ставил» — и никто не понимает, что не так
+  const waiting=!bg && !!trkMapBgRevOf(src);
+  const note=waiting?`<div class="mp-wait">${(navigator.onLine===false)?'Фон карты не загружен — нет связи':'Фон карты загружается…'}</div>`:'';
   return `<div class="mp-wrap"><div class="mp-grid" id="mpGrid" style="--cols:${cols}">
-      ${bg?`<div class="mp-bg" style="background-image:url('${cssUrl(bg)}')"></div>`:''}${toks}
+      ${bg?`<div class="mp-bg" style="background-image:url('${cssUrl(bg)}')"></div>`:''}${note}${toks}
     </div></div>${ctrl}`;
 }
 /* фон и размер сетки карты (только ГМ), merge-safe в общий стол */
@@ -14175,16 +14287,20 @@ function musMaybeCrossfade(){
 function musStop(){ musFinishCF(); musEls().forEach(a=>{ if(a){ a.pause(); if(a.src){ try{URL.revokeObjectURL(a.src);}catch(e){} a.removeAttribute('src'); a.load(); } a.volume=1; } }); musCur=null; musIdx=-1; musHideBar(); musCloseFull(); }
 function musCloseBar(){ musStop(); renderMusicLib(); }
 function musShowBar(){ const b=document.getElementById('musicBar'); if(b){ b.hidden=false; } const mt=document.getElementById('musicToggle'); if(mt) mt.classList.add('on'); }
-function musHideBar(){ const b=document.getElementById('musicBar'); if(b){ b.hidden=true; b.innerHTML=''; } const mt=document.getElementById('musicToggle'); if(mt) mt.classList.remove('on'); }
+function musHideBar(){ const b=document.getElementById('musicBar'); if(b){ b.hidden=true; b.innerHTML=''; }
+  const r=document.getElementById('drPlayer'); if(r){ r.hidden=true; r.innerHTML=''; }
+  const mt=document.getElementById('musicToggle'); if(mt) mt.classList.remove('on'); }
 function musRenderBar(){
   const b=document.getElementById('musicBar'); if(!b || b.hidden) return;
   if(!musCur){ musHideBar(); return; }
   const playing=!musPaused();
   b.classList.toggle('playing', playing);
-  b.innerHTML=`
-    <button class="mb-art${playing?' on':''}" onclick="musOpenFull()" aria-label="Открыть плеер">
-      <i></i><i></i><i></i>
-    </button>
+  // играет плейлист со своей обложкой — она и стоит вместо эквалайзера
+  let pl=null; try{ if(MPL_PLAY){ mplLoad(); pl=MPL.find(x=>x.id===MPL_PLAY)||null; } }catch(e){}
+  const art = (pl && pl.ava)
+    ? `<button class="mb-art img${playing?' on':''}" style="background-image:url('${cssUrl(pl.ava)}')" onclick="musOpenFull()" aria-label="Открыть плеер"></button>`
+    : `<button class="mb-art${playing?' on':''}" onclick="musOpenFull()" aria-label="Открыть плеер"><i></i><i></i><i></i></button>`;
+  b.innerHTML=art+`
     <div class="mb-mid">
       <div class="mb-title" onclick="musOpenFull()"><span class="mb-title-i">${esc(musCur.name)}</span></div>
       <div class="mb-row">
@@ -14199,6 +14315,42 @@ function musRenderBar(){
     </div>
     <button class="mb-x" onclick="musCloseBar()" aria-label="Закрыть">✕</button>`;
   requestAnimationFrame(musBarMarquee);
+  musRenderRail();
+}
+/* Прямоугольный плеер в левом рейле — над аватаром профиля и «Закладками».
+   Плашка снизу остаётся для узких экранов и телефона; на десктопе её прячет CSS. */
+function musRenderRail(){
+  const r=document.getElementById('drPlayer'); if(!r) return;
+  if(!musCur){ r.hidden=true; r.innerHTML=''; return; }
+  let pl=null; try{ if(MPL_PLAY){ mplLoad(); pl=MPL.find(x=>x.id===MPL_PLAY)||null; } }catch(e){}
+  const playing=!musPaused();
+  const art = (pl && pl.ava)
+    ? `<span class="dp-art img" style="background-image:url('${cssUrl(pl.ava)}')"></span>`
+    : `<span class="dp-art${playing?' on':''}"><i></i><i></i><i></i></span>`;
+  r.hidden=false;
+  r.innerHTML=`
+    <div class="dp-head">${art}
+      <div class="dp-meta">
+        <div class="dp-cap">${pl?esc(pl.name||'Плейлист'):'Сейчас играет'}</div>
+        <div class="dp-title" onclick="musOpenFull()"><span class="dp-title-i">${esc(musCur.name)}</span></div>
+      </div>
+      <button class="dp-x" onclick="musCloseBar()" aria-label="Остановить">✕</button>
+    </div>
+    <div class="dp-prog" id="drProg" onpointerdown="musScrub(event,'drProg')"><i id="drProgFill"></i></div>
+    <div class="dp-foot">
+      <span class="dp-time" id="drTime">0:00</span>
+      <div class="dp-ctrl">
+        <button onclick="musPrev()" aria-label="Назад">${MUS_ICON.prev}</button>
+        <button class="dp-play" onclick="musToggle()" aria-label="Пауза/играть">${playing?MUS_ICON.pause:MUS_ICON.play}</button>
+        <button onclick="musNext()" aria-label="Вперёд">${MUS_ICON.next}</button>
+      </div>
+    </div>`;
+  requestAnimationFrame(()=>{
+    const el=r.querySelector('.dp-title'), t=el&&el.querySelector('.dp-title-i'); if(!t) return;
+    el.classList.remove('marquee'); t.style.removeProperty('--mq');
+    const over=t.scrollWidth-el.clientWidth;
+    if(over>2){ t.style.setProperty('--mq', (-(over+2))+'px'); el.classList.add('marquee'); }
+  });
 }
 /* длинное название песни не обрезаем многоточием, а катаем лентой — как имена на доске */
 function musBarMarquee(){
@@ -14259,6 +14411,8 @@ function musProgTick(){
   const c=document.getElementById('mfCur'); if(c) c.textContent=musFmt(a.currentTime);
   const d=document.getElementById('mfDur'); if(d) d.textContent=musFmt(a.duration||0);
   const t=document.getElementById('musTime'); if(t) t.textContent=musFmt(a.currentTime);
+  const f3=document.getElementById('drProgFill'); if(f3) f3.style.width=pct+'%';
+  const t3=document.getElementById('drTime'); if(t3) t3.textContent=musFmt(a.currentTime)+' / '+musFmt(a.duration||0);
 }
 /* привязка событий аудио и жестов — один раз */
 (function musBind(){
@@ -14548,19 +14702,74 @@ var MPL_PLAY='';          // плейлист, который сейчас зв�
 function mplLoad(){ try{ MPL=JSON.parse(localStorage.getItem(MPL_KEY)||'[]')||[]; }catch(e){ MPL=[]; } if(!Array.isArray(MPL)) MPL=[]; }
 function mplSave(){ try{ localStorage.setItem(MPL_KEY, JSON.stringify(MPL)); }catch(e){ toast('Не удалось сохранить плейлист'); } }
 function mplCreate(){
-  const nm=prompt('Название плейлиста'); if(!nm||!nm.trim()) return;
-  mplLoad(); MPL.push({id:'pl'+Date.now().toString(36), name:nm.trim().slice(0,60), tracks:[]});
-  mplSave(); renderMusicPage(); toast('Плейлист создан');
+  mplLoad();
+  const p={id:'pl'+Date.now().toString(36), name:'', tracks:[], ava:''};
+  MPL.push(p); mplSave(); mplEdit(p.id, true);
+}
+/* цвет-заглушка обложки: у каждого плейлиста свой, но всегда один и тот же */
+function mplHue(id){ let h=0; for(let i=0;i<String(id).length;i++) h=(h*31+String(id).charCodeAt(i))%360; return h; }
+function mplAvaHtml(p, cls){
+  const nm=(p.name||'').trim();
+  return p.ava
+    ? `<span class="${cls}" style="background-image:url('${cssUrl(p.ava)}')"></span>`
+    : `<span class="${cls} ph" style="--plh:${mplHue(p.id)}">${esc((nm.charAt(0)||'♪').toUpperCase())}</span>`;
+}
+/* окно плейлиста: название и обложка. Обложка живёт на устройстве вместе со списком,
+   поэтому жмём её мелко (256 px) — иначе десяток плейлистов съест квоту localStorage */
+function mplEdit(id, isNew){
+  mplLoad(); const p=MPL.find(x=>x.id===id); if(!p) return;
+  document.getElementById('modal').innerHTML=`
+    <button class="x" onclick="mplEditClose('${p.id}')" aria-label="Закрыть">✕</button>
+    <div class="top">${rune('history',24)}<span class="clabel">Плейлист</span></div>
+    <h2>${isNew?'Новый плейлист':'Название и обложка'}</h2>
+    <div class="mpl-edit">
+      <button class="mpl-ava-btn" onclick="document.getElementById('mplAvaFile').click()" aria-label="Выбрать обложку">
+        ${mplAvaHtml(p,'mpl-ava')}<span class="mpl-ava-cap">Обложка</span>
+      </button>
+      <div class="field" style="flex:1;min-width:0;margin:0">
+        <label>Название</label>
+        <input id="mplName" maxlength="60" value="${esc(p.name||'')}" placeholder="Например: Таверна">
+      </div>
+    </div>
+    <input type="file" id="mplAvaFile" accept="image/*" hidden onchange="mplAvaPick('${p.id}',this)">
+    <div class="pacts">
+      <button class="btn primary" onclick="mplEditSave('${p.id}')">Сохранить</button>
+      ${p.ava?`<button class="btn ghost" onclick="mplAvaClear('${p.id}')">Убрать обложку</button>`:''}
+      <button class="btn ghost" onclick="mplEditClose('${p.id}')">Отмена</button>
+    </div>`;
+  document.getElementById('scrim').classList.add('open');
+  setTimeout(()=>{ const i=document.getElementById('mplName'); if(i){ i.focus(); i.select(); } }, 60);
+}
+function mplEditSave(id){
+  mplLoad(); const p=MPL.find(x=>x.id===id); if(!p) return;
+  const nm=(document.getElementById('mplName')||{}).value||'';
+  p.name=nm.trim().slice(0,60) || 'Без названия';
+  mplSave(); closeModal(); renderMusicPage(); musRenderBar(); toast('Плейлист сохранён');
+}
+/* закрыли окно, так и не назвав новый плейлист — не оставляем пустую строку в списке */
+function mplEditClose(id){
+  mplLoad(); const p=MPL.find(x=>x.id===id);
+  if(p && !(p.name||'').trim() && !(p.tracks||[]).length){ MPL=MPL.filter(x=>x.id!==id); mplSave(); }
+  closeModal(); renderMusicPage();
+}
+function mplAvaPick(id, inp){
+  const f=inp.files&&inp.files[0]; inp.value=''; if(!f) return;
+  compressImage(f,256,0.82).then(src=>{
+    mplLoad(); const p=MPL.find(x=>x.id===id); if(!p) return;
+    const nm=(document.getElementById('mplName')||{}).value; if(nm!=null) p.name=String(nm).trim().slice(0,60);
+    p.ava=src; mplSave(); mplEdit(id); renderMusicPage();
+  }).catch(()=>toast('⚠ Не удалось обработать картинку'));
+}
+function mplAvaClear(id){
+  mplLoad(); const p=MPL.find(x=>x.id===id); if(!p) return;
+  const nm=(document.getElementById('mplName')||{}).value; if(nm!=null) p.name=String(nm).trim().slice(0,60);
+  p.ava=''; mplSave(); mplEdit(id); renderMusicPage();
 }
 function mplDelete(id){
   mplLoad(); MPL=MPL.filter(p=>p.id!==id); mplSave();
   if(MPL_CUR===id) MPL_CUR=''; if(MPL_PLAY===id) MPL_PLAY=''; renderMusicPage();
 }
-function mplRename(id){
-  mplLoad(); const p=MPL.find(x=>x.id===id); if(!p) return;
-  const nm=prompt('Название плейлиста', p.name); if(!nm||!nm.trim()) return;
-  p.name=nm.trim().slice(0,60); mplSave(); renderMusicPage();
-}
+function mplRename(id){ mplEdit(id); }
 function mplToggleTrack(pid, tid){
   mplLoad(); const p=MPL.find(x=>x.id===pid); if(!p) return;
   const i=p.tracks.indexOf(tid);
@@ -14610,9 +14819,10 @@ function renderMusicPage(){
 
   const lists = MPL.map(p=>`<div class="mpg-row${(MPL_CUR===p.id||MPL_PLAY===p.id)?' playing':''}">
       <button class="mpg-play" onclick="mplPlay('${p.id}')" aria-label="Играть плейлист">${MP_ICO.play}</button>
-      <span class="mpg-nm" onclick="mplPick('${p.id}')" style="cursor:pointer">${esc(p.name)}
+      ${mplAvaHtml(p,'mpg-ava')}
+      <span class="mpg-nm" onclick="mplPick('${p.id}')" style="cursor:pointer">${esc(p.name||'Без названия')}
         <span class="mpg-sub">· ${p.tracks.length}</span></span>
-      <button class="mpg-ic" onclick="mplRename('${p.id}')" aria-label="Переименовать">${MP_ICO.pen}</button>
+      <button class="mpg-ic" onclick="mplEdit('${p.id}')" aria-label="Название и обложка">${MP_ICO.pen}</button>
       <button class="mpg-ic" onclick="mplDelete('${p.id}')" aria-label="Удалить плейлист">${MP_ICO.trash}</button>
     </div>`).join('');
 
@@ -14779,6 +14989,10 @@ function openInstallHelp(){
     padding:18px 0 16px;background:var(--bg2);border-right:0}
   #appPane{margin-left:var(--rail-w)}
   .topnav{display:none}
+  /* музыка переезжает в рейл: прямоугольным блоком над профилем и «Закладками» */
+  .dr-player:not([hidden]){display:block;margin:12px 14px 10px;padding:11px 12px 10px;
+    background:var(--surface);border:var(--hair) solid var(--line2);border-radius:14px}
+  .music-bar{display:none !important}
   .dr-top{padding:2px 20px 20px}
   .dr-list{gap:3px}
   .dr-it{font-size:.94rem;padding:10px 13px}

@@ -2,7 +2,7 @@
    Сама страница — network-first: онлайн всегда свежий код, по таймауту (NAV_TIMEOUT) или без сети —
    копия из версионного кэша, прогретая при установке. Статика (шрифты, библиотека облака, данные,
    картинки) — stale-while-revalidate: мгновенно из кэша, а в фоне тихо перекачиваем свежую. */
-const CACHE = 'comik-v278';
+const CACHE = 'comik-v279';
 // Статика (шрифты, иконки, данные, фоны) живёт в ОТДЕЛЬНОМ кэше, который не сбрасывается при смене
 // версии: раньше каждое обновление кода стирало и шрифты с картинками, и на телефоне первый запуск
 // новой версии шёл без них, пока всё не перекачается заново. Обновляются они сами (stale-while-revalidate).
@@ -113,7 +113,10 @@ self.addEventListener('fetch', e => {
         const fromCache = () => cache.match(e.request).then(c => c || cache.match('./') || cache.match('index.html'));
         // что отдали странице: 'net' — свежую с сети, 'cache' — копию по таймауту
         let served = null;
-        const network = fetch(e.request).then(async res => {
+        // страницу спрашиваем у сервера С ПРОВЕРКОЙ: без no-cache запрос уходил в HTTP-кэш
+        // браузера (GitHub Pages отдаёт index.html с max-age), и «обновить» первые минуты
+        // возвращало ту же сборку. Условный запрос с ETag стоит один заголовок, а не мегабайт.
+        const network = fetch(new Request(e.request.url, {cache:'no-cache', credentials:'same-origin', mode:'same-origin'})).then(async res => {
           if (res && res.ok) {
             const prev = await cache.match(e.request).catch(() => null);
             const changed = !!prev && (prev.headers.get('etag') || prev.headers.get('content-length') || '') !==
