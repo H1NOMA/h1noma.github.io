@@ -1275,6 +1275,15 @@
   .tb-hp-in:focus{outline:none}
   .tb-hpb{width:26px;height:26px;flex:none;border-radius:8px;border:var(--hair) solid var(--line2);background:var(--bg2);font-size:1rem;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center}
   .tb-hpb.dmg{color:var(--hp-low)} .tb-hpb.heal{color:var(--hp-ok)}
+  /* временные хиты (ВХ): свой отрезок сразу за полосой обычных хитов + знак «+N» на ней */
+  .tb-hpbar b.thp,.tb2 .tc-hp b.thp{position:absolute;top:0;bottom:0;width:0;background:#6aa9ff}
+  .tb-hpbar .txt em.thp,.tb2 .tc-hp .txt em.thp{font-style:normal;color:#cfe4ff}
+  .tb-cond.add.mx{display:inline-flex;align-items:center;gap:4px;padding:2px 6px}
+  .tb-cond.add.mx.ro{cursor:default}
+  .tb-max-in{width:30px;background:none;border:none;border-bottom:1px dashed var(--line2);color:var(--txt);text-align:center;font-family:var(--f-mono);font-size:.56rem;padding:0 0 1px}
+  .tb-max-in:focus{outline:none;border-bottom-color:var(--red)}
+  .tb-cond.add.thp{background:rgba(106,169,255,.12);color:#9cc6ff;border:1px dashed rgba(106,169,255,.45)}
+  .tb-cond.add.thp.on{background:rgba(106,169,255,.22);color:#dbeaff;border-style:solid}
   .tb-conds{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
   .tb-cond{font-family:var(--f-mono);font-size:.52rem;letter-spacing:.03em;padding:3px 7px;border-radius:6px;background:rgba(217,86,78,.14);color:#e79a94;border:1px solid rgba(217,86,78,.32)}
   .tb-cond.buff{background:rgba(120,196,107,.14);color:#9bd490;border-color:rgba(120,196,107,.32)}
@@ -1327,6 +1336,9 @@
   .tb2 .tc-acchip .acsh{width:13px;height:13px;color:var(--red-ink);flex:0 0 auto}
   /* тонкая кнопка «＋ состояние» под фото (только ГМ) */
   .tb2 .tc-statebtn{width:100%;background:#0e130e;border:none;border-top:var(--hair) solid var(--line2);color:var(--muted);font-family:var(--f-mono);font-size:.56rem;letter-spacing:.06em;padding:7px;cursor:pointer}
+  .tb2 .tc-btns{display:flex} .tb2 .tc-btns .tc-statebtn+.tc-statebtn{border-left:var(--hair) solid var(--line2)}
+  .tb2 .tc-btns .tc-statebtn{width:auto;flex:1 1 0;min-width:0;padding:7px 2px;white-space:nowrap}
+  .tb2 .tc-statebtn.thp.on{color:#9cc6ff}
   @media(min-width:560px){ .tb2.trk-grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))} }
   /* карта боя */
   .mp-wrap{border:var(--hair) solid var(--line2);border-radius:14px;overflow:hidden;background:var(--bg2)}
@@ -2864,6 +2876,7 @@
   .trk-me .tm-st b{font-family:var(--f-disp);font-size:1.15rem;color:var(--txt);line-height:1}
   .trk-me .tm-st b.hp{color:#ff6b70}
   .trk-me .tm-st b.hp i{font-style:normal;font-size:.7rem;color:var(--muted)}
+  .trk-me .tm-st b.hp em.thp{font-style:normal;font-size:.72rem;color:#8fc0ff;margin-left:3px}
   .trk-me .tm-st b.hp.over{color:#ffcf4a;text-shadow:0 0 10px rgba(255,207,74,.45)}
   .trk-me .tm-btns{display:flex;gap:10px}
   .trk-me .tm-btn{flex:1;padding:12px 6px;border-radius:11px;background:rgba(255,255,255,.03);font-family:var(--f-disp);font-weight:700;font-size:.92rem;letter-spacing:.02em;cursor:pointer;transition:transform .12s var(--spring)}
@@ -11310,8 +11323,11 @@ function trkMassHp(mode){
   hpAmountPrompt(mode==='dmg'?('Урон · врагов '+cnt):('Лечение · врагов '+cnt), mode==='dmg'?'#d9564e':'#78c46b', v=>{
     const n=Math.abs(parseInt(v,10)||0); if(!n) return;
     const s=TRK_SHARED[gmBoardKey()];
-    trkSelApply(x=>{ if(!isFoeCard(x)) return; const cur=parseInt(x.hp,10)||0; x.hp=mode==='dmg'?Math.max(0,cur-n):cur+n;
-      if(s&&Array.isArray(s.list)){ const t=s.list.find(r=>trkCardKey(r)===trkCardKey(x)); if(t) t.hp=x.hp; } });
+    trkSelApply(x=>{ if(!isFoeCard(x)) return; const cur=parseInt(x.hp,10)||0;
+      const r=trkHpCalc(cur, trkThp(x), trkMaxHp(x, CUR_PROJECT), n, mode==='dmg');   // ВХ первыми, лечение — до максимума
+      x.hp=r.hp; if(r.thp) x.thp=r.thp; else delete x.thp;
+      if(mode==='dmg' && cur>0 && r.hp<=0) trkLog('death',(x.name||'существо')+' повержено');
+      if(s&&Array.isArray(s.list)){ const t=s.list.find(k=>trkCardKey(k)===trkCardKey(x)); if(t){ t.hp=x.hp; if(r.thp) t.thp=r.thp; else delete t.thp; } } });
     trkSave(); renderTracker();
   });
 }
@@ -11360,7 +11376,7 @@ function trkMergedList(freshMap, list){
     // публикация ГМа не откатывала и не «воскрешала» умирающего игрока (спасброски независимы).
     if(isFoeCard(x)) return stripAva(x);
     const p=m[trkCardKey(x)];
-    return stripAva(p?{...x, hp:p.hp, init:p.init, ds:p.ds, conds:Array.isArray(p.conds)?p.conds:(x.conds||[]), conc:(p.conc!=null?!!p.conc:!!x.conc)}:x);
+    return stripAva(p?{...x, hp:p.hp, thp:p.thp, init:p.init, ds:p.ds, conds:Array.isArray(p.conds)?p.conds:(x.conds||[]), conc:(p.conc!=null?!!p.conc:!!x.conc)}:x);
   });
 }
 /* ГМ подтягивает «живые» правки игроков (ХП/инициатива/спасброски) из общего стола
@@ -11372,6 +11388,7 @@ function trkAbsorbShared(){
     if(isFoeCard(x)) return;   // врагов/NPC ведёт ГМ — локальные значения главнее копии в столе
     const p=m[trkCardKey(x)]; if(!p) return;
     if(p.hp!=null) x.hp=p.hp;
+    if(p.thp!=null) x.thp=p.thp; else delete x.thp;   // щит игрока ведёт он сам — в столе он авторитетнее
     if(p.init!=null) x.init=p.init;
     if(p.ds) x.ds=p.ds; else delete x.ds;
     if(Array.isArray(p.conds)) x.conds=p.conds;   // состояния игрок вешает на себя сам — публикация ГМа их не снимает
@@ -11662,6 +11679,25 @@ function trkMaxHp(x, proj){
   return parseInt(x&&x.max,10)||0;
 }
 function trkHpColor(p){ return p>.5?'var(--hp-ok)':p>.25?'var(--hp-mid)':'var(--hp-low)'; }
+/* Временные хиты (ВХ) карточки: свой запас поверх обычных — урон съедает его первым,
+   лечение его не восстанавливает и в максимум он не входит. Нет поля — нет и щита. */
+function trkThp(x){ return Math.max(0, parseInt(x&&x.thp,10)||0); }
+/* Новые {hp,thp} после урона/лечения: урон сначала уходит в ВХ, лечение упирается в
+   максимум (когда он известен) и никогда не понижает уже набранные сверх него хиты. */
+function trkHpCalc(cur, thp, max, n, dmg){
+  cur=Math.max(0,parseInt(cur,10)||0); thp=Math.max(0,parseInt(thp,10)||0);
+  n=Math.abs(parseInt(n,10)||0); max=parseInt(max,10)||0;
+  if(!dmg) return {hp: max>0?Math.max(cur,Math.min(cur+n,max)):cur+n, thp:thp};
+  const eat=Math.min(thp,n);
+  return {hp:Math.max(0,cur-(n-eat)), thp:thp-eat};
+}
+/* стиль отрезка ВХ на полосе: он идёт следом за обычными хитами, а когда те уже полны —
+   ложится на правый край полосы, иначе при целом здоровье щита не было бы видно совсем */
+function trkThpStyle(thp, max, hpPct){
+  if(!(max>0) || !(thp>0)) return 'width:0';
+  const w=Math.max(0,Math.min(100, Math.round(thp/max*100)));
+  return 'left:'+Math.max(0,Math.min(hpPct, 100-w))+'%;width:'+w+'%';
+}
 /* публикация ТОЛЬКО хода/раунда: тянем свежий стол из облака и меняем в нём
    только round/activeKey — список участников (живые ХП/инициатива игроков) не трогаем */
 function trkPublishTurn(){
@@ -11692,22 +11728,46 @@ function trkRoundReset(){ if(!ADMIN) return; TRK.round=1; const o=trkOrder(TRK.l
 /* быстрый урон/лечение врагу/NPC (карточки ГМа) */
 function trkHpQuick(i,mode){
   if(!ADMIN) return; const x=TRK.list[i]; if(!x) return;
-  const cur0=trkLiveHp(x), mx0=trkMaxHp(x, CUR_PROJECT);   // подсказка чипу «Все»
-  hpAmountPrompt(mode==='dmg'?'Урон · '+(x.name||''):'Лечение · '+(x.name||''), mode==='dmg'?'#d9564e':'#78c46b', v=>{
+  const dmg=mode==='dmg';
+  const cur0=trkLiveHp(x), mx0=trkMaxHp(x, CUR_PROJECT), th0=trkThp(x);   // подсказка чипу «Все» (урон бьёт и по щиту)
+  hpAmountPrompt(dmg?'Урон · '+(x.name||''):'Лечение · '+(x.name||''), dmg?'#d9564e':'#78c46b', v=>{
     const n=Math.abs(parseInt(v,10)||0); if(!n) return;
-    const cur=trkLiveHp(x);   // база — живое значение игрока (могло измениться, пока окно было открыто)
-    if(mode==='dmg' && trkMassiveDeath(x, cur, n, CUR_PROJECT)){
-      x.hp=0; x.ds={s:0,f:3};
-      trkSharedCardPatch(x, {hp:0, ds:x.ds});
+    const cur=trkLiveHp(x), thp=trkThp(x);   // база — живое значение игрока (могло измениться, пока окно было открыто)
+    const eat=dmg?Math.min(thp,n):0;         // ВХ приняли часть удара — «смертельным» считаем только остаток
+    if(dmg && trkMassiveDeath(x, cur, n-eat, CUR_PROJECT)){
+      x.hp=0; x.ds={s:0,f:3}; delete x.thp;
+      trkSharedCardPatch(x, {hp:0, ds:x.ds, thp:null});
       trkLog('death',(x.name||'персонаж')+' погибает от смертельного урона ('+n+')');
       toast('Смертельный урон — '+(x.name||'персонаж')+' погибает без спасбросков');
       renderTracker(); return;
     }
-    const nv=mode==='dmg'?Math.max(0,cur-n):cur+n;
-    trkLog(mode==='dmg'?'dmg':'heal','ГМ: '+(x.name||'')+(mode==='dmg'?' −':' +')+n+' ХП ('+nv+')');
-    if(mode==='dmg' && isFoeCard(x) && cur>0 && nv<=0) trkLog('death',(x.name||'существо')+' повержено');
-    trkSet(i,'hp', nv);
-  }, {max: mode==='dmg'?cur0:Math.max(0,mx0-cur0)});
+    const r=trkHpCalc(cur, thp, trkMaxHp(x, CUR_PROJECT), n, dmg);
+    trkLog(dmg?'dmg':'heal','ГМ: '+(x.name||'')+(dmg?' −':' +')+n+' ХП ('+r.hp+')');
+    if(dmg && isFoeCard(x) && cur>0 && r.hp<=0) trkLog('death',(x.name||'существо')+' повержено');
+    trkApplyHp(i, r.hp, r.thp);
+  }, {max: dmg?(cur0+th0):Math.max(0,mx0-cur0)});
+}
+/* ХП и ВХ карточки одним действием: у игрока/NPC они авторитетны в общем столе (пишем одним
+   патчем, иначе два патча гонятся между собой), у врага — в локальном списке ГМа.
+   extra — доп. поля карточки (например ds:null, когда боец поднялся с нуля). */
+function trkApplyHp(i, hp, thp, extra){
+  const x=TRK.list[i]; if(!x) return;
+  hp=Math.max(0,parseInt(hp,10)||0); thp=Math.max(0,parseInt(thp,10)||0);
+  const patch=Object.assign({hp:hp, thp:thp||null}, extra||{});   // thp:null — deepAssign снимает поле совсем
+  deepAssign(x, patch);
+  if(x.charId){ trkSharedCardPatch(x, patch); trkRedraw(true); return; }
+  const s=TRK_SHARED[gmBoardKey()];
+  if(s && Array.isArray(s.list)){ const t=s.list.find(r=>r && trkCardKey(r)===trkCardKey(x)); if(t) deepAssign(t, patch); }
+  trkSave(); trkRedraw(true);
+}
+/* «+ВХ»: временные хиты не складываются — новый запас заменяет прежний (0 снимает щит) */
+function trkThpPrompt(i){
+  if(!ADMIN) return; const x=TRK.list[i]; if(!x) return;
+  hpAmountPrompt('Временные ХП · '+(x.name||''), '#6aa9ff', v=>{
+    const nv=Math.max(0,parseInt(v,10)||0), cur=trkLiveHp(x);
+    trkLog('heal','ГМ: '+(x.name||'')+(nv?(' +'+nv+' временных ХП'):' — временные ХП сняты'));
+    trkApplyHp(i, cur, nv);
+  }, {presets:[1,2,3,5,10]});
 }
 /* живое ХП карточки ГМа: игроки/NPC ведут ХП в общем столе — читаем оттуда (и подтягиваем в локальную карточку) */
 function trkLiveHp(x){
@@ -11749,8 +11809,11 @@ function trkRowHtml(x,o){
   const active=o.activeKey && trkCardKey(x)===o.activeKey;
   const ava=trkAva(x,o.proj);
   const foe=o.foe, dead=o.dead, mine=o.mine;
-  const max=trkMaxHp(x,o.proj), hp=parseInt(x.hp,10)||0;
+  const max=trkMaxHp(x,o.proj), hp=parseInt(x.hp,10)||0, thp=trkThp(x);
   const pct=max? Math.max(0,Math.min(100,Math.round(hp/max*100))) : (hp>0?100:0);
+  // отрезок ВХ идёт следом за полосой хитов, знак «+N» стоит рядом с числом
+  const thpSeg=(max&&thp)?`<b class="thp" style="${trkThpStyle(thp,max,pct)}"></b>`:'';
+  const thpSign=`<em class="thp">${thp?'+'+thp:''}</em>`;
   const key0=trkCardKey(x), seld=TRK_SEL.has(key0);
   const cls=['tb-row', foe?'foe':'pc', active?'on-turn':'', dead?'dead':'', o.edit?'gm':'', seld?'sel':''].filter(Boolean).join(' ');
   const check=o.edit?(foe?`<label class="tb-check"><input type="checkbox" ${seld?'checked':''} onchange="trkSelToggle('${esc(key0)}')" aria-label="Выбрать"></label>`:`<span class="tb-check"></span>`):'';
@@ -11764,7 +11827,7 @@ function trkRowHtml(x,o){
   if(o.edit){
     hpBlock=`<div class="tb-hpwrap">
       <button class="tb-hpb dmg" onclick="trkHpQuick(${o.idx},'dmg')">−</button>
-      <div class="tb-hpbar">${max?`<i style="width:${pct}%;background:${trkHpColor(pct/100)}"></i>`:''}<span class="txt"><input class="tb-hp-in" inputmode="numeric" value="${esc(String(hp))}" onchange="trkSet(${o.idx},'hp',this.value)"></span></div>
+      <div class="tb-hpbar">${max?`<i style="width:${pct}%;background:${trkHpColor(pct/100)}"></i>`:''}${thpSeg}<span class="txt"><input class="tb-hp-in" inputmode="numeric" value="${esc(String(hp))}" onchange="trkSet(${o.idx},'hp',this.value)">${thpSign}</span></div>
       <button class="tb-hpb heal" onclick="trkHpQuick(${o.idx},'heal')">+</button>
     </div>`;
   } else if(foe && o.playerView){
@@ -11772,14 +11835,20 @@ function trkRowHtml(x,o){
   } else {
     hpBlock=`<div class="tb-hpwrap">
       ${mine?`<button class="tb-hpb dmg" onclick="playerHpAdjust('dmg')">−</button>`:''}
-      <div class="tb-hpbar">${max?`<i style="width:${pct}%;background:${trkHpColor(pct/100)}"></i>`:''}<span class="txt">${dead?'💀':String(hp)}</span></div>
+      <div class="tb-hpbar">${max?`<i style="width:${pct}%;background:${trkHpColor(pct/100)}"></i>`:''}${thpSeg}<span class="txt"><span class="n">${dead?'💀':String(hp)}</span>${thpSign}</span></div>
       ${mine?`<button class="tb-hpb heal" onclick="playerHpAdjust('heal')">+</button>`:''}
     </div>`;
   }
   // статусы игрока видны лишь ему самому и ГМу — чужие в режиме игрока скрыты
   const showConds = !o.playerView || foe || mine;
   const conds=showConds?(x.conds||[]).map(c=>`<span class="tb-cond${c.b?' buff':''}">${esc(c.t)}</span>`).join(''):'';
-  const condAdd=o.edit?`<button class="tb-cond add" onclick="trkCondPick(${o.idx})">＋ состояние</button>`:'';
+  // максимум ХП и запас ВХ — чипами в том же переносимом ряду, что и состояния:
+  // у врага максимум правится прямо здесь, у игрока он приходит из листа и только показывается
+  const maxChip=o.edit
+    ? (foe?`<span class="tb-cond add mx">макс<input class="tb-max-in" inputmode="numeric" value="${esc(String(max||''))}" aria-label="Максимум ХП" onchange="trkSet(${o.idx},'max',this.value)"></span>`
+         : (max?`<span class="tb-cond add mx ro">макс ${max}</span>`:''))
+    : '';
+  const condAdd=o.edit?`${maxChip}<button class="tb-cond add" onclick="trkCondPick(${o.idx})">＋ состояние</button><button class="tb-cond add thp${thp?' on':''}" onclick="trkThpPrompt(${o.idx})" title="Временные хиты">${thp?('ВХ '+thp):'＋ВХ'}</button>`:'';
   let right;
   if(!foe && (dead || hp<=0)){ const ds=x.ds||{s:0,f:0};   // при 0 ХП ГМ видит ход спасбросков, а не только итог
     right=`<div class="tb-ds"><div>${[0,1,2].map(k=>`<span class="p ${((ds.s||0)>k)?'s':''}"></span>`).join('')}</div><div>${[0,1,2].map(k=>`<span class="p ${((ds.f||0)>k)?'f':''}"></span>`).join('')}</div></div>`;
@@ -11960,7 +12029,8 @@ function trkComboSig(src, view){
     const foe=isFoeCard(x), foeHidden=src.playerView&&foe, hp=parseInt(x.hp,10)||0;
     const dead=foe?(hp<=0):(x.ds&&(x.ds.f||0)>=3);
     const dying=(!foe && hp<=0)?1:0, ds=(!foe && x.ds)?((x.ds.s||0)+'/'+(x.ds.f||0)):'';   // панель спасбросков и её точки
-    return [trkCardKey(x), x.name||'', x.ava||beastImgByName(x.name)||'', (x.conds||[]).map(c=>c.t+(c.b?'+':'')).join(','), x.conc?1:0, dead?1:0, foeHidden?1:0, dying, ds].join('~');
+    return [trkCardKey(x), x.name||'', x.ava||beastImgByName(x.name)||'', (x.conds||[]).map(c=>c.t+(c.b?'+':'')).join(','), x.conc?1:0, dead?1:0, foeHidden?1:0, dying, ds,
+            parseInt(x.max,10)||0, trkThp(x)?1:0].join('~');   // максимум и появление/снятие щита меняют разметку строки
   }).join('||')+extra;
 }
 function trkSetSig(){ const box=document.getElementById('trkBox'); if(box){ try{ box.dataset.trkSig=trkComboSig(trkSource(), trkViewMode()); }catch(e){} } }
@@ -11991,16 +12061,23 @@ function trkRefresh(){
   src.order.forEach(x=>{
     const key=trkCardKey(x); const node=box.querySelector('[data-key="'+esc2(key)+'"]'); if(!node) return;
     node.classList.toggle('on-turn', key===src.activeKey);
-    const foe=isFoeCard(x), max=trkMaxHp(x,src.proj), hp=parseInt(x.hp,10)||0;
+    const foe=isFoeCard(x), max=trkMaxHp(x,src.proj), hp=parseInt(x.hp,10)||0, thp=trkThp(x);
     const dead=foe?(hp<=0):(x.ds&&(x.ds.f||0)>=3);
     const pct=max?Math.max(0,Math.min(100,Math.round(hp/max*100))):(hp>0?100:0);
     const bar=node.querySelector('.tb-hpbar i, .tc-hp i'); if(bar&&max){ bar.style.width=pct+'%'; bar.style.background=trkHpColor(pct/100); }
+    const seg=node.querySelector('.tb-hpbar b.thp, .tc-hp b.thp');   // отрезок ВХ едет следом за полосой хитов
+    if(seg) seg.style.cssText=trkThpStyle(thp,max,pct);
     if(!(foe && src.playerView)){
       const txt=node.querySelector('.tb-hpbar .txt, .tc-hp .txt');
-      if(txt){ const inp=txt.querySelector('.tb-hp-in,.tc-hp-in');
+      if(txt){ const inp=txt.querySelector('.tb-hp-in,.tc-hp-in'), num=txt.querySelector('.n');
         if(inp){ if(document.activeElement!==inp) inp.value=hp; }
         // в списке мёртвый боец показывает 💀; у карточки — число (свой красный череп поверх фото)
-        else txt.textContent=(dead && !node.classList.contains('trk-card'))?'💀':hp; }
+        else if(num) num.textContent=(dead && !node.classList.contains('trk-card'))?'💀':hp;
+        else txt.textContent=(dead && !node.classList.contains('trk-card'))?'💀':hp;
+        const sg=txt.querySelector('em.thp'); if(sg) sg.textContent=thp?('+'+thp):''; }
+      const mxIn=node.querySelector('.tb-max-in'); if(mxIn && document.activeElement!==mxIn) mxIn.value=max||'';
+      const thpBtn=node.querySelector('.tb-cond.add.thp, .tc-statebtn.thp');   // чип в списке и кнопка на карточке
+      if(thpBtn){ thpBtn.textContent=thp?('ВХ '+thp):'＋ВХ'; thpBtn.classList.toggle('on', thp>0); }
     }
     const iniIn=node.querySelector('.tb-ini-in');   // инициатива правится только в списке (на карточках её нет)
     if(iniIn){ if(document.activeElement!==iniIn) iniIn.value=x.init??0; }
@@ -12010,7 +12087,7 @@ function trkRefresh(){
     const my=src.order.find(x=>x.charId && (CHARS_ALL[src.proj]||[]).some(c=>c&&c.id===x.charId&&!c.deleted&&SESSION&&normTag(c.owner||'')===currentTag()));
     if(my){
       const mi=box.querySelector('.trk-me .tm-in'); if(mi && document.activeElement!==mi) mi.value=my.init??0;
-      const mh=box.querySelector('.trk-me .tm-st b.hp'); if(mh){ const mx=trkMaxHp(my,src.proj); mh.innerHTML=(parseInt(my.hp,10)||0)+(mx?'<i>/'+mx+'</i>':''); }
+      const mh=box.querySelector('.trk-me .tm-st b.hp'); if(mh){ const mx=trkMaxHp(my,src.proj), mt=trkThp(my); mh.innerHTML=(parseInt(my.hp,10)||0)+(mx?'<i>/'+mx+'</i>':'')+(mt?'<em class="thp">+'+mt+'</em>':''); }
     }
   }
 }
@@ -12162,8 +12239,10 @@ function trkCardHtml(x, o){
   const ava = trkAva(x,o.proj);
   const bg = ava?` style="--img:url('${cssUrl(ava)}')"`:'';
   const foe=o.foe, dead=o.dead, mine=o.mine;
-  const max=trkMaxHp(x,o.proj), hp=parseInt(x.hp,10)||0;
+  const max=trkMaxHp(x,o.proj), hp=parseInt(x.hp,10)||0, thp=trkThp(x);
   const pct=max? Math.max(0,Math.min(100,Math.round(hp/max*100))) : (hp>0?100:0);
+  const thpSeg=(max&&thp)?`<b class="thp" style="${trkThpStyle(thp,max,pct)}"></b>`:'';
+  const thpSign=`<em class="thp">${thp?'+'+thp:''}</em>`;
   const cls=['trk-card', x.charId?'pc':'', active?'on-turn':'', ava?'':'noimg', dead?'dead':''].filter(Boolean).join(' ');
   const name = o.edit
     ? `<input class="tc-name-in" value="${esc(x.name||'')}" placeholder="Имя" onchange="trkSet(${o.idx},'name',this.value)">`
@@ -12178,8 +12257,8 @@ function trkCardHtml(x, o){
     // на полосе — только текущие хиты (число уменьшается по мере урона); смерть отмечает череп на картинке
     const inner = o.edit
       ? `<input class="tc-hp-in" inputmode="numeric" value="${esc(String(hp))}" onchange="trkSet(${o.idx},'hp',this.value)">`
-      : String(hp);
-    hpRow=`<div class="tc-hp">${max?`<i style="width:${pct}%;background:${trkHpColor(pct/100)}"></i>`:''}<span class="txt">${inner}</span></div>`;
+      : `<span class="n">${String(hp)}</span>`;
+    hpRow=`<div class="tc-hp">${max?`<i style="width:${pct}%;background:${trkHpColor(pct/100)}"></i>`:''}${thpSeg}<span class="txt">${inner}${thpSign}</span></div>`;
   }
   // инициатива больше не показывается на доске (остаётся в расчётах и в нижнем меню игрока)
   const sh='<svg class="acsh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z"/></svg>';
@@ -12199,7 +12278,7 @@ function trkCardHtml(x, o){
         <div class="tc-hprow">${hpRow}${acChip}</div>
       </div>
     </div>
-    ${o.edit?`<button class="tc-statebtn" onclick="trkCondPick(${o.idx})">＋ состояние</button>`:''}
+    ${o.edit?`<div class="tc-btns"><button class="tc-statebtn" onclick="trkCondPick(${o.idx})">＋ состояние</button><button class="tc-statebtn thp${thp?' on':''}" onclick="trkThpPrompt(${o.idx})" title="Временные хиты">${thp?('ВХ '+thp):'＋ВХ'}</button></div>`:''}
   </div>`;
 }
 /* ГМ пишет живое поле карточки прямо в общий стол (merge-safe). Нужно для карточек
@@ -12230,9 +12309,9 @@ function trkSet(i,field,val){
   else x[field]=parseInt(val,10)||0;
   // карточка игрока: ХП/инициатива авторитетны в столе — пишем туда напрямую, без републикации,
   // иначе публикация возьмёт прежнее облачное значение и правка ГМа откатится
-  if((field==='hp'||field==='init') && x.charId){ trkSharedCardSet(x, field, x[field]); trkRedraw(true); return; }
+  if((field==='hp'||field==='init'||field==='thp') && x.charId){ trkSharedCardSet(x, field, x[field]); trkRedraw(true); return; }
   // враг: мгновенно зеркалим в память, публикация возьмёт значение из локального списка
-  if(field==='hp' || field==='init'){
+  if(field==='hp' || field==='init' || field==='max' || field==='thp'){
     const s=TRK_SHARED[gmBoardKey()];
     if(s && Array.isArray(s.list)){ const t=s.list.find(r=>r && trkCardKey(r)===trkCardKey(x)); if(t) t[field]=x[field]; }
   }
@@ -12265,12 +12344,12 @@ function playerMaxHp(vp, charId){
    а при 0 ХП — спасброски от смерти */
 function playerMePanel(vp){
   const my=playerMyCard(vp); if(!my) return '';
-  const maxHp=playerMaxHp(vp,my.charId), hp=parseInt(my.hp,10)||0, over=maxHp>0 && hp>maxHp;
+  const maxHp=playerMaxHp(vp,my.charId), hp=parseInt(my.hp,10)||0, over=maxHp>0 && hp>maxHp, thp=trkThp(my);
   const dying = hp<=0;
   return `<div class="trk-me">
     <div class="tm-row">
       <div class="tm-st"><span>Иниц</span><input class="tm-in" inputmode="numeric" value="${esc(String(my.init??0))}" onchange="playerInitSet(this.value)"></div>
-      <div class="tm-st"><span>ХП</span><b class="hp${over?' over':''}">${hp}${maxHp?`<i>/${maxHp}</i>`:''}</b></div>
+      <div class="tm-st"><span>ХП</span><b class="hp${over?' over':''}">${hp}${maxHp?`<i>/${maxHp}</i>`:''}${thp?`<em class="thp">+${thp}</em>`:''}</b></div>
       <div class="tm-st"><span>КД</span><b>${my.ac?esc(String(my.ac)):'—'}</b></div>
     </div>
     <div class="tm-btns">
@@ -12421,31 +12500,29 @@ function playerHpAdjust(mode){
   const vp=trkActiveForPlayer(); if(!vp) return;
   const my0=playerMyCard(vp); if(!my0){ toast('Вашего персонажа нет на доске'); return; }
   const dmg = mode==='dmg';
-  const cur0=parseInt(my0.hp,10)||0, max0=playerMaxHp(vp,my0.charId);   // подсказка для чипа «Все»: весь ХП / до максимума
+  const cur0=parseInt(my0.hp,10)||0, max0=playerMaxHp(vp,my0.charId), th0=trkThp(my0);   // подсказка для чипа «Все»: весь ХП со щитом / до максимума
   hpAmountPrompt(dmg?'Получить урон':'Восполнить ХП', dmg?'#ff5a5f':'#3ecf6a', v=>{
     const n=Math.abs(parseInt(v,10)||0); if(!n) return;
     const my=playerMyCard(vp); if(!my) return;
     if(!dmg && my.ds && (my.ds.f||0)>=3){ toast('Персонаж мёртв — вернуть его может только Мастер'); return; }
-    const cur=parseInt(my.hp,10)||0;
-    const prev={hp:cur, ds:my.ds?JSON.parse(JSON.stringify(my.ds)):null};   // для «↶ Отменить» (копия: deepAssign правит ds на месте)
-    const patch={}; let died=false;
+    const cur=parseInt(my.hp,10)||0, thp=trkThp(my), mx=playerMaxHp(vp,my.charId);
+    const prev={hp:cur, thp:thp, ds:my.ds?JSON.parse(JSON.stringify(my.ds)):null};   // для «↶ Отменить» (копия: deepAssign правит ds на месте)
+    const r=trkHpCalc(cur, thp, mx, n, dmg);   // урон сначала съедает ВХ, лечение упирается в максимум листа
+    const patch={hp:r.hp, thp:r.thp||null}; let died=false;
     if(dmg){
-      patch.hp=Math.max(0,cur-n);
-      if(trkMassiveDeath(my, cur, n, boardProj(vp))){ patch.ds={s:0,f:3}; died=true; }  // урон «за ноль» ≥ макс. ХП — мгновенная смерть
-      else if(patch.hp>=1) patch.ds=null;                                                // ожил — спасброски сбрасываются
-    } else {
-      patch.hp=cur+n;
-      if(patch.hp>=1) patch.ds=null;
-    }
+      const eat=Math.min(thp,n);   // «за ноль» считаем по остатку урона, который прошёл сквозь щит
+      if(trkMassiveDeath(my, cur, n-eat, boardProj(vp))){ patch.ds={s:0,f:3}; died=true; }  // урон «за ноль» ≥ макс. ХП — мгновенная смерть
+      else if(patch.hp>=1) patch.ds=null;                                                   // ожил — спасброски сбрасываются
+    } else if(patch.hp>=1) patch.ds=null;
     deepAssign(my, patch); const s=TRK_SHARED[vp]; if(s) s.at=Date.now();   // оптимистично локально
     trkRedraw(true);
     trkCloudCardPatch(vp, trkCardKey(my), patch);
     trkLog(dmg?'dmg':'heal',(my.name||'Игрок')+(dmg?' получает '+n+' урона ('+patch.hp+' ХП)':' восполняет '+n+' ХП ('+patch.hp+')'));
     if(died) trkLog('death',(my.name||'Персонаж')+' погибает от смертельного урона');
-    const key=trkCardKey(my), set=patch.hp, mx=playerMaxHp(vp,my.charId);
-    toast((dmg?'−':'+')+n+' ХП · '+set+(mx?'/'+mx:'')+(died?' · смертельный урон, без спасбросков':''),
+    const key=trkCardKey(my), set=patch.hp;
+    toast((dmg?'−':'+')+n+' ХП · '+set+(mx?'/'+mx:'')+(r.thp?' (+'+r.thp+' ВХ)':'')+(died?' · смертельный урон, без спасбросков':''),
       {action:{label:'↶ Отменить', fn:()=>playerHpUndo(vp, key, set, prev, n, dmg)}, ms:6000});
-  }, {max: dmg?cur0:Math.max(0,max0-cur0)});
+  }, {max: dmg?(cur0+th0):Math.max(0,max0-cur0)});
 }
 /* отмена своего урона/лечения (кнопка в тосте, 6 с): возвращаем ХП и спасброски, какими они были,
    но только если ХП всё ещё равно тому, что мы записали — иначе кто-то (ГМ, второй тап) уже успел */
@@ -12453,7 +12530,7 @@ function playerHpUndo(vp, key, set, prev, n, dmg){
   const s=TRK_SHARED[vp]; const my=s&&Array.isArray(s.list)&&s.list.find(r=>r&&trkCardKey(r)===key);
   if(!my || (parseInt(my.hp,10)||0)!==set){ toast('ХП уже изменили'); return; }
   // то же условие — и на свежем значении из облака: правку ГМа, которую мы ещё не успели получить, не затираем
-  trkCloudCardPatch(vp, key, {hp:prev.hp, ds:prev.ds||null}, t=>(parseInt(t.hp,10)||0)===set);
+  trkCloudCardPatch(vp, key, {hp:prev.hp, thp:prev.thp||null, ds:prev.ds||null}, t=>(parseInt(t.hp,10)||0)===set);
   trkRedraw(true);
   trkLog(dmg?'heal':'dmg',(my.name||'Игрок')+' отменяет '+(dmg?'урон ':'лечение ')+n+' ('+prev.hp+' ХП)');
   toast('Отменено · '+prev.hp+' ХП');
@@ -12652,8 +12729,13 @@ function trkAddManual(){
   const el=document.getElementById('trk-add'); const v=el?el.value.trim():'';
   if(!v) return;
   if(el) el.value='';
-  TRK.list.push({name:v, init:0, hp:0, ac:'', foe:true, uid:uid()});
-  trkLog('add','ГМ добавил: '+v);
+  // хвост «12/12» или «12» читаем как хиты/максимум: без max у ручного врага нет полосы ХП,
+  // лечение ничем не ограничено, а «повержено» не срабатывает никогда (хиты и так 0)
+  const m=v.match(/^(.+?)[\s\u00b7]+(\d{1,5})(?:\s*\/\s*(\d{1,5}))?$/);
+  let name=v, hp=0, max=0;
+  if(m && m[1].trim()){ name=m[1].trim(); hp=parseInt(m[2],10)||0; max=(m[3]!=null?(parseInt(m[3],10)||0):hp); }
+  TRK.list.push({name:name, init:0, hp:hp, max:max, ac:'', foe:true, uid:uid()});
+  trkLog('add','ГМ добавил: '+name+(max?(' ('+hp+'/'+max+')'):''));
   trkSave(); renderTracker();
 }
 function trkSuggest(q){
@@ -12728,18 +12810,19 @@ function renderGmManage(){
 function gmCreaturePanel(x,i){
   const open=GM_MANAGE_OPEN.has(trkCardKey(x));
   const ava=trkAva(x,CUR_PROJECT);
-  const hp=parseInt(x.hp,10)||0;
+  const hp=parseInt(x.hp,10)||0, mx=trkMaxHp(x,CUR_PROJECT), th=trkThp(x);
   return `<div class="gm-cre${open?' open':''}">
     <button class="gm-cre-h" onclick="gmManageToggle(${i})">
       <span class="gm-cre-av"${ava?` style="background-image:url('${cssUrl(ava)}')"`:''}></span>
       <span class="gm-cre-nm">${esc(x.name||'—')}</span>
-      <span class="gm-cre-hp${hp<=0?' dead':''}">${hp<=0?'💀':hp+' ХП'}</span>
+      <span class="gm-cre-hp${hp<=0?' dead':''}">${hp<=0?'💀':hp+(mx?'/'+mx:'')+' ХП'+(th?' +'+th:'')}</span>
       <span class="gm-cre-ch">▾</span>
     </button>
     ${open?`<div class="gm-cre-b">
       <div class="gm-cre-ctrl">
         <button class="tm-btn dmg" onclick="gmHpPrompt(${i},'dmg')">− Урон</button>
         <button class="tm-btn heal" onclick="gmHpPrompt(${i},'heal')">＋ Лечить</button>
+        <button class="tm-btn" onclick="trkThpPrompt(${i})" title="Временные хиты">＋ВХ${th?' '+th:''}</button>
         <div class="gm-cre-init"><span>Иниц</span><input inputmode="numeric" value="${esc(String(x.init??0))}" onchange="trkSet(${i},'init',this.value)"></div>
       </div>
       ${gmCreatureBody(x)}
@@ -12785,32 +12868,23 @@ function gmManageToggle(i){
 // ХП существа ГМа: враги — ведёт ГМ (локальный список); NPC-листы живут в общем столе — правим там
 function gmManageHp(i,delta){
   const x=TRK.list[i]; if(!x) return;
-  if(!isFoeCard(x)){ const sh=TRK_SHARED[gmBoardKey()]; const t=sh&&Array.isArray(sh.list)&&sh.list.find(r=>r&&trkCardKey(r)===trkCardKey(x)); if(t&&t.hp!=null) x.hp=t.hp; }
+  if(!isFoeCard(x)){ const sh=TRK_SHARED[gmBoardKey()]; const t=sh&&Array.isArray(sh.list)&&sh.list.find(r=>r&&trkCardKey(r)===trkCardKey(x)); if(t){ if(t.hp!=null) x.hp=t.hp; x.thp=trkThp(t); } }
   const cur0=parseInt(x.hp,10)||0;
-  const nv=Math.max(0,cur0+delta);
-  x.hp=nv;
-  trkLog(delta<0?'dmg':'heal','ГМ: '+(x.name||'')+(delta<0?' −':' +')+Math.abs(delta)+' ХП ('+nv+')');
-  if(delta<0 && isFoeCard(x) && cur0>0 && nv<=0) trkLog('death',(x.name||'существо')+' повержено');
-  if(isFoeCard(x)){
-    // зеркалим в общий стол до перерисовки: иначе renderTracker → trkAbsorbShared вернул бы прежнее ХП из стола
-    const s=TRK_SHARED[gmBoardKey()]; if(s&&Array.isArray(s.list)){ const t=s.list.find(r=>r&&trkCardKey(r)===trkCardKey(x)); if(t) t.hp=nv; }
-    trkSave(); renderTracker();
-  } else {
-    const key=trkCardKey(x), bk=gmBoardKey();
-    const s=TRK_SHARED[bk]; if(s&&Array.isArray(s.list)){ const t=s.list.find(r=>trkCardKey(r)===key); if(t){ t.hp=nv; if(nv>=1 && t.ds) delete t.ds; s.at=Date.now(); } }
-    const patch={hp:nv}; if(nv>=1) patch.ds=null;
-    trkCloudCardPatch(bk, key, patch);
-  }
+  const r=trkHpCalc(cur0, trkThp(x), trkMaxHp(x, CUR_PROJECT), Math.abs(delta), delta<0);   // ВХ тратятся первыми, лечение — до максимума
+  trkLog(delta<0?'dmg':'heal','ГМ: '+(x.name||'')+(delta<0?' −':' +')+Math.abs(delta)+' ХП ('+r.hp+')');
+  if(delta<0 && isFoeCard(x) && cur0>0 && r.hp<=0) trkLog('death',(x.name||'существо')+' повержено');
+  // trkApplyHp сам решает, куда писать: враг — в локальный список (и зеркало в столе), игрок/NPC — патчем в стол
+  trkApplyHp(i, r.hp, r.thp, (!isFoeCard(x) && r.hp>=1) ? {ds:null} : null);
   renderGmManage();
 }
 function gmHpPrompt(i,mode){
   const x=TRK.list[i]; if(!x) return;
   const dmg=mode==='dmg';
-  const cur0=trkLiveHp(x), mx0=trkMaxHp(x, CUR_PROJECT);   // подсказка чипу «Все»
+  const cur0=trkLiveHp(x), mx0=trkMaxHp(x, CUR_PROJECT), th0=trkThp(x);   // подсказка чипу «Все»
   hpAmountPrompt((dmg?'Урон · ':'Лечение · ')+(x.name||''), dmg?'#ff5a5f':'#3ecf6a', v=>{
     const n=Math.abs(parseInt(v,10)||0); if(!n) return;
     gmManageHp(i, dmg?-n:n);
-  }, {max: dmg?cur0:Math.max(0,mx0-cur0)});
+  }, {max: dmg?(cur0+th0):Math.max(0,mx0-cur0)});
 }
 /* ГМ жмёт по карточке на доске: игрок/NPC — открываем его лист, монстр — сводку из бестиария.
    Всё открывается поверх доски (модалка), доска остаётся под ней и возвращается по закрытию */
@@ -14301,6 +14375,7 @@ function openInstallHelp(){
   .pd-bar-hp{position:relative;flex:1;height:22px;border-radius:8px;background:var(--surface2);
     border:var(--hair) solid var(--line2);overflow:hidden}
   .pd-bar-hp i{display:block;height:100%;border-radius:7px;transition:width .25s}
+  .pd-bar-hp b.thp{position:absolute;top:0;bottom:0;background:#6aa9ff}
   .pd-bar-hp span{position:absolute;inset:0;display:grid;place-items:center;
     font-family:var(--f-mono);font-size:.72rem;color:var(--txt);text-shadow:0 1px 3px rgba(0,0,0,.7)}
   .pd-hpb{width:34px;height:30px;flex:none;border-radius:9px;border:var(--hair) solid var(--line2);
@@ -14467,7 +14542,7 @@ function openInstallHelp(){
     if(have.cond){ var dt=me.querySelector('.tm-cond details'); if(dt) dt.open=true; }   // секция уже в панели — второй не добавляем, список раскрыт
     else { me.appendChild(condsNode(my)); have.cond=true; }
 
-    var maxHp=playerMaxHp(vp, my.charId), hp=parseInt(my.hp,10)||0;
+    var maxHp=playerMaxHp(vp, my.charId), hp=parseInt(my.hp,10)||0, thp=trkThp(my);
     var pct = maxHp ? Math.max(0,Math.min(100,Math.round(hp/maxHp*100))) : (hp>0?100:0);
     var ava=''; try{ ava=trkAva(my, boardProj(vp))||''; }catch(e){}
 
@@ -14487,7 +14562,8 @@ function openInstallHelp(){
       '<div class="pd-hp">'+
         '<button class="pd-hpb dmg" onclick="playerHpAdjust(\'dmg\')" title="Получить урон">−</button>'+
         '<div class="pd-bar-hp">'+(maxHp?'<i style="width:'+pct+'%;background:'+trkHpColor(pct/100)+'"></i>':'')+
-          '<span>'+(hp<=0?'💀 0':(hp+(maxHp?(' / '+maxHp):'')))+'</span></div>'+
+          ((maxHp&&thp)?'<b class="thp" style="'+trkThpStyle(thp,maxHp,pct)+'"></b>':'')+
+          '<span>'+(hp<=0?'💀 0':(hp+(maxHp?(' / '+maxHp):'')))+(thp?' (+'+thp+')':'')+'</span></div>'+
         '<button class="pd-hpb heal" onclick="playerHpAdjust(\'heal\')" title="Восполнить">+</button>'+
       '</div>'+
       '<div class="pd-st">КД<b>'+(my.ac?esc(String(my.ac)):'—')+'</b></div>'+
@@ -14844,11 +14920,11 @@ select:focus-visible,summary:focus-visible,[tabindex]:focus-visible,
   /* подпись состояния: перерисовываем только когда она сменилась */
   function stamp(){
     var b=board(), l=lastLog(), m=music();
-    var hp=0; if(b) for(var i=0;i<b.list.length;i++) hp+=parseInt(b.list[i].hp,10)||0;
+    var hp=0, th=0; if(b) for(var i=0;i<b.list.length;i++){ hp+=parseInt(b.list[i].hp,10)||0; th+=parseInt(b.list[i].thp,10)||0; }
     /* className несёт и текущий раздел (view-*), и режим ГМ (is-gm):
        смена любого из них меняет то, что показывает полка */
     var keys=''; if(b) for(var j=0;j<b.list.length;j++) keys+=(b.list[j]&&(b.list[j].charId||b.list[j].uid||b.list[j].name))+',';
-    return [b?b.key:'', b?b.round:'', b?b.activeKey:'', b?b.list.length:'', hp, keys,
+    return [b?b.key:'', b?b.round:'', b?b.activeKey:'', b?b.list.length:'', hp, th, keys,
             l?l.at:'', m?m.name:'', m?m.paused:'', dockOpen?1:0, R.className].join('|');
   }
 
@@ -14926,7 +15002,7 @@ select:focus-visible,summary:focus-visible,[tabindex]:focus-visible,
     var order=trkOrder(b.list), h='';
     for(var i=0;i<order.length;i++){
       var x=order[i], key=trkCardKey(x);
-      var foe=isFoeCard(x), max=trkMaxHp(x,b.proj), hp=parseInt(x.hp,10)||0;
+      var foe=isFoeCard(x), max=trkMaxHp(x,b.proj), hp=parseInt(x.hp,10)||0, thp=trkThp(x);
       var dead = foe ? hp<=0 : !!(x.ds && (x.ds.f||0)>=3);
       var pct = max ? Math.max(0,Math.min(100,Math.round(hp/max*100))) : (hp>0?100:0);
       var idx = b.gm ? TRK.list.indexOf(x) : -1;
@@ -14936,7 +15012,7 @@ select:focus-visible,summary:focus-visible,[tabindex]:focus-visible,
          '<span class="dk-nm"><span class="n">'+E(x.name||'—')+'</span>'+
            (max?'<span class="dk-bar"><i style="width:'+pct+'%;background:'+trkHpColor(pct/100)+'"></i></span>':'')+
          '</span>'+
-         '<span class="dk-hp">'+(max?(hp+' / '+max):(hp?String(hp):'—'))+
+         '<span class="dk-hp">'+(max?(hp+' / '+max):(hp?String(hp):'—'))+(thp?' (+'+thp+')':'')+
            (b.gm && idx>=0 ? '<span class="dk-hpbtns">'+
              '<button class="d" type="button" onclick="event.stopPropagation();trkHpQuick('+idx+',\'dmg\')" aria-label="Урон">&#8722;</button>'+
              '<button class="h" type="button" onclick="event.stopPropagation();trkHpQuick('+idx+',\'heal\')" aria-label="Лечение">+</button>'+
