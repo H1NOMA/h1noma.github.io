@@ -12305,9 +12305,12 @@ function trkRefresh(){
   if(src.playerView){
     const my=src.order.find(x=>x.charId && (CHARS_ALL[src.proj]||[]).some(c=>c&&c.id===x.charId&&!c.deleted&&SESSION&&normTag(c.owner||'')===currentTag()));
     if(my){
-      const mi=box.querySelector('.trk-me .tm-in'); if(mi && document.activeElement!==mi) mi.value=my.init??0;
-      const mh=box.querySelector('.trk-me .tm-st b.hp'); if(mh){ const mx=trkMaxHp(my,src.proj); mh.innerHTML=(parseInt(my.hp,10)||0)+(mx?'<i>/'+mx+'</i>':''); }
-      // на десктопе панель переезжает в нижний пульт — ищем блок спасбросков по странице, а не в #trkBox
+      // панель игрока переезжает из доски в пульт (#pdock) — патчим там, где она сейчас
+      const mp=document.querySelector('#trkBox .trk-me, #pdock .trk-me');
+      const mi=mp&&mp.querySelector('.tm-in'); if(mi && document.activeElement!==mi) mi.value=my.init??0;
+      const mh=mp&&mp.querySelector('.tm-st b.hp'); if(mh){ const mx=trkMaxHp(my,src.proj); mh.innerHTML=(parseInt(my.hp,10)||0)+(mx?'<i>/'+mx+'</i>':''); }
+      try{ if(window.pdPatch) pdPatch(my); }catch(e){}   // полоса пульта: ХП и иниц
+      // отметки спасбросков: блок живёт либо в доске, либо в пульте
       const dsb=document.querySelector('#trkBox .death-saves, #pdock .death-saves');
       if(dsb){ const d=my.ds||{};
         dsb.querySelectorAll('.dscell').forEach(c=>{ const kind=c.classList.contains('s')?'s':'f';
@@ -14632,6 +14635,101 @@ function openInstallHelp(){
 #addCharFab{display:none}
 #projRow{display:none}
 
+  /* ═══ БОЕВОЙ ПУЛЬТ ИГРОКА ═══
+     Полоса во всю ширину полотна, прижата к низу окна. В свёрнутом виде —
+     имя, инициатива, ХП с полосой и кнопками, КД и корешки разделов.
+     Развёрнутый — панель над полосой с тем же содержимым, что стояло
+     сбоку: атаки, заклинания, ячейки, отдых, инвентарь, состояния.
+     Блок переехал ИЗ десктопного медиазапроса сюда без единой правки: пульт
+     поднимается и на телефоне, разметка и pdSync у них общие. Мобильную подачу
+     задаёт блок «ПУЛЬТ ИГРОКА НА ТЕЛЕФОНЕ» в конце файла — он идёт позже и
+     перекрывает отсюда всё, что на телефоне должно выглядеть иначе. */
+  :root{--pdock-h:66px}
+  #pdock{position:fixed;left:var(--rail-w);right:0;bottom:0;z-index:63;
+    display:flex;flex-direction:column;pointer-events:none}
+  #pdock > *{pointer-events:auto}
+  html:not(.pdock-on) #pdock{display:none}
+
+  .pd-bar{height:var(--pdock-h);display:flex;align-items:center;gap:16px;padding:0 16px 0 12px;
+    background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(0,0,0,.34)),var(--bg2);
+    border-top:var(--hair) solid var(--line2);
+    box-shadow:0 -10px 30px rgba(0,0,0,.42)}
+  .pd-ava{width:44px;height:44px;flex:none;border-radius:12px;background:var(--surface2) center/cover no-repeat;
+    border:var(--hair) solid var(--line2);display:grid;place-items:center;
+    font-family:var(--f-disp);font-weight:700;color:var(--dim)}
+  .pd-nm{flex:none;min-width:0;max-width:210px}
+  .pd-nm b{display:block;font-family:var(--f-disp);font-size:1rem;color:var(--txt);line-height:1.15;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pd-nm span{display:block;font-family:var(--f-mono);font-size:.58rem;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--muted)}
+  .pd-st{flex:none;display:flex;align-items:center;gap:6px;font-family:var(--f-mono);font-size:.62rem;
+    letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+  .pd-st b{font-family:var(--f-disp);font-size:1.05rem;color:var(--txt);letter-spacing:0}
+  .pd-in{width:46px;background:var(--surface2);border:var(--hair) solid var(--line2);border-radius:9px;
+    color:var(--txt);font-family:var(--f-disp);font-size:1rem;text-align:center;padding:5px 2px;outline:none}
+  /* растянутая на пол-экрана полоса ХП читалась хуже короткой: держим
+     её фиксированной, а свободное место отдаём корешкам разделов */
+  .pd-hp{flex:0 0 auto;width:268px;display:flex;align-items:center;gap:9px}
+  .pd-bar-hp{position:relative;flex:1;height:22px;border-radius:8px;background:var(--surface2);
+    border:var(--hair) solid var(--line2);overflow:hidden}
+  .pd-bar-hp i{display:block;height:100%;border-radius:7px;transition:width .25s}
+  .pd-bar-hp span{position:absolute;inset:0;display:grid;place-items:center;
+    font-family:var(--f-mono);font-size:.72rem;color:var(--txt);text-shadow:0 1px 3px rgba(0,0,0,.7)}
+  .pd-hpb{width:34px;height:30px;flex:none;border-radius:9px;border:var(--hair) solid var(--line2);
+    background:var(--surface2);color:var(--dim);font-size:1.05rem;line-height:1;cursor:pointer;
+    display:grid;place-items:center;transition:color .15s,border-color .15s}
+  .pd-hpb.dmg:hover{color:#e0776d;border-color:rgba(224,119,109,.55)}
+  .pd-hpb.heal:hover{color:#84c97a;border-color:rgba(132,201,122,.55)}
+  .pd-tabs{flex:none;display:flex;gap:4px;margin-left:auto}
+  .pd-tab{font-family:var(--f-mono);font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--dim);background:none;border:var(--hair) solid transparent;border-radius:10px;
+    padding:8px 12px;cursor:pointer;white-space:nowrap;transition:background .15s,color .15s,border-color .15s}
+  .pd-tab:hover{background:var(--surface2);color:var(--txt)}
+  .pd-tab.on{background:var(--surface2);border-color:var(--line2);color:var(--red-ink)}
+  .pd-tab i{font-style:normal;font-family:var(--f-mono);font-size:.6rem;color:var(--muted);margin-left:5px}
+  .pd-x{width:32px;height:32px;flex:none;border-radius:9px;border:0;background:none;color:var(--muted);
+    cursor:pointer;display:grid;place-items:center;font-size:.9rem}
+  .pd-x:hover{background:var(--surface2);color:var(--txt)}
+
+  .pd-panel{display:none;background:var(--bg2);border-top:var(--hair) solid var(--line2);
+    box-shadow:0 -14px 34px rgba(0,0,0,.45)}
+  html.pdock-open .pd-panel{display:block}
+  .pd-panel-in{max-height:min(46vh,430px);overflow-y:auto;overscroll-behavior:contain;padding:14px 18px 16px}
+  .pd-panel-in .trk-me{margin:0;background:none;border:0;padding:0;
+    display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;align-items:start}
+  .pd-panel-in .tm-sec{margin:0}
+  /* Корешок только показывает свою группу — узлы никуда не переносятся и
+     не пересобираются, поэтому переключение туда-сюда ничего не теряет. */
+  .pd-panel-in .trk-me > [data-pd]{display:none}
+  #pdock[data-tab="atk"]   .trk-me > [data-pd="atk"],
+  #pdock[data-tab="sp"]    .trk-me > [data-pd="sp"],
+  #pdock[data-tab="slots"] .trk-me > [data-pd="slots"],
+  #pdock[data-tab="inv"]   .trk-me > [data-pd="inv"],
+  #pdock[data-tab="rest"]  .trk-me > [data-pd="rest"],
+  #pdock[data-tab="cond"]  .trk-me > [data-pd="cond"],
+  #pdock[data-tab="death"] .trk-me > [data-pd="death"]{display:block}
+  /* заклинания, снаряжение и состояния занимают всю ширину панели */
+  #pdock[data-tab="sp"] .trk-me,#pdock[data-tab="inv"] .trk-me,
+  #pdock[data-tab="cond"] .trk-me,#pdock[data-tab="death"] .trk-me{grid-template-columns:1fr}
+  .pd-panel-in .trk-me > .tm-inv{grid-column:1 / -1;min-width:0}
+  .pd-panel-in .tm-inv .tx-row{flex-wrap:nowrap}
+  .pd-panel-in .tm-inv .tx-note{flex:1 1 auto}
+  /* узкая боковая колонка (320–420px): [валюта][сумма] / [за что] сеткой, а не «переносом как получится»,
+     из-за которого поле «За что» уезжало на отдельную строку и выглядело пустым ящиком */
+  .trk-pside .trk-me .tx-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:6px}
+  .trk-pside .trk-me .tx-row .tx-note{grid-column:1 / -1}
+  .trk-pside .trk-me .tx-row select,.trk-pside .trk-me .tx-row input{width:100%;min-width:0}
+  /* состояния — своей вкладкой: чипы .pd-conds/.tbp-c описаны в общих стилях (панель на телефоне их тоже рисует);
+     в пульте места хватает — строка «активные + ＋» не нужна, полный список раскрыт (pdSync ставит open) */
+  .pd-panel-in .tm-cond .tm-cmore>summary{display:none}
+
+  /* подвал и плавающие кнопки уступают пульту его полосу */
+  html.pdock-on #view-combat{padding-bottom:calc(var(--pdock-h) + 14px)}
+  html.pdock-on .dice-fab,html.pdock-on .dice-menu,html.pdock-on #musicToggle,html.pdock-on .fab-side{
+    bottom:calc(var(--edge) + var(--fabLift,0px) + var(--pdock-h))}
+  html.pdock-on .toast{bottom:calc(26px + var(--pdock-h))}
+  html.pdock-on footer{padding-bottom:calc(54px + var(--pdock-h))}
+
 @media(min-width:1180px){
 
   /* ── АРХИВ: поиск от края до края ─────────────────────────────────────
@@ -14761,104 +14859,67 @@ function openInstallHelp(){
   /* ГМ-страница пользуется всей шириной монитора, а не 1620 px */
   #toolsPage:has(.tool-aside){max-width:1820px}
 
-  /* ═══ БОЕВОЙ ПУЛЬТ ИГРОКА ═══
-     Полоса во всю ширину полотна, прижата к низу окна. В свёрнутом виде —
-     имя, инициатива, ХП с полосой и кнопками, КД и корешки разделов.
-     Развёрнутый — панель над полосой с тем же содержимым, что стояло
-     сбоку: атаки, заклинания, ячейки, отдых, инвентарь, состояния. */
-  :root{--pdock-h:66px}
-  #pdock{position:fixed;left:var(--rail-w);right:0;bottom:0;z-index:63;
-    display:flex;flex-direction:column;pointer-events:none}
-  #pdock > *{pointer-events:auto}
-  html:not(.pdock-on) #pdock{display:none}
-
-  .pd-bar{height:var(--pdock-h);display:flex;align-items:center;gap:16px;padding:0 16px 0 12px;
-    background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(0,0,0,.34)),var(--bg2);
-    border-top:var(--hair) solid var(--line2);
-    box-shadow:0 -10px 30px rgba(0,0,0,.42)}
-  .pd-ava{width:44px;height:44px;flex:none;border-radius:12px;background:var(--surface2) center/cover no-repeat;
-    border:var(--hair) solid var(--line2);display:grid;place-items:center;
-    font-family:var(--f-disp);font-weight:700;color:var(--dim)}
-  .pd-nm{flex:none;min-width:0;max-width:210px}
-  .pd-nm b{display:block;font-family:var(--f-disp);font-size:1rem;color:var(--txt);line-height:1.15;
-    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .pd-nm span{display:block;font-family:var(--f-mono);font-size:.58rem;letter-spacing:.14em;
-    text-transform:uppercase;color:var(--muted)}
-  .pd-st{flex:none;display:flex;align-items:center;gap:6px;font-family:var(--f-mono);font-size:.62rem;
-    letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
-  .pd-st b{font-family:var(--f-disp);font-size:1.05rem;color:var(--txt);letter-spacing:0}
-  .pd-in{width:46px;background:var(--surface2);border:var(--hair) solid var(--line2);border-radius:9px;
-    color:var(--txt);font-family:var(--f-disp);font-size:1rem;text-align:center;padding:5px 2px;outline:none}
-  /* растянутая на пол-экрана полоса ХП читалась хуже короткой: держим
-     её фиксированной, а свободное место отдаём корешкам разделов */
-  .pd-hp{flex:0 0 auto;width:268px;display:flex;align-items:center;gap:9px}
-  .pd-bar-hp{position:relative;flex:1;height:22px;border-radius:8px;background:var(--surface2);
-    border:var(--hair) solid var(--line2);overflow:hidden}
-  .pd-bar-hp i{display:block;height:100%;border-radius:7px;transition:width .25s}
-  .pd-bar-hp span{position:absolute;inset:0;display:grid;place-items:center;
-    font-family:var(--f-mono);font-size:.72rem;color:var(--txt);text-shadow:0 1px 3px rgba(0,0,0,.7)}
-  .pd-hpb{width:34px;height:30px;flex:none;border-radius:9px;border:var(--hair) solid var(--line2);
-    background:var(--surface2);color:var(--dim);font-size:1.05rem;line-height:1;cursor:pointer;
-    display:grid;place-items:center;transition:color .15s,border-color .15s}
-  .pd-hpb.dmg:hover{color:#e0776d;border-color:rgba(224,119,109,.55)}
-  .pd-hpb.heal:hover{color:#84c97a;border-color:rgba(132,201,122,.55)}
-  .pd-tabs{flex:none;display:flex;gap:4px;margin-left:auto}
-  .pd-tab{font-family:var(--f-mono);font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;
-    color:var(--dim);background:none;border:var(--hair) solid transparent;border-radius:10px;
-    padding:8px 12px;cursor:pointer;white-space:nowrap;transition:background .15s,color .15s,border-color .15s}
-  .pd-tab:hover{background:var(--surface2);color:var(--txt)}
-  .pd-tab.on{background:var(--surface2);border-color:var(--line2);color:var(--red-ink)}
-  .pd-tab i{font-style:normal;font-family:var(--f-mono);font-size:.6rem;color:var(--muted);margin-left:5px}
-  .pd-x{width:32px;height:32px;flex:none;border-radius:9px;border:0;background:none;color:var(--muted);
-    cursor:pointer;display:grid;place-items:center;font-size:.9rem}
-  .pd-x:hover{background:var(--surface2);color:var(--txt)}
-
-  .pd-panel{display:none;background:var(--bg2);border-top:var(--hair) solid var(--line2);
-    box-shadow:0 -14px 34px rgba(0,0,0,.45)}
-  html.pdock-open .pd-panel{display:block}
-  .pd-panel-in{max-height:min(46vh,430px);overflow-y:auto;overscroll-behavior:contain;padding:14px 18px 16px}
-  .pd-panel-in .trk-me{margin:0;background:none;border:0;padding:0;
-    display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;align-items:start}
-  .pd-panel-in .tm-sec{margin:0}
-  /* Корешок только показывает свою группу — узлы никуда не переносятся и
-     не пересобираются, поэтому переключение туда-сюда ничего не теряет. */
-  .pd-panel-in .trk-me > [data-pd]{display:none}
-  #pdock[data-tab="atk"]   .trk-me > [data-pd="atk"],
-  #pdock[data-tab="sp"]    .trk-me > [data-pd="sp"],
-  #pdock[data-tab="slots"] .trk-me > [data-pd="slots"],
-  #pdock[data-tab="inv"]   .trk-me > [data-pd="inv"],
-  #pdock[data-tab="rest"]  .trk-me > [data-pd="rest"],
-  #pdock[data-tab="cond"]  .trk-me > [data-pd="cond"],
-  #pdock[data-tab="death"] .trk-me > [data-pd="death"]{display:block}
-  /* заклинания, снаряжение и состояния занимают всю ширину панели */
-  #pdock[data-tab="sp"] .trk-me,#pdock[data-tab="inv"] .trk-me,
-  #pdock[data-tab="cond"] .trk-me,#pdock[data-tab="death"] .trk-me{grid-template-columns:1fr}
-  .pd-panel-in .trk-me > .tm-inv{grid-column:1 / -1;min-width:0}
-  .pd-panel-in .tm-inv .tx-row{flex-wrap:nowrap}
-  .pd-panel-in .tm-inv .tx-note{flex:1 1 auto}
-  /* узкая боковая колонка (320–420px): [валюта][сумма] / [за что] сеткой, а не «переносом как получится»,
-     из-за которого поле «За что» уезжало на отдельную строку и выглядело пустым ящиком */
-  .trk-pside .trk-me .tx-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:6px}
-  .trk-pside .trk-me .tx-row .tx-note{grid-column:1 / -1}
-  .trk-pside .trk-me .tx-row select,.trk-pside .trk-me .tx-row input{width:100%;min-width:0}
-  /* состояния — своей вкладкой: чипы .pd-conds/.tbp-c описаны в общих стилях (панель на телефоне их тоже рисует);
-     в пульте места хватает — строка «активные + ＋» не нужна, полный список раскрыт (pdSync ставит open) */
-  .pd-panel-in .tm-cond .tm-cmore>summary{display:none}
-
-  /* подвал и плавающие кнопки уступают пульту его полосу */
-  html.pdock-on #view-combat{padding-bottom:calc(var(--pdock-h) + 14px)}
-  html.pdock-on .dice-fab,html.pdock-on .dice-menu,html.pdock-on #musicToggle,html.pdock-on .fab-side{
-    bottom:calc(var(--edge) + var(--fabLift,0px) + var(--pdock-h))}
-  html.pdock-on .toast{bottom:calc(26px + var(--pdock-h))}
-  html.pdock-on footer{padding-bottom:calc(54px + var(--pdock-h))}
 }
 
-/* пульт и плавающий «+» — только десктоп: на телефоне панель персонажа
-   остаётся под доской, а кнопка «Добавить персонажа» — сверху страницы.
-   Правило вне медиазапроса: .fab-side задаёт display:flex, и без этого
-   круглый «+» вылезал на телефоне вторым экземпляром той же кнопки. */
-@media(max-width:1179px){ #pdock{display:none !important} #addCharFab{display:none !important}
-  #projRow{display:none !important} }
+/* ═══ ПУЛЬТ ИГРОКА НА ТЕЛЕФОНЕ (< 1180px) ═══
+   Панель персонажа стояла ПОД всем списком участников — до «−/＋», состояний,
+   спасбросков и денег нужно было прокрутить пол-экрана. Теперь тот же узел
+   .trk-me уезжает в тот же пульт, что и на десктопе (pdSync общий), а разницу
+   в подаче делает только CSS: полоса во всю ширину у нижнего края, корешки
+   разделов — прокручиваемой строкой НАД полосой (position:absolute: в разметке
+   они остаются внутри .pd-bar, переносить узлы нельзя — pdSync рисует полосу
+   целиком), ящик раскрывается вверх. */
+@media(max-width:1179px){
+  :root{--pdock-h:64px; --pdtabs-h:42px}
+  /* --pdock-kb — высота экранной клавиатуры (pdKb): на iOS fixed-элемент остаётся
+     у низа ЛЭЙАУТА и уходит под клавиатуру вместе с полем «Иниц» */
+  #pdock{left:0;right:0;bottom:var(--pdock-kb,0px)}
+  .pd-bar{position:relative;height:calc(var(--pdock-h) + env(safe-area-inset-bottom));
+    padding:0 10px env(safe-area-inset-bottom) 10px;gap:8px}
+  .pd-ava{width:38px;height:38px;border-radius:10px}
+  .pd-nm{flex:0 1 auto;max-width:96px}
+  .pd-nm b{font-size:.84rem}
+  .pd-nm span{display:none}
+  .pd-st{flex-direction:column;gap:1px;font-size:.5rem;letter-spacing:.06em}
+  .pd-st b{font-size:.95rem}
+  .pd-in{width:44px;min-height:34px;font-size:.95rem;padding:4px 2px}
+  .pd-hp{flex:1 1 auto;width:auto;min-width:0;gap:6px}
+  .pd-hpb{width:38px;height:38px;font-size:1.2rem}          /* ≥38px — цель под палец */
+  .pd-tabs{position:absolute;left:0;right:0;bottom:100%;margin:0;height:var(--pdtabs-h);
+    align-items:center;gap:6px;padding:0 10px;overflow-x:auto;overflow-y:hidden;
+    scrollbar-width:none;-webkit-overflow-scrolling:touch;
+    background:var(--bg2);border-top:var(--hair) solid var(--line2)}
+  .pd-tabs::-webkit-scrollbar{display:none}
+  .pd-tab{flex:none;padding:8px 11px;font-size:.62rem}
+  /* «свернуть» прилипает к правому краю прокручиваемой строки, иначе за ним
+     пришлось бы листать корешки до конца */
+  .pd-x{position:sticky;right:-10px;width:34px;height:34px;background:var(--bg2);
+    box-shadow:-10px 0 10px var(--bg2)}
+  /* ящик: над корешками, прокручивается, не выше 55vh */
+  .pd-panel{display:block;margin-bottom:var(--pdtabs-h);border-radius:16px 16px 0 0}
+  .pd-panel-in{max-height:55vh;padding:12px 14px 16px}
+  /* Свёрнутый ящик не снимаем с отрисовки, а схлопываем: поля панели (сумма,
+     предмет) остаются в разметке и фокусируемыми — trkRestoreInputs возвращает
+     в них курсор после полной перерисовки, даже когда раздел ещё не раскрыт */
+  html:not(.pdock-open) #pdock .pd-panel{height:0;overflow:hidden;border-top:0;box-shadow:none}
+  html:not(.pdock-open) #pdock .pd-panel-in .trk-me > [data-pd]{display:block}
+  /* низ страницы, тосты и плавающие кнопки уступают пульту его полосу */
+  html.pdock-on #view-combat{padding-bottom:calc(var(--pdock-h) + var(--pdtabs-h) + 16px)}
+  html.pdock-on footer{padding-bottom:calc(var(--botnav-h) + 34px + var(--pdock-h) + var(--pdtabs-h))}
+  html.pdock-on .dice-fab,html.pdock-on .dice-circle,html.pdock-on .dice-menu,
+  html.pdock-on #musicToggle,html.pdock-on .fab-side,html.pdock-on .bm-circle{
+    bottom:calc(12px + env(safe-area-inset-bottom) + var(--pdock-h) + var(--pdtabs-h))}
+  html.pdock-on .dice-calc{bottom:calc(80px + env(safe-area-inset-bottom) + var(--pdock-h) + var(--pdtabs-h))}
+  html.pdock-on .toast{bottom:calc(var(--botnav-h) + 14px + env(safe-area-inset-bottom) + var(--pdock-h) + var(--pdtabs-h))}
+  html.pdock-on .search-float{bottom:calc(22px + var(--botnav-h) + env(safe-area-inset-bottom) + var(--pdock-h) + var(--pdtabs-h))}
+  /* на месте уехавшей панели — короткая подсказка, куда она делась */
+  .trk-pnote{margin-top:12px;padding:11px 12px;border-radius:12px;background:var(--surface);
+    border:var(--hair) dashed var(--line2);font-family:var(--f-mono);font-size:.62rem;
+    letter-spacing:.1em;text-transform:uppercase;color:var(--muted);text-align:center}
+  /* плавающий «+» на телефоне не нужен: кнопка «Добавить персонажа» — сверху страницы */
+  #addCharFab{display:none !important}
+  #projRow{display:none !important}
+}
 </style>
 <script>
 /* ═══════════════════════════════════════════════════════════════════════
@@ -14936,19 +14997,26 @@ function openInstallHelp(){
     d.setAttribute('data-tab', PD_TAB);
     R.classList.toggle('pdock-open', !!PD_TAB);
     Array.prototype.slice.call(d.querySelectorAll('.pd-tab')).forEach(function(b){
+      if(!b.hasAttribute('data-k')) return;            // корешок «Карта» не раскрывает ящик — его подсветку не трогаем
       b.classList.toggle('on', b.getAttribute('data-k')===PD_TAB); });
     var x=d.querySelector('.pd-x'); if(x) x.style.display=PD_TAB?'grid':'none';
   };
   window.pdClose=function(){ pdTab(PD_TAB); };
+  /* «Карта» — корешок без своей группы в панели: на телефоне карта не помещается
+     рядом с доской (на десктопе она постоянно справа), поэтому он переключает сам
+     вид доски, а повторный тап возвращает список. */
+  window.pdMapTab=function(){ try{ trkViewSet(trkViewMode()==='map'?'list':'map'); }catch(e){} };
 
   var TAB_NAMES={death:'Спасброски', atk:'Атаки', sp:'Заклинания', slots:'Ячейки',
-                 cond:'Состояния', inv:'Снаряжение', rest:'Отдых'};
+                 cond:'Состояния', inv:'Снаряжение', rest:'Отдых', map:'Карта'};
   var TAB_ORDER=['death','atk','sp','slots','cond','inv','rest'];
 
   function pdSync(){
     var R=document.documentElement;
-    if(!DESK() || isGM() || !onCombat()){ pdOff(); return; }
-    var me=document.querySelector('#trkBox .trk-pside .trk-me');
+    // пульт поднимается и на телефоне (подача — на стороне CSS), поэтому DESK() здесь больше не спрашиваем
+    if(isGM() || !onCombat()){ pdOff(); return; }
+    var side=document.querySelector('#trkBox .trk-pside');
+    var me=side && side.querySelector('.trk-me');
     if(!me){ pdOff(); return; }
     var vp=trkActiveForPlayer(); if(!vp){ pdOff(); return; }
     var my=playerMyCard(vp); if(!my){ pdOff(); return; }
@@ -14957,6 +15025,8 @@ function openInstallHelp(){
     var pin=d.querySelector('.pd-panel-in');
     pin.innerHTML='';                     // прошлый снимок панели уходит целиком
     pin.appendChild(me);                  // свежий — переезжает как есть
+    // на десктопе освободившуюся колонку займёт карта (sideMap), на телефоне — подсказка, куда уехала панель
+    if(!DESK()) side.innerHTML='<div class="trk-pnote">Панель персонажа — в пульте внизу ↓</div>';
     var have=mark(me);
     if(have.cond){ var dt=me.querySelector('.tm-cond details'); if(dt) dt.open=true; }   // секция уже в панели — второй не добавляем, список раскрыт
     else { me.appendChild(condsNode(my)); have.cond=true; }
@@ -14989,6 +15059,8 @@ function openInstallHelp(){
         var n = k==='cond' && (my.conds||[]).length ? '<i>'+(my.conds||[]).length+'</i>' : '';
         return '<button class="pd-tab'+(PD_TAB===k?' on':'')+'" data-k="'+k+'" onclick="pdTab(\''+k+'\')">'+
                esc(TAB_NAMES[k])+n+'</button>'; }).join('')+
+        // на десктопе карта и так стоит в правой колонке (sideMap) — корешок нужен только на телефоне
+        (DESK()?'':'<button class="pd-tab'+(trkViewMode()==='map'?' on':'')+'" onclick="pdMapTab()">'+esc(TAB_NAMES.map)+'</button>')+
         '<button class="pd-x" onclick="pdClose()" aria-label="Свернуть" style="display:'+(PD_TAB?'grid':'none')+'">▾</button>'+
       '</div>';
 
@@ -14996,6 +15068,36 @@ function openInstallHelp(){
     R.classList.add('pdock-on');
     R.classList.toggle('pdock-open', !!PD_TAB);
   }
+
+  /* Точечный патч полосы. trkRefresh обновляет числа БЕЗ полной перерисовки, а панель
+     с ХП уехала из #trkBox в пульт — без этого ХП и инициатива в полосе стояли до
+     следующей полной отрисовки (на телефоне полоса — единственное место, где игрок их
+     видит, и урон от ГМа «не доходил»). */
+  window.pdPatch=function(my){
+    var d=document.getElementById('pdock'); if(!d || !my) return;
+    var ini=d.querySelector('.pd-in');
+    if(ini && document.activeElement!==ini) ini.value=(my.init==null?0:my.init);
+    var maxHp=0; try{ maxHp=playerMaxHp(trkActiveForPlayer(), my.charId)||0; }catch(e){}
+    var hp=parseInt(my.hp,10)||0;
+    var pct = maxHp ? Math.max(0,Math.min(100,Math.round(hp/maxHp*100))) : (hp>0?100:0);
+    var i=d.querySelector('.pd-bar-hp i'); if(i){ i.style.width=pct+'%'; i.style.background=trkHpColor(pct/100); }
+    var t=d.querySelector('.pd-bar-hp span'); if(t) t.textContent=(hp<=0?'💀 0':(hp+(maxHp?(' / '+maxHp):'')));
+  };
+
+  /* Экранная клавиатура. На iOS она поднимается НАД страницей: fixed-элемент остаётся
+     у низа лэйаута и уходит под клавиатуру вместе с полем «Иниц». Пока курсор в поле
+     пульта — поднимаем пульт на высоту клавиатуры (на Android лэйаут ужимается сам,
+     формула даёт 0). Считаем только при фокусе в пульте, чтобы прокрутка страницы
+     (адресная строка то прячется, то нет) пульт не дёргала. */
+  function pdKb(){
+    var vv=window.visualViewport, ae=document.activeElement;
+    var on = vv && ae && ae.closest && ae.closest('#pdock') && (ae.tagName==='INPUT'||ae.tagName==='TEXTAREA');
+    var kb = on ? Math.max(0, Math.round(innerHeight - vv.height - vv.offsetTop)) : 0;
+    document.documentElement.style.setProperty('--pdock-kb', kb+'px');
+  }
+  if(window.visualViewport){ visualViewport.addEventListener('resize', pdKb); visualViewport.addEventListener('scroll', pdKb); }
+  document.addEventListener('focusin', pdKb, true);
+  document.addEventListener('focusout', function(){ setTimeout(pdKb, 60); }, true);
 
   /* ═══ 2. Карта боя у игрока — всегда сбоку ═══
      Переключатель на десктопе оставляет только «Список» и «Карточки»:
@@ -15035,7 +15137,7 @@ function openInstallHelp(){
   function bump(){
     [300,1200].forEach(function(ms){ setTimeout(function(){
       try{
-        if(!DESK() || isGM() || !onCombat()) return;
+        if(isGM() || !onCombat()) return;
         if(document.getElementById('pdock')) return;
         var vp=trkActiveForPlayer(); if(!vp || !playerMyCard(vp)) return;
         renderTracker();
