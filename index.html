@@ -2430,9 +2430,7 @@
     .mirror-ui .dice-menu{left:var(--fr);right:auto;transform-origin:bottom left}
     .mirror-ui .dice-calc{left:var(--fr);right:auto}
     .mirror-ui .search-float{left:calc(var(--fr) + 56px);right:auto}
-    /* музыка и импорт листа — справа от связки поиска, в тех же левых границах */
-    .mirror-ui .music-bar{left:calc(var(--fr) + 400px);right:auto;transform:none}
-    .mirror-ui.view-players .music-bar{left:calc(var(--fr) + 456px);right:auto;transform:none}
+    /* импорт листа — справа от связки поиска, в тех же левых границах (музыка живёт своим правилом ниже) */
     .mirror-ui .imp-circle{left:calc(var(--fr) + 400px);right:auto}
   }
   @media(prefers-reduced-motion:reduce){*{animation:none !important;transition:none !important}}
@@ -2646,17 +2644,36 @@
     border:var(--hair) solid var(--line2);border-radius:999px;box-shadow:0 8px 22px rgba(0,0,0,.4);padding:9px 14px 9px 10px;
     transition:opacity .25s,transform .25s}
   .music-bar[hidden]{display:none}
-  .music-bar .mb-x{flex:0 0 auto;width:30px;height:30px;border-radius:50%;border:none;background:rgba(255,255,255,.06);color:var(--muted);cursor:pointer;font-size:.9rem;display:flex;align-items:center;justify-content:center}
-  .music-bar .mb-x:active{transform:scale(.9)}
+  /* «обложка»: эквалайзер из трёх полосок — пляшет, пока играет, и замирает на паузе */
+  .music-bar .mb-art{flex:0 0 auto;width:38px;height:38px;border-radius:11px;border:var(--hair) solid var(--line2);
+    background:var(--red-soft);cursor:pointer;display:flex;align-items:flex-end;justify-content:center;gap:3px;padding:10px 0}
+  .music-bar .mb-art i{width:3px;height:6px;border-radius:2px;background:var(--red-ink);opacity:.85}
+  .music-bar .mb-art.on i{animation:mb-eq .9s ease-in-out infinite}
+  .music-bar .mb-art.on i:nth-child(2){animation-delay:.18s}
+  .music-bar .mb-art.on i:nth-child(3){animation-delay:.36s}
+  @keyframes mb-eq{0%,100%{height:5px}50%{height:16px}}
+  @media (prefers-reduced-motion:reduce){ .music-bar .mb-art.on i{animation:none;height:11px} }
   .music-bar .mb-mid{flex:1;min-width:0;display:flex;flex-direction:column;gap:5px}
-  .music-bar .mb-title{font-family:var(--f-disp);font-weight:700;font-size:.9rem;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .music-bar .mb-prog{height:4px;border-radius:2px;background:rgba(255,255,255,.14);cursor:pointer;position:relative;overflow:hidden;touch-action:none}
+  .music-bar .mb-title{font-family:var(--f-disp);font-weight:700;font-size:.88rem;color:var(--txt);cursor:pointer;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2}
+  .music-bar .mb-title .mb-title-i{display:inline-block;max-width:100%}
+  .music-bar .mb-title.marquee{text-overflow:clip}
+  .music-bar .mb-title.marquee .mb-title-i{max-width:none;animation:tc-marq 10s ease-in-out infinite}
+  @media (prefers-reduced-motion:reduce){ .music-bar .mb-title.marquee .mb-title-i{animation:none} .music-bar .mb-title.marquee{text-overflow:ellipsis} }
+  .music-bar .mb-row{display:flex;align-items:center;gap:8px}
+  .music-bar .mb-time{flex:none;font-family:var(--f-mono);font-size:.54rem;letter-spacing:.06em;color:var(--muted);min-width:30px;text-align:right}
+  .music-bar .mb-prog{flex:1;min-width:0;height:4px;border-radius:2px;background:rgba(255,255,255,.14);cursor:pointer;position:relative;overflow:hidden;touch-action:none}
   .music-bar .mb-prog i{position:absolute;left:0;top:0;bottom:0;width:0;background:var(--red);border-radius:2px}
-  .music-bar .mb-ctrl{flex:0 0 auto;display:flex;align-items:center;gap:4px}
+  .music-bar .mb-ctrl{flex:0 0 auto;display:flex;align-items:center;gap:2px}
   .music-bar .mb-ctrl button{width:34px;height:34px;border-radius:50%;border:none;background:transparent;color:var(--txt);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}
-  .music-bar .mb-ctrl button svg{width:20px;height:20px;fill:currentColor}
+  .music-bar .mb-ctrl button svg{width:19px;height:19px;fill:currentColor}
   .music-bar .mb-ctrl .mb-play{background:var(--red-soft);color:var(--red-ink)}
   .music-bar .mb-ctrl button:active{transform:scale(.9)}
+  /* «закрыть» — скромной кнопкой у правого края, а не крупным кружком слева */
+  .music-bar .mb-x{flex:0 0 auto;width:24px;height:24px;margin-left:2px;border-radius:50%;border:none;
+    background:none;color:var(--muted);cursor:pointer;font-size:.72rem;display:flex;align-items:center;justify-content:center}
+  .music-bar .mb-x:hover{background:rgba(255,255,255,.07);color:var(--txt)}
+  .music-bar .mb-x:active{transform:scale(.9)}
   /* плашка уходит, чтобы не мешать: при открытом меню/поиске/модалке */
   .nav-open .music-bar,.dice-open .music-bar{opacity:0;pointer-events:none;transform:translateY(20px)}
   /* единственная причина сузить плашку — плавающая кнопка в правом нижнем углу
@@ -2666,10 +2683,14 @@
   body:has(#scrim.open) .music-bar,body:has(#scrim2.open) .music-bar,body:has(.hp-prompt) .music-bar{opacity:0;pointer-events:none;transform:translateY(20px)}
   /* десктоп/планшет: плашка музыки — продолжением поисковой строки, слева от неё, в общих границах макета */
   @media(min-width:880px){
-    .music-bar{left:auto;right:calc(var(--fr) + 400px);transform:none;bottom:24px;width:min(360px, calc(100vw - var(--fr) - 400px - var(--rail)))}
+    /* левый нижний угол: справа внизу и так тесно от кубов, музыки, закладок и связи с нами */
+    .music-bar{left:var(--fr);right:auto;transform:none;bottom:24px;width:min(370px, calc(100vw - 2*var(--fr)))}
     .nav-open .music-bar{transform:translateY(20px)}
-    /* в разделе «Игроки» слева от поиска стоит кнопка импорта — музыку сдвигаем ещё левее, чтобы не перекрывать */
-    .view-players .music-bar{right:calc(var(--fr) + 456px);transform:none;width:min(320px, calc(100vw - var(--fr) - 456px - var(--rail)))}
+    /* зеркальный режим: плавающие кнопки слева — значит музыке место справа */
+    .mirror-ui .music-bar{left:auto;right:var(--fr);transform:none}
+    /* .fab-right сужает плашку только на телефоне: на десктопе она и так в другом углу */
+    .fab-right .music-bar{left:var(--fr);right:auto}
+    .mirror-ui.fab-right .music-bar{left:auto;right:var(--fr)}
     body:has(#scrim.open) .music-bar,body:has(#scrim2.open) .music-bar,body:has(.hp-prompt) .music-bar{transform:translateY(20px)}
   }
   /* музыкальная библиотека (в модалке) */
@@ -2754,6 +2775,11 @@
   .trk-idle-cap{font-family:var(--f-disp);font-weight:600;font-size:.95rem;letter-spacing:.1em;text-transform:uppercase;color:var(--red-ink)}
   /* подпись над чужой доской (своего персонажа на ней нет / не вошёл) — доска ниже только для чтения */
   .trk-note{font-family:var(--f-mono);font-size:.62rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);text-align:center;margin:0 0 10px}
+  /* Мастер сел за чужой стол: видно, у кого играешь, и как вернуться к своей доске */
+  .trk-guest{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;padding:9px 12px;
+    border-radius:12px;background:var(--red-soft);border:var(--hair) solid rgba(var(--accent-rgb),.4);
+    font-family:var(--f-mono);font-size:.6rem;letter-spacing:.08em;text-transform:uppercase;color:var(--red-ink)}
+  .trk-guest .btn{margin-left:auto;flex:none}
   .tool-title{font-family:var(--f-mono);font-size:.72rem;letter-spacing:.18em;color:var(--red-ink);text-transform:uppercase;margin-bottom:10px}
   /* ── журнал действий ГМа ── */
   #trkLogBox .empty{padding:16px 6px;text-align:center;color:var(--muted);font-family:var(--f-mono);font-size:.7rem;line-height:1.7}
@@ -6914,10 +6940,11 @@ async function doSignup(id){
    только ГМ, поэтому оставляем в строке доски отметку joinAt — его клиент по ней
    перечитает запись и досадит нас за стол (см. trkPartyCatchup). */
 async function trkJoinLive(s, ch){
-  if(!s || ADMIN) return;
+  if(!s) return;
   try{
     if(!TRK_FETCHED && supa) await trkFetchShared(true);   // могли записаться из «Новостей» — стола ещё не читали
     const bk=trkLiveBoardOfGame(s.id); if(!bk) return;     // партия ещё не началась — ничего особенного не нужно
+    if(ADMIN && bk===gmBoardKey()) return;                 // это наша собственная доска — состав мы ведём сами
     if(!ch){ toast('Партия уже идёт. Выберите персонажа в записи — тогда он встанет на доску'); return; }
     trkCloudBoardMerge(bk, {joinAt:Date.now()}, 'join:'+bk);
     toast('Партия уже идёт — Мастер увидит вас на доске через несколько секунд');
@@ -11773,8 +11800,8 @@ function trkLogArc(bk){
 }
 /* доска, куда игрок вправе писать: только та, где стоит его персонаж (для просмотра подходит любая активная) */
 function trkMyBoardKey(){ const k=trkActiveForPlayer(); return (k && playerMyCard(k)) ? k : null; }
-function trkLogBoardKey(){ return ADMIN ? gmBoardKey() : trkMyBoardKey(); }
-function trkActorName(){ if(ADMIN) return 'ГМ'; const vp=trkActiveForPlayer(); if(vp){ const my=playerMyCard(vp); if(my && my.name) return my.name; } return SESSION||'Игрок'; }
+function trkLogBoardKey(){ return trkPlayerMode() ? trkMyBoardKey() : gmBoardKey(); }
+function trkActorName(){ if(!trkPlayerMode()) return 'ГМ'; const vp=trkActiveForPlayer(); if(vp){ const my=playerMyCard(vp); if(my && my.name) return my.name; } return SESSION||'Игрок'; }
 function trkLog(kind, text){
   const bk=trkLogBoardKey(); if(!bk || !text) return;
   const entry={at:Date.now(), k:kind||'', t:String(text).slice(0,160)};
@@ -11918,7 +11945,7 @@ async function trkPartyCatchup(force){
 }
 /* игрок меняет хиты только собственного персонажа — правка уходит в общий стол */
 function trkPlayerHp(charId,d){
-  const vp=(!ADMIN)?trkActiveForPlayer():gmBoardKey();
+  const vp=trkPlayerMode()?trkActiveForPlayer():gmBoardKey();
   const shared=TRK_SHARED[vp]; if(!shared || !Array.isArray(shared.list)) return;
   const mine=(CHARS_ALL[boardProj(vp)]||[]).some(c=>c && c.id===charId && !c.deleted && SESSION && normTag(c.owner||'')===currentTag());
   if(!mine){ toast('Менять хиты можно только своему персонажу'); return; }
@@ -11949,7 +11976,27 @@ addEventListener('resize', function(){ clearTimeout(window.__mqT); window.__mqT=
 function trkViewMode(){ try{ return localStorage.getItem('comik:trk:view')||'list'; }catch(e){ return 'list'; } }
 function trkViewSet(m){ try{ localStorage.setItem('comik:trk:view', m); }catch(e){} renderTracker(); }
 /* десктоп + ГМ: карта живёт отдельным «окном» справа, а в основной колонке — редактируемый список */
-function trkDeskGM(){ try{ return !!ADMIN && window.matchMedia('(min-width:1000px)').matches; }catch(e){ return false; } }
+/* ── Разработчик тоже садится за чужой стол ──────────────────────────────────
+   Мастер — это роль на СВОЕЙ доске. Если своя партия не идёт, а другой Мастер
+   ведёт игру, где стоит мой персонаж, — доска показывается мне как игроку:
+   со своей панелью, уроном и состояниями. Кнопка «Моя доска» возвращает к
+   управлению (флаг живёт до перезагрузки — это выбор на сейчас, а не настройка). */
+let TRK_GUEST_OFF=false;
+function trkGuestBoard(){
+  if(!ADMIN || TRK_GUEST_OFF) return '';
+  try{
+    const own=gmBoardKey();
+    if(TRK_SHARED[own] && TRK_SHARED[own].active) return '';   // веду свою игру — она главнее
+    const vp=trkActiveForPlayer();
+    return (vp && vp!==own && playerMyCard(vp)) ? vp : '';
+  }catch(e){ return ''; }
+}
+/* «сейчас я за столом как игрок»: и обычный игрок, и Мастер в гостях у другого Мастера */
+function trkPlayerMode(){ return !ADMIN || !!trkGuestBoard(); }
+function trkGuestGmName(vp){ const s=TRK_SHARED[vp]; const t=(s&&s.owner)||''; return t?('Мастера '+t):'другого Мастера'; }
+function trkGuestOff(){ TRK_GUEST_OFF=true; renderTracker(); }
+function trkGuestOn(){ TRK_GUEST_OFF=false; renderTracker(); }
+function trkDeskGM(){ try{ return !ADMIN || trkPlayerMode() ? false : window.matchMedia('(min-width:1000px)').matches; }catch(e){ return false; } }
 const TRK_CONDS=['Отравлен','Ослеплён','Оглушён','Ошеломлён','Испуган','Опутан','Схвачен','Обездвижен','Недееспособен','Невидим','Очарован','Парализован','Окаменел','Без сознания','Ничком','Истощение'];
 const TRK_BUFFS=['Благословение','Вдохновение','Ускорение','Сопротивление','Помощь','Щит'];
 /* порядок хода: инициатива вниз, при равной — модификатор Ловкости (правило книги),
@@ -12674,9 +12721,11 @@ function renderTrackerCore(){
   const box=document.getElementById('trkBox'); if(!box) return;
   const _tt=document.getElementById('trkTitle'); if(_tt) _tt.style.display='';   // по умолчанию заголовок «Доска ходов» виден; прячем только на «простое»
   const view=trkViewMode();
-  // у игроков — только «стол» ГМа: актуальная партия текущего сеттинга
-  if(!ADMIN){
-    const vp=trkActiveForPlayer();
+  // у игроков — только «стол» ГМа: актуальная партия текущего сеттинга.
+  // сюда же попадает Мастер, который сейчас играет за чужим столом (см. trkGuestBoard)
+  const guestVp=trkGuestBoard();
+  if(!ADMIN || guestVp){
+    const vp=guestVp||trkActiveForPlayer();
     if(!vp){
       // доска не активна: вместо подсказки — эмблема (d20 в шестиграннике) под цвет сеттинга и подпись
       if(_tt) _tt.style.display='none';
@@ -12691,7 +12740,8 @@ function renderTrackerCore(){
     }
     const shared=TRK_SHARED[vp]||{}; const vproj=boardProj(vp);
     // доска есть, а своего персонажа на ней нет (нет листа / не вошёл): показываем её только для чтения и говорим почему
-    const note=playerMyCard(vp)?'':`<div class="trk-note">${SESSION?'Вашего персонажа нет на доске':'Войдите, чтобы участвовать'}</div>`;
+    let note=playerMyCard(vp)?'':`<div class="trk-note">${SESSION?'Вашего персонажа нет на доске':'Войдите, чтобы участвовать'}</div>`;
+    if(guestVp) note=`<div class="trk-guest">Вы за столом ${esc(trkGuestGmName(guestVp))} — играете своим персонажем<button class="btn ghost sm" onclick="trkGuestOff()">Моя доска</button></div>`+note;
     const order=trkOrder(shared.list||[]);
     const activeKey=shared.activeKey||'';
     const who=order.find(x=>trkCardKey(x)===activeKey)||order[0];
@@ -12717,6 +12767,12 @@ function renderTrackerCore(){
   }
   trkSyncParty(false);
   trkAbsorbShared();   // показываем ГМу актуальные значения игроков, а не стартовые
+  // свою доску не ведём, а рядом идёт партия, где стоит наш персонаж — не теряем её из виду
+  let guestHint='';
+  try{ const own=gmBoardKey(), vp=trkActiveForPlayer();
+    if(TRK_GUEST_OFF && vp && vp!==own && !(TRK_SHARED[own]&&TRK_SHARED[own].active) && playerMyCard(vp))
+      guestHint=`<div class="trk-guest">Идёт игра у ${esc(trkGuestGmName(vp))}, вы в ней участвуете<button class="btn ghost sm" onclick="trkGuestOn()">За стол</button></div>`;
+  }catch(e){}
   const parties=myManagedGames((GAMES||[]).filter(g=>g && g.game===CUR_PROJECT));
   const isActive = !!(TRK_SHARED[gmBoardKey()] && TRK_SHARED[gmBoardKey()].active);
   const order=trkOrder(TRK.list);
@@ -12738,7 +12794,7 @@ function renderTrackerCore(){
       <button class="x" onclick="trkSelClear()">✕</button>
     </div>`:'';
   const hasFoes=TRK.list.some(isFoeCard);
-  box.innerHTML=
+  box.innerHTML=guestHint+
     trkCombatBar({round:TRK.round||1, whoName:(who&&who.name)||'—', gm:true})+`
     <div class="trk-active${isActive?' on':''}" onclick="trkToggleActive()"><span class="dot"></span>
       <span>${isActive?'Доска активна — игроки видят её вживую':'Сделать доску активной для игроков'}</span></div>
@@ -13291,9 +13347,10 @@ function trkRedraw(force){
 }
 function trkLiveApply(){
   const box=document.getElementById('trkBox'); if(!box) return;
-  if(ADMIN) trkCloudRestore();   // первый снимок мог прийти позже открытия раздела; сама функция срабатывает один раз на доску
+  const gm=!trkPlayerMode();
+  if(gm) trkCloudRestore();   // первый снимок мог прийти позже открытия раздела; сама функция срабатывает один раз на доску
   trkRefresh();   // сам решает: патч на месте (можно и при вводе) или полная отрисовка (отложится до focusout)
-  if(ADMIN) renderTrkLog();   // журнал: подхватываем действия игроков вживую
+  if(gm) renderTrkLog();   // журнал: подхватываем действия игроков вживую
 }
 /* (пере)подписка на Realtime: сокет на десктопе с долго открытой вкладкой рвётся —
    раньше канал создавался один раз и не восстанавливался, из-за чего «живая» синхронизация умирала */
@@ -14122,17 +14179,34 @@ function musHideBar(){ const b=document.getElementById('musicBar'); if(b){ b.hid
 function musRenderBar(){
   const b=document.getElementById('musicBar'); if(!b || b.hidden) return;
   if(!musCur){ musHideBar(); return; }
+  const playing=!musPaused();
+  b.classList.toggle('playing', playing);
   b.innerHTML=`
-    <button class="mb-x" onclick="musCloseBar()" aria-label="Закрыть">✕</button>
-    <div class="mb-mid" onclick="musOpenFull()">
-      <div class="mb-title">${esc(musCur.name)}</div>
-      <div class="mb-prog" id="musProg" onpointerdown="event.stopPropagation();musScrub(event,'musProg')"><i id="musProgFill"></i></div>
+    <button class="mb-art${playing?' on':''}" onclick="musOpenFull()" aria-label="Открыть плеер">
+      <i></i><i></i><i></i>
+    </button>
+    <div class="mb-mid">
+      <div class="mb-title" onclick="musOpenFull()"><span class="mb-title-i">${esc(musCur.name)}</span></div>
+      <div class="mb-row">
+        <div class="mb-prog" id="musProg" onpointerdown="event.stopPropagation();musScrub(event,'musProg')"><i id="musProgFill"></i></div>
+        <span class="mb-time" id="musTime">0:00</span>
+      </div>
     </div>
     <div class="mb-ctrl">
       <button onclick="musPrev()" aria-label="Назад">${MUS_ICON.prev}</button>
       <button class="mb-play" onclick="musToggle()" aria-label="Пауза/играть">${musPaused()?MUS_ICON.play:MUS_ICON.pause}</button>
       <button onclick="musNext()" aria-label="Вперёд">${MUS_ICON.next}</button>
-    </div>`;
+    </div>
+    <button class="mb-x" onclick="musCloseBar()" aria-label="Закрыть">✕</button>`;
+  requestAnimationFrame(musBarMarquee);
+}
+/* длинное название песни не обрезаем многоточием, а катаем лентой — как имена на доске */
+function musBarMarquee(){
+  const el=document.querySelector('#musicBar .mb-title'); if(!el) return;
+  const t=el.querySelector('.mb-title-i'); if(!t) return;
+  el.classList.remove('marquee'); t.style.removeProperty('--mq');
+  const over=t.scrollWidth-el.clientWidth;
+  if(over>2){ t.style.setProperty('--mq', (-(over+2))+'px'); el.classList.add('marquee'); }
 }
 /* полноэкранный плеер: вместо обложки — название кампании в стиле street-art, по диагонали */
 function musOpenFull(){
@@ -14184,6 +14258,7 @@ function musProgTick(){
   const f2=document.getElementById('mfProgFill'); if(f2) f2.style.width=pct+'%';
   const c=document.getElementById('mfCur'); if(c) c.textContent=musFmt(a.currentTime);
   const d=document.getElementById('mfDur'); if(d) d.textContent=musFmt(a.duration||0);
+  const t=document.getElementById('musTime'); if(t) t.textContent=musFmt(a.currentTime);
 }
 /* привязка событий аудио и жестов — один раз */
 (function musBind(){
@@ -15281,7 +15356,8 @@ function openInstallHelp(){
   var DESK  = function(){ return innerWidth >= 1180; };
   var onCombat = function(){ var v=document.getElementById('view-combat');
     return !!(v && v.classList.contains('active')); };
-  var isGM = function(){ return typeof ADMIN!=='undefined' && !!ADMIN; };
+  // «Мастер» здесь — тот, кто ведёт ЭТУ доску: в гостях у другого Мастера мы обычный игрок
+  var isGM = function(){ try{ return !trkPlayerMode(); }catch(e){ return typeof ADMIN!=='undefined' && !!ADMIN; } };
   var PD_TAB = '';                 // какой корешок раскрыт
 
   /* ═══ 1. Боевой пульт игрока ═══ */
