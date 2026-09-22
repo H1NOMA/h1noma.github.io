@@ -7003,7 +7003,8 @@ async function gamePlayed(id){
   const boardsOff=v=>{ Object.keys(v).forEach(k=>{ const sh=v[k];
     if(sh && typeof sh==='object' && !Array.isArray(sh) && (sh.party===id || (ownWas && k===ownBk))) v[k]={list:[], party:'', at:Date.now(), active:false, owner:sh.owner||currentTag(), round:1, activeKey:'', log:sh.log||[], mapPos:{}, mapBgRev:'', mapCols:sh.mapCols||TRK_MAPCOLS}; }); };
   trkWrite(boardsOff, 'active:'+ownBk);
-  offKeys.forEach(k=>trkBgDrop(k));   // картинки фонов лежат отдельными строками — гасим их вместе с досками
+  offKeys.forEach(k=>{ trkBgDrop(k); delete TRK_LOG_ARC[k]; });   // фоны лежат отдельными строками, журнал — на устройстве: гасим вместе с досками
+  trkLogArcSave();
   trkSave();
   // экран обновляем до ответа облака: пока шёл сетевой раунд, удалённая игра висела в расписании и баннере
   openSchedule(); renderNews(); toast('Сессия завершена и удалена');
@@ -11644,6 +11645,9 @@ function trkAdopt(v, src){
   }
   if(rev>TRK_REV) TRK_REV=rev;
   TRK_SHARED=v; trkApplyPending(TRK_SHARED);
+  // журнал забираем из каждого снимка, а не только при открытой панели: ГМ может быть
+  // в другом разделе, а короткий хвост в облаке за это время успел бы провернуться
+  if(ADMIN) try{ trkLogArc(gmBoardKey()); }catch(e){}
   return true;
 }
 /* Compare-and-swap для строки kv: свежее чтение → mutate → value.rev+1 → UPDATE с условием
@@ -11712,7 +11716,28 @@ function trkCloudBoardMerge(boardKey, fields, key){
 /* ── Журнал действий (только у ГМа): привязан к доске выбранной игры ──
    Записи копятся в TRK_SHARED[boardKey].log; игроки в него ПИШУТ свои действия
    (урон, спасброски, деньги), но НЕ видят его — панель есть только у ГМа. */
-const TRK_LOG_CAP=80;
+/* В облачной строке доски журнал — САМЫЙ тяжёлый кусок (у живого боя это примерно две трети её
+   веса), а строку целиком перечитывает и переписывает каждый тап по ХП любого игрока. При этом
+   читает журнал только ГМ. Поэтому в облаке держим короткий хвост, а клиент ГМа складывает всё,
+   что через него прошло, в свой архив на устройстве — история там становится даже длиннее. */
+const TRK_LOG_CAP=24, TRK_LOG_KEEP=400;
+let TRK_LOG_ARC={};                                  // {доска:[записи]} — архив ГМа, только на этом устройстве
+try{ TRK_LOG_ARC=JSON.parse(localStorage.getItem('comik:trk:log')||'{}')||{}; }catch(e){ TRK_LOG_ARC={}; }
+function trkLogArcSave(){ try{ localStorage.setItem('comik:trk:log', JSON.stringify(TRK_LOG_ARC)); }catch(e){} }
+/* слить хвост из облака в архив: записи приходят и от игроков, порядок — по времени, дубли по (at,t) */
+function trkLogArc(bk){
+  const arc=Array.isArray(TRK_LOG_ARC[bk])?TRK_LOG_ARC[bk]:[];
+  const s=TRK_SHARED[bk], tail=(s&&Array.isArray(s.log))?s.log:[];
+  if(!tail.length) return arc;
+  const seen=new Set(arc.map(x=>x&&(x.at+'|'+x.t)));
+  let add=0;
+  tail.forEach(x=>{ if(!x) return; const k=x.at+'|'+x.t; if(seen.has(k)) return; seen.add(k); arc.push(x); add++; });
+  if(!add) return arc;
+  arc.sort((a,b)=>(a.at||0)-(b.at||0));
+  if(arc.length>TRK_LOG_KEEP) arc.splice(0, arc.length-TRK_LOG_KEEP);
+  TRK_LOG_ARC[bk]=arc; trkLogArcSave();
+  return arc;
+}
 /* доска, куда игрок вправе писать: только та, где стоит его персонаж (для просмотра подходит любая активная) */
 function trkMyBoardKey(){ const k=trkActiveForPlayer(); return (k && playerMyCard(k)) ? k : null; }
 function trkLogBoardKey(){ return ADMIN ? gmBoardKey() : trkMyBoardKey(); }
@@ -11732,15 +11757,18 @@ function trkLogIcon(k){ return ({combat:'⚔️',add:'➕',del:'➖',dmg:'🩸',
 function trkLogTime(at){ try{ return new Date(at).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}); }catch(e){ return ''; } }
 function renderTrkLog(){
   if(!ADMIN) return;
+  // хвост из облака забираем в архив ДАЖЕ когда панель закрыта: иначе записи игроков,
+  // пришедшие в это время, выпали бы из короткого хвоста и пропали бы совсем
+  const bk=gmBoardKey(), arc=trkLogArc(bk);
   const box=document.getElementById('trkLogBox'); if(!box) return;
-  const s=TRK_SHARED[gmBoardKey()]||{};
-  const log=(s.log||[]).slice().reverse();
+  const log=arc.slice().reverse();   // архив этого устройства ⊇ хвост в облаке
   if(!log.length){ box.innerHTML='<div class="empty">Здесь появятся действия: вступление в бой, добавление существ, урон, смерти, броски, переводы денег.</div>'; return; }
   box.innerHTML=`<div class="tlog-top"><span class="tlog-n">${log.length}</span><button class="btn ghost sm" onclick="trkLogClear()">Очистить</button></div>
     <div class="tlog">${log.map(e=>`<div class="tlog-row"><span class="ic">${trkLogIcon(e.k)}</span><span class="tx">${esc(e.t||'')}</span><span class="ti">${trkLogTime(e.at)}</span></div>`).join('')}</div>`;
 }
 function trkLogClear(){
   if(!ADMIN) return; const bk=gmBoardKey(); const s=TRK_SHARED[bk]; if(s){ s.log=[]; s.at=Date.now(); }
+  delete TRK_LOG_ARC[bk]; trkLogArcSave();   // «Очистить» убирает и архив устройства, иначе он тут же вернул бы записи
   renderTrkLog(); if(bk) trkCloudBoardMerge(bk, {log:[]}, 'logclear:'+bk);
 }
 /* приватные заметки ГМ: просто поле к выбранной партии, живёт только на этом устройстве
