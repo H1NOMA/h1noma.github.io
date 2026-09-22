@@ -12222,7 +12222,9 @@ function trkBgMigrate(bk){
   //  3) локальная копия ГМа, когда метки нет нигде: прошлая версия держала картинку и в браузере.
   const lk=gmLegacyBoardKey(), lg=(lk!==bk)?TRK_SHARED[lk]:null;
   const legacyMine=!!(lg && typeof lg==='object' && !Array.isArray(lg) && lg.mapBg && normTag(lg.owner||'')===currentTag());
-  const noStamp=!(TRK.mapBgRev||'') && !(s && s.mapBgRev);
+  // «метки нет вовсе» (доска прошлой версии: поля mapBgRev в строке ещё не было) — это не то же,
+  // что «метка пустая» (фон сняли): снятый фон локальная копия возвращать не должна
+  const noStamp=!(TRK.mapBgRev||'') && !(s && s.mapBgRev!=null);
   const old=(s&&s.mapBg) || (legacyMine?lg.mapBg:'') || (noStamp?(TRK.mapBg||''):'');
   if(!old) return;
   TRK_BG_MIG[bk]=1;
