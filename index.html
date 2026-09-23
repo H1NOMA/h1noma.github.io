@@ -694,14 +694,102 @@
   background:radial-gradient(circle at 50% 30%, rgba(150,120,255,.2), transparent 56%),
              radial-gradient(circle at 18% 78%, rgba(80,170,255,.13), transparent 60%);
   animation:spFadeIn .6s ease both}
-/* сама луна */
-[data-project="legacy"] .sp-fx1{
-  background:radial-gradient(circle at 50% 27%, rgba(244,242,255,.88) 0 2.4%, rgba(214,208,255,.42) 3.6%, rgba(150,130,240,.13) 8.5%, transparent 19%);
-  animation:moonRise 1.7s cubic-bezier(.16,.84,.3,1) .12s both}
+/* ── Луна ───────────────────────────────────────────────────────────────────
+   Была одним радиальным пятном на весь слой: с растянутым краем и ступеньками
+   на градиенте — «спрайт» вместо небесного тела. Теперь это настоящий диск:
+   чистый край, подсветка с одной стороны, три кратера и отдельный ореол,
+   который дышит сам по себе. */
+[data-project="legacy"] .sp-fx1{background:none;animation:none;opacity:1}
+[data-project="legacy"] .lg-moon{--mz:clamp(84px,13vw,132px);
+  position:absolute;left:50%;top:26%;
+  width:var(--mz);height:var(--mz);margin:calc(var(--mz) / -2) 0 0 calc(var(--mz) / -2);
+  border-radius:50%;pointer-events:none;overflow:hidden;
+  background:
+    radial-gradient(circle at 36% 32%, #ffffff 0%, #f4f2ff 34%, #ded8fb 62%, #b9b0ea 86%, #9d92d6 100%);
+  box-shadow:0 0 0 1px rgba(255,255,255,.3) inset,
+             -9px -11px 26px rgba(74,60,140,.5) inset,   /* терминатор: тень с теневой стороны */
+             0 0 18px rgba(214,208,255,.55),
+             0 0 60px rgba(150,130,240,.38),
+             0 0 140px rgba(120,100,220,.24);
+  will-change:transform,opacity;
+  animation:moonRise 1.9s cubic-bezier(.16,.84,.3,1) .12s both}
+/* кратеры: мягкие тени по диску, чтобы он не читался плоским кружком */
+[data-project="legacy"] .lg-moon u{position:absolute;border-radius:50%;
+  background:radial-gradient(circle at 38% 34%, rgba(126,116,178,.42), rgba(126,116,178,.12) 62%, transparent 76%)}
+/* Пятна нарочно вразнобой по размеру и месту: три одинаково расставленных
+   кружка складывались в «лицо» — два глаза и рот. */
+[data-project="legacy"] .lg-moon u:nth-child(1){left:55%;top:46%;width:26%;height:23%;transform:rotate(-18deg)}
+[data-project="legacy"] .lg-moon u:nth-child(2){left:27%;top:26%;width:15%;height:14%;opacity:.85}
+[data-project="legacy"] .lg-moon u:nth-child(3){left:38%;top:70%;width:10%;height:10%;opacity:.6}
+[data-project="legacy"] .lg-moon u:nth-child(4){left:74%;top:22%;width:8%;height:8%;opacity:.5}
+/* ореол вокруг луны — отдельным слоем, чтобы дышал независимо от диска */
+[data-project="legacy"] .lg-halo{--hz:min(124vw,860px);
+  position:absolute;left:50%;top:26%;
+  width:var(--hz);height:var(--hz);margin:calc(var(--hz) / -2) 0 0 calc(var(--hz) / -2);
+  pointer-events:none;border-radius:50%;
+  background:radial-gradient(circle at 50% 50%,
+    rgba(196,186,255,.22) 0%, rgba(150,130,240,.12) 26%, rgba(110,92,210,.05) 46%, transparent 68%);
+  will-change:transform,opacity;
+  animation:moonHalo 3.4s cubic-bezier(.3,.5,.3,1) .1s both}
+/* столб лунного света: широкий конус вниз, медленно качается */
+[data-project="legacy"] .lg-ray{--rz:min(76vw,540px);
+  position:absolute;left:50%;top:26%;
+  width:var(--rz);height:96vh;margin-left:calc(var(--rz) / -2);
+  pointer-events:none;transform-origin:50% 0;mix-blend-mode:screen;
+  background:linear-gradient(180deg, rgba(214,208,255,.20) 0%, rgba(170,150,245,.10) 34%, transparent 76%);
+  -webkit-mask-image:linear-gradient(180deg,#000 0%,rgba(0,0,0,.5) 52%,transparent 92%);
+          mask-image:linear-gradient(180deg,#000 0%,rgba(0,0,0,.5) 52%,transparent 92%);
+  clip-path:polygon(38% 0, 62% 0, 100% 100%, 0 100%);
+  /* края конуса размываем: без этого луч выглядел прожектором с рублеными
+     боками, а не лунным светом, который тонет в воздухе */
+  filter:blur(17px);
+  will-change:transform,opacity;
+  animation:moonRay 4.2s cubic-bezier(.35,.45,.35,1) .35s both}
+/* ядро луча: уже и ярче, размыто слабее — свет внутри света */
+[data-project="legacy"] .lg-ray::before{content:"";position:absolute;inset:0;
+  background:linear-gradient(180deg, rgba(236,232,255,.3) 0%, rgba(196,182,255,.12) 30%, transparent 64%);
+  clip-path:polygon(45.5% 0, 54.5% 0, 74% 100%, 26% 100%);filter:blur(7px)}
+/* магическая пыль: искры всплывают к луне, каждая по своей дуге */
+[data-project="legacy"] .lg-mote{position:absolute;left:var(--x);top:var(--y);
+  width:calc(var(--r) * 2);height:calc(var(--r) * 2);margin:calc(var(--r) * -1) 0 0 calc(var(--r) * -1);
+  border-radius:50%;pointer-events:none;opacity:0;
+  background:radial-gradient(circle at 50% 50%, #fff 0%, rgba(226,222,255,.92) 36%, rgba(150,130,240,0) 74%);
+  box-shadow:0 0 12px rgba(198,188,255,.85), 0 0 26px rgba(150,130,240,.45);
+  will-change:transform,opacity;
+  animation:moteRise var(--d) cubic-bezier(.35,.2,.5,1) var(--dl) both}
+/* звёзды по всему кадру: на десктопе верх и бока были пустыми,
+   а «больше магии» — это в первую очередь живое небо */
+[data-project="legacy"] .lg-star{position:absolute;left:var(--x);top:var(--y);
+  width:var(--r);height:var(--r);margin:calc(var(--r) / -2) 0 0 calc(var(--r) / -2);
+  border-radius:50%;pointer-events:none;opacity:0;background:#f2efff;
+  box-shadow:0 0 var(--g) rgba(214,208,255,.9);
+  animation:starTwinkle var(--d) ease-in-out var(--dl) infinite}
+@keyframes starTwinkle{
+  0%{opacity:0;transform:scale(.6)}
+  22%{opacity:var(--o);transform:scale(1)}
+  58%{opacity:calc(var(--o) * .35);transform:scale(.86)}
+  100%{opacity:0;transform:scale(.6)}
+}
 @keyframes moonRise{
-  0%{opacity:0;transform:translate3d(0,16vh,0) scale(.72)}
-  46%{opacity:.9}
+  0%{opacity:0;transform:translate3d(0,14vh,0) scale(.68)}
+  46%{opacity:1}
   100%{opacity:1;transform:none}
+}
+@keyframes moonHalo{
+  0%{opacity:0;transform:scale(.72)}
+  40%{opacity:1;transform:scale(1.02)}
+  100%{opacity:.82;transform:scale(1)}
+}
+@keyframes moonRay{
+  0%{opacity:0;transform:rotate(-3.5deg) scaleY(.82)}
+  36%{opacity:1}
+  100%{opacity:.7;transform:rotate(2.5deg) scaleY(1)}
+}
+@keyframes moteRise{
+  0%{opacity:0;transform:translate3d(0,0,0) scale(.5)}
+  14%{opacity:var(--o)}
+  70%{opacity:calc(var(--o) * .7)}
+  100%{opacity:0;transform:translate3d(var(--dx),calc(var(--up) * -1),0) scale(1)}
 }
 /* туман двумя полосами в разные стороны */
 [data-project="legacy"] .sp-fx2{
@@ -870,37 +958,99 @@
   animation:gwIn .4s ease both}
 @keyframes gwIn{from{opacity:0}to{opacity:1}}
 @keyframes gwOut{to{opacity:0}}
-/* код стратагемы */
-[data-project="gw"] .sp-fx1>i:nth-child(1){animation:gwIn .2s ease .15s both, gwOut .18s ease 1.55s forwards}
-[data-project="gw"] .sp-fx1>i:nth-child(1)::after{content:"↑ → ↓ ↓ ↓";position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);
-  text-align:center;font:700 clamp(34px,10vw,52px)/1 system-ui,-apple-system,"Segoe UI",sans-serif;letter-spacing:.16em;
-  color:#e9e3cf;clip-path:inset(0 100% 0 0);
-  animation:gwType .75s steps(5,end) .2s forwards, gwExec .6s steps(1,end) .95s both}
-@keyframes gwType{to{clip-path:inset(0 0 0 0)}}
+/* ── Код стратагемы ────────────────────────────────────────────────────────
+   Порядок строгий: стрелки встают ПО ОДНОЙ, и только когда встала последняя,
+   весь код начинает мигать «выполняется». Потом помехи рвут его в клочья —
+   и уже из них выходит логотип. Раньше код проявлялся шторкой и мигал внахлёст
+   с проявлением, а «глюка» не было вовсе — логотип просто сменял код. */
+[data-project="gw"] .sp-fx1>i:nth-child(1){display:none}
+[data-project="gw"] .gw-code{position:absolute;left:0;right:0;top:50%;
+  display:flex;align-items:center;justify-content:center;gap:clamp(9px,2.4vw,18px);
+  font:700 clamp(34px,10vw,52px)/1 system-ui,-apple-system,"Segoe UI",sans-serif;
+  color:#e9e3cf;will-change:transform,opacity,clip-path;
+  transform:translateY(-50%);
+  animation:gwTear .3s steps(1,end) 1.80s both}
+[data-project="gw"] .gw-code s{display:block;text-decoration:none;opacity:0;
+  will-change:transform,opacity;
+  /* forwards, а не both: с both жёлтый цвет из первого кадра «выполняется»
+     красил стрелки ещё пока они только появлялись — мигание начиналось раньше времени */
+  animation:gwArrow .3s cubic-bezier(.2,1.4,.35,1) var(--dl) both,
+            gwExec .54s steps(1,end) 1.26s forwards}
+/* каждая стрелка «встаёт» на место: приходит снизу, чуть перелетает и садится */
+@keyframes gwArrow{
+  0%{opacity:0;transform:translate3d(0,10px,0) scale(.45)}
+  55%{opacity:1;transform:translate3d(0,0,0) scale(1.14)}
+  100%{opacity:1;transform:none}
+}
 /* «выполняется»: три жёлтых вспышки без плавности, как индикатор */
 @keyframes gwExec{
   0%,33.3%,66.6%{color:#ffd23f;text-shadow:0 0 16px rgba(255,210,63,.75)}
   16.6%,50%,83.3%{color:#e9e3cf;text-shadow:none}
-  100%{color:#ffd23f;text-shadow:0 0 16px rgba(255,210,63,.75)}
+  100%{color:#ffd23f;text-shadow:0 0 18px rgba(255,210,63,.8)}
+}
+/* помехи: код дёргается, расслаивается по цвету и рвётся полосами */
+@keyframes gwTear{
+  0%{transform:translateY(-50%)}
+  10%{transform:translateY(-50%) translateX(-10px);filter:drop-shadow(5px 0 0 rgba(255,47,94,.85)) drop-shadow(-5px 0 0 rgba(47,216,255,.85))}
+  26%{transform:translateY(-50%) translateX(8px) skewX(-7deg);clip-path:inset(30% 0 36% 0)}
+  42%{transform:translateY(-50%) translateX(-6px);clip-path:inset(4% 0 64% 0);filter:drop-shadow(-4px 0 0 rgba(255,47,94,.7)) drop-shadow(4px 0 0 rgba(47,216,255,.7))}
+  58%{transform:translateY(-50%) translateX(5px) skewX(5deg);clip-path:inset(58% 0 8% 0)}
+  74%{opacity:1;transform:translateY(-50%) translateX(-3px);clip-path:inset(22% 0 22% 0)}
+  88%{opacity:.5;transform:translateY(-50%) scale(1.04);clip-path:inset(0 0 0 0);filter:none}
+  100%{opacity:0;transform:translateY(-50%) scale(1.08)}
+}
+/* строчная рябь по всему кадру и короткая жёлтая засветка — тот самый «глюк» */
+[data-project="gw"] .gw-scan{position:absolute;inset:0;pointer-events:none;opacity:0;
+  background:repeating-linear-gradient(180deg, rgba(233,227,207,.10) 0 2px, transparent 2px 5px);
+  will-change:transform,opacity;animation:gwScan .34s steps(1,end) 1.80s both}
+@keyframes gwScan{
+  0%{opacity:0}
+  8%{opacity:.95;transform:translate3d(0,-2%,0)}
+  26%{opacity:.25;transform:translate3d(0,3%,0)}
+  46%{opacity:.85;transform:translate3d(0,-1%,0)}
+  66%{opacity:.18;transform:translate3d(0,2%,0)}
+  86%{opacity:.4}
+  100%{opacity:0}
+}
+[data-project="gw"] .gw-flash{position:absolute;inset:0;pointer-events:none;opacity:0;
+  background:#ffd23f;mix-blend-mode:screen;animation:gwFlash .3s steps(1,end) 1.82s both}
+@keyframes gwFlash{
+  0%{opacity:0} 7%{opacity:.5} 15%{opacity:0}
+  36%{opacity:.28} 44%{opacity:0} 100%{opacity:0}
 }
 /* лишние слои выключены */
 [data-project="gw"] .sp-fx1>i:nth-child(2),[data-project="gw"] .sp-fx1>i:nth-child(3),[data-project="gw"] .sp-fx2,
 [data-project="gw"] .sp-glint,[data-project="gw"] .sp-pour{display:none}
-/* логотип: жёлтый с чёрной обводкой (стопка теней по четырём сторонам), без свечения */
+/* логотип: жёлтый с чёрной обводкой (стопка теней по четырём сторонам), без свечения.
+   Выходит из помех: первые кадры ещё дёргается вместе с ними и только потом встаёт */
 [data-project="gw"] .splash-logo{
-  animation:gwLogo .45s cubic-bezier(.2,.9,.3,1.15) 1.62s both;
+  animation:gwLogo .52s cubic-bezier(.2,.9,.3,1.15) 1.98s both;
   filter:sepia(1) saturate(2.6) hue-rotate(8deg) brightness(1.12) contrast(1.05)
     drop-shadow(1.5px 0 0 #000) drop-shadow(-1.5px 0 0 #000) drop-shadow(0 1.5px 0 #000) drop-shadow(0 -1.5px 0 #000)
     drop-shadow(0 3px 2px rgba(0,0,0,.6))}
-@keyframes gwLogo{0%{opacity:0;transform:scale(.9)}60%{opacity:1;transform:scale(1.02)}100%{opacity:1;transform:none}}
+@keyframes gwLogo{
+  0%{opacity:0;transform:translate3d(-7px,0,0) scale(.9)}
+  22%{opacity:1;transform:translate3d(6px,0,0) scale(.97)}
+  42%{transform:translate3d(-4px,0,0) scale(1.03)}
+  66%{transform:translate3d(2px,0,0) scale(1.01)}
+  100%{opacity:1;transform:none}
+}
 
 /* ASSIMILATION — логотип и так собирается из полос, лишний свет ни к чему */
 [data-project="assimilation"] .sp-pour{display:none}
 /* Руны на камне: тусклое поле по всему фону, поверх — два набора,
    которые разгораются волнами. Знаки нарисованы линиями в SVG, а не
    набраны шрифтом: рунического шрифта на телефонах нет. */
+/* Руны — по всему кадру. Плитка повторялась только по вертикали, и на десктопе
+   знаки шли одной колонкой посередине. Теперь она множится и вбок; два набора
+   стоят с разным смещением, поэтому повтор не бросается в глаза. */
 [data-project="neverland"] .sp-fx1>i{
-  background-repeat:repeat-y;background-position:center 0;background-size:420px 1900px}
+  background-repeat:repeat;background-position:center 0;background-size:420px 1900px}
+/* второй набор — своей шириной плитки, а не просто сдвинутый: при одинаковом
+   шаге оба слоя повторялись в такт и на десктопе было видно три одинаковых
+   столбца рун. Разный шаг (420 и 337) даёт период в сотни экранов. */
+[data-project="neverland"] .sp-fx1>i:nth-child(2){
+  background-position:113px 61px;background-size:337px 1524px}
 [data-project="neverland"] .sp-fx1>i:nth-child(1){
   background-image:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20420%201900%22%20width%3D%22420%22%20height%3D%221900%22%20fill%3D%22none%22%20stroke%3D%22%23ffd980%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cg%20transform%3D%22translate%2886.2%201281.7%29%20rotate%289.6%29%20translate%28-23.9%20-23.9%29%22%20opacity%3D%220.95%22%3E%3Cpath%20d%3D%22M14.3%2047.8%20L14.3%200.0M14.3%200.0%20L33.4%209.6M33.4%209.6%20L14.3%2019.1M14.3%2019.1%20L33.4%2033.4M33.4%2033.4%20L14.3%2047.8%22%20stroke-width%3D%223.58%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%22translate%28200.6%201759.7%29%20rotate%28-7.4%29%20translate%28-17.6%20-17.6%29%22%20opacity%3D%220.55%22%3E%3Cpath%20d%3D%22M10.5%2035.1%20L10.5%200.0M24.6%2035.1%20L24.6%200.0M10.5%207.0%20L24.6%2017.6%22%20stroke-width%3D%222.64%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%22translate%2850.8%201463.5%29%20rotate%285.4%29%20translate%28-18.3%20-18.3%29%22%20opacity%3D%220.72%22%3E%3Cpath%20d%3D%22M11.0%2036.5%20L11.0%200.0M11.0%200.0%20L25.6%2011.0M25.6%2011.0%20L11.0%2018.3%22%20stroke-width%3D%222.74%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%22translate%28393.1%201423.2%29%20rotate%28-13.0%29%20translate%28-20.7%20-20.7%29%22%20opacity%3D%220.68%22%3E%3Cpath%20d%3D%22M20.7%2041.4%20L20.7%200.0M20.7%200.0%20L8.3%2012.4M20.7%200.0%20L33.1%2012.4%22%20stroke-width%3D%223.10%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%22translate%28209.1%20278.4%29%20rotate%28-13.3%29%20translate%28-28.3%20-28.3%29%22%20opacity%3D%220.85%22%3E%3Cpath%20d%3D%22M28.3%2056.7%20L28.3%200.0M28.3%200.0%20L39.7%205.7M28.3%2056.7%20L17.0%2051.0%22%20stroke-width%3D%224.25%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%22translate%2857.9%201489.5%29%20rotate%281.5%29%20translate%28-15.3%20-15.3%29%22%20opacity%3D%220.69%22%3E%3Cpath%20d%3D%22M21.4%200.0%20L9.2%2015.3M9.2%2015.3%20L21.4%2030.5%22%20stroke-width%3D%222.29%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%22translate%28204.3%20402.7%29%20rotate%28-11.9%29%20translate%28-15.5%20-15.5%29%22%20opacity%3D%220.63%22%3E%3Cpath%20d%3D%22M9.3%2031.0%20L9.3%200.0M9.3%200.0%20L21.7%209.3M21.7%209.3%20L9.3%2015.5%22%20stroke-width%3D%222.33%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%22translate%28274.2%201479.5%29%20rotate%2813.7%29%20translate%28-24.2%20-24.2%29%22%20opacity%3D%220.58%22%3E%3Cpath%20d%3D%22M19.4%2048.4%20L19.4%200.0M19.4%200.0%20L38.7%2014.5%22%20stroke-width%3D%223.63%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%22translate%28168.6%20672.5%29%20rotate%28-2.5%29%20translate%28-17.0%20-17.0%29%22%20opacity%3D%220.70%22%3E%3Cpath%20d%3D%22M10.2%2034.1%20L10.2%200.0M23.9%2034.1%20L23.9%200.0M10.2%203.4%20L23.9%2017.0M23.9%203.4%20L10.2%2017.0%22%20stroke-width%3D%222.56%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E");
   animation:runeGlow 1.5s cubic-bezier(.3,.6,.3,1) .34s both}
@@ -927,6 +1077,7 @@
   background:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20420%201900%22%20width%3D%22420%22%20height%3D%221900%22%20fill%3D%22none%22%20stroke%3D%22%23c8a24e%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cg%20transform%3D%22translate%28366.8%20890.0%29%20rotate%28-8.7%29%20translate%28-17.1%20-17.1%29%22%20opacity%3D%220.37%22%3E%3Cpath%20d%3D%22M13.7%2034.2%20L13.7%200.0M13.7%200.0%20L27.4%2010.3%22%20stroke-width%3D%222.56%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%22translate%28201.0%201149.2%29%20rotate%28-5.5%29%20translate%28-13.2%20-13.2%29%22%20opacity%3D%220.20%22%3E%3Cpath%20d%3D%22M13.2%2026.5%20L13.2%200.0M13.2%200.0%20L5.3%207.9M13.2%200.0%20L21.2%207.9%22%20stroke-width%3D%221.99%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%22translate%28324.4%201288.1%29%20rotate%2813.0%29%20translate%28-11.5%20-11.5%29%22%20opacity%3D%220.34%22%3E%3Cpath%20d%3D%22M11.5%2023.0%20L11.5%202.3M11.5%206.9%20L4.6%200.0M11.5%206.9%20L18.4%200.0%22%20stroke-width%3D%221.73%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%22translate%28252.7%20351.3%29%20rotate%28-12.2%29%20translate%28-11.2%20-11.2%29%22%20opacity%3D%220.19%22%3E%3Cpath%20d%3D%22M6.7%2022.4%20L6.7%200.0M15.7%2022.4%20L15.7%200.0M6.7%204.5%20L15.7%2011.2%22%20stroke-width%3D%221.68%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%22translate%28350.3%201124.1%29%20rotate%28-1.7%29%20translate%28-20.3%20-20.3%29%22%20opacity%3D%220.38%22%3E%3Cpath%20d%3D%22M12.2%204.1%20L24.4%2012.2M24.4%2012.2%20L12.2%2020.3M28.5%2036.6%20L16.3%2028.5M16.3%2028.5%20L28.5%2020.3%22%20stroke-width%3D%223.05%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%22translate%28217.1%201195.2%29%20rotate%28-11.6%29%20translate%28-17.0%20-17.0%29%22%20opacity%3D%220.34%22%3E%3Cpath%20d%3D%22M17.0%200.0%20L27.2%2010.2M27.2%2010.2%20L17.0%2020.4M17.0%2020.4%20L6.8%2010.2M6.8%2010.2%20L17.0%200.0M17.0%2020.4%20L27.2%2034.0M17.0%2020.4%20L6.8%2034.0%22%20stroke-width%3D%222.55%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%22translate%28369.6%20221.4%29%20rotate%280.4%29%20translate%28-14.0%20-14.0%29%22%20opacity%3D%220.19%22%3E%3Cpath%20d%3D%22M8.4%2028.1%20L8.4%200.0M8.4%200.0%20L19.7%208.4M19.7%208.4%20L8.4%2014.0%22%20stroke-width%3D%222.11%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%22translate%28233.3%20264.7%29%20rotate%28-3.2%29%20translate%28-12.3%20-12.3%29%22%20opacity%3D%220.41%22%3E%3Cpath%20d%3D%22M12.3%2024.6%20L12.3%200.0%22%20stroke-width%3D%221.84%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%22translate%28338.4%2077.0%29%20rotate%28-0.8%29%20translate%28-13.5%20-13.5%29%22%20opacity%3D%220.42%22%3E%3Cpath%20d%3D%22M8.1%2027.0%20L8.1%202.7M8.1%202.7%20L18.9%208.1M18.9%208.1%20L18.9%2027.0%22%20stroke-width%3D%222.03%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%22translate%28172.1%20203.7%29%20rotate%28-6.4%29%20translate%28-18.6%20-18.6%29%22%20opacity%3D%220.20%22%3E%3Cpath%20d%3D%22M18.6%200.0%20L29.7%2011.1M29.7%2011.1%20L18.6%2022.3M18.6%2022.3%20L7.4%2011.1M7.4%2011.1%20L18.6%200.0M18.6%2022.3%20L29.7%2037.1M18.6%2022.3%20L7.4%2037.1%22%20stroke-width%3D%222.78%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%22translate%28148.1%201761.2%29%20rotate%28-10.2%29%20translate%28-20.1%20-20.1%29%22%20opacity%3D%220.35%22%3E%3Cpath%20d%3D%22M12.1%2040.2%20L12.1%200.0M12.1%204.0%20L28.1%2012.1M12.1%2016.1%20L28.1%2024.1%22%20stroke-width%3D%223.01%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%22translate%2829.2%20888.7%29%20rotate%281.7%29%20translate%28-16.8%20-16.8%29%22%20opacity%3D%220.29%22%3E%3Cpath%20d%3D%22M16.8%200.0%20L26.9%2010.1M26.9%2010.1%20L16.8%2020.2M16.8%2020.2%20L6.7%2010.1M6.7%2010.1%20L16.8%200.0M16.8%2020.2%20L26.9%2033.7M16.8%2020.2%20L6.7%2033.7%22%20stroke-width%3D%222.53%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%22translate%2895.7%201355.4%29%20rotate%28-3.3%29%20translate%28-12.6%20-12.6%29%22%20opacity%3D%220.27%22%3E%3Cpath%20d%3D%22M7.5%2025.1%20L7.5%200.0M17.6%2025.1%20L17.6%200.0M7.5%200.0%20L17.6%2025.1M7.5%2025.1%20L17.6%200.0%22%20stroke-width%3D%221.89%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%22translate%28391.1%2076.8%29%20rotate%28-5.5%29%20translate%28-21.4%20-21.4%29%22%20opacity%3D%220.39%22%3E%3Cpath%20d%3D%22M17.1%2042.7%20L17.1%200.0M17.1%200.0%20L34.2%2012.8%22%20stroke-width%3D%223.21%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%22translate%28103.1%20765.2%29%20rotate%282.2%29%20translate%28-21.3%20-21.3%29%22%20opacity%3D%220.19%22%3E%3Cpath%20d%3D%22M12.8%2042.5%20L12.8%200.0M29.8%2042.5%20L29.8%200.0M12.8%200.0%20L29.8%2042.5M12.8%2042.5%20L29.8%200.0%22%20stroke-width%3D%223.19%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%22translate%2828.7%201142.9%29%20rotate%28-11.9%29%20translate%28-21.0%20-21.0%29%22%20opacity%3D%220.20%22%3E%3Cpath%20d%3D%22M21.0%2041.9%20L21.0%204.2M21.0%2012.6%20L8.4%200.0M21.0%2012.6%20L33.5%200.0%22%20stroke-width%3D%223.14%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%22translate%28240.6%20500.8%29%20rotate%283.4%29%20translate%28-18.2%20-18.2%29%22%20opacity%3D%220.21%22%3E%3Cpath%20d%3D%22M18.2%2036.4%20L18.2%200.0M18.2%200.0%20L25.5%203.6M18.2%2036.4%20L10.9%2032.8%22%20stroke-width%3D%222.73%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%22translate%28242.3%201531.0%29%20rotate%28-8.9%29%20translate%28-12.6%20-12.6%29%22%20opacity%3D%220.22%22%3E%3Cpath%20d%3D%22M12.6%2025.3%20L12.6%202.5M12.6%207.6%20L5.1%200.0M12.6%207.6%20L20.2%200.0%22%20stroke-width%3D%221.89%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%22translate%28361.0%201505.5%29%20rotate%28-9.6%29%20translate%28-14.0%20-14.0%29%22%20opacity%3D%220.33%22%3E%3Cpath%20d%3D%22M8.4%200.0%20L19.6%2028.0M19.6%200.0%20L8.4%2028.0%22%20stroke-width%3D%222.10%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%22translate%28229.9%201276.8%29%20rotate%282.9%29%20translate%28-15.7%20-15.7%29%22%20opacity%3D%220.28%22%3E%3Cpath%20d%3D%22M9.4%2031.3%20L9.4%200.0M9.4%200.0%20L21.9%206.3M21.9%206.3%20L9.4%2012.5M9.4%2012.5%20L21.9%2021.9M21.9%2021.9%20L9.4%2031.3%22%20stroke-width%3D%222.35%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%22translate%2863.6%20143.6%29%20rotate%286.7%29%20translate%28-22.6%20-22.6%29%22%20opacity%3D%220.27%22%3E%3Cpath%20d%3D%22M13.5%2045.1%20L13.5%200.0M13.5%200.0%20L31.6%2013.5M31.6%2013.5%20L13.5%2022.6%22%20stroke-width%3D%223.38%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%22translate%28180.7%201657.6%29%20rotate%28-9.1%29%20translate%28-16.9%20-16.9%29%22%20opacity%3D%220.35%22%3E%3Cpath%20d%3D%22M10.1%2033.8%20L10.1%200.0M23.6%2033.8%20L23.6%200.0M10.1%206.8%20L23.6%2016.9%22%20stroke-width%3D%222.53%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%22translate%2850.6%20475.2%29%20rotate%283.2%29%20translate%28-17.7%20-17.7%29%22%20opacity%3D%220.25%22%3E%3Cpath%20d%3D%22M17.7%203.5%20L28.3%2017.7M28.3%2017.7%20L17.7%2031.9M17.7%2031.9%20L7.1%2017.7M7.1%2017.7%20L17.7%203.5%22%20stroke-width%3D%222.66%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%22translate%28364.3%20432.6%29%20rotate%28-2.5%29%20translate%28-11.2%20-11.2%29%22%20opacity%3D%220.24%22%3E%3Cpath%20d%3D%22M11.2%2022.4%20L11.2%200.0M4.5%2015.7%20L17.9%206.7%22%20stroke-width%3D%221.68%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%22translate%2842.4%20568.9%29%20rotate%28-11.4%29%20translate%28-17.4%20-17.4%29%22%20opacity%3D%220.21%22%3E%3Cpath%20d%3D%22M10.4%2034.7%20L10.4%200.0M10.4%200.0%20L24.3%206.9M24.3%206.9%20L10.4%2013.9M10.4%2013.9%20L24.3%2034.7%22%20stroke-width%3D%222.61%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%22translate%28191.6%20654.5%29%20rotate%282.4%29%20translate%28-19.8%20-19.8%29%22%20opacity%3D%220.21%22%3E%3Cpath%20d%3D%22M11.9%2039.6%20L11.9%200.0M27.7%2039.6%20L27.7%200.0M11.9%207.9%20L27.7%2019.8%22%20stroke-width%3D%222.97%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%22translate%2838.2%20107.3%29%20rotate%2813.0%29%20translate%28-21.9%20-21.9%29%22%20opacity%3D%220.19%22%3E%3Cpath%20d%3D%22M21.9%2043.8%20L21.9%200.0%22%20stroke-width%3D%223.29%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%22translate%28295.2%20633.4%29%20rotate%28-1.3%29%20translate%28-23.0%20-23.0%29%22%20opacity%3D%220.27%22%3E%3Cpath%20d%3D%22M13.8%2046.0%20L13.8%200.0M13.8%209.2%20L27.6%2018.4M27.6%2018.4%20L13.8%2027.6%22%20stroke-width%3D%223.45%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%22translate%2841.6%201712.6%29%20rotate%288.2%29%20translate%28-19.8%20-19.8%29%22%20opacity%3D%220.40%22%3E%3Cpath%20d%3D%22M11.9%2039.7%20L11.9%200.0M11.9%200.0%20L27.8%207.9M27.8%207.9%20L11.9%2015.9M11.9%2015.9%20L27.8%2039.7%22%20stroke-width%3D%222.98%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%22translate%28155.2%201273.6%29%20rotate%2812.4%29%20translate%28-21.8%20-21.8%29%22%20opacity%3D%220.19%22%3E%3Cpath%20d%3D%22M30.5%200.0%20L13.1%2013.1M13.1%2013.1%20L30.5%2026.2M30.5%2026.2%20L13.1%2039.3%22%20stroke-width%3D%223.27%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E") repeat-y center 0/420px 1900px;
   height:150%;top:-25%;
   animation:emberRise 2.6s cubic-bezier(.3,.4,.3,1) both}
+[data-project="neverland"] .sp-fx2{background-repeat:repeat}
 @keyframes emberRise{
   0%{opacity:0;transform:translate3d(0,6%,0)}
   30%{opacity:1}
@@ -951,47 +1102,26 @@
              radial-gradient(26% 18% at 16% 88%, rgba(255,168,74,.14), transparent 74%),
              linear-gradient(180deg, #0e1013 0%, #131311 62%, #17130e 100%);
   animation:spFadeIn .6s ease both}
-/* Далёкие взрывы и вспышки выстрелов у горизонта: размытые пятна света,
-   каждое со своим временем. Мягкость даёт сам градиент — blur на слой
-   во весь экран стоил бы дороже всего остального вместе взятого. */
-[data-project="terra"] .sp-fx1>i:nth-child(1){
-  background:radial-gradient(32% 18% at 22% 72%, rgba(255,206,128,.9) 0%, rgba(232,132,54,.42) 30%, transparent 66%);
-  filter:blur(4px);
-  animation:farBlast 2.6s cubic-bezier(.1,.76,.32,1) .26s both}
-[data-project="terra"] .sp-fx1>i:nth-child(2){
-  background:radial-gradient(38% 21% at 78% 80%, rgba(255,190,104,.78) 0%, rgba(216,112,46,.34) 30%, transparent 64%);
-  filter:blur(5px);
-  animation:farBlast 3.1s cubic-bezier(.1,.76,.32,1) 1.05s both}
-/* Вспышки выстрелов у горизонта: не резкие точки, а мягкие пятна света —
-   так это и выглядит издалека сквозь снег. Загораются быстро, гаснут долго,
-   поэтому глаз успевает их заметить, но они не мельтешат. */
-[data-project="terra"] .sp-fx1>i:nth-child(3){
-  background:radial-gradient(22% 12% at 61% 68%, rgba(255,232,186,.55) 0%, rgba(255,204,124,.22) 30%, rgba(240,170,90,.07) 56%, transparent 76%),
-             radial-gradient(19% 10% at 34% 63%, rgba(255,228,180,.45) 0%, rgba(255,198,112,.18) 30%, rgba(232,162,84,.06) 56%, transparent 74%),
-             radial-gradient(16% 9% at 47% 74%, rgba(255,224,172,.38) 0%, rgba(246,186,104,.14) 32%, transparent 70%);
-  filter:blur(3px);
-  animation:muzzle 3.4s cubic-bezier(.1,.8,.4,1) .5s both}
-@keyframes farBlast{
-  0%{opacity:0;transform:scale(.42)}
-  7%{opacity:.92;transform:scale(.7)}
-  24%{opacity:.6;transform:scale(.94)}
-  52%{opacity:.28;transform:scale(1.12)}
-  100%{opacity:0;transform:scale(1.32)}
-}
-/* Две вспышки, разнесённые по времени. Подъём резкий (2% длительности),
-   спад долгий — как настоящее зарево выстрела, а не мигающая лампочка.
-   Частота остаётся заведомо безопасной: меньше одной вспышки в секунду. */
-@keyframes muzzle{
-  0%,10%{opacity:0}
-  12%{opacity:.9}
-  20%{opacity:.5}
-  34%{opacity:.16}
-  46%{opacity:0}
-  58%{opacity:0}
-  60%{opacity:.75}
-  68%{opacity:.42}
-  82%{opacity:.13}
-  100%{opacity:0}
+/* ── Вспышки боя ────────────────────────────────────────────────────────────
+   Раньше это были три неподвижных пятна на одном слое, мигавших разом: вспышки
+   всегда в одних и тех же местах, да ещё и уезжавшие вниз вместе со снегом.
+   Теперь каждая вспышка — свой элемент: своё место по всему кадру, свой размер
+   и своё время. Они загораются быстро, гаснут долго и никуда не едут —
+   появляются и исчезают там, где вспыхнули. */
+[data-project="terra"] .sp-fx1>i{display:none}
+[data-project="terra"] .tr-fl{position:absolute;left:var(--x);top:var(--y);
+  width:var(--s);height:calc(var(--s) * .62);margin:calc(var(--s) * -.31) 0 0 calc(var(--s) * -.5);
+  border-radius:50%;pointer-events:none;opacity:0;will-change:transform,opacity;
+  background:radial-gradient(circle at 50% 50%,
+    rgba(255,236,196,1) 0%, rgba(255,206,128,.55) 24%, rgba(232,140,60,.2) 48%, transparent 74%);
+  filter:blur(var(--b));
+  animation:trFlash var(--d) cubic-bezier(.05,.8,.35,1) var(--dl) both}
+@keyframes trFlash{
+  0%{opacity:0;transform:scale(.55)}
+  6%{opacity:var(--o);transform:scale(1)}
+  26%{opacity:calc(var(--o) * .45);transform:scale(1.12)}
+  58%{opacity:calc(var(--o) * .16);transform:scale(1.2)}
+  100%{opacity:0;transform:scale(1.26)}
 }
 /* Снег двумя планами: мелкий дальний медленнее, крупный ближний быстрее.
    Обе картинки — россыпь в случайных местах, чтобы не читалась плитка. */
@@ -1000,6 +1130,11 @@
              url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20420%201900%22%20width%3D%22420%22%20height%3D%221900%22%3E%3Ccircle%20cx%3D%22194.5%22%20cy%3D%22709.3%22%20r%3D%221.51%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.55%22%2F%3E%3Ccircle%20cx%3D%22211.2%22%20cy%3D%221706.8%22%20r%3D%221.29%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.73%22%2F%3E%3Ccircle%20cx%3D%2217.2%22%20cy%3D%22720.1%22%20r%3D%222.05%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.62%22%2F%3E%3Ccircle%20cx%3D%2266.0%22%20cy%3D%22452.2%22%20r%3D%221.25%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.83%22%2F%3E%3Ccircle%20cx%3D%22248.0%22%20cy%3D%221471.0%22%20r%3D%221.42%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.58%22%2F%3E%3Ccircle%20cx%3D%22122.3%22%20cy%3D%221281.0%22%20r%3D%222.02%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.43%22%2F%3E%3Ccircle%20cx%3D%22112.0%22%20cy%3D%22398.8%22%20r%3D%221.47%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.61%22%2F%3E%3Ccircle%20cx%3D%22372.3%22%20cy%3D%221670.8%22%20r%3D%221.17%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.7%22%2F%3E%3Ccircle%20cx%3D%229.9%22%20cy%3D%22807.0%22%20r%3D%222.76%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.36%22%2F%3E%3Ccircle%20cx%3D%2250.9%22%20cy%3D%221099.5%22%20r%3D%222.88%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.22%22%2F%3E%3Ccircle%20cx%3D%2235.1%22%20cy%3D%221025.6%22%20r%3D%220.96%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.7%22%2F%3E%3Ccircle%20cx%3D%22386.8%22%20cy%3D%22798.2%22%20r%3D%221.35%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.58%22%2F%3E%3Ccircle%20cx%3D%22243.5%22%20cy%3D%22327.9%22%20r%3D%222.56%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.42%22%2F%3E%3Ccircle%20cx%3D%22233.1%22%20cy%3D%221152.1%22%20r%3D%221.09%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.85%22%2F%3E%3Ccircle%20cx%3D%22419.1%22%20cy%3D%22230.5%22%20r%3D%222.55%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.47%22%2F%3E%3Ccircle%20cx%3D%22256.7%22%20cy%3D%2281.8%22%20r%3D%221.37%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.73%22%2F%3E%3Ccircle%20cx%3D%22325.3%22%20cy%3D%22164.8%22%20r%3D%221.5%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.73%22%2F%3E%3Ccircle%20cx%3D%22189.5%22%20cy%3D%22764.1%22%20r%3D%223.4%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.22%22%2F%3E%3Ccircle%20cx%3D%22335.7%22%20cy%3D%22624.6%22%20r%3D%221.05%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.68%22%2F%3E%3Ccircle%20cx%3D%22136.4%22%20cy%3D%22168.8%22%20r%3D%221.7%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.64%22%2F%3E%3Ccircle%20cx%3D%2210.7%22%20cy%3D%221483.4%22%20r%3D%222.1%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.61%22%2F%3E%3Ccircle%20cx%3D%22104.3%22%20cy%3D%221401.5%22%20r%3D%221.06%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.84%22%2F%3E%3Ccircle%20cx%3D%22168.4%22%20cy%3D%22708.6%22%20r%3D%223.12%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.37%22%2F%3E%3Ccircle%20cx%3D%2271.8%22%20cy%3D%221602.2%22%20r%3D%220.94%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.84%22%2F%3E%3Ccircle%20cx%3D%2272.6%22%20cy%3D%221798.4%22%20r%3D%223.45%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.22%22%2F%3E%3Ccircle%20cx%3D%2225.6%22%20cy%3D%22396.3%22%20r%3D%221.33%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.84%22%2F%3E%3Ccircle%20cx%3D%22148.9%22%20cy%3D%22267.2%22%20r%3D%221.74%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.43%22%2F%3E%3Ccircle%20cx%3D%22233.5%22%20cy%3D%221322.4%22%20r%3D%221.22%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.76%22%2F%3E%3Ccircle%20cx%3D%22321.0%22%20cy%3D%22727.7%22%20r%3D%222.84%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.38%22%2F%3E%3Ccircle%20cx%3D%22324.1%22%20cy%3D%221672.5%22%20r%3D%220.97%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.56%22%2F%3E%3Ccircle%20cx%3D%22222.1%22%20cy%3D%22329.3%22%20r%3D%221.68%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.63%22%2F%3E%3Ccircle%20cx%3D%2293.4%22%20cy%3D%2224.7%22%20r%3D%221.22%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.72%22%2F%3E%3Ccircle%20cx%3D%22163.1%22%20cy%3D%22328.8%22%20r%3D%221.56%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.71%22%2F%3E%3Ccircle%20cx%3D%22395.3%22%20cy%3D%2254.7%22%20r%3D%223.84%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.35%22%2F%3E%3Ccircle%20cx%3D%22219.9%22%20cy%3D%221020.5%22%20r%3D%222.69%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.37%22%2F%3E%3Ccircle%20cx%3D%22227.7%22%20cy%3D%22570.6%22%20r%3D%222.32%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.43%22%2F%3E%3Ccircle%20cx%3D%22293.8%22%20cy%3D%22861.7%22%20r%3D%221.35%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.57%22%2F%3E%3Ccircle%20cx%3D%22253.2%22%20cy%3D%22709.0%22%20r%3D%222.92%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.41%22%2F%3E%3Ccircle%20cx%3D%22306.4%22%20cy%3D%221187.5%22%20r%3D%222.65%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.36%22%2F%3E%3Ccircle%20cx%3D%22257.6%22%20cy%3D%221288.3%22%20r%3D%220.95%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.61%22%2F%3E%3Ccircle%20cx%3D%22255.4%22%20cy%3D%22344.5%22%20r%3D%221.15%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.69%22%2F%3E%3Ccircle%20cx%3D%22224.9%22%20cy%3D%2249.3%22%20r%3D%221.93%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.63%22%2F%3E%3Ccircle%20cx%3D%223.6%22%20cy%3D%221812.7%22%20r%3D%222.58%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.7%22%2F%3E%3Ccircle%20cx%3D%22349.8%22%20cy%3D%22201.8%22%20r%3D%221.06%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.78%22%2F%3E%3Ccircle%20cx%3D%2280.7%22%20cy%3D%22420.2%22%20r%3D%220.98%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.83%22%2F%3E%3Ccircle%20cx%3D%22410.0%22%20cy%3D%22707.6%22%20r%3D%222.07%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.56%22%2F%3E%3Ccircle%20cx%3D%22155.2%22%20cy%3D%221206.0%22%20r%3D%221.08%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.71%22%2F%3E%3Ccircle%20cx%3D%2282.9%22%20cy%3D%22834.6%22%20r%3D%222.63%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.24%22%2F%3E%3Ccircle%20cx%3D%22336.0%22%20cy%3D%22109.8%22%20r%3D%221.5%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.73%22%2F%3E%3Ccircle%20cx%3D%2292.7%22%20cy%3D%22111.4%22%20r%3D%221.11%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.79%22%2F%3E%3Ccircle%20cx%3D%22409.7%22%20cy%3D%221493.9%22%20r%3D%223.9%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.42%22%2F%3E%3Ccircle%20cx%3D%22386.4%22%20cy%3D%221838.3%22%20r%3D%221.12%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.62%22%2F%3E%3Ccircle%20cx%3D%22253.8%22%20cy%3D%22934.2%22%20r%3D%221.49%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.67%22%2F%3E%3Ccircle%20cx%3D%2287.8%22%20cy%3D%22525.1%22%20r%3D%221.33%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.72%22%2F%3E%3Ccircle%20cx%3D%22184.8%22%20cy%3D%22354.0%22%20r%3D%221.13%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.6%22%2F%3E%3Ccircle%20cx%3D%22228.4%22%20cy%3D%22358.3%22%20r%3D%222.26%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.44%22%2F%3E%3Ccircle%20cx%3D%22262.7%22%20cy%3D%22641.9%22%20r%3D%221.32%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.78%22%2F%3E%3Ccircle%20cx%3D%22371.1%22%20cy%3D%221393.7%22%20r%3D%221.28%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.65%22%2F%3E%3Ccircle%20cx%3D%228.0%22%20cy%3D%221049.7%22%20r%3D%221.51%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.65%22%2F%3E%3Ccircle%20cx%3D%22350.1%22%20cy%3D%22976.9%22%20r%3D%221.4%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.64%22%2F%3E%3Ccircle%20cx%3D%22224.1%22%20cy%3D%22135.7%22%20r%3D%221.54%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.56%22%2F%3E%3Ccircle%20cx%3D%2262.6%22%20cy%3D%22310.3%22%20r%3D%221.48%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.85%22%2F%3E%3Ccircle%20cx%3D%22272.7%22%20cy%3D%22751.4%22%20r%3D%223.31%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.25%22%2F%3E%3Ccircle%20cx%3D%22289.9%22%20cy%3D%22682.1%22%20r%3D%221.12%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.67%22%2F%3E%3Ccircle%20cx%3D%2276.6%22%20cy%3D%221163.8%22%20r%3D%223.4%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.22%22%2F%3E%3Ccircle%20cx%3D%22287.4%22%20cy%3D%2238.2%22%20r%3D%221.51%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.75%22%2F%3E%3Ccircle%20cx%3D%22381.4%22%20cy%3D%221433.8%22%20r%3D%221.0%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.69%22%2F%3E%3Ccircle%20cx%3D%22285.5%22%20cy%3D%22440.9%22%20r%3D%221.42%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.65%22%2F%3E%3Ccircle%20cx%3D%22252.4%22%20cy%3D%221036.3%22%20r%3D%222.64%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.26%22%2F%3E%3Ccircle%20cx%3D%22327.0%22%20cy%3D%221271.3%22%20r%3D%220.99%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.61%22%2F%3E%3Ccircle%20cx%3D%22228.1%22%20cy%3D%221714.5%22%20r%3D%221.04%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.76%22%2F%3E%3Ccircle%20cx%3D%22177.7%22%20cy%3D%221608.7%22%20r%3D%223.91%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.38%22%2F%3E%3Ccircle%20cx%3D%22208.4%22%20cy%3D%22115.7%22%20r%3D%222.0%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.54%22%2F%3E%3Ccircle%20cx%3D%22265.5%22%20cy%3D%221831.7%22%20r%3D%222.52%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.69%22%2F%3E%3Ccircle%20cx%3D%2235.7%22%20cy%3D%22673.8%22%20r%3D%223.67%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.44%22%2F%3E%3Ccircle%20cx%3D%2278.3%22%20cy%3D%221009.2%22%20r%3D%223.36%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.37%22%2F%3E%3Ccircle%20cx%3D%22409.5%22%20cy%3D%22329.3%22%20r%3D%221.5%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.72%22%2F%3E%3Ccircle%20cx%3D%2284.1%22%20cy%3D%221581.4%22%20r%3D%220.99%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.64%22%2F%3E%3Ccircle%20cx%3D%2215.1%22%20cy%3D%22771.0%22%20r%3D%222.05%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.69%22%2F%3E%3Ccircle%20cx%3D%2217.6%22%20cy%3D%22328.8%22%20r%3D%221.3%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.61%22%2F%3E%3Ccircle%20cx%3D%22280.2%22%20cy%3D%22994.1%22%20r%3D%222.44%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.64%22%2F%3E%3Ccircle%20cx%3D%22387.4%22%20cy%3D%22289.0%22%20r%3D%221.57%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.67%22%2F%3E%3Ccircle%20cx%3D%22119.9%22%20cy%3D%22915.4%22%20r%3D%221.49%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.74%22%2F%3E%3Ccircle%20cx%3D%2239.7%22%20cy%3D%221832.1%22%20r%3D%221.85%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.58%22%2F%3E%3Ccircle%20cx%3D%22398.8%22%20cy%3D%22659.0%22%20r%3D%221.04%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.57%22%2F%3E%3Ccircle%20cx%3D%22222.0%22%20cy%3D%22591.8%22%20r%3D%222.89%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.22%22%2F%3E%3Ccircle%20cx%3D%22195.2%22%20cy%3D%22234.4%22%20r%3D%221.06%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.6%22%2F%3E%3Ccircle%20cx%3D%22267.2%22%20cy%3D%221778.8%22%20r%3D%221.35%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.65%22%2F%3E%3Ccircle%20cx%3D%22384.3%22%20cy%3D%221050.5%22%20r%3D%221.42%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.61%22%2F%3E%3Ccircle%20cx%3D%2219.7%22%20cy%3D%2236.8%22%20r%3D%223.59%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.3%22%2F%3E%3Ccircle%20cx%3D%22234.2%22%20cy%3D%221340.3%22%20r%3D%221.39%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.76%22%2F%3E%3Ccircle%20cx%3D%22395.8%22%20cy%3D%22112.3%22%20r%3D%222.11%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.65%22%2F%3E%3Ccircle%20cx%3D%22152.9%22%20cy%3D%221258.6%22%20r%3D%223.09%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.34%22%2F%3E%3Ccircle%20cx%3D%22375.3%22%20cy%3D%2264.8%22%20r%3D%223.04%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.33%22%2F%3E%3Ccircle%20cx%3D%22120.8%22%20cy%3D%221515.6%22%20r%3D%222.35%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.43%22%2F%3E%3Ccircle%20cx%3D%22369.8%22%20cy%3D%221559.6%22%20r%3D%221.82%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.48%22%2F%3E%3Ccircle%20cx%3D%22189.9%22%20cy%3D%22123.7%22%20r%3D%223.17%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.44%22%2F%3E%3Ccircle%20cx%3D%2276.8%22%20cy%3D%221231.3%22%20r%3D%222.24%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.53%22%2F%3E%3Ccircle%20cx%3D%228.0%22%20cy%3D%22827.4%22%20r%3D%221.56%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.84%22%2F%3E%3Ccircle%20cx%3D%22401.9%22%20cy%3D%221862.3%22%20r%3D%220.92%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.64%22%2F%3E%3Ccircle%20cx%3D%223.3%22%20cy%3D%22225.8%22%20r%3D%221.8%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.58%22%2F%3E%3Ccircle%20cx%3D%22159.9%22%20cy%3D%22520.7%22%20r%3D%222.86%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.42%22%2F%3E%3Ccircle%20cx%3D%22221.3%22%20cy%3D%221259.6%22%20r%3D%221.42%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.82%22%2F%3E%3Ccircle%20cx%3D%2283.2%22%20cy%3D%22898.3%22%20r%3D%222.07%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.63%22%2F%3E%3Ccircle%20cx%3D%22270.6%22%20cy%3D%22596.6%22%20r%3D%222.37%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.54%22%2F%3E%3Ccircle%20cx%3D%22248.0%22%20cy%3D%221205.8%22%20r%3D%220.96%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.67%22%2F%3E%3Ccircle%20cx%3D%22326.8%22%20cy%3D%221375.5%22%20r%3D%221.23%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.73%22%2F%3E%3Ccircle%20cx%3D%22223.8%22%20cy%3D%22284.6%22%20r%3D%222.3%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.56%22%2F%3E%3Ccircle%20cx%3D%22394.6%22%20cy%3D%221097.5%22%20r%3D%221.1%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.76%22%2F%3E%3Ccircle%20cx%3D%2233.5%22%20cy%3D%221833.5%22%20r%3D%222.36%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.45%22%2F%3E%3Ccircle%20cx%3D%222.8%22%20cy%3D%221658.8%22%20r%3D%222.04%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.56%22%2F%3E%3Ccircle%20cx%3D%22322.6%22%20cy%3D%22707.8%22%20r%3D%221.76%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.69%22%2F%3E%3Ccircle%20cx%3D%22292.3%22%20cy%3D%22605.3%22%20r%3D%221.52%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.65%22%2F%3E%3Ccircle%20cx%3D%22293.6%22%20cy%3D%221727.6%22%20r%3D%222.96%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.4%22%2F%3E%3Ccircle%20cx%3D%22255.6%22%20cy%3D%221536.3%22%20r%3D%221.19%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.69%22%2F%3E%3Ccircle%20cx%3D%22342.1%22%20cy%3D%22858.9%22%20r%3D%221.05%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.8%22%2F%3E%3Ccircle%20cx%3D%22370.8%22%20cy%3D%221090.2%22%20r%3D%221.44%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.81%22%2F%3E%3Ccircle%20cx%3D%22120.6%22%20cy%3D%22915.5%22%20r%3D%220.94%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.77%22%2F%3E%3Ccircle%20cx%3D%2266.8%22%20cy%3D%22165.4%22%20r%3D%222.73%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.39%22%2F%3E%3Ccircle%20cx%3D%22342.3%22%20cy%3D%22476.5%22%20r%3D%221.06%22%20fill%3D%22%23f2f4f6%22%20opacity%3D%220.76%22%2F%3E%3C%2Fsvg%3E") repeat-y center 0/300px 1360px;
   height:230%;top:-115%;
   animation:snowFall 6.4s linear both}
+/* Снег идёт по ВСЕМУ кадру. Плитка 420 px повторялась только по вертикали
+   (repeat-y center) — на десктопе это была узкая колонка снега посередине
+   и пустота по бокам. Теперь плитка размножается и по горизонтали, а два
+   слоя с разной шириной (420 и 300) дают разный шаг — стык не читается. */
+[data-project="terra"] .sp-fx2{background-repeat:repeat, repeat}
 @keyframes snowFall{
   0%{opacity:0;transform:translate3d(0,0,0)}
   7%{opacity:1}
@@ -3663,16 +3798,88 @@ if(/Android/i.test(navigator.userAgent||'')) d.classList.add('lite');}catch(e){}
   window.__splashStop=function(){};           // осталось для совместимости с boot
   if(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   var mode=document.documentElement.getAttribute('data-project')||'assimilation';
-  if(mode!=='assimilation') return;
-  var N=10, html='';
-  for(var i=0;i<N;i++){
-    var top=(i/N*100).toFixed(2), bot=(100-(i+1)/N*100).toFixed(2);
-    var from=(i%2? 1:-1)*(30+Math.round(Math.random()*46));
-    var dl=(0.30+i*0.045).toFixed(3);
-    html+='<i style="clip-path:inset('+top+'% 0 '+bot+'% 0);--from:'+from+'px;--dl:'+dl+'s"></i>';
+  var fx=document.querySelector('.splash .sp-fx1');
+  var rnd=function(a,b){ return a+Math.random()*(b-a); };
+  var f2=function(v){ return v.toFixed(2); };
+
+  /* ASSIMILATION — логотип собирается из горизонтальных срезов */
+  if(mode==='assimilation'){
+    var N=10, html='';
+    for(var i=0;i<N;i++){
+      var top=(i/N*100).toFixed(2), bot=(100-(i+1)/N*100).toFixed(2);
+      var from=(i%2? 1:-1)*(30+Math.round(Math.random()*46));
+      var dl=(0.30+i*0.045).toFixed(3);
+      html+='<i style="clip-path:inset('+top+'% 0 '+bot+'% 0);--from:'+from+'px;--dl:'+dl+'s"></i>';
+    }
+    html+='<b class="r"></b><b class="c"></b>';
+    host.innerHTML=html;
+    return;
   }
-  html+='<b class="r"></b><b class="c"></b>';
-  host.innerHTML=html;
+  if(!fx) return;
+
+  /* GALACTIC WAR — код стратагемы. Стрелки ПОЯВЛЯЮТСЯ по одной (каждая своим
+     элементом со своей задержкой), и только когда встала последняя, весь код
+     начинает мигать. Дальше помехи рвут его в клочья — и из них выходит логотип. */
+  if(mode==='gw'){
+    var arrows=['↑','→','↓','↓','↓'], code='';
+    for(var a=0;a<arrows.length;a++)
+      code+='<s style="--dl:'+(0.34+a*0.15).toFixed(2)+'s">'+arrows[a]+'</s>';
+    fx.insertAdjacentHTML('beforeend',
+      '<b class="gw-code">'+code+'</b><b class="gw-scan"></b><b class="gw-flash"></b>');
+    return;
+  }
+
+  /* TERRA AETERNA — вспышки боя. Каждая живёт сама по себе: своё место по всему
+     кадру, свой размер и своё время, поэтому они вспыхивают и гаснут вразнобой,
+     а не тремя пятнами в одном и том же месте. */
+  if(mode==='terra'){
+    var wide=innerWidth>=880, F=wide?11:7, out='';
+    for(var k=0;k<F;k++){
+      var big=Math.random()<0.34;
+      out+='<b class="tr-fl" style="'
+         +'--x:'+f2(rnd(wide?4:10, wide?96:90))+'%;'
+         +'--y:'+f2(rnd(46,90))+'%;'
+         +'--s:'+f2(big?rnd(200,330):rnd(90,170))+'px;'
+         +'--b:'+f2(big?rnd(5,9):rnd(2.5,5))+'px;'
+         +'--o:'+f2(big?rnd(.62,.9):rnd(.4,.7))+';'
+         +'--dl:'+f2(rnd(.1,1.65))+'s;'
+         +'--d:'+f2(big?rnd(1.1,1.8):rnd(.7,1.25))+'s"></b>';
+    }
+    fx.insertAdjacentHTML('beforeend', out);
+    return;
+  }
+
+  /* LEGACY — луна, её свет и магическая пыль. Луна и лучи — настоящие элементы
+     (диск с кратерами и ореолом), а не одно радиальное пятно на фоне; пылинки
+     всплывают к ней каждая по своей дуге. */
+  if(mode==='legacy'){
+    var wideL=innerWidth>=880, M=wideL?32:18, S=wideL?34:18, mo='';
+    mo+='<b class="lg-halo"></b><b class="lg-moon"><u></u><u></u><u></u><u></u></b><b class="lg-ray"></b>';
+    for(var st=0;st<S;st++){
+      var far=Math.random()<0.7;
+      mo+='<b class="lg-star" style="'
+        +'--x:'+f2(rnd(1,99))+'%;'
+        +'--y:'+f2(rnd(1,88))+'%;'
+        +'--r:'+f2(far?rnd(1.2,2):rnd(2.2,3.4))+'px;'
+        +'--g:'+f2(far?rnd(4,7):rnd(8,14))+'px;'
+        +'--o:'+f2(far?rnd(.3,.6):rnd(.65,1))+';'
+        +'--dl:'+f2(rnd(0,2.6))+'s;'
+        +'--d:'+f2(rnd(2.2,4))+'s"></b>';
+    }
+    for(var m=0;m<M;m++){
+      mo+='<b class="lg-mote" style="'
+        +'--x:'+f2(rnd(3,97))+'%;'
+        +'--y:'+f2(rnd(58,102))+'%;'
+        +'--r:'+f2(rnd(1.4,3.6))+'px;'
+        +'--dx:'+f2(rnd(-42,42))+'px;'
+        +'--up:'+f2(rnd(34,78))+'vh;'
+        +'--o:'+f2(rnd(.5,1))+';'
+        +'--dl:'+f2(rnd(0,1.6))+'s;'
+        +'--d:'+f2(rnd(2.4,4.2))+'s"></b>';
+    }
+    fx.insertAdjacentHTML('beforeend', mo);
+    return;
+  }
 })();
 </script>
 <div id="logo-src" hidden aria-hidden="true" style="display:none"><a class="brand" href="#" onclick="rebootFX();return false;" aria-label="КОМИК — перезапуск системы">
@@ -14470,9 +14677,14 @@ function preboot(){
   const sp=document.getElementById('splash');
   if(!sp){ if(window.__splashStop) try{ window.__splashStop(); }catch(e){} return; }
   const reduced = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const minT   = reduced?400:1900;   // ровно столько идёт основная анимация
-  const graceT = reduced?600:2600;   // столько ждём облако, чтобы не мигать содержимым
-  const maxT   = reduced?800:4200;   // дальше не держим ни при каких условиях
+  // у каждого мира своя длина сцены: GALACTIC WAR набирает код по стрелке,
+  // потом мигает и ломается помехами — логотип выходит только к 2,5 с.
+  // Уйти раньше значило бы обрубить заставку на самом интересном месте.
+  const SP_MIN={gw:2620, legacy:2100, terra:2000};
+  const _proj=document.documentElement.getAttribute('data-project')||'';
+  const minT   = reduced?400:(SP_MIN[_proj]||1900);   // ровно столько идёт основная анимация
+  const graceT = reduced?600:Math.max(2600, minT+300);   // столько ждём облако, чтобы не мигать содержимым
+  const maxT   = reduced?800:Math.max(4200, minT+900);  // дальше не держим ни при каких условиях
   const start=Date.now();
   const hide=()=>{ sp.classList.add('hide'); setTimeout(()=>{ sp.remove(); if(window.__splashStop) try{ window.__splashStop(); }catch(e){} }, 550); };
   /* Уходим по трём условиям, от лучшего к худшему:
