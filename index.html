@@ -12348,12 +12348,13 @@ function trkMarquee(){
 // не перерисовывая доску: полная отрисовка сбросила бы ввод под пальцем
 addEventListener('resize', function(){ clearTimeout(window.__mqT); window.__mqT=setTimeout(trkMarquee, 250); }, {passive:true});
 /* ── Доска v2: режим вида, раунды/порядок хода, состояния ── */
-/* Доска v2 — образец: один общий вид (большая карта + лента карточек). Пока за флагом:
-   ?board2=1 включает его на этом устройстве, ?board2=0 возвращает старую доску. */
-function trkV2(){ try{ return localStorage.getItem('comik:ui:board2')==='1'; }catch(e){ return false; } }
+/* Доска v2: один общий вид (большая карта + лента карточек) — для всех по умолчанию.
+   Прежняя доска оставлена запасным выходом: ?board2=0 включает её на этом устройстве,
+   ?board2=1 возвращает новую. */
+function trkV2(){ try{ return localStorage.getItem('comik:ui:board2')!=='0'; }catch(e){ return true; } }
 (function(){ try{
   const q=new URLSearchParams(location.search).get('board2');
-  if(q==='1') localStorage.setItem('comik:ui:board2','1'); else if(q==='0') localStorage.removeItem('comik:ui:board2');
+  if(q==='0') localStorage.setItem('comik:ui:board2','0'); else if(q==='1') localStorage.removeItem('comik:ui:board2');
   document.documentElement.classList.toggle('board-v2', trkV2());
 }catch(e){} })();
 function trkViewMode(){ if(trkV2()) return 'stage'; try{ return localStorage.getItem('comik:trk:view')||'list'; }catch(e){ return 'list'; } }
@@ -12665,7 +12666,7 @@ function trkRowHtml(x,o){
   const rc=o.edit?`<div class="tb-rc">${concBtn}${del}</div>`:'';
   return `<div class="${cls}" data-key="${esc(trkCardKey(x))}">
     ${check}
-    <div class="tb-ini">${ini}<span class="l">иниц</span></div>
+    <div class="tb-ini" title="Инициатива">${ini}</div>
     <div class="tb-av${foe?' foe':''}"${ava?` style="background-image:url('${cssUrl(ava)}')"`:''}${o.openJs?` onclick="${o.openJs}" style="cursor:pointer" title="Открыть карточку"`:''}></div>
     <div class="tb-mid">
       <div class="tb-nm">${nm}${conc}<span class="tb-tag ${foe?'foe':'pc'}">${foe?(x.charId?'NPC':'враг'):'игрок'}</span></div>
@@ -13295,6 +13296,7 @@ let TRK_V2_INS='';                     // карточка, открытая в 
 let BV2_Z=1, BV2_FIT=0, BV2_FILL=1;    // масштаб карты (1 — вписана), размер «вписанной» карты, px, и масштаб «по ширине»
 let BV2_SCROLL={x:0,y:0,s:0};          // прокрутка карты и ленты — переживает перерисовку доски
 let BV2_ACT=null;                      // чей ход был при прошлой отрисовке: ленту подводим только при смене
+let BV2_INS_SEEN='';                   // карточка, к которой лента уже подъезжала для инспектора
 try{ BV2_Z=Math.max(1,Math.min(3.3,parseFloat(localStorage.getItem('comik:trk:zoom'))||1)); }catch(e){}
 const BV2_SHIELD='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z"/></svg>';
 function bv2Mob(){ return innerWidth<760; }
@@ -13317,7 +13319,10 @@ function trkStripCard(x, o){
   const conds=showConds?(x.conds||[]).slice(0,4).map(c=>`<span class="tc-ci${c.b?' buff':''}" title="${esc(c.t)}">${c.b?'✦':'☠'}</span>`).join(''):'';
   const k=esc(key), seld=TRK_SEL.has(key);
   const sel=(o.edit && foe) ? `<label class="bv2-sel" onclick="event.stopPropagation()" title="Выбрать для массового урона"><input type="checkbox" ${seld?'checked':''} onchange="trkSelToggle('${k}')" aria-label="Выбрать"></label>` : '';
-  const cls=['bv2-card', foe?'foe':'pc', active?'on-turn':'', dead?'dead':'', mine?'mine':'', TRK_V2_INS===key?'insp':'', seld?'sel':''].filter(Boolean).join(' ');
+  const dying=!foe && !dead && hp<=0;
+  const ds=x.ds||{}, pips=(c,n)=>[0,1,2].map(i=>`<span class="p${n>i?' '+c:''}"></span>`).join('');
+  const dsHtml=dying?`<div class="tb-ds bv2-ds" title="Спасброски от смерти"><div class="ds-s">${pips('s',ds.s||0)}</div><div class="ds-f">${pips('f',ds.f||0)}</div></div>`:'';
+  const cls=['bv2-card', foe?'foe':'pc', active?'on-turn':'', dead?'dead':'', dying?'dying':'', mine?'mine':'', TRK_V2_INS===key?'insp':'', seld?'sel':''].filter(Boolean).join(' ');
   return `<div class="${cls}" data-key="${k}" role="button" tabindex="0" aria-label="${esc(x.name||'—')}"
       onclick="bv2Inspect('${k}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();bv2Inspect('${k}')}">
     <div class="bv2-ph"${ava?` style="background-image:url('${cssUrl(ava)}')"`:''}>
@@ -13326,7 +13331,7 @@ function trkStripCard(x, o){
       ${active?'<span class="bv2-turn">ход</span>':''}
       ${dead?`<span class="bv2-skull" title="Выбыл">${SKULL_SVG}</span>`:''}
       ${x.conc?'<span class="bv2-conc" title="Концентрация">◈</span>':''}
-      ${sel}
+      ${sel}${dsHtml}
     </div>
     <div class="bv2-foot">
       <div class="tc-name"><span class="tc-name-t">${esc(x.name||'—')}</span></div>
@@ -13440,26 +13445,29 @@ function bv2Fit(){
   const W=st.clientWidth, padX=mob?6:28;
   // на десктопе панель висит поверх верхнего края карты, а карта уходит под ленту почти целиком —
   // там её низ размыт и переходит в фон; на телефоне карта короче и прячет под лентой меньше
-  const topPad=Math.round(hudH*(mob?1:0.5)), keep=mob?0.62:0.2;   // keep — доля ленты, под которой карты уже нет
+  const topPad=Math.round(hudH*(mob?1:0.5));
   const avail=Math.round(innerHeight-top-dock-(mob?4:16));
-  let H, room;
-  if(mob){
+  // «по содержимому»: карта по ширине, лента заходит на неё на треть, сцена ровно такой высоты
+  // (у игрока — до пульта, чтобы лента стояла прямо над ним)
+  const byWidth=()=>{ const keep=0.62;
     BV2_FIT=Math.max(200, Math.floor(Math.min(W-2*padX, avail-topPad-stripH*keep)));
-    H=topPad+BV2_FIT+Math.round(stripH*keep);
-    // у игрока снизу пульт: сцена дотягивается до него, лента встаёт прямо над пультом,
-    // а карта остаётся под панелью — свободное место уходит в размытый зазор над лентой
-    if(dock) H=Math.max(H, avail);
-    room=BV2_FIT;
-  } else {
+    let h=topPad+BV2_FIT+Math.round(stripH*keep); if(dock) h=Math.max(h, avail); return h; };
+  let H;
+  if(mob) H=byWidth();
+  else {
+    // десктоп: карта вписана по высоте и уходит под ленту почти целиком — там её низ размыт
     H=Math.max(560, avail);
-    room=H-topPad-stripH*keep;
+    const room=H-topPad-stripH*0.2;
     BV2_FIT=Math.max(260, Math.floor(Math.min(W-2*padX, room)));
+    if(BV2_FIT<room-40) H=byWidth();      // упёрлись в ширину (планшет, узкое окно)
   }
   st.style.height=Math.round(H)+'px';
   st.style.setProperty('--bv2-strip-h', stripH+'px');
-  const extra=mob?0:Math.max(0, room-BV2_FIT);
+  st.style.setProperty('--bv2-hud-h', (hud?hud.offsetTop+hud.offsetHeight:0)+'px');
   BV2_FILL=Math.max(1, (W-2*padX)/BV2_FIT);           // «по ширине» — во сколько раз больше вписанной
-  cv.style.padding=`${Math.round(topPad+extra/2)}px ${padX}px ${Math.round(stripH+12)}px`;
+  // лента не влезает целиком — справа оставляем место под кнопку кубиков
+  if(strip){ const inn=strip.firstElementChild; strip.classList.toggle('over', !!inn && inn.scrollWidth>strip.clientWidth+4); }
+  cv.style.padding=`${topPad}px ${padX}px ${Math.round(stripH+12)}px`;
   bv2Apply();
 }
 function bv2Apply(){
@@ -13544,6 +13552,13 @@ function trkStageBind(){
   const act=strip.querySelector('.bv2-card.on-turn'), ak=act?act.getAttribute('data-key'):'';
   if(act && ak!==BV2_ACT && !TRK_V2_INS) bv2StripTo(act, BV2_ACT!==null);
   BV2_ACT=ak;
+  if(TRK_V2_INS && TRK_V2_INS!==BV2_INS_SEEN){
+    const q=(window.CSS&&CSS.escape)?CSS.escape(TRK_V2_INS):TRK_V2_INS;
+    const ic=strip.querySelector('.bv2-card[data-key="'+q+'"]');
+    if(ic){ const sr=strip.getBoundingClientRect(), cr=ic.getBoundingClientRect();
+      if(cr.left<sr.left+24 || cr.right>sr.right-100) bv2StripTo(ic, true); }
+  }
+  BV2_INS_SEEN=TRK_V2_INS;
   bv2InsPlace();
   // пульт и шрифты встают следующим кадром — перемеряем, сохранив прокрутку
   requestAnimationFrame(()=>{ if(!st.isConnected) return; bv2Fit(); view.scrollLeft=BV2_SCROLL.x; view.scrollTop=BV2_SCROLL.y; bv2InsPlace(); });
@@ -16521,7 +16536,7 @@ function openInstallHelp(){
       '<div class="pd-ava"'+(ava?(' style="background-image:url(\''+cssUrl(ava)+'\')"'):'')+'>'+
         (ava?'':esc(((my.name||'?').trim().charAt(0)||'?').toUpperCase()))+'</div>'+
       '<div class="pd-nm"><b>'+esc(my.name||'—')+'</b><span>ваш персонаж</span></div>'+
-      '<div class="pd-st">Иниц<input class="pd-in" inputmode="numeric" value="'+esc(String(my.init==null?0:my.init))+
+      '<div class="pd-st pd-ini" title="Инициатива"><input class="pd-in" inputmode="numeric" aria-label="Инициатива" value="'+esc(String(my.init==null?0:my.init))+
         '" onchange="playerInitSet(this.value)"></div>'+
       '<div class="pd-hp">'+
         '<button class="pd-hpb dmg" onclick="playerHpAdjust(\'dmg\')" title="Получить урон">−</button>'+
@@ -16530,7 +16545,7 @@ function openInstallHelp(){
           '<span>'+(hp<=0?'💀 0':(hp+(maxHp?(' / '+maxHp):'')))+(thp?' (+'+thp+')':'')+'</span></div>'+
         '<button class="pd-hpb heal" onclick="playerHpAdjust(\'heal\')" title="Восполнить">+</button>'+
       '</div>'+
-      '<div class="pd-st">КД<b>'+(my.ac?esc(String(my.ac)):'—')+'</b></div>'+
+      '<div class="pd-st pd-ac" title="Класс доспеха">'+BV2_SHIELD+'<b>'+(my.ac?esc(String(my.ac)):'—')+'</b></div>'+
       '<div class="pd-tabs">'+tabs.map(function(k){
         var n = k==='cond' && (my.conds||[]).length ? '<i>'+(my.conds||[]).length+'</i>' : '';
         return '<button class="pd-tab'+(PD_TAB===k?' on':'')+'" data-k="'+k+'" onclick="pdTab(\''+k+'\')">'+
@@ -17166,6 +17181,7 @@ html.board-v2 #pdock .pd-tab:not([data-k]){display:none}          /* кореш�
           mask-image:linear-gradient(90deg,transparent 0,#000 34px,#000 calc(100% - 34px),transparent 100%)}
 .bv2-strip::-webkit-scrollbar{display:none}
 .bv2-strip-in{display:flex;align-items:flex-end;gap:12px;width:max-content;margin:0 auto;padding:0 36px}
+.bv2-strip.over .bv2-strip-in{padding-right:96px}
 .bv2-card{--cw:132px;position:relative;flex:none;width:var(--cw);border-radius:15px;overflow:hidden;cursor:pointer;outline:none;
   background:var(--surface);border:1.5px solid var(--line2);box-shadow:0 12px 30px rgba(0,0,0,.5);
   transition:transform .24s cubic-bezier(.3,.7,.3,1),box-shadow .24s,border-color .2s}
@@ -17179,6 +17195,14 @@ html.board-v2 #pdock .pd-tab:not([data-k]){display:none}          /* кореш�
 .bv2-card.sel{box-shadow:0 0 0 2px var(--red),0 0 18px rgba(var(--accent-rgb),.35)}
 .bv2-card.dead .bv2-ph{filter:grayscale(1) brightness(.55)}
 .bv2-card.dead .bv2-foot{opacity:.7}
+.bv2-card.dying .bv2-ph::before{content:"";position:absolute;inset:0;z-index:1;pointer-events:none;
+  box-shadow:inset 0 0 26px rgba(224,86,76,.55);animation:bv2Dying 2.2s ease-in-out infinite}
+@keyframes bv2Dying{50%{box-shadow:inset 0 0 12px rgba(224,86,76,.25)}}
+.bv2-ds{position:absolute;left:7px;bottom:7px;z-index:2;display:flex;flex-direction:column;gap:3px;padding:4px 5px;border-radius:7px;background:rgba(8,9,8,.74)}
+.bv2-ds > div{display:flex;gap:3px}
+.bv2-ds .p{width:7px;height:7px;border-radius:50%;border:1px solid rgba(255,255,255,.35);box-sizing:border-box}
+.bv2-ds .p.s{background:#5fd17a;border-color:#5fd17a}
+.bv2-ds .p.f{background:#e0564c;border-color:#e0564c}
 .bv2-ph{position:relative;aspect-ratio:1/.86;background:#1c2019 center/cover no-repeat}
 .bv2-ph::after{content:"";position:absolute;left:0;right:0;bottom:0;height:40%;background:linear-gradient(180deg,transparent,rgba(0,0,0,.45))}
 .bv2-lt{position:absolute;inset:0;display:grid;place-items:center;font:700 2.4rem var(--f-disp);color:rgba(255,255,255,.22)}
@@ -17215,9 +17239,12 @@ html.board-v2 #pdock .pd-tab:not([data-k]){display:none}          /* кореш�
 .bv2-empty{padding:16px 22px;margin-bottom:10px;color:var(--muted);font-size:.9rem;background:color-mix(in srgb,var(--bg) 70%,transparent);
   border:var(--hair) dashed var(--line2);border-radius:14px}
 /* ── массовые действия ГМа — над лентой ── */
-.bv2-mass{position:absolute;z-index:6;left:50%;transform:translateX(-50%);bottom:calc(var(--bv2-strip-h,190px) + 8px);max-width:calc(100% - 24px)}
-.bv2-mass .tb-mass{margin:0;background:color-mix(in srgb,var(--bg) 80%,transparent);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
+.bv2-mass{position:absolute;z-index:8;left:50%;transform:translateX(-50%);top:calc(var(--bv2-hud-h,64px) + 10px);max-width:calc(100% - 24px)}
+.bv2-mass .tb-mass{margin:0;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;
+  background:color-mix(in srgb,var(--bg) 82%,transparent);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
   box-shadow:0 12px 30px rgba(0,0,0,.4)}
+.bv2-mass .tb-mass::-webkit-scrollbar{display:none}
+.bv2-mass .tb-mass > *{flex:none;white-space:nowrap}
 /* ── инспектор: открытая карточка целиком (строка бывшего списка) ── */
 .bv2-insp{position:absolute;z-index:7;left:12px;bottom:calc(var(--bv2-strip-h,190px) + 2px);width:min(780px,calc(100% - 24px));
   box-sizing:border-box;padding:10px 12px 12px;border-radius:18px;background:var(--surface);border:var(--hair) solid var(--line2);
@@ -17235,6 +17262,7 @@ html.board-v2 #pdock .pd-tab:not([data-k]){display:none}          /* кореш�
 .bv2-gm-h{font-family:var(--f-mono);font-size:.62rem;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-bottom:12px}
 .bv2-gm .trk-active{margin-bottom:12px}
 .bv2-gm .mp-ctrl{margin-top:0}
+.bv2-gm .row > .btn:only-child{grid-column:1 / -1;width:100%}   /* одиночная кнопка — во всю колонку, а не в половину */
 /* ── ТЕЛЕФОН: та же сцена во всю ширину экрана ── */
 @media(max-width:759px){
   html.board-v2 #toolsPage > .tool-block:first-child{margin-left:-15px;margin-right:-15px;margin-bottom:0}
@@ -17247,6 +17275,7 @@ html.board-v2 #pdock .pd-tab:not([data-k]){display:none}          /* кореш�
   .bv2-hud .tb-round{min-width:38px}
   .bv2-hud .tb-round .n{font-size:1.1rem}
   .bv2-hud .tb-now{flex:1}
+  #trkBox .bv2-hud .tb-now{flex:1 1 auto;align-items:flex-start}
   .bv2-hud .tb-now .who{font-size:.92rem;max-width:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .bv2-hud .tb-tbtn{width:34px;height:34px}
   .bv2-hud .tb-tbtn.main{padding:0 11px;font-size:.86rem}
@@ -17260,7 +17289,8 @@ html.board-v2 #pdock .pd-tab:not([data-k]){display:none}          /* кореш�
   /* у игрока справа — только масштаб и точка связи */
   .bv2:not(.gm) .bv2-zl{display:none}
   .bv2-strip{padding:22px 0 12px}
-  .bv2-strip-in{gap:8px;padding:0 84px 0 16px}   /* справа — место под кнопку кубиков: последняя карточка из-под неё выезжает */
+  .bv2-strip-in{gap:8px;padding:0 16px}
+  .bv2-strip.over .bv2-strip-in{padding-right:84px}   /* справа — место под кнопку кубиков: последняя карточка из-под неё выезжает */
   .bv2-card{--cw:94px;border-radius:12px}
   .bv2-card.on-turn{transform:translateY(-8px) scale(1.04)}
   .bv2-ph .tb-ini{left:5px;top:5px;width:24px;height:24px;border-radius:7px}
@@ -17282,9 +17312,54 @@ html.board-v2 #pdock .pd-tab:not([data-k]){display:none}          /* кореш�
   .bv2-insp{left:6px!important;right:6px;width:auto;max-height:62%;overflow:auto;border-radius:16px;padding:8px 8px 10px}
   .bv2-insp::after{display:none}
   .bv2-gm{grid-template-columns:1fr;margin:8px 15px 0}
+  .bv2-gm .btn{letter-spacing:.04em;font-size:.84rem;padding-left:14px;padding-right:14px}
   html.board-v2 #trkBox > .trk-note,html.board-v2 #trkBox > .trk-guest{margin-left:15px;margin-right:15px}
 }
-@media (prefers-reduced-motion:reduce){ .bv2-card,.bv2-mapbox{transition:none} .bv2-insp{animation:none} .bv2-live.on::before{animation:none} }
+@media (prefers-reduced-motion:reduce){ .bv2-card,.bv2-mapbox{transition:none} .bv2-insp{animation:none} .bv2-live.on::before,.bv2-card.dying .bv2-ph::before{animation:none} }
+/* инспектор на широком экране: строка в два этажа — имя и хиты сверху, состояния снизу во всю
+   ширину. В один этаж колонка состояний сжималась до ширины одного чипа и росла столбиком */
+@media(min-width:760px){
+  #trkBox .bv2-insp .tb-row .tb-mid{display:grid;grid-template-columns:minmax(0,1fr) minmax(220px,1.3fr);align-items:center;column-gap:18px;row-gap:9px}
+  #trkBox .bv2-insp .tb-row .tb-conds{grid-column:1 / -1}
+}
+/* пульт на узком телефоне: имя уже есть на карточке, а без него полоса хитов читается целиком */
+.pd-bar-hp span{white-space:nowrap}
+@media(max-width:419px){ .pd-nm{display:none} }
+@media(max-width:359px){ .pd-ava{display:none} }
+/* инспектор на телефоне: строка в три этажа — [иниц | имя / хиты | КД], ниже состояния во всю ширину.
+   Фото уже есть на карточке прямо под шторкой — в строке его не повторяем, место отдаём хитам */
+@media(max-width:759px){
+  #trkBox .bv2-insp .tb-row{grid-template-columns:auto auto minmax(0,1fr) auto;
+    grid-template-areas:"ck ini nm rt" "ck ini hp rt" "cd cd cd cd" "dsb dsb dsb dsb";row-gap:8px;align-items:center}
+  #trkBox .bv2-insp .tb-row .tb-av{display:none}
+  #trkBox .bv2-insp .tb-row .tb-mid{display:contents}
+  #trkBox .bv2-insp .tb-row .tb-check{grid-area:ck}
+  #trkBox .bv2-insp .tb-row .tb-ini{grid-area:ini}
+  #trkBox .bv2-insp .tb-row .tb-nm{grid-area:nm;margin:0}
+  #trkBox .bv2-insp .tb-row .tb-hpwrap{grid-area:hp;margin:0}
+  #trkBox .bv2-insp .tb-row .tb-conds{grid-area:cd;margin:0}
+  #trkBox .bv2-insp .tb-row .tb-conds:empty{display:none}
+  #trkBox .bv2-insp .tb-row .tb-right{grid-area:rt}
+  #trkBox .bv2-insp .tb-row .tb-dsb{grid-area:dsb;margin:0}
+}
+/* ── Пульт игрока: инициатива без подписи — поле вровень с кнопками −/+; КД — щитом, как на карточках ── */
+.pd-st.pd-ini{gap:0}
+.pd-st.pd-ac{flex-direction:row;align-items:center;gap:4px;color:var(--muted)}
+.pd-st.pd-ac svg{width:15px;height:15px;flex:none}
+.pd-st.pd-ac b{line-height:1}
+@media(max-width:1179px){
+  .pd-st.pd-ini .pd-in{height:38px;min-height:38px;box-sizing:border-box;padding:0 2px}
+  .pd-st.pd-ac{flex-direction:row;gap:3px}
+  .pd-st.pd-ac svg{width:14px;height:14px}
+}
+/* ── Верхняя панель: кнопки хода по краям от имени (старые правила панели переставляли их),
+   «Сейчас ходит» — чуть ниже, блок сидит по центру плашки ── */
+#trkBox .bv2-hud .tb-now{order:0;margin:0 4px 0 2px!important;justify-content:center;padding-top:3px}
+@media(min-width:760px){ #trkBox .bv2-hud .tb-now{flex:0 1 auto} }
+@media(max-width:759px){ #trkBox .bv2-hud .tb-now{flex:1 1 auto;align-items:flex-start;min-width:0} }
+#trkBox .bv2-hud .tb-tbtn{order:0}
+#trkBox .bv2-hud .tb-now .cap{line-height:1;margin-bottom:2px}
+#trkBox .bv2-hud .tb-now .who{line-height:1.15}
 /* Нынешняя доска ГМа на десктопе (без флага): колонка списка узкая (справа карта и журнал),
    а строка ГМа — пятиколоночная и в один этаж. Не влезала: КД, концентрация и «убрать»
    уезжали за край. Середину строки кладём в два этажа — имя и хиты сверху, состояния снизу. */
