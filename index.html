@@ -3592,6 +3592,66 @@ html.dr-live #appPane{box-shadow:-2px 0 0 0 var(--line2), 0 0 46px rgba(0,0,0,.5
 .mpg-chip{padding:7px 13px;border-radius:999px;border:var(--hair) solid var(--line2);background:var(--surface2);
   color:var(--dim);font-size:.85rem;cursor:pointer}
 .mpg-chip.on{background:var(--red);color:#12130f;border-color:transparent;font-weight:600}
+/* ── Плейлист — раскрывающаяся карточка: шапка + треки внутри ───────────────── */
+.mpg-pl{background:var(--surface);border:var(--hair) solid var(--line);border-radius:var(--r-md);
+  transition:border-color .2s,box-shadow .2s,background .2s}
+.mpg-pl.live{border-color:color-mix(in srgb,var(--red) 45%,transparent)}
+.mpg-pl-hd{display:flex;align-items:center;gap:11px;padding:10px 12px}
+.mpg-pl.live .mpg-pl-hd .mpg-play{background:var(--red);color:#12130f;border-color:transparent}
+.mpg-pl-tg{flex:1;min-width:0;display:flex;align-items:center;gap:11px;background:none;border:0;padding:0;
+  margin:0;font:inherit;color:inherit;text-align:left;cursor:pointer;border-radius:10px}
+.mpg-pl-tg:focus-visible{outline:2px solid var(--red);outline-offset:3px}
+.mpg-pl-t{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.mpg-pl-t .mpg-nm{flex:none}
+.mpg-chev{flex:none;width:22px;height:22px;display:grid;place-items:center;color:var(--muted);transition:transform .26s cubic-bezier(.3,.7,.3,1)}
+.mpg-chev svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.mpg-pl.open .mpg-chev{transform:rotate(180deg);color:var(--txt)}
+/* раскрытие без замера высоты: строка сетки 0fr → 1fr плавно тянется под содержимое */
+.mpg-pl-bd{display:grid;grid-template-rows:0fr;transition:grid-template-rows .28s cubic-bezier(.3,.7,.3,1)}
+.mpg-pl.open .mpg-pl-bd{grid-template-rows:1fr}
+.mpg-pl-in{min-height:0;overflow:hidden}
+.mpg-pl-list{display:flex;flex-direction:column;gap:6px;padding:0 10px 10px 10px;
+  border-top:var(--hair) solid var(--line);padding-top:10px;margin:0 2px}
+.mpg-pl:not(.open) .mpg-pl-list{visibility:hidden;transition:visibility 0s .28s}
+.mpg-pl .mpg-tr{background:var(--surface2);padding:7px 10px;gap:10px}
+.mpg-pl .mpg-tr .mpg-play{width:32px;height:32px}
+.mpg-pl-empty{padding:12px 10px;color:var(--muted);font-size:.85rem;line-height:1.45;text-align:center}
+.mpg-inl{display:inline-grid;place-items:center;vertical-align:-3px}
+.mpg-inl svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.mpg-here{align-self:center;display:inline-flex;align-items:center;gap:7px;padding:7px 13px;border-radius:999px;
+  background:none;border:var(--hair) dashed var(--line2);color:var(--muted);font:inherit;font-size:.82rem;cursor:pointer}
+.mpg-here:hover{color:var(--txt);border-color:var(--red)}
+.mpg-here svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round}
+/* трек только что лёг сюда — карточка коротко подсвечивается */
+.mpg-pl.flash{animation:mplFlash .9s ease-out}
+@keyframes mplFlash{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--red) 60%,transparent)}
+  35%{box-shadow:0 0 0 5px color-mix(in srgb,var(--red) 30%,transparent)}100%{box-shadow:0 0 0 0 transparent}}
+/* ── Перетаскивание (только мышь) ─────────────────────────────────────────── */
+.mpg.can-dnd .mpg-tr{cursor:grab}
+.mpg.can-dnd .mpg-tr:active{cursor:grabbing}
+.mpg-tr.dragging{opacity:.4}
+.mpg-tr.ins-b{box-shadow:0 -2px 0 0 var(--red)}
+.mpg-tr.ins-a{box-shadow:0 2px 0 0 var(--red)}
+#musicPage.dnd .mpg-pl,#musicPage.dnd .mpg-gen{outline:1.5px dashed transparent;outline-offset:3px;transition:outline-color .15s}
+#musicPage.dnd .mpg-pl{outline-color:var(--line2)}
+.mpg-pl.drop,.mpg-gen.drop{outline:2px dashed var(--red)!important;outline-offset:3px;border-radius:var(--r-md)}
+.mpg-gen{border-radius:var(--r-md)}
+/* ── Окно «Куда перенести» ─────────────────────────────────────────────────── */
+.mpm-h{font-size:1.05rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mpm{display:flex;flex-direction:column;gap:7px;margin:6px 0 4px;max-height:min(52vh,420px);overflow:auto}
+.mpm-opt{display:flex;align-items:center;gap:11px;width:100%;padding:9px 11px;border-radius:var(--r-md);
+  background:var(--surface);border:var(--hair) solid var(--line);color:var(--txt);font:inherit;text-align:left;cursor:pointer}
+.mpm-opt:hover:not(:disabled){border-color:var(--red);background:var(--surface2)}
+.mpm-opt.here{opacity:.55;cursor:default}
+.mpm-nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mpm-sub{flex:none;font-family:var(--f-mono);font-size:.64rem;color:var(--muted)}
+.mpm-gen{background:var(--surface2);color:var(--dim)}
+.mpm-gen svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.mpm-new{border-style:dashed}
+.mpm-del{display:inline-flex;align-items:center;gap:7px;color:var(--muted)}
+.mpm-del svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.mpm-del.sure{color:#fff;background:#b3261e;border-color:transparent}
+@media (prefers-reduced-motion:reduce){ .mpg-pl-bd,.mpg-chev{transition:none} .mpg-pl.flash{animation:none} }
 </style>
 
 <style id="install-css">
@@ -14368,7 +14428,7 @@ function openMusicLib(){
     <button class="x" onclick="closeModal()" aria-label="Закрыть">✕</button>
     <div class="top">${rune('character',24)}<span class="clabel">Музыка</span></div>
     <div class="music-lib">
-      <button class="btn primary ml-add" onclick="document.getElementById('musicFile').click()">＋ Добавить треки</button>
+      <button class="btn primary ml-add" onclick="musPickFiles('')">＋ Добавить треки</button>
       <div class="ml-list" id="musLibList"></div>
     </div>`;
   document.getElementById('scrim').classList.add('open');
@@ -14387,15 +14447,19 @@ function renderMusicLib(){
 }
 async function musicAddFiles(inp){
   const files=[...(inp.files||[])]; inp.value='';
+  // куда класть: плейлист, из которого выбирали файлы, или общий список
+  const dest=(typeof MUS_ADD_TO==='string')?MUS_ADD_TO:''; if(typeof MUS_ADD_TO==='string') MUS_ADD_TO='';
   if(!files.length) return;
   musListLoad();
-  const startIdx=MUSIC.length;
+  const startIdx=MUSIC.length, added=[];
   for(const f of files){
     if(!/^audio\//.test(f.type||'') && !/\.(mp3|m4a|ogg|wav|flac|aac|opus)$/i.test(f.name)) continue;
     const id='mus'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
-    try{ await musBlobPut(id, f); MUSIC.push({id, name:f.name.replace(/\.[^.]+$/,'')}); }catch(e){}
+    try{ await musBlobPut(id, f); MUSIC.push({id, name:f.name.replace(/\.[^.]+$/,'')}); added.push(id); }catch(e){}
   }
-  musListSave(); renderMusicLib();
+  musListSave();
+  if(dest && added.length && typeof mplAddTracks==='function') mplAddTracks(dest, added);
+  renderMusicLib();
   toast('Добавлено: '+(MUSIC.length-startIdx));
   if(!musCur && MUSIC.length>startIdx){ try{ musPlay(startIdx); }catch(e){} }   // сразу играем добавленное — появляется плашка «сейчас играет»
 }
@@ -14405,6 +14469,7 @@ async function musDelete(id){
   const wasCur = musCur && musCur.id===id;
   await musBlobDel(id);
   MUSIC.splice(i,1); musListSave();
+  if(typeof mplForget==='function') mplForget(id);
   if(wasCur) musStop();
   renderMusicLib();
 }
@@ -14503,7 +14568,7 @@ function musRenderBar(){
   const playing=!musPaused();
   b.classList.toggle('playing', playing);
   // играет плейлист со своей обложкой — она и стоит вместо эквалайзера
-  let pl=null; try{ if(MPL_PLAY){ mplLoad(); pl=MPL.find(x=>x.id===MPL_PLAY)||null; } }catch(e){}
+  let pl=null; try{ pl=(typeof mplPlaying==='function')?mplPlaying():null; }catch(e){}
   const art = (pl && pl.ava)
     ? `<button class="mb-art img${playing?' on':''}" style="background-image:url('${cssUrl(pl.ava)}')" onclick="musOpenFull()" aria-label="Открыть плеер"></button>`
     : `<button class="mb-art${playing?' on':''}" onclick="musOpenFull()" aria-label="Открыть плеер"><i></i><i></i><i></i></button>`;
@@ -14529,7 +14594,7 @@ function musRenderBar(){
 function musRenderRail(){
   const r=document.getElementById('drPlayer'); if(!r) return;
   if(!musCur){ r.hidden=true; r.innerHTML=''; return; }
-  let pl=null; try{ if(MPL_PLAY){ mplLoad(); pl=MPL.find(x=>x.id===MPL_PLAY)||null; } }catch(e){}
+  let pl=null; try{ pl=(typeof mplPlaying==='function')?mplPlaying():null; }catch(e){}
   const playing=!musPaused();
   const art = (pl && pl.ava)
     ? `<span class="dp-art img" style="background-image:url('${cssUrl(pl.ava)}')"></span>`
@@ -14907,16 +14972,125 @@ boot();
 </script>
 
 <script>
-/* ═══ Раздел «Музыка»: треки и плейлисты, всё на устройстве ═══ */
+/* ═══ Раздел «Музыка»: треки и плейлисты, всё на устройстве ═══
+   Плейлисты устроены как папки: трек лежит ЛИБО в общем списке, ЛИБО ровно в одном
+   плейлисте. Перенесли в плейлист — из общего списка он ушёл; вынули его или удалили
+   сам плейлист — вернулся в общий. Плейлист раскрывается и показывает, что в нём лежит.
+   Раньше плейлист был набором галочек поверх общего списка: трек оставался и там,
+   и там, а сам плейлист не раскрывался — содержимое было видно только по галочкам. */
 const MPL_KEY='comik:music:playlists';
-let MPL=[], MPL_CUR='';   // MPL_CUR — плейлист, который сейчас редактируем
-var MPL_PLAY='';          // плейлист, который сейчас звучит (задаёт порядок треков)
-function mplLoad(){ try{ MPL=JSON.parse(localStorage.getItem(MPL_KEY)||'[]')||[]; }catch(e){ MPL=[]; } if(!Array.isArray(MPL)) MPL=[]; }
+const MPL_OPEN_KEY='comik:music:plopen';
+let MPL=[];
+var MUS_ADD_TO='';        // куда класть новые файлы: id плейлиста или '' — общий список
+let MPL_OPEN=new Set();   // раскрытые плейлисты — удобство одного устройства
+let MPL_FLASH={id:'',until:0};   // плейлист, куда только что лёг трек, — мигнёт (переживает лишнюю перерисовку)
+function mplFlash(id){ MPL_FLASH={id, until:Date.now()+900}; }
+try{ MPL_OPEN=new Set(JSON.parse(localStorage.getItem(MPL_OPEN_KEY)||'[]')||[]); }catch(e){}
+function mplOpenSave(){ try{ localStorage.setItem(MPL_OPEN_KEY, JSON.stringify([...MPL_OPEN])); }catch(e){} }
+function mplLoad(){
+  try{ MPL=JSON.parse(localStorage.getItem(MPL_KEY)||'[]')||[]; }catch(e){ MPL=[]; }
+  if(!Array.isArray(MPL)) MPL=[];
+  MPL=MPL.filter(p=>p && p.id);
+  MPL.forEach(p=>{ if(!Array.isArray(p.tracks)) p.tracks=[]; });
+}
 function mplSave(){ try{ localStorage.setItem(MPL_KEY, JSON.stringify(MPL)); }catch(e){ toast('Не удалось сохранить плейлист'); } }
-function mplCreate(){
+/* Приводим к правилу «один трек — одно место». В старых плейлистах-галочках один
+   трек мог стоять в нескольких сразу — оставляем его в первом по списку. Ссылки на
+   удалённые треки выбрасываем, только когда фонотека точно прочитана (не пуста):
+   иначе сбой чтения вычистил бы все плейлисты. */
+function mplNormalize(){
+  musListLoad(); mplLoad();
+  const have=new Set(MUSIC.map(t=>t.id)), seen=new Set(); let dirty=false;
+  MPL.forEach(p=>{
+    const keep=p.tracks.filter(id=>{
+      if(seen.has(id) || (have.size && !have.has(id))) return false;
+      seen.add(id); return true;
+    });
+    if(keep.length!==p.tracks.length){ p.tracks=keep; dirty=true; }
+  });
+  if(dirty) mplSave();
+}
+function mplOf(tid){ if(!tid) return null; for(const p of MPL){ if(p.tracks.indexOf(tid)>=0) return p; } return null; }
+/* общий список — все треки, которые не разложены по плейлистам, в порядке фонотеки */
+function mplLoose(){ const used=new Set(); MPL.forEach(p=>p.tracks.forEach(id=>used.add(id))); return MUSIC.filter(t=>!used.has(t.id)); }
+/* трек удалили совсем — вычёркиваем его и из плейлиста */
+function mplForget(tid){
+  mplLoad(); let d=false;
+  MPL.forEach(p=>{ const i=p.tracks.indexOf(tid); if(i>=0){ p.tracks.splice(i,1); d=true; } });
+  if(d) mplSave();
+}
+/* плейлист, где лежит звучащий трек: по нему плеер показывает обложку и имя,
+   и по нему же идёт очередь «следующий/предыдущий» */
+function mplPlaying(){ try{ if(!musCur) return null; mplLoad(); return mplOf(musCur.id); }catch(e){ return null; } }
+function mplPlural(n){
+  const a=n%10, b=n%100;
+  return n+' '+(a===1&&b!==11?'трек':(a>=2&&a<=4&&(b<12||b>14))?'трека':'треков');
+}
+/* Перенести трек. pid — плейлист ('' — общий список). at — место:
+   id трека — встать перед ним; '$end' — в конец; не задано — в конец плейлиста,
+   а в общем списке — на своё прежнее место (порядок общего списка — это порядок фонотеки). */
+function mplMove(tid, pid, at){
+  musListLoad(); mplLoad();
+  if(!MUSIC.some(t=>t.id===tid) || at===tid) return false;
+  const dest = pid ? MPL.find(x=>x.id===pid) : null;
+  if(pid && !dest) return false;                      // плейлист успели удалить — трек не трогаем
+  MPL.forEach(p=>{ const i=p.tracks.indexOf(tid); if(i>=0) p.tracks.splice(i,1); });
+  if(dest){
+    const k = (at && at!=='$end') ? dest.tracks.indexOf(at) : -1;
+    if(k>=0) dest.tracks.splice(k,0,tid); else dest.tracks.push(tid);
+    mplFlash(dest.id);
+  } else if(at){
+    const a=MUSIC.findIndex(t=>t.id===tid), t=MUSIC.splice(a,1)[0];
+    const b = at==='$end' ? -1 : MUSIC.findIndex(x=>x.id===at);
+    MUSIC.splice(b<0?MUSIC.length:b, 0, t); musListSave();
+  }
+  mplSave(); renderMusicPage(); musRenderBar();
+  return true;
+}
+/* окно «Куда перенести»: общий список, плейлисты, новый плейлист, удалить трек */
+function mplMoveMenu(tid){
+  mplNormalize();
+  const t=MUSIC.find(x=>x.id===tid); if(!t) return;
+  const cur=mplOf(tid);
+  const opt=(pid, ava, name, sub, here)=>`<button class="mpm-opt${here?' here':''}"${here?' disabled':''}
+      onclick="mplMovePick('${tid}','${pid}')">${ava}<span class="mpm-nm">${esc(name)}</span>
+      <span class="mpm-sub">${here?'сейчас здесь':sub}</span></button>`;
+  const gen = opt('', `<span class="mpg-ava mpm-gen">${MP_ICO.list}</span>`, 'Общий список', mplPlural(mplLoose().length), !cur);
+  const lists = MPL.map(p=>opt(p.id, mplAvaHtml(p,'mpg-ava'), p.name||'Без названия', mplPlural(p.tracks.length), cur&&cur.id===p.id)).join('');
+  document.getElementById('modal').innerHTML=`
+    <button class="x" onclick="closeModal()" aria-label="Закрыть">✕</button>
+    <div class="top">${rune('history',24)}<span class="clabel">Перенести трек</span></div>
+    <h2 class="mpm-h">${esc(t.name)}</h2>
+    <div class="mpm">
+      ${gen}${lists}
+      <button class="mpm-opt mpm-new" onclick="closeModal();mplCreate('${tid}')">
+        <span class="mpg-ava mpm-gen">${MP_ICO.plus}</span><span class="mpm-nm">Новый плейлист</span><span class="mpm-sub">и сразу туда</span></button>
+    </div>
+    <div class="pacts"><button class="btn ghost mpm-del" id="mpmDel" onclick="mplTrackDelete('${tid}',this)">${MP_ICO.trash}Удалить трек</button></div>`;
+  document.getElementById('scrim').classList.add('open');
+}
+function mplMovePick(tid, pid){
+  closeModal();
+  if(!mplMove(tid, pid)) return;
+  mplLoad(); const p=pid?MPL.find(x=>x.id===pid):null;
+  toast(p ? 'Перенесено в плейлист «'+(p.name||'Без названия')+'»' : 'Трек вернулся в общий список');
+}
+/* удаление файла — в два нажатия: кнопка стоит рядом с переносом, промахнуться легко */
+function mplTrackDelete(tid, btn){
+  if(btn && !btn.classList.contains('sure')){
+    btn.classList.add('sure'); btn.lastChild.textContent='Точно удалить?';
+    setTimeout(()=>{ if(btn.isConnected){ btn.classList.remove('sure'); btn.lastChild.textContent='Удалить трек'; } }, 3000);
+    return;
+  }
+  closeModal(); musDelete(tid);
+}
+function mplCreate(tid){
   mplLoad();
   const p={id:'pl'+Date.now().toString(36), name:'', tracks:[], ava:''};
-  MPL.push(p); mplSave(); mplEdit(p.id, true);
+  MPL.push(p); mplSave();
+  if(tid) mplMove(tid, p.id);
+  MPL_OPEN.add(p.id); mplOpenSave();
+  mplEdit(p.id, true);
 }
 /* цвет-заглушка обложки: у каждого плейлиста свой, но всегда один и тот же */
 function mplHue(id){ let h=0; for(let i=0;i<String(id).length;i++) h=(h*31+String(id).charCodeAt(i))%360; return h; }
@@ -14958,10 +15132,10 @@ function mplEditSave(id){
   p.name=nm.trim().slice(0,60) || 'Без названия';
   mplSave(); closeModal(); renderMusicPage(); musRenderBar(); toast('Плейлист сохранён');
 }
-/* закрыли окно, так и не назвав новый плейлист — не оставляем пустую строку в списке */
+/* закрыли окно, так и не назвав новый плейлист, — пустую строку в списке не оставляем */
 function mplEditClose(id){
   mplLoad(); const p=MPL.find(x=>x.id===id);
-  if(p && !(p.name||'').trim() && !(p.tracks||[]).length){ MPL=MPL.filter(x=>x.id!==id); mplSave(); }
+  if(p && !(p.name||'').trim() && !(p.tracks||[]).length){ MPL=MPL.filter(x=>x.id!==id); mplSave(); MPL_OPEN.delete(id); mplOpenSave(); }
   closeModal(); renderMusicPage();
 }
 function mplAvaPick(id, inp){
@@ -14977,27 +15151,44 @@ function mplAvaClear(id){
   const nm=(document.getElementById('mplName')||{}).value; if(nm!=null) p.name=String(nm).trim().slice(0,60);
   p.ava=''; mplSave(); mplEdit(id); renderMusicPage();
 }
+/* плейлист удаляем, треки — нет: они возвращаются в общий список */
 function mplDelete(id){
-  mplLoad(); MPL=MPL.filter(p=>p.id!==id); mplSave();
-  if(MPL_CUR===id) MPL_CUR=''; if(MPL_PLAY===id) MPL_PLAY=''; renderMusicPage();
+  mplLoad(); const p=MPL.find(x=>x.id===id); if(!p) return;
+  const n=p.tracks.length;
+  MPL=MPL.filter(x=>x.id!==id); mplSave(); MPL_OPEN.delete(id); mplOpenSave();
+  renderMusicPage(); musRenderBar();
+  toast(n ? 'Плейлист удалён — '+mplPlural(n)+' вернулись в общий список' : 'Плейлист удалён');
 }
 function mplRename(id){ mplEdit(id); }
-function mplToggleTrack(pid, tid){
-  mplLoad(); const p=MPL.find(x=>x.id===pid); if(!p) return;
-  const i=p.tracks.indexOf(tid);
-  if(i>=0) p.tracks.splice(i,1); else p.tracks.push(tid);
-  mplSave(); renderMusicPage();
+/* раскрыть/свернуть — переключаем класс на месте, без перерисовки: так работает анимация */
+function mplToggleOpen(id){
+  if(MPL_OPEN.has(id)) MPL_OPEN.delete(id); else MPL_OPEN.add(id);
+  mplOpenSave();
+  const card=document.querySelector('#musicPage .mpg-pl[data-pl="'+id+'"]');
+  if(!card){ renderMusicPage(); return; }
+  const open=MPL_OPEN.has(id);
+  card.classList.toggle('open', open);
+  const tg=card.querySelector('.mpg-pl-tg'); if(tg) tg.setAttribute('aria-expanded', open?'true':'false');
 }
-function mplPick(id){ MPL_CUR = (MPL_CUR===id?'':id); renderMusicPage(); }
+/* ▶ у плейлиста: играет трек отсюда — пауза/продолжить, иначе — с первого трека */
 function mplPlay(id){
-  mplLoad(); musListLoad();
-  const p=MPL.find(x=>x.id===id); if(!p||!p.tracks.length){ toast('Плейлист пуст'); return; }
-  const i=MUSIC.findIndex(t=>t.id===p.tracks[0]);
-  if(i<0){ toast('Треки плейлиста не найдены'); return; }
-  MPL_PLAY=id; musPlay(i); toast('Играет: '+p.name); renderMusicPage();
+  mplNormalize();
+  const p=MPL.find(x=>x.id===id);
+  if(!p || !p.tracks.length){ toast('Плейлист пуст — перенесите в него треки'); return; }
+  const live=mplPlaying();
+  if(live && live.id===id){ musToggle(); return; }
+  const i=MUSIC.findIndex(t=>t.id===p.tracks[0]); if(i<0) return;
+  musPlay(i);
 }
-/* одиночный трек — выходим из очереди плейлиста */
-function mpPlayTrack(i){ MPL_PLAY=''; musPlay(i); }
+function mpPlayTrack(i){ musPlay(i); }
+/* выбор файлов: сразу в плейлист (кнопка внутри раскрытого) или в общий список */
+function musPickFiles(pid){ MUS_ADD_TO=pid||''; const f=document.getElementById('musicFile'); if(f) f.click(); }
+/* новые файлы, выбранные «сюда», кладём в плейлист (musicAddFiles зовёт после загрузки) */
+function mplAddTracks(pid, ids){
+  mplLoad(); const p=MPL.find(x=>x.id===pid); if(!p || !ids.length) return;
+  ids.forEach(id=>{ if(!mplOf(id)) p.tracks.push(id); });
+  mplFlash(pid); mplSave(); renderMusicPage(); musRenderBar();
+}
 const MP_ICO={
   play:'<svg viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5z"/></svg>',
   pause:'<svg viewBox="0 0 24 24"><path d="M8 5h3.2v14H8zM12.8 5H16v14h-3.2z"/></svg>',
@@ -15005,53 +15196,144 @@ const MP_ICO={
   trash:'<svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/></svg>',
   pen:'<svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>',
   list:'<svg viewBox="0 0 24 24"><path d="M4 7h11M4 12h11M4 17h7M18 12v7M18 12l3-1"/></svg>',
-  check:'<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></svg>'
+  check:'<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></svg>',
+  chev:'<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>',
+  // «в плейлист» и «вынуть из плейлиста» — привычная пара: список с плюсом и список с минусом
+  toPl:'<svg viewBox="0 0 24 24"><path d="M4 6h11M4 11h11M4 16h7M18 13v6M15 16h6"/></svg>',
+  // «перенести»: две встречные стрелки
+  move:'<svg viewBox="0 0 24 24"><path d="M7 4v14M7 18l-3-3M7 18l3-3M17 20V6M17 6l-3 3M17 6l3 3"/></svg>',
+  eject:'<svg viewBox="0 0 24 24"><path d="M4 6h11M4 11h11M4 16h7M15 16h6"/></svg>'
 };
+/* ── Перетаскивание (десктоп, мышь) ────────────────────────────────────────
+   Трек тащится на плейлист (свёрнутый раскроется, если задержать над ним курсор),
+   внутри списка — меж треков, чтобы поменять порядок; на «Общий список» — вынуть.
+   С компьютера можно бросить и сами аудиофайлы — лягут туда, куда бросили.
+   На телефоне этого нет (HTML-перетаскивание там не работает) — там кнопка «перенести». */
+const MPG_DND = !!(window.matchMedia && matchMedia('(hover:hover) and (pointer:fine)').matches);
+let MPG_DRAG='', MPG_HOVER={pid:'',t:0};
+function mpgIsFiles(e){ try{ return !MPG_DRAG && [...(e.dataTransfer.types||[])].indexOf('Files')>=0; }catch(_){ return false; } }
+function mpgClearMarks(){
+  document.querySelectorAll('#musicPage .drop,#musicPage .ins-b,#musicPage .ins-a')
+    .forEach(x=>x.classList.remove('drop','ins-b','ins-a'));
+}
+function mpgDragStart(e, tid){
+  MPG_DRAG=tid;
+  try{ e.dataTransfer.effectAllowed='move'; e.dataTransfer.setData('text/plain', tid); }catch(_){}
+  const row=e.currentTarget;
+  requestAnimationFrame(()=>{ row.classList.add('dragging'); const m=document.getElementById('musicPage'); if(m) m.classList.add('dnd'); });
+}
+function mpgDragEnd(){
+  MPG_DRAG=''; clearTimeout(MPG_HOVER.t); MPG_HOVER={pid:'',t:0}; mpgClearMarks();
+  const m=document.getElementById('musicPage'); if(m) m.classList.remove('dnd');
+  document.querySelectorAll('#musicPage .dragging').forEach(x=>x.classList.remove('dragging'));
+}
+/* куда встанет трек: перед строкой под курсором или после неё (по половине высоты) */
+function mpgSpot(e){
+  const row = e.target && e.target.closest ? e.target.closest('.mpg-tr') : null;
+  if(!row || row.dataset.tid===MPG_DRAG) return {row:null};
+  const r=row.getBoundingClientRect();
+  if(e.clientY-r.top < r.height/2) return {row, at:row.dataset.tid, cls:'ins-b'};
+  let n=row.nextElementSibling;
+  while(n && !n.classList.contains('mpg-tr')) n=n.nextElementSibling;
+  return {row, at: n ? n.dataset.tid : '$end', cls:'ins-a'};
+}
+function mpgDragOver(e, pid){
+  const files=mpgIsFiles(e);
+  if(!MPG_DRAG && !files) return;
+  e.preventDefault(); e.stopPropagation();
+  try{ e.dataTransfer.dropEffect = files ? 'copy' : 'move'; }catch(_){}
+  mpgClearMarks();
+  const box=e.currentTarget; box.classList.add('drop');
+  if(!files){ const s=mpgSpot(e); if(s.row) s.row.classList.add(s.cls); }
+  // свёрнутый плейлист раскрывается, если подержать над ним курсор, — как папка в проводнике
+  if(pid && !MPL_OPEN.has(pid) && MPG_HOVER.pid!==pid){
+    clearTimeout(MPG_HOVER.t);
+    MPG_HOVER={pid, t:setTimeout(()=>{ if((MPG_DRAG||files) && !MPL_OPEN.has(pid)) mplToggleOpen(pid); }, 650)};
+  }
+}
+function mpgDragLeave(e){
+  const box=e.currentTarget;
+  if(e.relatedTarget && box.contains(e.relatedTarget)) return;
+  box.classList.remove('drop');
+  box.querySelectorAll('.ins-b,.ins-a').forEach(x=>x.classList.remove('ins-b','ins-a'));
+  clearTimeout(MPG_HOVER.t); MPG_HOVER={pid:'',t:0};
+}
+function mpgDrop(e, pid){
+  if(mpgIsFiles(e)){
+    e.preventDefault(); e.stopPropagation(); mpgDragEnd();
+    const fl=[...(e.dataTransfer.files||[])]; if(!fl.length) return;
+    MUS_ADD_TO=pid||''; musicAddFiles({files:fl, value:''});
+    return;
+  }
+  if(!MPG_DRAG) return;
+  e.preventDefault(); e.stopPropagation();
+  const tid=MPG_DRAG, s=mpgSpot(e);
+  mpgDragEnd();
+  mplMove(tid, pid, s.row ? s.at : '$end');
+}
+function mplTrackRow(t, i, pid, curId, playing){
+  const on=t.id===curId, pause=on&&playing;
+  const drag = MPG_DND ? ` draggable="true" ondragstart="mpgDragStart(event,'${t.id}')" ondragend="mpgDragEnd()"` : '';
+  const acts = pid
+    ? `<button class="mpg-ic" onclick="mplMoveMenu('${t.id}')" aria-label="Перенести" title="Перенести">${MP_ICO.move}</button>
+       <button class="mpg-ic" onclick="mplMovePick('${t.id}','')" aria-label="Вернуть в общий список" title="Вернуть в общий список">${MP_ICO.eject}</button>`
+    : `<button class="mpg-ic" onclick="mplMoveMenu('${t.id}')" aria-label="В плейлист" title="В плейлист">${MP_ICO.toPl}</button>
+       <button class="mpg-ic" onclick="musDelete('${t.id}')" aria-label="Удалить трек" title="Удалить">${MP_ICO.trash}</button>`;
+  return `<div class="mpg-row mpg-tr${on?' playing':''}" data-tid="${t.id}"${drag}>
+      <button class="mpg-play" onclick="mpPlayTrack(${i})" aria-label="${pause?'Пауза':'Играть'}">${pause?MP_ICO.pause:MP_ICO.play}</button>
+      <span class="mpg-nm">${esc(t.name)}</span>${acts}
+    </div>`;
+}
+function mplCard(p, curId, playing){
+  const open=MPL_OPEN.has(p.id), live=!!curId && p.tracks.indexOf(curId)>=0, pause=live&&playing;
+  const rows=p.tracks.map(id=>{ const i=MUSIC.findIndex(t=>t.id===id); return i<0 ? '' : mplTrackRow(MUSIC[i], i, p.id, curId, playing); }).join('');
+  const hint = 'Пусто. Перенесите сюда треки из общего списка — кнопкой '
+    + `<span class="mpg-inl">${MP_ICO.toPl}</span> у трека` + (MPG_DND ? ' или перетащив мышью' : '') + '.';
+  return `<div class="mpg-pl${open?' open':''}${live?' live':''}${(MPL_FLASH.id===p.id && Date.now()<MPL_FLASH.until)?' flash':''}" data-pl="${p.id}"
+      ondragover="mpgDragOver(event,'${p.id}')" ondragleave="mpgDragLeave(event)" ondrop="mpgDrop(event,'${p.id}')">
+    <div class="mpg-pl-hd">
+      <button class="mpg-play" onclick="mplPlay('${p.id}')" aria-label="${pause?'Пауза':'Играть плейлист'}">${pause?MP_ICO.pause:MP_ICO.play}</button>
+      <button class="mpg-pl-tg" onclick="mplToggleOpen('${p.id}')" aria-expanded="${open?'true':'false'}">
+        ${mplAvaHtml(p,'mpg-ava')}
+        <span class="mpg-pl-t"><span class="mpg-nm">${esc(p.name||'Без названия')}</span>
+          <span class="mpg-sub">${mplPlural(p.tracks.length)}${live?' · играет':''}</span></span>
+        <span class="mpg-chev">${MP_ICO.chev}</span>
+      </button>
+      <button class="mpg-ic" onclick="mplEdit('${p.id}')" aria-label="Название и обложка" title="Название и обложка">${MP_ICO.pen}</button>
+      <button class="mpg-ic" onclick="mplDelete('${p.id}')" aria-label="Удалить плейлист" title="Удалить плейлист (треки вернутся в общий список)">${MP_ICO.trash}</button>
+    </div>
+    <div class="mpg-pl-bd"><div class="mpg-pl-in"><div class="mpg-pl-list">
+      ${rows || `<div class="mpg-pl-empty">${hint}</div>`}
+      <button class="mpg-here" onclick="musPickFiles('${p.id}')">${MP_ICO.plus}Добавить файлы сюда</button>
+    </div></div></div>
+  </div>`;
+}
 function renderMusicPage(){
   const el=document.getElementById('musicPage'); if(!el) return;
   if(!(typeof isDev==='function' && isDev())){ el.innerHTML=''; return; }
-  musListLoad(); mplLoad();
+  mplNormalize();
   const cur = (typeof musCur!=='undefined' && musCur) ? musCur.id : '';
-  const playing = cur && typeof musPaused==='function' && !musPaused();
-  const pl = MPL_CUR ? MPL.find(p=>p.id===MPL_CUR) : null;
-
-  const tracks = MUSIC.map((t,i)=>{
-    const on = t.id===cur;
-    const inPl = pl ? pl.tracks.indexOf(t.id)>=0 : false;
-    return `<div class="mpg-row${on?' playing':''}">
-      <button class="mpg-play" onclick="mpPlayTrack(${i})" aria-label="Играть">${on&&playing?MP_ICO.pause:MP_ICO.play}</button>
-      <span class="mpg-nm">${esc(t.name)}</span>
-      ${pl?`<button class="mpg-ic" onclick="mplToggleTrack('${pl.id}','${t.id}')"
-            aria-label="${inPl?'Убрать из плейлиста':'Добавить в плейлист'}"
-            title="${inPl?'Убрать из плейлиста':'Добавить в плейлист'}"
-            style="${inPl?'color:var(--red-ink)':''}">${inPl?MP_ICO.check:MP_ICO.plus}</button>`:''}
-      <button class="mpg-ic" onclick="musDelete('${t.id}')" aria-label="Удалить трек" title="Удалить">${MP_ICO.trash}</button>
-    </div>`;
-  }).join('');
-
-  const lists = MPL.map(p=>`<div class="mpg-row${(MPL_CUR===p.id||MPL_PLAY===p.id)?' playing':''}">
-      <button class="mpg-play" onclick="mplPlay('${p.id}')" aria-label="Играть плейлист">${MP_ICO.play}</button>
-      ${mplAvaHtml(p,'mpg-ava')}
-      <span class="mpg-nm" onclick="mplPick('${p.id}')" style="cursor:pointer">${esc(p.name||'Без названия')}
-        <span class="mpg-sub">· ${p.tracks.length}</span></span>
-      <button class="mpg-ic" onclick="mplEdit('${p.id}')" aria-label="Название и обложка">${MP_ICO.pen}</button>
-      <button class="mpg-ic" onclick="mplDelete('${p.id}')" aria-label="Удалить плейлист">${MP_ICO.trash}</button>
-    </div>`).join('');
-
-  el.innerHTML = `<div class="mpg">
+  const playing = !!cur && typeof musPaused==='function' && !musPaused();
+  const loose = mplLoose();
+  const lists = MPL.map(p=>mplCard(p, cur, playing)).join('');
+  const gen = loose.map(t=>mplTrackRow(t, MUSIC.indexOf(t), '', cur, playing)).join('');
+  const genEmpty = !MUSIC.length
+    ? `<div class="mpg-empty">Пока пусто. Нажмите «Добавить треки» и выберите аудиофайлы${MPG_DND?' или перетащите их сюда':''} — они сохранятся на этом устройстве.</div>`
+    : `<div class="mpg-empty">Все треки разложены по плейлистам.${MPG_DND?' Перетащите трек сюда, чтобы вынуть его.':''}</div>`;
+  el.innerHTML = `<div class="mpg${MPG_DND?' can-dnd':''}">
     <div class="mpg-head">
       <h2 class="mpg-h">Музыка Мастера</h2>
     </div>
     <div class="mpg-actions">
-      <button class="mpg-btn primary" onclick="document.getElementById('musicFile').click()">${MP_ICO.plus}Добавить треки</button>
+      <button class="mpg-btn primary" onclick="musPickFiles('')">${MP_ICO.plus}Добавить треки</button>
       <button class="mpg-btn" onclick="mplCreate()">${MP_ICO.list}Новый плейлист</button>
     </div>
     ${MPL.length?`<div class="mpg-sect">
-      <div class="mpg-cap">Плейлисты</div>${lists}
+      <div class="mpg-cap">Плейлисты · ${MPL.length}</div>${lists}
     </div>`:''}
-    ${MUSIC.length?`<div class="mpg-sect">
-      <div class="mpg-cap">Все треки · ${MUSIC.length}</div>${tracks}
-    </div>`:''}
+    <div class="mpg-sect mpg-gen" ondragover="mpgDragOver(event,'')" ondragleave="mpgDragLeave(event)" ondrop="mpgDrop(event,'')">
+      <div class="mpg-cap">Общий список · ${loose.length}</div>${gen || genEmpty}
+    </div>
   </div>`;
 }
 /* Библиотека перерисовывается после любого изменения (добавили, удалили,
@@ -15065,20 +15347,21 @@ function renderMusicPage(){
     return r;
   };
 })();
-/* Порядок треков внутри играющего плейлиста. Пока плейлист не выбран —
-   всё как раньше, по общему списку. */
+/* Очередь «следующий/предыдущий» — тот список, где лежит звучащий трек: играет трек
+   из плейлиста — идём по плейлисту, из общего списка — по общему списку. Перенесли
+   трек прямо во время игры — очередь сама пошла за ним. */
 (function(){
   var nx=window.musNextIdx, pv=window.musPrevIdx;
-  function queue(){
-    if(!MPL_PLAY) return null;
-    mplLoad(); var p=MPL.find(function(x){return x.id===MPL_PLAY;});
-    if(!p) return null;
-    var q=p.tracks.map(function(id){ return MUSIC.findIndex(function(t){return t.id===id;}); })
-                  .filter(function(i){ return i>=0; });
+  function queue(i){
+    var t=MUSIC[i]; if(!t) return null;
+    mplLoad(); var p=mplOf(t.id);
+    var ids = p ? p.tracks : mplLoose().map(function(x){ return x.id; });
+    var q=ids.map(function(id){ return MUSIC.findIndex(function(x){ return x.id===id; }); })
+             .filter(function(k){ return k>=0; });
     return q.length?q:null;
   }
   function step(i,d,fb){
-    var q=queue(); if(!q) return fb(i);
+    var q=queue(i); if(!q) return fb(i);
     var k=q.indexOf(i);
     if(k<0) return q[0];
     return q[(k+d+q.length)%q.length];
