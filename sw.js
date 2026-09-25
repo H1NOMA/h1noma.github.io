@@ -73,7 +73,10 @@ self.addEventListener('push', e => {
     body: d.body || 'Новая игра',
     icon: 'icon-192.png',
     badge: 'icon-192.png',
-    tag: d.tag || 'komik-game',
+    // у каждой игры свой tag: с общим «komik-game» новый анонс молча подменял в шторке
+    // прежний — без звука и вибрации. renotify — повторный анонс той же игры тоже звенит
+    tag: gid ? ('komik-game-' + gid) : (d.tag || 'komik-game'),
+    renotify: true,
     data: { url, gid }
   }));
 });
