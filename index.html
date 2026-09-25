@@ -7298,9 +7298,9 @@ function persistGames(quiet){
   GAMES_Q=p; return p;
 }
 async function persistGamesOnce(quiet){
-  let ok=false, why='';
+  let ok=false, why='', localOk=true;
   try{
-    await ssetLocal(KEY_GAMES, gamesPayload(), true);
+    localOk = (await ssetLocal(KEY_GAMES, gamesPayload(), true))!==false;   // квота кончилась — сказать честно, см. SSET_NOWHERE
     if(!supa){ ok=true; }
     else for(let i=0;i<5 && !ok;i++){
       let remote;
@@ -7321,7 +7321,7 @@ async function persistGamesOnce(quiet){
     gamesDirty(true);
     if(!quiet){
       if(why==='noperm') toast('⚠ Нет прав на запись — запись на игру не сохранена в облаке');
-      else toast('⚠ Облако не ответило — запись сохранена на устройстве, отправим, когда связь вернётся');
+      else toast(localOk ? '⚠ Облако не ответило — запись сохранена на устройстве, отправим, когда связь вернётся' : SSET_NOWHERE);
     }
   }
   try{ renderNews(); }catch(e){} // обновить баннер «Ближайшая игра» и кнопку записи сразу после изменения игр
@@ -7918,7 +7918,7 @@ function openAccessModal(hint, tab){
   let accountPane;
   if(SESSION){
     accountPane = `<div class="acc-me"><div class="kicker" style="margin-bottom:4px">Вы вошли как</div><div class="acc-tag">${esc(dispTag(SESSION))}</div></div>
-      <button class="btn ghost" id="pushBtn" style="width:100%;margin-top:12px" onclick="pushToggle()">Уведомления о новых играх</button>
+      <button class="btn ghost" data-push style="width:100%;margin-top:12px" onclick="pushToggle()">Уведомления о новых играх</button>
       <button class="btn ghost" style="width:100%;margin-top:8px" onclick="logout();closeModal()">Выйти из аккаунта</button>`;
   } else {
     accountPane = `<div class="field" id="au-f-tag"><label>Логин <span class="req">*</span></label>
@@ -8365,6 +8365,8 @@ async function logout(){
   try{ await withTimeout(inlineDropForAuth().then(()=>CHARS_PERSIST_NEXT||CHARS_PERSIST), 5000); }catch(e){}
   if(supa){ try{ await authTimeout(supa.auth.signOut()); }catch(e){} }
   SESSION=null; await sset(KEY_SESSION, null, false);
+  // закладки прошлого аккаунта лежат в его облаке — на общем устройстве гостю их не показываем
+  BMARKS=[]; ssetLocal(KEY_BM, [], false); try{ localStorage.removeItem(KEY_BM_OWNER); }catch(e){} bmBtnSync();
   if(ADMIN_VIA_DEV){ ADMIN=false; ADMIN_VIA_DEV=false; adminSideFX(); }
   renderAcct(); renderPlayers(); renderCats(); applyView(); updateDevUI(); renderSettings(); updateOnboard(); toast('Вы вышли из аккаунта');
 }
@@ -8416,7 +8418,7 @@ async function persistCharsNow(retry){
       mine.at=Date.now();   // штамп записи: по нему фоновый тик у других решает, перечитывать ли строку (fetchCloudCharsChanged)
       const ok=await sset('comik:chars:'+tag, mine, true, !!retry);   // фоновая досылка — без тостов внутри sset
       CHARS_DIRTY=!ok;                                   // не дошло — дошлём при возврате сети / очередным фоновым тиком
-      if(!ok && supa && !CHARS_DIRTY_TOLD && SSET_LAST_ERR!=='noperm'){ CHARS_DIRTY_TOLD=true; toast('⚠ Облако недоступно — сохранено локально, отправим, когда связь вернётся'); }   // при отказе в правах sset уже сказал своё
+      if(!ok && supa && !CHARS_DIRTY_TOLD && SSET_LAST_ERR!=='noperm'){ CHARS_DIRTY_TOLD=true; toast(SSET_LOCAL_OK ? '⚠ Облако недоступно — сохранено локально, отправим, когда связь вернётся' : SSET_NOWHERE); }   // при отказе в правах sset уже сказал своё
       if(ok){ CHARS_DIRTY_TOLD=false; CHARS_SEEN_AT['comik:chars:'+tag]=String(mine.at); }   // свою запись перечитывать незачем
       return !!ok;
     } else {
@@ -15238,8 +15240,12 @@ async function pushHeal(force){
     pushRenderBtn();
   }catch(e){}
 }
+/* кнопок две: переключатель в настройках (#pushBtn) и кнопка в меню аккаунта ([data-push]) — раньше у обеих
+   был id="pushBtn", и getElementById обновлял только первую, так что в меню состояние не показывалось */
 function pushRenderBtn(){
-  const el=document.getElementById('pushBtn'); if(!el) return;
+  document.querySelectorAll('#pushBtn,[data-push]').forEach(pushRenderOne);
+}
+function pushRenderOne(el){
   pushStatus().then(st=>{
     if(el.classList.contains('set-sw')){   // новый вид: переключатель в настройках
       el.classList.toggle('on', st==='on');
