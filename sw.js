@@ -20,7 +20,7 @@ const STATIC = 'comik-static-v1';
 // темах и разделах): подмножества latin и cyrillic; latin-ext/cyrillic-ext, Chakra Petch 500 и
 // Rajdhani 600 не грузятся вовсе. Без них офлайн-старт открывался системным шрифтом.
 const PRECACHE = ['manifest.webmanifest', 'fonts.css', 'supabase.js', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png',
-  'img/logo-komik.png', 'img/chrono-gw.jpg', 'img/team-1.jpg', 'img/team-2.jpg', 'img/team-3.jpg', 'img/team-4.jpg', 'img/team-5.jpg',
+  'img/logo-komik.png', 'img/badge-96.png', 'img/chrono-gw.jpg', 'img/team-1.jpg', 'img/team-2.jpg', 'img/team-3.jpg', 'img/team-4.jpg', 'img/team-5.jpg',
   'data/hero.json', 'data/chrono.json',
   ...['classic','terra','legacy','neverland','assimilation','komik','komikw','komikn'].map(k => 'manifest-' + k + '.webmanifest'),
   ...['chakra-petch-400','chakra-petch-600','chakra-petch-700','cinzel-decorative-700','cinzel-decorative-900',
@@ -75,7 +75,9 @@ self.addEventListener('push', e => {
   e.waitUntil(self.registration.showNotification(title, {
     body: d.body || 'Новая игра',
     icon: 'icon-192.png',
-    badge: 'icon-192.png',
+    // значок строки состояния Android строится только по альфа-каналу: icon-192.png без прозрачности
+    // давал сплошной белый квадрат, здесь — белый к20 на прозрачном фоне
+    badge: 'img/badge-96.png',
     tag: d.tag || 'komik-game',
     data: { url, gid }
   }));
