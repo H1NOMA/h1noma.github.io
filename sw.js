@@ -2,7 +2,7 @@
    Сама страница — network-first: онлайн всегда свежий код, по таймауту (NAV_TIMEOUT) или без сети —
    копия из версионного кэша, прогретая при установке. Статика (шрифты, библиотека облака, данные,
    картинки) — stale-while-revalidate: мгновенно из кэша, а в фоне тихо перекачиваем свежую. */
-const CACHE = 'comik-v285';
+const CACHE = 'comik-v286';
 // Статика (шрифты, иконки, данные, фоны) живёт в ОТДЕЛЬНОМ кэше, который не сбрасывается при смене
 // версии: раньше каждое обновление кода стирало и шрифты с картинками, и на телефоне первый запуск
 // новой версии шёл без них, пока всё не перекачается заново. Обновляются они сами (stale-while-revalidate).
@@ -23,9 +23,10 @@ const PRECACHE = ['manifest.webmanifest', 'fonts.css', 'supabase.js', 'icon-192.
   'img/logo-komik.png', 'img/badge-96.png', 'img/chrono-gw.jpg', 'img/team-1.jpg', 'img/team-2.jpg', 'img/team-3.jpg', 'img/team-4.jpg', 'img/team-5.jpg',
   'data/hero.json', 'data/chrono.json',
   ...['classic','terra','legacy','neverland','assimilation','komik','komikw','komikn'].map(k => 'manifest-' + k + '.webmanifest'),
-  ...['chakra-petch-400','chakra-petch-600','chakra-petch-700','cinzel-decorative-700','cinzel-decorative-900',
-      'rajdhani-500','share-tech-mono-400','uncial-antiqua-400'].map(k => 'fonts/' + k + '-normal-latin.woff2'),
-  ...['inter-400','inter-500','inter-600','ruslan-display-400'].flatMap(k => ['cyrillic','latin'].map(s => 'fonts/' + k + '-normal-' + s + '.woff2'))];
+  ...['cinzel-decorative-700','cinzel-decorative-900','rajdhani-500','uncial-antiqua-400'].map(k => 'fonts/' + k + '-normal-latin.woff2'),
+  // Exo 2 (заголовки) и Roboto Mono (подписи) — с кириллицей, как и Inter
+  ...['inter-400','inter-500','inter-600','ruslan-display-400','exo-2-400','exo-2-500','exo-2-600','exo-2-700','roboto-mono-400','roboto-mono-500']
+      .flatMap(k => ['cyrillic','latin'].map(s => 'fonts/' + k + '-normal-' + s + '.woff2'))];
 // сколько ждём сеть для самой страницы, прежде чем отдать копию из кэша.
 // В регионах, где канал до хостинга душат, ожидание сети — это и есть «сайт не открывается»:
 // повторный заход обязан открыться мгновенно из кэша, а свежая версия догрузится фоном.
