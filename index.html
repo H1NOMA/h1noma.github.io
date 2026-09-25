@@ -11872,7 +11872,7 @@ function chChips(h){
   if(h.loot) chips.push(`<span class="tline-chip loot">🎒 ${esc(String(h.loot))}</span>`);
   return chips.length?`<div class="tline-chips">${chips.join('')}</div>`:'';
 }
-let CH_EDIT=null;
+let CH_EDIT=null, CH_NEW=null;   // CH_NEW — {id, hid} записи, только что созданной «＋ Добавить событие» (ещё ни разу не сохранённой)
 function openCharHistory(id){
   const c=findCharAny(id); if(!c) return;
   const own=isOwner(c);
@@ -11916,14 +11916,24 @@ function openCharHistory(id){
     ${body}`;
   document.getElementById('scrim2').classList.add('open');
 }
-function charHistEdit(id,hid){ CH_EDIT=hid; openCharHistory(id); }
-function charHistCancel(id){ CH_EDIT=null; openCharHistory(id); }
+/* «＋ Добавить событие» сразу кладёт пустую запись (форме правки нужен её hid). Передумали — «Отмена»
+   или правка другой записи — и она так и осталась пустой: убираем, иначе в хронике висит «Игра» без заметок */
+function charHistDropNew(){
+  const n=CH_NEW; CH_NEW=null; if(!n) return;
+  const c=findCharAny(n.id); if(!c||!isOwner(c)) return;
+  const h=(c.history||[]).find(x=>chHid(x)===n.hid);
+  if(!h || h.t || h.note || (parseInt(h.xp,10)||0)>0 || h.gold || h.loot) return;
+  c.history=c.history.filter(x=>x!==h); c.updatedAt=Date.now(); persistChars();
+}
+function charHistEdit(id,hid){ if(!CH_NEW || CH_NEW.hid!==hid) charHistDropNew(); CH_EDIT=hid; openCharHistory(id); }
+function charHistCancel(id){ charHistDropNew(); CH_EDIT=null; openCharHistory(id); }
 function charHistAdd(id){
   const c=findCharAny(id); if(!c||!isOwner(c)) return;
+  charHistDropNew();   // прошлая новая запись, брошенная пустой, второй пустышкой не копится
   c.history=c.history||[];
   const h={hid:uid(), t:'', g:charGame(c), at:Date.now(), note:'', xp:0, gold:'', loot:''};
   c.history.push(h); c.updatedAt=Date.now(); persistChars();
-  CH_EDIT=h.hid; openCharHistory(id);
+  CH_EDIT=h.hid; CH_NEW={id, hid:h.hid}; openCharHistory(id);
 }
 function charHistSave(id,hid){
   const c=findCharAny(id); if(!c||!isOwner(c)) return;
@@ -11935,7 +11945,7 @@ function charHistSave(id,hid){
   h.gold=(pval('chGold')||'').trim();
   h.loot=(pval('chLoot')||'').trim();
   c.updatedAt=Date.now(); persistChars();
-  CH_EDIT=null; openCharHistory(id);
+  CH_EDIT=null; if(CH_NEW && CH_NEW.hid===hid) CH_NEW=null; openCharHistory(id);   // сохранили — запись своя, даже пустая
 }
 function charHistDel(id, hid){
   const c=findCharAny(id); if(!c||!isOwner(c)) return;
@@ -12164,8 +12174,13 @@ function restoreBackup(inp){
       if(d.chrono) CHRONO_DATA=Object.assign({}, d.chrono, CHRONO_DATA);
       if(d.hero) HERO_EDITS=Object.assign({}, d.hero, HERO_EDITS);
       if(Array.isArray(d.users)){ const tags=new Set(USERS.map(u=>normTag(u.tag))); d.users.forEach(u=>{ if(u && !tags.has(normTag(u.tag))) USERS.push(u); }); }
+      // закладки: недостающие (по id и сеттингу) добавляем к своим — копия их хранит, значит и возвращает
+      if(Array.isArray(d.bmarks)){ const has=new Set(BMARKS.map(b=>b&&(b.id+'|'+b.scope))); d.bmarks.forEach(b=>{ if(b && b.id && !has.has(b.id+'|'+b.scope)){ BMARKS.push(b); has.add(b.id+'|'+b.scope); } }); }
       bindGameData(); renderPlayers(); renderNews();
-      await Promise.all([persistChars(), persistGames(), sset(KEY_NEWS, NEWS, true), sset(KEY_USERS, USERS, true)]);
+      // архив, хронологию и приветствия тоже сохраняем: слитые только в память, они пропадали при первой же синхронизации
+      await Promise.all([persistChars(), persistGames(), sset(KEY_NEWS, NEWS, true), sset(KEY_USERS, USERS, true),
+        persistArchive(), persistChrono(), sset(KEY_HERO, HERO_EDITS, true), sset(KEY_BM, BMARKS, false),
+        (SESSION && supa) ? sset('comik:bm:'+currentTag(), BMARKS, true) : null]);
       toast('Копия восстановлена и слита с текущими данными');
     }catch(e){ toast('Не удалось прочитать файл копии'); }
   };
@@ -12272,17 +12287,19 @@ function trkBoardBuild(prev, opts){
   const fm={}; (Array.isArray(prev.list)?prev.list:[]).forEach(c=>{ if(c) fm[trkCardKey(c)]=c; });
   // бой завершён: состав и фишки уходят, а карта остаётся — её ставят на сеттинг, а не на один бой
   // (картинка лежит отдельной строкой и доску не раздувает; совсем её убирает «Игра сыграна»)
-  if(opts.finish) return {list:[], party:'', at:Date.now(), active:false, owner:currentTag(), round:1, activeKey:'',
+  if(opts.finish) return {list:[], party:'', at:Date.now(), gmAt:sn.at||0, active:false, owner:currentTag(), round:1, activeKey:'',
     log:prev.log||[], mapPos:{}, mapBgRev:(prev.mapBgRev!=null?prev.mapBgRev:''), mapCols:prev.mapCols||sn.mapCols||TRK_MAPCOLS};
   // метка фона: из облака; если там пусто, а у ГМа фон задан локально (доска ещё не публиковалась) — его метка.
   // Самой картинки в строке доски нет: старая копия (mapBg) не переносится и исчезает при первой же публикации
   const bgRev=(prev.mapBgRev!=null && prev.mapBgRev!=='')?String(prev.mapBgRev):(sn.mapBgRev||'');
-  return {list:trkMergedList(fm, sn.list), party:sn.party, at:Date.now(), active:(opts.active!=null)?!!opts.active:!!prev.active,
+  // gmAt — когда Мастер правил этот состав (часы его устройства): s.at сдвигает любой патч игрока,
+  // а по gmAt второе устройство Мастера понимает, что его локальный снимок старше опубликованного
+  return {list:trkMergedList(fm, sn.list), party:sn.party, at:Date.now(), gmAt:sn.at||0, active:(opts.active!=null)?!!opts.active:!!prev.active,
     owner:currentTag(), round:sn.round||1, activeKey:sn.activeKey||'',
     log:prev.log||[], mapPos:prev.mapPos||{}, mapBgRev:bgRev, mapCols:prev.mapCols||sn.mapCols||TRK_MAPCOLS};
 }
 /* снимок локального стола на момент действия: мутация выполнится позже (очередь, бэкофф), а ГМ мог уже сменить сеттинг */
-function trkSnap(){ return {list:(TRK.list||[]).map(x=>stripAva(x)), party:TRK.party||'', round:TRK.round||1, activeKey:TRK.activeKey||'', mapCols:TRK.mapCols||0, mapBgRev:trkBgRev(gmBoardKey())}; }
+function trkSnap(){ return {list:(TRK.list||[]).map(x=>stripAva(x)), party:TRK.party||'', round:TRK.round||1, activeKey:TRK.activeKey||'', mapCols:TRK.mapCols||0, mapBgRev:trkBgRev(gmBoardKey()), at:parseInt(TRK.at,10)||0}; }
 /* пустой состав поверх живой доски = состав этого браузера ещё не сверен с облаком
    (другое устройство, чистка PWA): публиковать его нельзя — у игроков исчезнет бой */
 let TRK_RESTORED={}, TRK_EMPTY_WARNED=false;   // сверка сделана (по ключу доски) / предупреждали ли уже
@@ -12330,15 +12347,17 @@ function trkMigrateBoardKey(){
 /* (2) Состав ГМа живёт в localStorage одного браузера: на другом устройстве (или после чистки
    PWA) он пуст, и первая же публикация стёрла бы живой бой. Берём доску из облака, если
    локально пусто либо облачная свежее локального снимка (TRK.at) и держит карточки, которых
-   у нас нет. Враги — как есть, игроки — той копией, что ведут они сами (в общей доске уже
-   живые ХП/инициатива/спасброски/состояния). */
+   у нас нет, либо Мастер публиковал её (gmAt) позже, чем правил состав на этом устройстве, —
+   тогда и при том же составе у нас старые ХП врагов, раунд и ход. Враги — как есть, игроки —
+   той копией, что ведут они сами (в общей доске уже живые ХП/инициатива/спасброски/состояния). */
 function trkPullCloud(){
   const s=TRK_SHARED[gmBoardKey()];
   if(!(s && typeof s==='object' && !Array.isArray(s) && Array.isArray(s.list) && s.list.length)) return false;
   const have={}; (TRK.list||[]).forEach(x=>{ if(x) have[trkCardKey(x)]=1; });
   const differs=s.list.some(x=>x && !have[trkCardKey(x)]);
   const newer=(parseInt(s.at,10)||0)>(parseInt(TRK.at,10)||0);
-  if((TRK.list||[]).length && !(differs && newer)) return false;
+  const gmNewer=(parseInt(s.gmAt,10)||0)>(parseInt(TRK.at,10)||0);   // с другого устройства Мастер правил доску позже
+  if((TRK.list||[]).length && !(differs && newer) && !gmNewer) return false;
   TRK.list=s.list.map(x=>Object.assign({}, x));
   TRK.party=s.party||''; TRK.round=parseInt(s.round,10)||1; TRK.activeKey=s.activeKey||'';
   TRK.mapPos=Object.assign({}, s.mapPos||{});
@@ -12359,6 +12378,7 @@ async function trkFetchShared(full, ignoreOnline){
   if(TRK_FETCHING){ if(full) TRK_FETCH_FULL_AGAIN=true; return false; }   // поверх незавершённого чтения не стучимся; полное — повторим после него
   if(navigator.onLine===false && !full && !ignoreOnline) return false;    // onLine — подсказка, не запрет: принудительное и «контрольное» чтение идут всегда
   TRK_FETCHING=true;
+  let first=false;
   try{
     // сначала дёшево спрашиваем только версию: не изменилась — всю строку (с картой и журналами) не качаем
     // (full — читать строку обязательно: после отклонённой записи экран надо вернуть к облаку, хотя версия та же)
@@ -12367,11 +12387,14 @@ async function trkFetchShared(full, ignoreOnline){
       if(r && !r.error && r.data && (parseInt(r.data.rev,10)||0)===TRK_REV) return false;
     }
     const v=await withTimeout(cloudGet(KEY_TRKSHARED),8000);
-    const first=(v!==undefined && !TRK_FETCHED); if(v!==undefined) TRK_FETCHED=true;   // ответ пришёл (пусть и пустой) — «Подключаемся…» на простое пора сменить
+    first=(v!==undefined && !TRK_FETCHED); if(v!==undefined) TRK_FETCHED=true;   // ответ пришёл (пусть и пустой) — «Подключаемся…» на простое пора сменить
     if(v && typeof v==='object'){ const before=JSON.stringify(TRK_SHARED); if(trkAdopt(v,'poll')) return first || JSON.stringify(TRK_SHARED)!==before; }
     if(first) return true;
   }catch(e){}
-  finally{ TRK_FETCHING=false; if(TRK_FETCH_FULL_AGAIN){ TRK_FETCH_FULL_AGAIN=false; setTimeout(()=>trkLiveCatchup(true), 0); } }
+  finally{ TRK_FETCHING=false; if(TRK_FETCH_FULL_AGAIN){ TRK_FETCH_FULL_AGAIN=false; setTimeout(()=>trkLiveCatchup(true), 0); }
+    // первое чтение мог начать не тот, кто рисует доску (полка на десктопе при старте): доску, открытую
+    // в эти секунды, её вызов застал «занятой» — доводим снимок до экрана сами, иначе «Подключаемся…» висело до первой записи
+    if(first) setTimeout(trkLiveApply, 0); }
   return false;
 }
 /* ══ Единый канал записи общего стола ══════════════════════════════════════════
@@ -12446,7 +12469,9 @@ function trkAdopt(v, src){
   TRK_FETCHED=true;   // снимок дошёл (Realtime/своя запись) — облако отвечает
   const rev=parseInt(v.rev,10)||0;
   if(rev && TRK_REV && rev<TRK_REV){
-    if(src!=='write' && TRK_REV-rev<=5) return false;   // запоздавшее эхо — отбрасываем
+    // запоздавшее эхо — отбрасываем. Ответ на СВОЮ запись тоже: версия новее, уже пришедшая по Realtime,
+    // записана поверх нашей (CAS по rev), то есть наша правка в ней уже есть, а старый снимок откатил бы чужую
+    if(TRK_REV-rev<=5) return false;
     TRK_REV=rev;                                          // версия «уехала назад» (строку пересоздали / писал старый клиент) — принимаем и живём дальше
   }
   if(rev>TRK_REV) TRK_REV=rev;
@@ -12467,6 +12492,9 @@ function trkAdopt(v, src){
 async function kvCasUpdate(key, mutate, tries){
   tries=tries||8;
   let lastErr=null, prevRev=-1, sameRev=0;
+  // запись не ответила за 8 с — это сеть, а не «нет прав»: без этого два зависших UPDATE подряд
+  // засчитывались проверкой rev ниже как отказ RLS, и trkFlush выбрасывал очередь правок
+  const wto=()=>{ const te=new Error('write timeout'); te.code='timeout'; return te; };
   for(let i=0;i<tries;i++){
     const cur=await withTimeout(cloudGet(key), 6000);
     if(cur===undefined){ const te=new Error('read timeout'); te.code='timeout'; throw te; }   // сеть молчит: не крутим 8×6 с — trkFlush повторит с растущей паузой
@@ -12481,12 +12509,14 @@ async function kvCasUpdate(key, mutate, tries){
     v.rev=rev+1; v.at=Date.now();
     if(missing){                                       // строки ещё нет — создаём; гонка двух создателей решится повтором
       const r=await withTimeout(supa.from('kv').insert({key, value:v}), 8000);
+      if(r===undefined) throw wto();
       if(r && !r.error) return v;
-      lastErr=(r&&r.error)||new Error('insert timeout'); continue;
+      lastErr=(r&&r.error)||new Error('insert failed'); continue;
     }
     let q=supa.from('kv').update({value:v}).eq('key',key);
     q = rev ? q.eq('value->>rev', String(rev)) : q.is('value->>rev', null);
     const r=await withTimeout(q.select('key'), 8000);
+    if(r===undefined) throw wto();
     if(r && r.error){ lastErr=r.error; throw r.error; }  // ошибка сервера/прав — не наша гонка, наверх
     if(r && Array.isArray(r.data) && r.data.length) return v;
     await new Promise(res=>setTimeout(res, 120+Math.random()*380));
@@ -12516,6 +12546,15 @@ function trkCloudCardPatch(boardKey, cardKey, patch, when){
     const t=s.list.find(r=>r && trkCardKey(r)===cardKey); if(!t) return;
     if(when && !when(t)) return;
     deepAssign(t,p); s.at=Date.now(); }, 'card:'+boardKey+':'+cardKey+':'+Object.keys(p).sort().join(','));
+}
+/* состояние карточки — ОДНО намерение «повесить/снять по имени», а не весь массив: ГМ и игрок, правящие
+   состояния одновременно, писали свои копии conds целиком, и в CAS-очереди последний стирал добавленное другим */
+function trkCondFlip(boardKey, cardKey, name, buff, on){
+  trkWrite(v=>{ const s=trkFollow(v, boardKey); if(!s||!Array.isArray(s.list)) return;
+    const t=s.list.find(r=>r && trkCardKey(r)===cardKey); if(!t) return;
+    const cs=Array.isArray(t.conds)?t.conds:[], at=cs.findIndex(c=>c && c.t===name);
+    if(on && at<0) cs.push(buff?{t:name,b:1}:{t:name}); else if(!on && at>=0) cs.splice(at,1); else return;
+    t.conds=cs; s.at=Date.now(); }, 'cond:'+boardKey+':'+cardKey+':'+name);
 }
 /* глубокое слияние полей одной доски (позиция фишки, размер сетки, фон, журнал) */
 function trkCloudBoardMerge(boardKey, fields, key){
@@ -12620,6 +12659,9 @@ function trkSyncParty(replace){
   wanted.forEach(p=>{
     if(TRK.list.some(x=>x.charId===p.charId)) return;
     const c=(CHARS_ALL[s.game]||[]).find(x=>x && x.id===p.charId && !x.deleted);
+    // листа ещё нет (не дочитан, чтение упало по тайм-ауту): без него карточка встала бы с 0 ХП —
+    // у всех «при смерти». Посадим следующей отрисовкой или trkPartyCatchup, когда лист дойдёт
+    if(!c) return;
     TRK.list.push({
       name:(c&&c.name)||p.charName||p.name||'Игрок', init:parseInt((c&&c.init),10)||0,   // инициатива из листа, как в trkAddChar
       hp:parseInt(String((c&&c.hp)||'').match(/\d+/)||'0',10),
@@ -12854,11 +12896,12 @@ function trkThpStyle(thp, max, hpPct){
    только round/activeKey — список участников (живые ХП/инициатива игроков) не трогаем */
 function trkPublishTurn(){
   if(!ADMIN) return;
+  TRK.at=Date.now();   // ход и раунд — тоже правка Мастера: по gmAt второе устройство поймёт, что его снимок старше
   try{ localStorage.setItem('comik:tracker:v2', JSON.stringify(TRK_ALL)); }catch(e){}
   const bk=gmBoardKey(), s=TRK_SHARED[bk];
   if(!s || !Array.isArray(s.list)){ trkPublish(); return; }   // доски ещё нет — полная публикация
-  s.round=TRK.round||1; s.activeKey=TRK.activeKey||''; s.at=Date.now();   // оптимистично
-  trkCloudBoardMerge(bk, {round:TRK.round||1, activeKey:TRK.activeKey||''});
+  s.round=TRK.round||1; s.activeKey=TRK.activeKey||''; s.gmAt=TRK.at; s.at=Date.now();   // оптимистично
+  trkCloudBoardMerge(bk, {round:TRK.round||1, activeKey:TRK.activeKey||'', gmAt:TRK.at});
 }
 /* ГМ листает ход: активная карточка + раунд (± на «перевороте» списка) */
 function trkStep(d){
@@ -12950,7 +12993,7 @@ function trkCondPick(i){
   if(!ADMIN) return; const x=TRK.list[i]; if(!x) return;
   const has=n=>(x.conds||[]).some(c=>c.t===n);
   const ov=document.createElement('div'); ov.className='hp-prompt';
-  const chip=(n,b)=>`<button class="tbp-c${b?' buff':''}${has(n)?' on':''}" onclick="trkCondToggle(${i},'${esc(n)}',${b?1:0})">${esc(n)}</button>`;
+  const chip=(n,b)=>`<button class="tbp-c${b?' buff':''}${has(n)?' on':''}" data-c="${esc(n)}" onclick="trkCondToggle(${i},this.dataset.c,${b?1:0})">${esc(n)}</button>`;
   ov.innerHTML=`<div class="hp-box tbp-box">
     <div class="hp-t">Состояния · ${esc(x.name||'')}</div>
     <div class="tbp-grid">${TRK_CONDS.map(n=>chip(n,0)).join('')}</div>
@@ -12970,7 +13013,9 @@ function trkCondToggle(i,name,isBuff){
   const had=at>=0;
   if(had) x.conds.splice(at,1); else x.conds.push(isBuff?{t:name,b:1}:{t:name});
   trkLog('cond','ГМ '+(had?'снял':'навесил')+' «'+name+'» — '+(x.name||''));
-  if(x.charId) trkSharedCardSet(x,'conds',x.conds); else trkSave();
+  if(x.charId){ try{ localStorage.setItem('comik:tracker:v2', JSON.stringify(TRK_ALL)); }catch(e){}
+    trkCondFlip(gmBoardKey(), trkCardKey(x), name, isBuff, !had); }
+  else trkSave();
   renderTracker();
   const box=document.querySelector('.tbp-box'); if(box){ box.querySelectorAll('.tbp-c').forEach(btn=>{ btn.classList.toggle('on',(x.conds||[]).some(c=>c.t===btn.textContent)); }); }
 }
@@ -12988,7 +13033,7 @@ function trkRowHtml(x,o){
   const key0=trkCardKey(x), seld=TRK_SEL.has(key0);
   const gmds=!!(o.edit && !foe && (dead || hp<=0));   // у ГМа справа встанут точки спасбросков и две команды — строке нужна колонка пошире
   const cls=['tb-row', foe?'foe':'pc', active?'on-turn':'', dead?'dead':'', o.edit?'gm':'', gmds?'gmds':'', seld?'sel':''].filter(Boolean).join(' ');
-  const check=o.edit?(foe?`<label class="tb-check"><input type="checkbox" ${seld?'checked':''} onchange="trkSelToggle('${esc(key0)}')" aria-label="Выбрать"></label>`:`<span class="tb-check"></span>`):'';
+  const check=o.edit?(foe?`<label class="tb-check"><input type="checkbox" ${seld?'checked':''} onchange="trkSelToggle(this.closest('[data-key]').dataset.key)" aria-label="Выбрать"></label>`:`<span class="tb-check"></span>`):'';
   const ini=o.edit
     ? `<input class="tb-ini-in" inputmode="numeric" value="${esc(String(x.init??0))}" onchange="trkSet(${o.idx},'init',this.value)">`
     : `<span class="v">${esc(String(x.init??0))}</span>`;
@@ -13054,7 +13099,7 @@ function trkRowHtml(x,o){
 }
 /* верхняя панель боя */
 function trkCombatBar(o){
-  o=o||{}; const round=o.round||1, view=trkViewMode(), gm=!!o.gm;
+  o=o||{}; const round=parseInt(o.round,10)||1, view=trkViewMode(), gm=!!o.gm;   // раунд у игрока — из общего стола: в разметку только число
   const nav=gm
     ? `<button class="tb-tbtn" onclick="trkStep(-1)" aria-label="Назад">◀</button>
        <div class="tb-now"><span class="cap">Сейчас ходит</span><span class="who">${esc(o.whoName||'—')}</span></div>
@@ -13099,9 +13144,12 @@ function trkSyncBadge(){
 const TRK_MAPCOLS=12;
 let TRK_DRAGGING=false;
 /* размер сетки и фон карты берём из общего стола (для GM — из своей доски, для игрока — из активной) */
-function trkMapBgKey(src){ return (ADMIN?gmBoardKey():(src&&src.vp))||''; }
+/* карта своей доски Мастера. Мастер в гостях за чужим столом (trkGuestBoard) смотрит карту как игрок:
+   иначе фон, позиции фишек и перетаскивание брались бы с его собственной, пустой доски */
+function trkMapOwn(src){ return ADMIN && !(src&&src.playerView); }
+function trkMapBgKey(src){ return (trkMapOwn(src)?gmBoardKey():(src&&src.vp))||''; }
 function trkMapBoard(src){ const k=trkMapBgKey(src); return (k&&TRK_SHARED[k])||null; }
-function trkMapColsOf(src){ const s=trkMapBoard(src); return (s&&parseInt(s.mapCols,10)) || (ADMIN&&parseInt(TRK.mapCols,10)) || TRK_MAPCOLS; }
+function trkMapColsOf(src){ const s=trkMapBoard(src); return (s&&parseInt(s.mapCols,10)) || (trkMapOwn(src)&&parseInt(TRK.mapCols,10)) || TRK_MAPCOLS; }
 /* ── Фон карты живёт в СВОЕЙ строке kv, а не внутри строки доски ──
    Строку доски перечитывает и переписывает каждый тап по ХП любого игрока в любом сеттинге, а
    Realtime перестаёт отдавать значение примерно с мегабайта: картинка 1600 px внутри неё ломала
@@ -13216,19 +13264,22 @@ function trkBgDrop(bk){
 }
 function trkMapBgRevOf(src){ const s=trkMapBoard(src); return (s&&s.mapBgRev!=null)?String(s.mapBgRev):''; }
 function trkMapBgOf(src){
-  const k=trkMapBgKey(src), s=(k&&TRK_SHARED[k])||null;
+  const k=trkMapBgKey(src), s=(k&&TRK_SHARED[k])||null, own=trkMapOwn(src);
   // доска прошлой версии несёт картинку внутри: считаем её текущей (и кэшируем), пока ГМ не перенёс
   if(s && s.mapBg){ if(k && (!TRK_BG[k] || TRK_BG[k].src!==s.mapBg)) TRK_BG[k]={rev:String(s.mapBgRev||''), src:s.mapBg}; return s.mapBg; }
   const rev=s?((s.mapBgRev!=null)?String(s.mapBgRev):''):'';
-  if(!rev){ if(k && !ADMIN) delete TRK_BG[k]; return (ADMIN&&TRK.mapBg)||''; }   // у ГМа фон работает и до публикации, и без сети
+  if(!rev){ if(k && !own) delete TRK_BG[k]; return (own&&TRK.mapBg)||''; }   // у ГМа фон работает и до публикации, и без сети
   const c=k&&TRK_BG[k];
   if(!c || c.rev!==rev) trkBgFetch(k, rev);
-  return (c&&c.src) || (ADMIN&&TRK.mapBg) || '';   // пока картинка летит — показываем прежнюю, а не пустую сетку
+  return (c&&c.src) || (own&&TRK.mapBg) || '';   // пока картинка летит — показываем прежнюю, а не пустую сетку
 }
 function trkMapPosFor(src){
-  if(ADMIN){ const s=TRK_SHARED[gmBoardKey()]; if(s){ s.mapPos=s.mapPos||{}; return s.mapPos; } TRK.mapPos=TRK.mapPos||{}; return TRK.mapPos; }
+  if(trkMapOwn(src)){ const s=TRK_SHARED[gmBoardKey()]; if(s){ s.mapPos=s.mapPos||{}; return s.mapPos; } TRK.mapPos=TRK.mapPos||{}; return TRK.mapPos; }
   const s=TRK_SHARED[src.vp]; return (s&&(s.mapPos=s.mapPos||{}))||{};
 }
+/* верх фишки: центр клетки, но не выше половины самой фишки. Имя под портретом делает фишку выше клетки,
+   и в первой строке (туда встают все новые участники) .mp-grid с overflow:hidden срезал верх портрета */
+function trkTokTop(y, cols){ return 'max('+((y+0.5)/cols*100)+'%, calc('+(50/cols)+'% + 7px))'; }
 function trkAutoPos(order, pos, cols){
   const used=new Set(Object.keys(pos).map(k=>pos[k]&&pos[k].x+','+pos[k].y)); let n=0;
   order.forEach(x=>{ const k=trkCardKey(x); if(pos[k]) return; let cx,cy;
@@ -13250,14 +13301,14 @@ function trkMapHtml(src){
   const toks=src.order.map(x=>{
     const k=trkCardKey(x), raw=pos[k]||{x:0,y:0}, pp={x:Math.min(cols-1,raw.x||0), y:Math.min(cols-1,raw.y||0)}, foe=isFoeCard(x), active=k===src.activeKey;
     const ava=trkAva(x,src.proj);
-    const dead=foe?((parseInt(x.hp,10)||0)<=0):(x.ds&&(x.ds.f||0)>=3);
-    const canDrag=ADMIN || (src.playerView && x.charId && (CHARS_ALL[src.proj]||[]).some(c=>c&&c.id===x.charId&&!c.deleted&&SESSION&&normTag(c.owner||'')===currentTag()));
-    return `<div class="mp-tok${foe?' foe':' pc'}${active?' on':''}${dead?' dead':''}${canDrag?' drag':''}" data-key="${esc(k)}" style="left:${(pp.x+0.5)/cols*100}%;top:${(pp.y+0.5)/cols*100}%">
+    const dead=trkOutOfFight(x);   // враг, добавленный одним именем, живёт с hp 0 и получает ход — он не «выбыл»
+    const canDrag=trkMapOwn(src) || (src.playerView && x.charId && (CHARS_ALL[src.proj]||[]).some(c=>c&&c.id===x.charId&&!c.deleted&&SESSION&&normTag(c.owner||'')===currentTag()));
+    return `<div class="mp-tok${foe?' foe':' pc'}${active?' on':''}${dead?' dead':''}${canDrag?' drag':''}" data-key="${esc(k)}" style="left:${(pp.x+0.5)/cols*100}%;top:${trkTokTop(pp.y, cols)}">
       <span class="mp-av"${ava?` style="background-image:url('${cssUrl(ava)}')"`:''}>${ava?'':esc((x.name||'?').slice(0,1))}</span>
       <span class="mp-nm">${esc(x.name||'')}</span>
     </div>`;
   }).join('');
-  const ctrl=(ADMIN && !src.noCtrl)?trkMapCtrlHtml(bg, cols):'';
+  const ctrl=(trkMapOwn(src) && !src.noCtrl)?trkMapCtrlHtml(bg, cols):'';
   // в доске стоит метка фона, а самой картинки на руках ещё нет: честно говорим об этом,
   // иначе пустая сетка выглядит как «Мастер фон не ставил» — и никто не понимает, что не так
   const waiting=!bg && !!trkMapBgRevOf(src);
@@ -13295,19 +13346,27 @@ function trkMapBind(){
     tok.onpointerdown=e=>{
       e.preventDefault(); TRK_DRAGGING=true; tok.classList.add('dragging'); try{ tok.setPointerCapture(e.pointerId); }catch(_){}
       const rect=grid.getBoundingClientRect(), cell=rect.width/cols;
+      const l0=tok.style.left, t0=tok.style.top;   // клетка до жеста: сорвался — фишка возвращается туда
       const move=ev=>{ const gx=Math.max(0,Math.min(rect.width,ev.clientX-rect.left)), gy=Math.max(0,Math.min(rect.height,ev.clientY-rect.top));
         tok.style.left=gx/rect.width*100+'%'; tok.style.top=gy/rect.height*100+'%'; };
-      const up=ev=>{ tok.removeEventListener('pointermove',move); tok.removeEventListener('pointerup',up); tok.classList.remove('dragging');
+      const end=()=>{ tok.removeEventListener('pointermove',move); tok.removeEventListener('pointerup',up);
+        tok.removeEventListener('pointercancel',cancel); tok.removeEventListener('lostpointercapture',cancel);
+        tok.classList.remove('dragging'); TRK_DRAGGING=false; };
+      const up=ev=>{ end();
         const gx=ev.clientX-rect.left, gy=ev.clientY-rect.top;
         const cx=Math.max(0,Math.min(cols-1,Math.floor(gx/cell))), cy=Math.max(0,Math.min(cols-1,Math.floor(gy/cell)));
-        TRK_DRAGGING=false; trkMapSet(tok.getAttribute('data-key'), cx, cy);
-        tok.style.left=(cx+0.5)/cols*100+'%'; tok.style.top=(cy+0.5)/cols*100+'%'; };
+        trkMapSet(tok.getAttribute('data-key'), cx, cy);
+        tok.style.left=(cx+0.5)/cols*100+'%'; tok.style.top=trkTokTop(cy, cols); };
+      // звонок, шторка уведомлений, системный жест: вместо pointerup приходит pointercancel. Без него
+      // TRK_DRAGGING залипал навсегда, и trkRefresh больше не применял ни ходов, ни чужих ХП
+      const cancel=()=>{ end(); tok.style.left=l0; tok.style.top=t0; };
       tok.addEventListener('pointermove',move); tok.addEventListener('pointerup',up);
+      tok.addEventListener('pointercancel',cancel); tok.addEventListener('lostpointercapture',cancel);
     };
   });
 }
 function trkMapSet(key,x,y){
-  if(ADMIN){
+  if(!trkPlayerMode()){   // Мастер в гостях двигает свою фишку на чужой доске — как игрок
     TRK.mapPos=TRK.mapPos||{}; TRK.mapPos[key]={x,y};
     try{ localStorage.setItem('comik:tracker:v2', JSON.stringify(TRK_ALL)); }catch(e){}
     const bk=gmBoardKey(), s=TRK_SHARED[bk];
@@ -13323,15 +13382,18 @@ function trkMapSet(key,x,y){
 }
 /* единый источник данных доски (для живого патча без пересоздания картинок) */
 function trkSource(){
-  if(ADMIN){
+  // Мастер в гостях за чужим столом видит его как игрок (renderTrackerCore) — и живой патч с подписью
+  // должны считаться по той же доске, а не по своей: иначе ход, раунд и чужие ХП у него застывали
+  const gv=trkGuestBoard();
+  if(ADMIN && !gv){
     trkAbsorbShared();   // живые ХП/иниц/спасброски игроков — и при точечном обновлении, не только при полной отрисовке
     const order=trkOrder(TRK.list);
     if(order.length && !order.some(x=>trkCardKey(x)===TRK.activeKey)) TRK.activeKey=trkCardKey(order[0]);
     return {order, round:TRK.round||1, activeKey:TRK.activeKey||'', proj:CUR_PROJECT, playerView:false};
   }
-  const vp=trkActiveForPlayer(); if(!vp) return null;
+  const vp=gv||trkActiveForPlayer(); if(!vp) return null;
   const sh=TRK_SHARED[vp]||{};
-  return {order:trkOrder(sh.list||[]), round:sh.round||1, activeKey:sh.activeKey||'', proj:boardProj(vp), playerView:true, vp};
+  return {order:trkOrder(sh.list||[]), round:parseInt(sh.round,10)||1, activeKey:sh.activeKey||'', proj:boardProj(vp), playerView:true, vp};
 }
 /* фишки на всех картах страницы — по актуальным позициям (без пересоздания картинок) */
 function trkMapPatch(src){
@@ -13340,7 +13402,7 @@ function trkMapPatch(src){
   toks.forEach(tok=>{ const k=tok.getAttribute('data-key'); const pp=pos[k];
     if(pp && !tok.classList.contains('dragging')){   // как при полной отрисовке: после уменьшения сетки фишка остаётся у края, а не уезжает за него
       const x=Math.min(cols-1,Math.max(0,pp.x||0)), y=Math.min(cols-1,Math.max(0,pp.y||0));
-      tok.style.left=(x+0.5)/cols*100+'%'; tok.style.top=(y+0.5)/cols*100+'%'; }
+      tok.style.left=(x+0.5)/cols*100+'%'; tok.style.top=trkTokTop(y, cols); }
     tok.classList.toggle('on', k===src.activeKey); });
 }
 /* структурная «подпись»: если совпадает — обновляем только числа/подсветку, иначе полная отрисовка */
@@ -13352,12 +13414,13 @@ function trkComboSig(src, view){
   try{ extra='|cols:'+trkMapColsOf(src)+'|bg:'+trkMapBgRevOf(src)+(trkMapBgOf(src)?':1':':0'); }catch(e){}
   return view+'|'+src.order.map(x=>{
     const foe=isFoeCard(x), foeHidden=src.playerView&&foe, hp=parseInt(x.hp,10)||0;
-    const dead=foe?(hp<=0):(x.ds&&(x.ds.f||0)>=3);
+    const dead=trkOutOfFight(x);
     // панель спасбросков и её ИТОГ (смерть/стабилизация меняют разметку); сами точки в подпись не входят —
     // их патчит на месте trkRefresh, иначе отметка со стороны ГМа пересобирала бы блок под пальцем игрока
     const dying=(!foe && hp<=0)?1:0, stab=(!foe && x.ds && ((x.ds.s||0)>=3 || x.ds.st))?1:0;
     return [trkCardKey(x), x.name||'', x.ava||beastImgByName(x.name)||'', (x.conds||[]).map(c=>c.t+(c.b?'+':'')).join(','), x.conc?1:0, dead?1:0, foeHidden?1:0, dying, stab,
-            parseInt(x.max,10)||0, trkThp(x)?1:0].join('~');   // максимум и появление/снятие щита меняют разметку строки
+            parseInt(x.max,10)||0, trkThp(x)?1:0,   // максимум и появление/снятие щита меняют разметку строки
+            foeHidden?'':String(x.ac||'')].join('~');   // КД живой патч не трогает — сменился (заклинание «Щит») → перерисовка
   }).join('||')+extra;
 }
 function trkSetSig(){ const box=document.getElementById('trkBox'); if(box){ try{ box.dataset.trkSig=trkComboSig(trkSource(), trkViewMode()); }catch(e){} } }
@@ -13417,7 +13480,7 @@ function trkRefresh(){
     box.querySelectorAll('[data-key="'+esc2(key)+'"]:not(.mp-tok)').forEach(node=>{
     node.classList.toggle('on-turn', key===src.activeKey);
     const foe=isFoeCard(x), max=trkMaxHp(x,src.proj), hp=parseInt(x.hp,10)||0, thp=trkThp(x);
-    const dead=foe?(hp<=0):(x.ds&&(x.ds.f||0)>=3);
+    const dead=trkOutOfFight(x);
     const pct=max?Math.max(0,Math.min(100,Math.round(hp/max*100))):(hp>0?100:0);
     const bar=node.querySelector('.tb-hpbar i, .tc-hp i'); if(bar&&max){ bar.style.width=pct+'%'; bar.style.background=trkHpColor(pct/100); }
     const seg=node.querySelector('.tb-hpbar b.thp, .tc-hp b.thp');   // отрезок ВХ едет следом за полосой хитов
@@ -13495,6 +13558,7 @@ function trkIdleCaption(){
 }
 function renderTracker(){
   TRK_DEFER=false;   // полная отрисовка состоялась — отложенной больше нет (поле могло исчезнуть без focusout)
+  TRK_DRAGGING=false;   // фишки пересоздаются: жест над старой уже не закончится и флаг снять не сможет
   const keep=trkKeepInputs();
   try{ renderTrackerCore(); } finally{ if(keep.length) trkRestoreInputs(keep); }
   trkSyncBadge();
@@ -13530,12 +13594,12 @@ function renderTrackerCore(){
     const oFor=x=>{
       const mine = x.charId && (CHARS_ALL[vproj]||[]).some(c=>c && c.id===x.charId && !c.deleted && SESSION && normTag(c.owner||'')===currentTag());
       const foe = isFoeCard(x);
-      const dead = foe ? ((parseInt(x.hp,10)||0)<=0) : (x.ds && (x.ds.f||0)>=3);
-      const openJs = mine ? ("openPlayer('"+x.charId+"')") : '';
+      const dead = trkOutOfFight(x);   // тот же признак, что у «пропускать павших»: враг с hp 0 без хитов вообще — жив
+      const openJs = mine ? ('openPlayer('+esc(JSON.stringify(String(x.charId)))+')') : '';   // charId из стола — JS-литералом, а не в кавычках: esc() в строке обработчика не спасает
       return {playerView:true, foe, dead, mine, openJs, activeKey, proj:vproj};
     };
     if(view==='stage'){
-      box.innerHTML=note+trkStageHtml({gm:false, order, activeKey, round:shared.round||1,
+      box.innerHTML=note+trkStageHtml({gm:false, order, activeKey, round:parseInt(shared.round,10)||1,
         whoName:(who&&who.name)||'—', proj:vproj, vp, cardO:oFor})+
         `<div class="trk-pside bv2-me">${playerMePanel(vp)}</div>`;
       trkSetSig(); trkStageBind(); requestAnimationFrame(trkMarquee);
@@ -13547,7 +13611,7 @@ function renderTrackerCore(){
         :view==='cards'?`<div class="trk-grid tb2">${items||empty}</div>`
         :`<div class="tb-list">${items||empty}</div>`;
     box.innerHTML=note+
-      trkCombatBar({round:shared.round||1, whoName:(who&&who.name)||'—', gm:false})+
+      trkCombatBar({round:parseInt(shared.round,10)||1, whoName:(who&&who.name)||'—', gm:false})+
       `<div class="trk-pcols"><div class="trk-pboard">${boardHtml}</div><div class="trk-pside">${playerMePanel(vp)}</div></div>`;
     trkSetSig();
     if(view==='map') trkMapBind();
@@ -13570,7 +13634,7 @@ function renderTrackerCore(){
   const oFor=x=>{
     const i=TRK.list.indexOf(x);
     const foe=isFoeCard(x);
-    const dead=foe?((parseInt(x.hp,10)||0)<=0):((x.ds&&(x.ds.f||0)>=3));
+    const dead=trkOutOfFight(x);
     return {edit:true, idx:i, foe, dead, activeKey:TRK.activeKey, proj:CUR_PROJECT, openJs:'trkOpenCard('+i+')'};
   };
   const items=view==='stage'?'':order.map(x=>{ const o=oFor(x); return view==='cards'?trkCardHtml(x,o):trkRowHtml(x,o); }).join('');
@@ -13586,7 +13650,7 @@ function renderTrackerCore(){
   const partyField=`<div class="field" style="margin-bottom:10px"><label>Актуальная партия</label>
       <select onchange="trkPartyPick(this.value)">
         <option value="">— вручную, без заявки —</option>
-        ${parties.map(g=>`<option value="${g.id}"${TRK.party===g.id?' selected':''}>${esc(g.title||gameTitle(g.game))}${g.time?' · '+esc(g.time):''}</option>`).join('')}
+        ${parties.map(g=>`<option value="${esc(g.id)}"${TRK.party===g.id?' selected':''}>${esc(g.title||gameTitle(g.game))}${g.time?' · '+esc(g.time):''}</option>`).join('')}
       </select></div>`;
   const addField=`<div class="field" style="margin-top:12px"><label>Добавить участника</label>
       <input id="trk-add" placeholder="Найти существо" autocomplete="off" oninput="trkSuggest(this.value)" onkeydown="if(event.key==='Enter')trkAddManual()">
@@ -13632,7 +13696,7 @@ function renderTrackerCore(){
     <div class="field" style="margin-bottom:10px"><label>Актуальная партия</label>
       <select onchange="trkPartyPick(this.value)">
         <option value="">— вручную, без заявки —</option>
-        ${parties.map(g=>`<option value="${g.id}"${TRK.party===g.id?' selected':''}>${esc(g.title||gameTitle(g.game))}${g.time?' · '+esc(g.time):''}</option>`).join('')}
+        ${parties.map(g=>`<option value="${esc(g.id)}"${TRK.party===g.id?' selected':''}>${esc(g.title||gameTitle(g.game))}${g.time?' · '+esc(g.time):''}</option>`).join('')}
       </select></div>
     ${(view==='map'&&!trkDeskGM())?trkMapHtml({order, activeKey:TRK.activeKey, proj:CUR_PROJECT, playerView:false})
       :view==='cards'?`<div class="trk-grid tb2">${items||empty}</div>`
@@ -13692,14 +13756,16 @@ function trkStripCard(x, o){
   const ac = hidden ? '?' : (x.ac ? esc(String(x.ac)) : '—');
   const showConds=!o.playerView || foe || mine;       // чужие состояния игроку не видны — как и раньше
   const conds=showConds?(x.conds||[]).slice(0,4).map(c=>`<span class="tc-ci${c.b?' buff':''}" title="${esc(c.t)}">${c.b?'✦':'☠'}</span>`).join(''):'';
+  // ключ карточки (uid/charId приходят из общего стола) — только в data-key: esc() внутри JS-строки
+  // обработчика не защищает, браузер раскодирует &#39; обратно в кавычку ещё до разбора кода
   const k=esc(key), seld=TRK_SEL.has(key);
-  const sel=(o.edit && foe) ? `<label class="bv2-sel" onclick="event.stopPropagation()" title="Выбрать для массового урона"><input type="checkbox" ${seld?'checked':''} onchange="trkSelToggle('${k}')" aria-label="Выбрать"></label>` : '';
+  const sel=(o.edit && foe) ? `<label class="bv2-sel" onclick="event.stopPropagation()" title="Выбрать для массового урона"><input type="checkbox" ${seld?'checked':''} onchange="trkSelToggle(this.closest('[data-key]').dataset.key)" aria-label="Выбрать"></label>` : '';
   const dying=!foe && !dead && hp<=0;
   const ds=x.ds||{}, pips=(c,n)=>[0,1,2].map(i=>`<span class="p${n>i?' '+c:''}"></span>`).join('');
   const dsHtml=dying?`<div class="tb-ds bv2-ds" title="Спасброски от смерти"><div class="ds-s">${pips('s',ds.s||0)}</div><div class="ds-f">${pips('f',ds.f||0)}</div></div>`:'';
   const cls=['bv2-card', foe?'foe':'pc', active?'on-turn':'', dead?'dead':'', dying?'dying':'', mine?'mine':'', TRK_V2_INS===key?'insp':'', seld?'sel':''].filter(Boolean).join(' ');
   return `<div class="${cls}" data-key="${k}" role="button" tabindex="0" aria-label="${esc(x.name||'—')}"
-      onclick="bv2Inspect('${k}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();bv2Inspect('${k}')}">
+      onclick="bv2Inspect(this.dataset.key)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();bv2Inspect(this.dataset.key)}">
     <div class="bv2-ph"${ava?` style="background-image:url('${cssUrl(ava)}')"`:''}>
       ${ava?'':`<span class="bv2-lt">${esc((x.name||'?').slice(0,1).toUpperCase())}</span>`}
       <div class="tb-ini" title="Инициатива"><span class="v">${esc(String(x.init??0))}</span></div>
@@ -13727,7 +13793,7 @@ function trkStageHud(S){
       <button class="bv2-ib${trkSkipDead()?' on':''}" onclick="trkSkipDeadToggle()" title="Не давать ход выбывшим из боя">💀</button>` : '';
   return `<div class="bv2-hud">
     <div class="bv2-hl">
-      <button class="tb-round"${gm?' onclick="trkRoundReset()" title="Сбросить бой"':' disabled'}><span class="n">${S.round}</span><span class="l">раунд</span></button>
+      <button class="tb-round"${gm?' onclick="trkRoundReset()" title="Сбросить бой"':' disabled'}><span class="n">${parseInt(S.round,10)||1}</span><span class="l">раунд</span></button>
     </div>
     <div class="bv2-hc">
       ${gm?`<button class="tb-tbtn" onclick="trkStep(-1)" aria-label="Назад">◀</button>`:''}
@@ -13818,9 +13884,10 @@ function bv2Fit(){
   const hudH=hud?hud.offsetHeight+(mob?14:22):0, stripH=strip?strip.offsetHeight:0;
   const top=st.getBoundingClientRect().top+scrollY;
   const W=st.clientWidth, padX=mob?6:28;
-  // на десктопе панель висит поверх верхнего края карты, а карта уходит под ленту почти целиком —
-  // там её низ размыт и переходит в фон; на телефоне карта короче и прячет под лентой меньше
-  const topPad=Math.round(hudH*(mob?1:0.5));
+  // карта начинается под верхней панелью и на десктопе: раньше панель наполовину висела поверх неё и
+  // закрывала первую строку — туда trkAutoPos ставит всех новых участников, а прокрутить выше при 100% нельзя.
+  // Низ карты уходит под ленту почти целиком — там он размыт и переходит в фон; на телефоне — меньше
+  const topPad=Math.round(hudH);
   const avail=Math.round(innerHeight-top-dock-(mob?4:16));
   // «по содержимому»: карта по ширине, лента заходит на неё на треть, сцена ровно такой высоты
   // (у игрока — до пульта, чтобы лента стояла прямо над ним)
@@ -14136,13 +14203,13 @@ function playerCharBlock(vp, my){
   const s=c.slots||{}; const lvls=Object.keys(s).filter(k=>s[k]&&s[k].max>0).sort((a,b)=>a-b);
   const slotHtml = lvls.length?`<div class="tm-sec"><div class="tm-sec-h">Ячейки заклинаний</div><div class="tm-slots">${
     lvls.map(l=>`<div class="tm-slot-line"><span class="sl">${l} круг</span><span class="pips">${
-      Array.from({length:s[l].max},(_,i)=>`<button class="pip${i<(s[l].used||0)?' used':''}" onclick="trkSlotTap('${c.id}',${l},${i})" aria-label="Ячейка"></button>`).join('')
+      Array.from({length:s[l].max},(_,i)=>`<button class="pip${i<(s[l].used||0)?' used':''}" data-cid="${esc(c.id)}" onclick="trkSlotTap(this.dataset.cid,${l},${i})" aria-label="Ячейка"></button>`).join('')
     }</span></div>`).join('')
   }</div></div>`:'';
   // отдых: быстрый и длительный (Z — храп) в одну строку
   const restHtml=`<div class="tm-rest">
-    <button class="tm-rest-b short" onclick="trkRest('${c.id}','short')"><span class="zzz"><i>z</i></span> Быстрый отдых</button>
-    <button class="tm-rest-b long" onclick="trkRest('${c.id}','long')"><span class="zzz"><i>z</i><i>z</i><i>z</i></span> Длительный отдых</button>
+    <button class="tm-rest-b short" data-cid="${esc(c.id)}" onclick="trkRest(this.dataset.cid,'short')"><span class="zzz"><i>z</i></span> Быстрый отдых</button>
+    <button class="tm-rest-b long" data-cid="${esc(c.id)}" onclick="trkRest(this.dataset.cid,'long')"><span class="zzz"><i>z</i><i>z</i><i>z</i></span> Длительный отдых</button>
   </div>`;
   return atkHtml + spHtml + slotHtml + playerCondsHtml(my) + restHtml + invMoneyBoard(c, charGame(c), canEdit(c));
 }
@@ -14152,7 +14219,8 @@ function playerCharBlock(vp, my){
 let PC_COND_OPEN=false;
 function playerCondsHtml(my){
   const have={}; (my.conds||[]).forEach(c=>{ if(c) have[c.t]=1; });
-  const chip=(n,b)=>`<button class="tbp-c${b?' buff':''}${have[n]?' on':''}" onclick="pdCondToggle('${esc(n)}',${b?1:0})">${esc(n)}</button>`;
+  // название состояния приходит из общего стола — в data-атрибут, а не в JS-строку обработчика
+  const chip=(n,b)=>`<button class="tbp-c${b?' buff':''}${have[n]?' on':''}" data-c="${esc(n)}" onclick="pdCondToggle(this.dataset.c,${b?1:0})">${esc(n)}</button>`;
   const cur=(my.conds||[]).filter(c=>c && c.t).map(c=>chip(c.t,c.b?1:0)).join('');
   return `<div class="tm-sec tm-cond"><div class="tm-sec-h">Состояния</div>
     <details class="tm-cmore"${PC_COND_OPEN?' open':''} ontoggle="if(!this.closest('#pdock')) PC_COND_OPEN=this.open">
@@ -14172,7 +14240,7 @@ function pdCondToggle(name, buff){
   if(had) my.conds.splice(at,1); else my.conds.push(buff?{t:name,b:1}:{t:name});
   const s=TRK_SHARED[vp]; if(s) s.at=Date.now();
   trkRedraw(true);   // состав чипов — структурная правка (conds входит в trkComboSig); при зажатом пальце/вводе — дорисуется после
-  trkCloudCardPatch(vp, trkCardKey(my), {conds:my.conds});
+  trkCondFlip(vp, trkCardKey(my), name, buff, !had);
   trkLog('cond',(my.name||'Игрок')+(had?' снял':' навесил')+' «'+name+'»');
 }
 window.pdCondToggle=pdCondToggle;
@@ -14234,8 +14302,9 @@ function deathSavesHtml(my){
   </div>`;
 }
 /* применить НОВОЕ состояние спасбросков (значения абсолютные, не «+1»):
-   три успеха — персонаж стабилизировался и приходит в себя с 1 ХП, три провала — смерть */
-function dsApply(vp, my, s, f){
+   три успеха — персонаж стабилизировался и приходит в себя с 1 ХП, три провала — смерть.
+   quiet — журнал и тост уже написал вызывающий (натуральная 20 — это не «три успеха») */
+function dsApply(vp, my, s, f, quiet){
   s=Math.max(0,Math.min(3,s|0)); f=Math.max(0,Math.min(3,f|0));
   const stabilized = f<3 && s>=3;
   const patch = stabilized ? {hp:1, ds:null} : {ds:{s,f,st:null}};   // st:null — снова бросают, признак стабилизации снят
@@ -14243,6 +14312,7 @@ function dsApply(vp, my, s, f){
   const st=TRK_SHARED[vp]; if(st) st.at=Date.now();
   trkRedraw(true);
   trkCloudCardPatch(vp, trkCardKey(my), patch);
+  if(quiet) return;
   if(stabilized){ trkLog('heal',(my.name||'Персонаж')+' стабилизировался (три успеха) — 1 ХП'); toast('Три успеха — персонаж стабилизировался'); }
   else if(f>=3){ trkLog('death',(my.name||'Персонаж')+' проваливает третий спасбросок — смерть'); toast('Три провала — персонаж мёртв'); }
 }
@@ -14286,13 +14356,15 @@ function rollDeathSave(){
   const roll=1+Math.floor(Math.random()*20);
   // новое состояние спасбросков вычисляем заранее (один бросок), затем идемпотентно применяем
   let s=ds.s||0, f=ds.f||0;
-  if(roll===20) s+=2; else if(roll===1) f+=2; else if(roll>=10) s+=1; else f+=1;
+  // натуральная 20 не «два успеха»: персонаж сразу приходит в себя с 1 ХП (SRD 5.1, правила 2024) —
+  // s=3 даёт ровно это в dsApply (hp:1, спасброски сняты)
+  if(roll===20) s=3; else if(roll===1) f+=2; else if(roll>=10) s+=1; else f+=1;
   s=Math.min(3,s); f=Math.min(3,f);
   const ok = roll>=10;
-  const tag = roll===20 ? 'крит. успех' : roll===1 ? 'крит. провал' : (ok ? 'успех' : 'провал');
+  const tag = roll===20 ? 'натуральная 20: приходит в себя с 1 ХП' : roll===1 ? 'крит. провал' : (ok ? 'успех' : 'провал');
   dsShowRoll(roll, tag, ok);   // «14 — успех» остаётся в блоке; отрисует её trkRedraw внутри dsApply
-  trkLog(f>=3?'death':'roll',(my.name||'Игрок')+' — спасбросок от смерти: d20='+roll+' ('+tag+')');
-  dsApply(vp, my, s, f);
+  trkLog(roll===20?'heal':f>=3?'death':'roll',(my.name||'Игрок')+' — спасбросок от смерти: d20='+roll+' ('+tag+')');
+  dsApply(vp, my, s, f, roll===20);
   toast(roll + ' — ' + tag);
 }
 function playerHpAdjust(mode){
@@ -14550,9 +14622,10 @@ function trkSuggest(q){
   // сначала — уже созданные листы этого сеттинга (NPC и персонажи), потом бестиарий
   const chars=(CHARS_ALL[CUR_PROJECT]||[]).filter(c=>c && !c.deleted && (c.name||'').toLowerCase().includes(q) && !TRK.list.some(x=>x.charId===c.id)).slice(0,6);
   const hits=ARCHIVE.filter(c=>c.sub==='bestiary' && c.title.toLowerCase().includes(q)).slice(0,6);  // из архива сеттинга: в сказках классических чудищ нет
+  // id листа пишет его владелец (строка comik:chars:<тег>) — в data-атрибут, а не в JS-строку обработчика
   el.innerHTML =
-    chars.map(c=>`<button class="btn ghost sm" style="margin:6px 6px 0 0" onclick="trkAddChar('${c.id}')">👤 ${esc(c.name)}</button>`).join('') +
-    hits.map(c=>`<button class="btn ghost sm" style="margin:6px 6px 0 0" onclick="trkAddBeast('${c.id}')">${esc(c.title)}</button>`).join('');
+    chars.map(c=>`<button class="btn ghost sm" style="margin:6px 6px 0 0" data-id="${esc(c.id)}" onclick="trkAddChar(this.dataset.id)">👤 ${esc(c.name)}</button>`).join('') +
+    hits.map(c=>`<button class="btn ghost sm" style="margin:6px 6px 0 0" data-id="${esc(c.id)}" onclick="trkAddBeast(this.dataset.id)">${esc(c.title)}</button>`).join('');
 }
 /* добавить на доску уже существующий лист (NPC ГМа или персонаж) — с фото и статами */
 function trkAddChar(id){
@@ -14616,11 +14689,12 @@ function gmCreaturePanel(x,i){
   const open=GM_MANAGE_OPEN.has(trkCardKey(x));
   const ava=trkAva(x,CUR_PROJECT);
   const hp=parseInt(x.hp,10)||0, mx=trkMaxHp(x,CUR_PROJECT), th=trkThp(x);
+  const out=isFoeCard(x)?trkOutOfFight(x):hp<=0;   // враг «одним именем» с hp 0 жив и ходит — черепа ему не рисуем
   return `<div class="gm-cre${open?' open':''}">
     <button class="gm-cre-h" onclick="gmManageToggle(${i})">
       <span class="gm-cre-av"${ava?` style="background-image:url('${cssUrl(ava)}')"`:''}></span>
       <span class="gm-cre-nm">${esc(x.name||'—')}</span>
-      <span class="gm-cre-hp${hp<=0?' dead':''}">${hp<=0?'💀':hp+(mx?'/'+mx:'')+' ХП'+(th?' +'+th:'')}</span>
+      <span class="gm-cre-hp${out?' dead':''}">${out?'💀':hp+(mx?'/'+mx:'')+' ХП'+(th?' +'+th:'')}</span>
       <span class="gm-cre-ch">▾</span>
     </button>
     ${open?`<div class="gm-cre-b">
@@ -17413,7 +17487,7 @@ select:focus-visible,summary:focus-visible,[tabindex]:focus-visible,
                         proj:CUR_PROJECT, key:gmBoardKey(), gm:true };
       var vp=trkActiveForPlayer(); if(!vp) return null;
       var s=TRK_SHARED[vp]||{};
-      return { list:s.list||[], round:s.round||1, activeKey:s.activeKey||'',
+      return { list:s.list||[], round:parseInt(s.round,10)||1, activeKey:s.activeKey||'',   // раунд из общего стола — только числом
                proj:boardProj(vp), key:vp, gm:false };
     }catch(e){ return null; }
   }
@@ -17515,12 +17589,13 @@ select:focus-visible,summary:focus-visible,[tabindex]:focus-visible,
     var order=trkOrder(b.list), h='';
     for(var i=0;i<order.length;i++){
       var x=order[i], key=trkCardKey(x);
-      var foe=isFoeCard(x), max=trkMaxHp(x,b.proj), hp=parseInt(x.hp,10)||0, thp=trkThp(x);
-      var dead = foe ? hp<=0 : !!(x.ds && (x.ds.f||0)>=3);
+      var max=trkMaxHp(x,b.proj), hp=parseInt(x.hp,10)||0, thp=trkThp(x);
+      var dead = trkOutOfFight(x);
       var pct = max ? Math.max(0,Math.min(100,Math.round(hp/max*100))) : (hp>0?100:0);
       var idx = b.gm ? TRK.list.indexOf(x) : -1;
       var cls='dk-row'+(key===b.activeKey?' on':'')+(dead?' dead':'')+(b.gm?' can':'');
-      h+='<div class="'+cls+'"'+(b.gm?' onclick="shelfSetTurn(\''+E(key)+'\')"':'')+'>'+
+      // ключ (uid/charId из общего стола) — в data-атрибут: E() внутри JS-строки обработчика не защищает
+      h+='<div class="'+cls+'"'+(b.gm?' data-key="'+E(key)+'" onclick="shelfSetTurn(this.dataset.key)"':'')+'>'+
          '<span class="dk-ini">'+E(String(x.init==null?0:x.init))+'</span>'+
          '<span class="dk-nm"><span class="n">'+E(x.name||'—')+'</span>'+
            (max?'<span class="dk-bar"><i style="width:'+pct+'%;background:'+trkHpColor(pct/100)+'"></i></span>':'')+
