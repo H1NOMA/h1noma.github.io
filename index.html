@@ -5066,7 +5066,10 @@ const charsSeen=m=>{ if(m && m.stamps) Object.assign(CHARS_SEEN_AT, m.stamps); }
 async function fetchCloudCharsChanged(){
   let r=null;
   try{ r=await withTimeout(supa.from('kv').select('key,at:value->>at').like('key','comik:chars:%'), 8000); }catch(e){}
-  if(!r || r.error || !Array.isArray(r.data)) return fetchCloudChars();
+  // зонд не успел (тайм-аут) — пропускаем тик: полная выборка листов с портретами на плохой сети — самый тяжёлый
+  // запрос, и брошенная по тайм-ауту она продолжала бы качаться в фоне. Ошибка зонда (не поддержан) — читаем всё, как раньше
+  if(!r) return null;
+  if(r.error || !Array.isArray(r.data)) return fetchCloudChars();
   const keys=r.data.filter(x=>x && x.key && CHARS_SEEN_AT[x.key]!==(x.at==null?'':String(x.at))).map(x=>x.key);
   return keys.length ? fetchCloudChars(keys) : null;
 }
@@ -8092,7 +8095,7 @@ function validTag(t){ return /^[a-z0-9_]{4,32}$/.test(normTag(t)); }
 function dispTag(t){ return normTag(t); }
 /* ── Кастомные профили: имя + оформление аватарки (фон и цвет буквы) — на устройстве ── */
 const PROFILE_COLORS=['#ff4757','#f0592a','#f5c542','#3ecf6a','#37a9e6','#5865f2','#b57bff','#ff6fae','#9d9dac','#e9e9f0'];
-const INK_COLORS=['#ffffff','#12131a','#ff4757','#f5c542','#3ecf6a','#37a9e6','#b57bff'];
+const INK_COLORS=['#ffffff','#12131a','#191b23','#ff4757','#f5c542','#3ecf6a','#37a9e6','#b57bff'];   // #191b23 — буквы пресета «светлый»
 // готовые пары «фон + цвет буквы» для аватара — один ряд вместо двух палитр (охватывают все цвета фона)
 const PROFILE_PRESETS=[
   {bg:'#37a9e6',ink:'#ffffff'},{bg:'#ff4757',ink:'#ffffff'},{bg:'#f5c542',ink:'#12131a'},
@@ -8753,7 +8756,7 @@ function collectInv(p){
 /* --- ячейки заклинаний: игрок сам настраивает количество по кругам --- */
 let SLOTS_TMP={};
 function sheetSlotsBlock(p, slots){
-  SLOTS_TMP={}; for(let i=1;i<=9;i++) SLOTS_TMP[i]=(slots&&slots[i]&&slots[i].max)||0;
+  SLOTS_TMP={}; for(let i=1;i<=9;i++) SLOTS_TMP[i]=Math.min(9, Math.max(0, parseInt(slots&&slots[i]&&slots[i].max,10)||0));
   const rows=[];
   for(let i=1;i<=9;i++){
     rows.push(`<div class="slot-cfg-row${SLOTS_TMP[i]>0?' has':''}" id="${p}-slotrow-${i}">
@@ -9603,7 +9606,7 @@ function sheetAvaBlock(cur){
   AVA_TMP=cur||'';
   return `<div class="field"><label>Аватар</label>
     <div class="ava-row">
-      <span class="ava" id="avaPrev">${cur?`<img src="${cur}" alt="">`:'<span class="ava-ph">?</span>'}</span>
+      <span class="ava" id="avaPrev">${cur?`<img src="${esc(safeUrl(cur))}" alt="">`:'<span class="ava-ph">?</span>'}</span>
       <button type="button" class="btn ghost sm" onclick="document.getElementById('avaFile').click()">Фото</button>
       <button type="button" class="btn ghost sm" onclick="avaClear()">Убрать</button>
       <input type="file" id="avaFile" accept="image/*" hidden onchange="avaPick(this)">
@@ -12169,7 +12172,7 @@ function restoreBackup(inp){
         if(d.chars && d.chars[g]) CHARS_ALL[g]=mergeChars(CHARS_ALL[g], d.chars[g]);
         if(d.archive && d.archive[g]) ARCHIVE_ALL[g]=mergeById(ARCHIVE_ALL[g], d.archive[g]);
       });
-      if(Array.isArray(d.games)){ const ids=new Set(GAMES.map(x=>x.id)); d.games.forEach(x=>{ if(x && !ids.has(x.id)) GAMES.push(x); }); }
+      if(Array.isArray(d.games)) gamesMergeRemote(d.games);   // тем же сливом, что облако: очистка, надгробия, записи по свежести
       if(Array.isArray(d.news)) NEWS=mergeById(NEWS, d.news);
       if(d.chrono) CHRONO_DATA=Object.assign({}, d.chrono, CHRONO_DATA);
       if(d.hero) HERO_EDITS=Object.assign({}, d.hero, HERO_EDITS);
