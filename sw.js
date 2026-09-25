@@ -78,7 +78,10 @@ self.addEventListener('push', e => {
     // значок строки состояния Android строится только по альфа-каналу: icon-192.png без прозрачности
     // давал сплошной белый квадрат, здесь — белый к20 на прозрачном фоне
     badge: 'img/badge-96.png',
-    tag: d.tag || 'komik-game',
+    // у каждой игры свой tag: с общим «komik-game» новый анонс молча подменял в шторке
+    // прежний — без звука и вибрации. renotify — повторный анонс той же игры тоже звенит
+    tag: gid ? ('komik-game-' + gid) : (d.tag || 'komik-game'),
+    renotify: true,
     data: { url, gid }
   }));
 });

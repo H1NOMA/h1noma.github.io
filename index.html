@@ -4138,7 +4138,7 @@ if(/Android/i.test(navigator.userAgent||'')) d.classList.add('lite');}catch(e){}
       <div id="nextGame" hidden></div>
       <div class="signup-bar">
         <button class="btn primary" style="width:100%" id="signupBtn" hidden onclick="openGameSignup()">Записаться на игру</button>
-        <button class="btn ghost" style="width:100%;margin-top:8px" id="schedBtn" hidden onclick="openSchedule()">Расписание игр · ГМ</button>
+        <button class="btn ghost" style="width:100%;margin-top:8px" id="schedBtn" hidden onclick="openSchedule(CUR_PROJECT)">Расписание игр · ГМ</button>
       </div>
       <div id="onboardCard" hidden></div>
       <div id="admNewsBar" hidden style="margin:14px 0"><button class="btn primary" style="width:100%" onclick="openNewsEditor()">+ Новость</button></div>
@@ -5127,21 +5127,25 @@ async function sget(key, shared=SHARED){
    «отправим, когда связь вернётся» там, где связь ни при чём */
 let SSET_LAST_ERR='', SSET_NOPERM_AT=0;
 function cloudNoPerm(e){ const c=e&&(e.code||e.status); return c==='42501' || c===403 || c==='403' || /row-level security|permission denied/i.test(String((e&&e.message)||'')); }
+/* SSET_LOCAL_OK — легла ли последняя запись на устройство. Квота localStorage кончилась — ssetLocal
+   молча возвращает false, и обещать «сохранено локально» при сбое облака нельзя: правки нет нигде */
+let SSET_LOCAL_OK=true;
+const SSET_NOWHERE='⚠ Не сохранено: нет места на устройстве и нет связи';
 async function sset(key,val, shared=SHARED, quiet){
   if(supa && shared){
-    await ssetLocal(key,val,shared);   // мгновенно и независимо от сети
+    SSET_LOCAL_OK = await ssetLocal(key,val,shared)!==false;   // мгновенно и независимо от сети
     let cloudOk=false;
     try{
       const r = await withTimeout(cloudSet(key,val), CLOUD_TMO);
       // withTimeout по тайм-ауту РЕЗОЛВИТСЯ значением undefined, а не падает,
       // поэтому молчание сети сюда, в catch, не попадает — ловим отдельно
-      if(r===undefined){ SSET_LAST_ERR='timeout'; if(!quiet) toast('⚠ Облако не ответило — сохранено на этом устройстве'); }
+      if(r===undefined){ SSET_LAST_ERR='timeout'; if(!quiet) toast(SSET_LOCAL_OK ? '⚠ Облако не ответило — сохранено на этом устройстве' : SSET_NOWHERE); }
       else { cloudOk = r!==false; SSET_LAST_ERR=''; }
     }
     catch(e){                                          // quiet — фоновая досылка: не дёргаем человека каждые 40 с
       SSET_LAST_ERR = cloudNoPerm(e) ? 'noperm' : 'net';
       if(!quiet){
-        if(SSET_LAST_ERR!=='noperm') toast('⚠ Облако недоступно — сохранено локально');
+        if(SSET_LAST_ERR!=='noperm') toast(SSET_LOCAL_OK ? '⚠ Облако недоступно — сохранено локально' : SSET_NOWHERE);
         else if(Date.now()-SSET_NOPERM_AT>8000){ SSET_NOPERM_AT=Date.now(); toast('⚠ Нет прав на запись — в облако не сохранено'); }   // серия правок → один тост
       }
     }
@@ -5539,8 +5543,10 @@ async function boot(){
   if(typeof pushHeal==='function') setTimeout(()=>pushHeal(), 4000);    // подписка на пуши чинит себя сама (ключ сервера, список рассылки)
   bmCloudSync();
   gmNotesLoad();
-  // автокопия последнего состояния — страховка на случай проблем с облаком
-  try{ ssetLocal('comik:backup:auto', {at:Date.now(), chars:CHARS_ALL, games:GAMES, news:NEWS}); }catch(e){}
+  // автокопии comik:backup:auto больше нет: её никто не читал, а листы ВСЕХ игроков с портретами и новости
+  // с фото занимали мегабайты квоты — и запись своего листа без сети падала. Копия — «Настройки → Резервная копия».
+  // Старую стираем, чтобы вернуть место
+  try{ localStorage.removeItem('comik:backup:auto'); }catch(e){}
   // офлайн-режим: сервис-воркер кэширует сайт целиком
   /* Регистрация воркера и — главное — ДОСТАВКА обновлений.
      Раньше воркер регистрировался один раз и всё: открытая вкладка (а в приложении
@@ -5989,7 +5995,8 @@ function storySave(){
 /* ---------- Поиск ---------- */
 /* ====================== Модальное окно ====================== */
 let CUR_ARCH={};
-function pickArch(id,i){ CUR_ARCH[id]=i; openModal(id); }
+// ov — чип нажат в карточке-оверлее (#modal2): перерисовываем её же, а не основной #modal с листом под ней
+function pickArch(id,i,ov){ CUR_ARCH[id]=i; openModal(id,!!ov); }
 /* Подпись карточки (body) у большинства импортированных записей — это первые фразы
    раздела «Описание»/«Подробности»: в открытой карточке текст шёл дважды подряд.
    Приоритет у раздела: если подпись целиком содержится в каком-то разделе, сверху
@@ -6021,7 +6028,7 @@ function openModal(id, overlay){
   if(archs.length){
     archUI = `<div class="arch-pick">
       <div class="arch-lbl">Архетип</div>
-      <div class="arch-chips"><button class="arch-chip${ai===-1?' on':''}" onclick="pickArch('${e.id}',-1)">Без архетипа</button>${archs.map((a,i)=>`<button class="arch-chip${i===ai?' on':''}" onclick="pickArch('${e.id}',${i})">${esc(a.name)}</button>`).join('')}</div>
+      <div class="arch-chips"><button class="arch-chip${ai===-1?' on':''}" onclick="pickArch('${e.id}',-1,${overlay?1:0})">Без архетипа</button>${archs.map((a,i)=>`<button class="arch-chip${i===ai?' on':''}" onclick="pickArch('${e.id}',${i},${overlay?1:0})">${esc(a.name)}</button>`).join('')}</div>
       ${A&&A.desc?`<p class="arch-desc">${esc(A.desc)}</p>`:''}
     </div>`;
   }
@@ -6033,7 +6040,7 @@ function openModal(id, overlay){
     const S=list[si];
     subraceUI=`<div class="arch-pick">
       <div class="arch-lbl">Подраса</div>
-      <div class="arch-chips">${list.map((s,i)=>`<button class="arch-chip${i===si?' on':''}" onclick="pickArch('${e.id}',${i})">${esc(s.name)}</button>`).join('')}</div>
+      <div class="arch-chips">${list.map((s,i)=>`<button class="arch-chip${i===si?' on':''}" onclick="pickArch('${e.id}',${i},${overlay?1:0})">${esc(s.name)}</button>`).join('')}</div>
       ${S?`<p class="arch-desc"><b>${srAsiText(S)}</b>${srAsiText(S)?' — ':''}${esc(S.desc)}</p>`:''}
     </div>`;
   }
@@ -6230,21 +6237,29 @@ function saveDeityStat(id, btn){
 
 /* ====================== Закладки (личные, на устройстве) ====================== */
 const KEY_BM='comik:bmarks:v1';
-let BMARKS=[];   // [{id, scope}] — scope: 'dnd' для карточек общего ядра, иначе id игры
+let BMARKS=[];   // [{id, scope, at}] — scope: 'dnd' для карточек общего ядра, иначе id игры; убранная — надгробие {deleted:true}
+const KEY_BM_OWNER='comik:bmarks:owner';   // чей аккаунт последним сливал закладки этого устройства
+const bmKey=b=>(b&&b.id)+'|'+((b&&b.scope)||'');
+function bmLive(){ return BMARKS.filter(b=>b && b.id && !b.deleted); }
+function bmBtnSync(){ const bb=document.getElementById('bmBtn'); if(bb) bb.classList.toggle('has', bmLive().length>0); }
 const BM_SVG='<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M7 3.5h10a1 1 0 011 1V21l-6-4-6 4V4.5a1 1 0 011-1z"/></svg>';
 function bmVisible(b){ return b.scope==='dnd' ? CORE_GAMES.indexOf(CUR_PROJECT)>=0 : b.scope===CUR_PROJECT; }
 // закладка считается «здесь», только если она сохранена в ТЕКУЩЕМ сеттинге (у каждого сеттинга свои)
-function isBookmarked(id){ return BMARKS.some(b=>b && b.id===id && bmVisible(b)); }
+function isBookmarked(id){ return BMARKS.some(b=>b && !b.deleted && b.id===id && bmVisible(b)); }
 function toggleBookmark(id){
+  const now=Date.now();
   if(isBookmarked(id)){
-    BMARKS=BMARKS.filter(b=>!(b && b.id===id && bmVisible(b)));   // убираем закладку только текущего сеттинга
+    // убираем закладку только текущего сеттинга — надгробием: просто вычеркнутую
+    // устройство со старой копией вернуло бы в облако при следующем слиянии
+    BMARKS=BMARKS.map(b=>(b && !b.deleted && b.id===id && bmVisible(b)) ? {id, scope:b.scope, deleted:true, at:now} : b);
     toast('Убрано из закладок');
   } else {
-    BMARKS.push({id, scope: CUR_PROJECT});                       // сохраняем в текущий сеттинг (даже карточки ядра)
+    BMARKS=BMARKS.filter(b=>!(b && b.deleted && b.id===id && b.scope===CUR_PROJECT));   // надгробие той же пары сменяется живой записью
+    BMARKS.push({id, scope: CUR_PROJECT, at:now});               // сохраняем в текущий сеттинг (даже карточки ядра)
     toast('Сохранено в закладки');
   }
   sset(KEY_BM, BMARKS, false).catch(()=>{});
-  if(SESSION && supa) sset('comik:bm:'+currentTag(), BMARKS, true).catch(()=>{});
+  bmCloudSync();   // в облако — слиянием, а не поверх: закладки с другого устройства не затираем
   // красим ВСЕ копии этой карточки на экране: лист, оверлей поверх него, панель-читальня
   document.querySelectorAll('[data-bm="'+String(id).replace(/"/g,'\\"')+'"]')
     .forEach(b=>b.classList.toggle('on', isBookmarked(id)));
@@ -6256,31 +6271,40 @@ function toggleBookmark(id){
     if(on && top && !f) top.insertAdjacentHTML('beforeend','<span class="bm-mini" title="В закладках">⚑</span>');
     else if(!on && f) f.remove();
   });
-  const bb=document.getElementById('bmBtn'); if(bb) bb.classList.toggle('has', BMARKS.length>0);
+  bmBtnSync();
 }
-/* закладки в аккаунте: при входе объединяем локальные с облачными профиля */
+/* закладки в аккаунте: при входе, на старте и после каждой правки сливаем локальные с облачными профиля.
+   На каждую пару «карточка + сеттинг» побеждает более свежая запись (at; у старых записей его нет — 0),
+   в том числе надгробие: так удаление на одном устройстве доезжает до других, а не откатывается ими */
 async function bmCloudSync(){
+  bmBtnSync();   // и на старте: значок — по живым закладкам, надгробия не в счёт
   if(!SESSION || !supa) return;
   try{
-    const key='comik:bm:'+currentTag();
-    const cb=await withTimeout(cloudGet(key),4000).catch(()=>null);
+    const tag=currentTag(), key='comik:bm:'+tag;
+    // общее устройство: закладки прошлого аккаунта уже лежат в его облаке — в этот их не вливаем.
+    // Закладки гостя (владельца ещё нет) по-прежнему переезжают в аккаунт при входе
+    let owner=''; try{ owner=localStorage.getItem(KEY_BM_OWNER)||''; }catch(e){}
+    if(owner!==tag){ if(owner) BMARKS=[]; try{ localStorage.setItem(KEY_BM_OWNER, tag); }catch(e){} }
+    let cb; try{ cb=await withTimeout(cloudGet(key),4000); }catch(e){ cb=undefined; }
+    if(cb===undefined){ sset(KEY_BM, BMARKS, false).catch(()=>{}); bmBtnSync(); return; }   // облако не ответило — его не трогаем: слепая запись стёрла бы чужие правки
     // Ключ — пара «карточка + сеттинг»: одна и та же карточка может быть в
     // закладках у нескольких миров. Раньше сравнивали по одному id, и облачная
     // закладка из другого сеттинга считалась дублем — не добавлялась, а следующей
     // же строкой урезанный список уезжал обратно в облако и стирал её везде.
-    if(Array.isArray(cb)){
-      const key=b=>(b&&b.id)+'|'+((b&&b.scope)||'');
-      const have=new Set(BMARKS.map(key));
-      cb.forEach(b=>{ if(b && b.id && !have.has(key(b))){ have.add(key(b)); BMARKS.push(b); } });
-    }
-    sset(key, BMARKS, true).catch(()=>{});
+    const by=new Map(); BMARKS.forEach(b=>{ if(b && b.id) by.set(bmKey(b), b); });
+    (Array.isArray(cb)?cb:[]).forEach(b=>{ if(!(b && b.id)) return; const k=bmKey(b), l=by.get(k);
+      if(!l || (b.at||0)>(l.at||0)) by.set(k, b); });
+    // надгробия старше полугода вычищаем — все устройства к этому времени их уже увидели
+    const old=Date.now()-180*864e5;
+    BMARKS=[...by.values()].filter(b=>!(b.deleted && (b.at||0)<old));
+    if(JSON.stringify(BMARKS)!==JSON.stringify(cb)) sset(key, BMARKS, true, true).catch(()=>{});
     sset(KEY_BM, BMARKS, false).catch(()=>{});
-    const bb=document.getElementById('bmBtn'); if(bb) bb.classList.toggle('has', BMARKS.length>0);
+    bmBtnSync();
   }catch(e){}
 }
 function openBookmarks(){
-  const list=BMARKS.filter(bmVisible).map(b=>ARCHIVE.find(x=>x.id===b.id)).filter(Boolean);
-  const hidden=BMARKS.length - list.length;
+  const list=bmLive().filter(bmVisible).map(b=>ARCHIVE.find(x=>x.id===b.id)).filter(Boolean);
+  const hidden=bmLive().length - list.length;
   // группировка: категория / подкатегория как в архиве
   const groups={};
   list.forEach(e=>{
@@ -6494,6 +6518,9 @@ function delChronoGame(){
 }
 /* «Анонсировать» → сохраняем игру и открываем создание анонса в новостях с предзаполнением и связью */
 function announceChronoGame(){
+  // хронология открыта разработчику всегда, а редактор ячейки — только в режиме ГМ: без этой проверки
+  // openCellEditor молча выходил, и поверх новостей снова всплывал тот же редактор хронологии
+  if(!ADMIN){ toast('Анонс — в режиме Game Master: включите его в настройках'); return; }
   const e=chronoCollect(); if(!e) return; const g=e.g;
   if(!g.title){ toast('Укажи название игры'); return; }
   persistChronoGames();
@@ -7361,6 +7388,8 @@ function calGames(){
   return (GAMES||[]).filter(s=>s && vis.indexOf(s.game)>=0).map(s=>({s, d:gameDateOf(s)})).filter(x=>x.d);
 }
 function calByDay(){ const by={}; calGames().forEach(x=>{ (by[x.d]=by[x.d]||[]).push(x.s); }); return by; }
+// «1 игра», «3 игры», «5 игр», «11 игр», «21 игра»
+function ruGames(n){ const a=n%10, b=n%100; return n+' '+(a===1&&b!==11?'игра':(a>=2&&a<=4&&(b<12||b>14))?'игры':'игр'); }
 function calShift(dm){ calInit(); CAL.m+=dm; if(CAL.m<0){ CAL.m=11; CAL.y--; } if(CAL.m>11){ CAL.m=0; CAL.y++; } CAL.sel=null; calRefresh(); }
 function calPick(iso){ CAL.sel = (CAL.sel===iso) ? null : iso; calRefresh(); }
 function calGameRow(s, withDate){
@@ -7391,7 +7420,7 @@ function calHtml(){
       ring=` style="--ring:conic-gradient(from -90deg,${stops})"`;
     }
     cells+= gs.length
-      ? `<button type="button" class="${cls}"${ring} onclick="calPick('${iso}')" title="${gs.length===1?'1 игра':gs.length+' игры'}"><i>${d}</i></button>`
+      ? `<button type="button" class="${cls}"${ring} onclick="calPick('${iso}')" title="${ruGames(gs.length)}"><i>${d}</i></button>`
       : `<span class="${cls}"><i>${d}</i></span>`;
   }
   const vis=(typeof visibleProjects==='function') ? visibleProjects() : Object.keys(PROJECT_TITLES);
@@ -7456,8 +7485,12 @@ function openGameBrief(id){
 /* --- игрок: список анонсов и запись --- */
 function openGameSignup(){
   // анонсы разделены по сеттингам: показываем только сессии открытой игры
-  const list=gamesByDate(GAMES.filter(s=>s && s.game===CUR_PROJECT));
-  const body=list.length ? list.map(s=>gsCardHtml(s)).join('')
+  const all=gamesByDate(GAMES.filter(s=>s && s.game===CUR_PROJECT));
+  // прошедшие, но не закрытые ГМом игры — в конец и без записи: баннер «Ближайшая игра» и календарь
+  // их тоже не считают, а первой в списке стояла вчерашняя с живой кнопкой «Записаться»
+  const today=calToday(), past=s=>{ const d=gameDateOf(s); return !!d && d<today; };
+  const list=all.filter(s=>!past(s)).concat(all.filter(past));
+  const body=list.length ? list.map(s=>gsCardHtml(s, past(s))).join('')
     : `<div class="empty" style="margin-top:14px">[ ПОКА ПУСТО ]<br>В ${esc(gameTitle(CUR_PROJECT))} нет анонсированных сессий — загляни позже или переключи игру в шапке.</div>`;
   document.getElementById('modal').innerHTML=`
     <button class="x" onclick="closeModal()" aria-label="Закрыть">✕</button>
@@ -7473,7 +7506,7 @@ function gsAvaHtml(p, i, sid){
   const initial=esc((p.name||p.tag||'?').charAt(0).toUpperCase());
   return `<button class="gs-ava" onclick="gsPlayerInfo('${sid}',${i})" title="${esc(p.name||'участник')}"${photo?'':` style="background:${bg};color:${ink}"`}>${photo?`<img src="${esc(safeUrl(photo))}" alt="">`:initial}</button>`;
 }
-function gsCardHtml(s){
+function gsCardHtml(s, past){
   const left=seatsLeft(s), mine=myEntry(s), live=!!trkLiveBoardOfGame(s.id);
   const players=(s.players||[]).map((p,i)=>gsAvaHtml(p,i,s.id)).join('');
   let act;
@@ -7481,6 +7514,7 @@ function gsCardHtml(s){
   else if(left<=0) act='<span class="badge">Мест нет</span>';
   else if(!SESSION) act=`<button class="btn primary sm" onclick="toast('Запись доступна после входа');openAccessModal(null,'account')">Войти и записаться</button>`;
   else act=`<button class="btn primary sm" onclick="openSignupForm('${s.id}')">Записаться</button>`;
+  if(past) act='<span class="badge">Игра прошла</span>';   // дата позади — записываться уже не на что
   return `<div class="gs-card">
     <div class="gs-title">${esc(s.title||'Сессия')}${live?'<span class="gs-live">идёт сейчас</span>':''}</div>
     <div class="gs-meta">
@@ -7597,6 +7631,8 @@ function openSchedule(game){
   if(!ADMIN){ toast('Раздел доступен Мастеру'); return; }
   // игрок-ГМ (не разработчик) может анонсировать игры ТОЛЬКО по «Классике»
   const allowed = isDev() ? PROJECT_ORDER : ['classic'];
+  // кнопка на новостях передаёт текущий сеттинг: без него расписание открывалось на прошлом выборе
+  // (по умолчанию TERRA), и «+ Ячейка сессии» из LEGACY создавала игру в TERRA
   if(game && allowed.includes(game)) SCHED_GAME=game;
   if(!allowed.includes(SCHED_GAME)) SCHED_GAME=allowed[0];
   const chips=allowed.map(g=>`<button class="sp-cls${SCHED_GAME===g?' on':''}" onclick="openSchedule('${g}')">${esc(gameTitle(g))}</button>`).join('');
@@ -7671,7 +7707,7 @@ async function gamePlayed(id, btn){
   await persistGames();
 }
 function openCellEditor(id){
-  if(!ADMIN) return;
+  if(!ADMIN){ CHRONO_LINK=null; return; }   // одноразовая связь с хронологией не должна дожить до чужой ячейки
   const s=id?GAMES.find(x=>x.id===id):null;
   if(s && !canManageGame(s)){ toast('Редактировать можно только свои анонсы'); return; }
   const chronoRef = (!id && CHRONO_LINK) ? CHRONO_LINK : null; CHRONO_LINK=null;   // связь с игрой из хронологии (одноразово)
@@ -7996,11 +8032,21 @@ async function decodeImage(file){
     img.src=url;
   });
 }
+/* JPEG прозрачности не знает: браузер кладёт альфу на чёрный фон, и PNG-токен бестиария
+   становился картинкой на чёрном квадрате (а «Сжать фото в облаке» делал это необратимо).
+   Есть хоть один не вполне непрозрачный пиксель — кодируем в WebP: он держит альфу и жмёт с потерями.
+   Где кодера WebP нет (Safari), toDataURL сам отдаёт PNG — крупнее, зато без чёрного фона */
+function canvasHasAlpha(c){
+  try{ const d=c.getContext('2d').getImageData(0,0,c.width,c.height).data;
+    for(let i=3;i<d.length;i+=4) if(d[i]<255) return true; }catch(e){}
+  return false;
+}
 function bitmapToDataUrl(img, maxDim, q){
   const iw=img.width||img.naturalWidth, ih=img.height||img.naturalHeight;
   const k=Math.min(1, maxDim/Math.max(iw,ih));
   const w=Math.max(1,Math.round(iw*k)), h=Math.max(1,Math.round(ih*k));
-  return drawScaledCanvas(img, w, h).toDataURL('image/jpeg', q);
+  const c=drawScaledCanvas(img, w, h);
+  return c.toDataURL(canvasHasAlpha(c)?'image/webp':'image/jpeg', q);
 }
 function compressImage(file, maxDim, q){
   maxDim=maxDim||1500; q=q||0.85;
@@ -15209,10 +15255,14 @@ function pushRenderBtn(){
     const [txt,dis]=m[st]||m.off; el.textContent=txt; el.disabled=!!dis; el.classList.toggle('on', st==='on');
   });
 }
-/* открыть меню конкретной игры по id (по тапу на уведомление) */
-function openGameDeep(gid){
+/* открыть меню конкретной игры по id (по тапу на уведомление).
+   fresh — GAMES уже прочитан из облака (холодный старт по ?g=): ждать нечего. Игры нет —
+   ГМ её закрыл «Игра сыграна» или удалил: объясняем и показываем анонсы, а не молчим */
+function openGameDeep(gid, fresh){
   if(!gid) return;
   let tries=0;
+  const miss=()=>{ toast('Эта игра уже прошла или удалена');
+    if(!document.querySelector('.scrim.open')){ go('news'); openGameSignup(); } };   // пока ждали, человек открыл своё окно — его не подменяем
   const attempt=()=>{
     const s=(typeof GAMES!=='undefined'?GAMES:[]).find(x=>x&&x.id===gid);
     if(!s) return false;
@@ -15223,11 +15273,13 @@ function openGameDeep(gid){
     return true;
   };
   if(attempt()) return;
-  const t=setInterval(()=>{ if(attempt()||++tries>40) clearInterval(t); }, 300);  // ждём загрузки игр из облака
+  if(fresh){ miss(); return; }
+  const t=setInterval(()=>{ if(attempt()){ clearInterval(t); return; } if(++tries>40){ clearInterval(t); miss(); } }, 300);  // ждём загрузки игр из облака
 }
-/* холодный старт: если открыли по ссылке ?g=<id> — открываем игру и чистим адрес */
+/* холодный старт: если открыли по ссылке ?g=<id> — открываем игру и чистим адрес.
+   Зовётся из boot() после чтения игр из облака — поэтому fresh */
 function pushDeepLinkFromUrl(){
-  try{ const g=new URLSearchParams(location.search).get('g'); if(g){ openGameDeep(g); history.replaceState(null,'',location.pathname); } }catch(e){}
+  try{ const g=new URLSearchParams(location.search).get('g'); if(g){ openGameDeep(g, true); history.replaceState(null,'',location.pathname); } }catch(e){}
 }
 /* тап по уведомлению при уже открытом приложении — SW пришлёт сообщение */
 if('serviceWorker' in navigator){
@@ -15241,13 +15293,17 @@ if('serviceWorker' in navigator){
    Если человек посреди правки листа или в модалке — ждём, пока он свернёт приложение
    или закроет окно, и перезапускаем тогда (правки к этому моменту уже автосохранены) */
 let SW_UPDATE_PENDING=false;
-function swUpdateBusy(){ return !!(document.querySelector('.scrim.open') || (typeof INLINE_ID!=='undefined' && INLINE_ID) || document.querySelector('.hp-prompt') || (typeof trkTyping==='function' && trkTyping())); }
+// играющая музыка ГМа — тоже «занято»: перезагрузка посреди сессии обрывала трек
+function swUpdateBusy(){ return !!(document.querySelector('.scrim.open') || (typeof INLINE_ID!=='undefined' && INLINE_ID) || document.querySelector('.hp-prompt') || (typeof trkTyping==='function' && trkTyping()) || (typeof musPaused==='function' && !musPaused())); }
 function swUpdateReady(){
   if(SW_UPDATE_PENDING) return; SW_UPDATE_PENDING=true;
   const go=()=>{ try{ if(typeof flushInlineSave==='function') flushInlineSave(); }catch(e){} location.reload(); };
   if(!swUpdateBusy()){ go(); return; }
   toast('Есть новая версия — обновится, когда закроешь окно');
-  document.addEventListener('visibilitychange', ()=>{ if(document.hidden) go(); });
+  // свернули приложение — перезагружаемся, только если ничего не открыто: редакторы в модалках
+  // (новость, карточка архива, хроника) черновиков не хранят, и перезагрузка в фоне стирала текст.
+  // Занято — дождётся закрытия окна (интервал ниже)
+  document.addEventListener('visibilitychange', ()=>{ if(document.hidden && !swUpdateBusy()) go(); });
   const t=setInterval(()=>{ if(!swUpdateBusy()){ clearInterval(t); go(); } }, 1500);
 }
 /* вызов серверной функции рассылки. На шлюз идёт анон-ключ (он всегда проходит),
@@ -15315,9 +15371,10 @@ function musDbOpen(){
     rq.onerror=()=>rej(rq.error);
   });
 }
-function musBlobPut(id, blob){ return musDbOpen().then(db=>new Promise((res,rej)=>{ const tx=db.transaction('blobs','readwrite'); tx.objectStore('blobs').put(blob,id); tx.oncomplete=res; tx.onerror=()=>rej(tx.error); })); }
+// нехватка квоты прерывает транзакцию событием abort без error — без onabort промис не завершался никогда
+function musBlobPut(id, blob){ return musDbOpen().then(db=>new Promise((res,rej)=>{ const tx=db.transaction('blobs','readwrite'); tx.objectStore('blobs').put(blob,id); tx.oncomplete=res; tx.onerror=()=>rej(tx.error); tx.onabort=()=>rej(tx.error||new Error('abort')); })); }
 function musBlobGet(id){ return musDbOpen().then(db=>new Promise((res,rej)=>{ const tx=db.transaction('blobs','readonly'); const rq=tx.objectStore('blobs').get(id); rq.onsuccess=()=>res(rq.result||null); rq.onerror=()=>rej(rq.error); })); }
-function musBlobDel(id){ return musDbOpen().then(db=>new Promise((res)=>{ const tx=db.transaction('blobs','readwrite'); tx.objectStore('blobs').delete(id); tx.oncomplete=res; tx.onerror=res; })); }
+function musBlobDel(id){ return musDbOpen().then(db=>new Promise((res)=>{ const tx=db.transaction('blobs','readwrite'); tx.objectStore('blobs').delete(id); tx.oncomplete=res; tx.onerror=res; tx.onabort=res; })); }
 function musListLoad(){
   // разовая склейка прежних раздельных списков в одну общую фонотеку
   try{
@@ -15373,15 +15430,19 @@ async function musicAddFiles(inp){
   if(!files.length) return;
   musListLoad();
   const startIdx=MUSIC.length, added=[];
-  for(const f of files){
-    if(!/^audio\//.test(f.type||'') && !/\.(mp3|m4a|ogg|wav|flac|aac|opus)$/i.test(f.name)) continue;
+  const audio=files.filter(f=>/^audio\//.test(f.type||'') || /\.(mp3|m4a|ogg|wav|flac|aac|opus)$/i.test(f.name));
+  let full=false, failed=0;
+  for(const f of audio){
     const id='mus'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
-    try{ await musBlobPut(id, f); MUSIC.push({id, name:f.name.replace(/\.[^.]+$/,'')}); added.push(id); }catch(e){}
+    try{ await musBlobPut(id, f); MUSIC.push({id, name:f.name.replace(/\.[^.]+$/,'')}); added.push(id); }
+    catch(e){ failed++; if(e && e.name==='QuotaExceededError'){ full=true; break; } }   // места нет — остальные файлы тоже не влезут
   }
   musListSave();
   if(dest && added.length && typeof mplAddTracks==='function') mplAddTracks(dest, added);
   renderMusicLib();
-  toast('Добавлено: '+(MUSIC.length-startIdx));
+  if(full) toast('⚠ Не хватает места на устройстве — добавлено '+added.length+' из '+audio.length, {ms:5000});
+  else if(failed) toast('⚠ Добавлено '+added.length+' из '+audio.length+' — часть файлов не сохранилась', {ms:5000});
+  else toast('Добавлено: '+(MUSIC.length-startIdx));
   if(!musCur && MUSIC.length>startIdx){ try{ musPlay(startIdx); }catch(e){} }   // сразу играем добавленное — появляется плашка «сейчас играет»
 }
 async function musDelete(id){
@@ -15410,20 +15471,29 @@ function musPaused(){ const a=musAudio(); return !a || a.paused; }
 function musToggle(){ const a=musAudio(); if(!a||!musCur) return; if(a.paused){ a.play().catch(()=>{}); } else { if(musCF) musFinishCF(); a.pause(); } }
 function musCurIndex(){ return musCur ? MUSIC.findIndex(t=>t.id===musCur.id) : -1; }
 // мгновенно завершить идущий кроссфейд: входящий — на полную, уходящий — стоп
-function musFinishCF(){ if(!musCF) return; try{ cancelAnimationFrame(musCF.raf); }catch(e){}
+function musFinishCF(){ if(!musCF) return; try{ cancelAnimationFrame(musCF.raf); }catch(e){} clearTimeout(musCF.to);
   const out=musCF.out;
   if(out){ out.pause(); if(out.src){ try{URL.revokeObjectURL(out.src);}catch(e){} out.removeAttribute('src'); } out.volume=1; }
   const a=musAudio(); if(a) a.volume=1; musCF=null; }
+/* Громкость из JS меняется не везде: на iOS volume только для чтения и всегда 1 —
+   там «плавный» переход — это два трека разом на полной громкости */
+let MUS_VOL_OK=null;
+function musVolOk(){ if(MUS_VOL_OK===null){ try{ const a=document.createElement('audio'); a.volume=0.5; MUS_VOL_OK=Math.abs(a.volume-0.5)<0.01; }catch(e){ MUS_VOL_OK=true; } } return MUS_VOL_OK; }
 // равномощная кривая (sin/cos) — без провала громкости в середине перехода
 function musRamp(inEl,outEl,dur){
   musFinishCF();
+  // вкладка в фоне / экран погашен — кадров rAF нет: входящий так и играл бы на нуле, а живой musCF
+  // глушил переход к следующему треку, и музыка замолкала. Там переходим сразу, без плавности
+  if(document.hidden || !musVolOk()){ musCF={out:outEl}; musFinishCF(); return; }
   const t0=performance.now();
   const step=(now)=>{ const k=Math.min(1,(now-t0)/(Math.max(0.1,dur)*1000)); const q=k*Math.PI/2;
     inEl.volume=Math.min(1,Math.max(0,Math.sin(q))); outEl.volume=Math.min(1,Math.max(0,Math.cos(q)));
     if(k<1){ musCF.raf=requestAnimationFrame(step); }
-    else { outEl.pause(); if(outEl.src){ try{URL.revokeObjectURL(outEl.src);}catch(e){} outEl.removeAttribute('src'); } outEl.volume=1; inEl.volume=1; musCF=null; }
+    else { clearTimeout(musCF.to); outEl.pause(); if(outEl.src){ try{URL.revokeObjectURL(outEl.src);}catch(e){} outEl.removeAttribute('src'); } outEl.volume=1; inEl.volume=1; musCF=null; }
   };
-  musCF={ out:outEl, raf:requestAnimationFrame(step) };
+  const cf=musCF={ out:outEl, raf:requestAnimationFrame(step) };
+  // страховка таймером (он, в отличие от rAF, идёт и в фоне): свернули посреди перехода — доводим его
+  cf.to=setTimeout(()=>{ if(musCF===cf) musFinishCF(); }, Math.max(0.1,dur)*1000+250);
 }
 // мгновенная загрузка в активный элемент (первый запуск, когда ничего не играет)
 async function musLoadInstant(i){
@@ -15469,6 +15539,7 @@ function musPrev(){ const a=musAudio(); if(a && a.currentTime>3 && !musCF){ a.cu
 // авто-кроссфейд у конца трека: стартуем следующий за MUS_CF_DUR секунд до конца
 function musMaybeCrossfade(){
   if(musCF) return; const a=musAudio(); if(!a||!musCur) return;
+  if(document.hidden || !musVolOk()) return;   // плавно не выйдет (см. musRamp) — трек доигрывает до конца, дальше следующий по ended
   if(!isFinite(a.duration)||a.duration<=0) return;
   if(MUSIC.length<2) return;
   if(musCFfrom===musCur.id) return;   // для этого трека переход уже начат
