@@ -276,7 +276,9 @@
   .brand .komik{height:26px;width:auto;display:block;filter:drop-shadow(0 0 8px rgba(255,46,61,.28))}
   .brand .vr{width:1px;height:24px;background:var(--line2);flex-shrink:0}
   .bar{position:relative}
-  .lock{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;align-items:center;justify-content:center;min-width:0;max-width:calc(100% - 190px);text-align:center;touch-action:pan-y;user-select:none;-webkit-user-select:none}
+  /* запас по краям — бургер и поиск (15+40 px) и хвост значка «V 2.0» (16 px) с зазором;
+     прежние 190 px резали «РУССКИЕ СКАЗКИ» уже на айфоне */
+  .lock{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;align-items:center;justify-content:center;min-width:0;max-width:calc(100% - 150px);text-align:center;touch-action:pan-y;user-select:none;-webkit-user-select:none}
   .lock .project{padding-left:.2em} /* компенсация хвостового letter-spacing */
   .lock .project{max-width:100%}
   .lock .project.slide-l{animation:projL .28s ease}
@@ -286,12 +288,16 @@
   .lock .project{font-family:var(--f-disp);font-weight:700;font-size:.92rem;letter-spacing:.2em;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .lock .project i{font-style:normal;color:var(--red-ink)}
   /* название сеттинга — «пилюля»: из неё же выплывает список сеттингов */
-  .lock .project{cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:opacity .18s;
+  /* блоком, а не inline-flex: многоточие на flex-контейнер не действует (длинное имя резалось посреди
+     буквы), а gap раздвигал «ASS I MILATION» на три куска */
+  .lock .project{cursor:pointer;display:block;transition:opacity .18s;
     /* дисплейный шрифт визуально сидит выше центра — компенсируем паддингом (низ меньше верха) */
     padding:10px 13px 6px 16px;border:var(--hair) solid var(--line2);border-radius:999px;
     background:rgba(255,255,255,.045);box-shadow:0 1px 6px rgba(0,0,0,.22)}
   .lock .project:active{opacity:.6}
   .lock .project.menu-open{opacity:0;pointer-events:none}
+  /* узкие Android (360 px): разрядка поуже — длинные имена сеттингов влезают целиком */
+  @media(max-width:374px){ .lock .project{letter-spacing:.12em} }
   /* значок версии «V 2.0» — набросок карандашом, заезжает на правый нижний угол пилюли сеттинга:
      графитовый штрих, двойной обвод овала, дрожание линии через feDisplacementMap */
   .hdr-ver{position:absolute;right:-16px;bottom:-13px;width:46px;height:26px;color:#d4ccb9;opacity:.88;
@@ -1246,9 +1252,11 @@
   .dice-circle.active{color:var(--red-ink)}
   .dice-circle.active svg{filter:drop-shadow(0 0 7px rgba(var(--accent-rgb),.7))}
 
-  .dice-menu{position:fixed;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:65;display:grid;grid-template-columns:repeat(3,1fr);gap:10px;width:min(300px, calc(100vw - 36px));padding:14px;border-radius:24px;background:var(--glass2);backdrop-filter:blur(28px) saturate(180%);-webkit-backdrop-filter:blur(28px) saturate(180%);border:var(--hair) solid var(--line2);box-shadow:0 18px 48px rgba(0,0,0,.55);pointer-events:none;opacity:0;transform:scale(.5);transform-origin:bottom right;transition:opacity .2s,transform .28s var(--spring)}
+  .dice-menu{position:fixed;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:65;display:grid;grid-template-columns:repeat(3,1fr);gap:10px;width:min(300px, calc(100vw - 36px));padding:14px;border-radius:24px;background:var(--glass2);backdrop-filter:blur(28px) saturate(180%);-webkit-backdrop-filter:blur(28px) saturate(180%);border:var(--hair) solid var(--line2);box-shadow:0 18px 48px rgba(0,0,0,.55);pointer-events:none;opacity:0;transform:scale(.5);transform-origin:bottom right;visibility:hidden;transition:opacity .2s,transform .28s var(--spring),visibility 0s .28s}
   @media(min-width:880px){.dice-menu,.dice-calc{display:none !important}}
-  .dice-menu.open{pointer-events:auto;opacity:1;transform:none}
+  /* закрытое меню невидимо, но без visibility:hidden его кнопки оставались в порядке Tab и бросали кубик вслепую;
+     скрываем с задержкой, чтобы доиграла анимация закрытия, а открываем сразу */
+  .dice-menu.open{pointer-events:auto;opacity:1;transform:none;visibility:visible;transition-delay:0s}
   .dice-opt{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;aspect-ratio:1;border-radius:50%;border:var(--hair) solid var(--line2);background:rgba(255,255,255,.05);color:var(--txt);font-family:var(--f-mono);font-size:.72rem;letter-spacing:.06em;cursor:pointer;transition:transform .12s,background .15s,color .15s}
   .dice-opt svg{width:30px;height:30px;stroke:currentColor;fill:none;stroke-width:1.4;stroke-linejoin:round;stroke-linecap:round}
   .dice-opt:active{transform:scale(.92);background:var(--red-soft);color:var(--red-ink)}
@@ -1607,6 +1615,9 @@
   .ob-steps{margin:0 0 12px 18px;display:flex;flex-direction:column;gap:7px;font-size:.86rem;color:var(--muted)}
   .ob-steps b{color:var(--txt)}
   .ob-x{position:absolute;top:8px;right:8px;width:30px;height:30px;background:none;border:none;color:var(--dim);cursor:pointer;font-size:.9rem}
+  /* две кнопки в ряд — только когда обе влезают: в узкой колонке новостей (1340–1599, открытый карман)
+     «КАЛЬКУЛЯТОР» одним словом шире половины карточки и вылезал за её рамку */
+  .ob-card .row{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
   .dc-result{display:none;text-align:center;border-top:1px dashed var(--line);padding-top:10px}
   .dc-result.show{display:block;animation:fade .2s}
   .dc-total{font-family:var(--f-disp);font-weight:700;font-size:2.1rem;line-height:1;color:var(--red-ink);text-shadow:0 0 16px rgba(var(--accent-rgb),.55)}
@@ -1709,7 +1720,9 @@
   .chrono-tools{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
   .chrono-tools .btn{flex:1 1 auto;min-width:110px}
   /* --- досье-карточки --- */
-  .card.has-img{overflow:visible;padding-right:74px}
+  /* content-visibility:auto включает paint containment и срезает фото-«досье» по рамке карточки —
+     карточкам с фото его выключаем (в сетке их всё равно не больше SEC_SHOWN) */
+  .card.has-img{overflow:visible;padding-right:74px;content-visibility:visible}
   .card .cimg{position:absolute;top:-8px;right:-8px;width:62px;height:62px;border-radius:12px;overflow:hidden;border:1px solid var(--line2);box-shadow:0 8px 18px rgba(0,0,0,.45);transform:rotate(3deg);background:#2b2825}
   .card .cimg img{width:100%;height:100%;object-fit:cover;display:block}
   .dossier{position:relative;margin:10px 0 6px}
@@ -1825,7 +1838,9 @@
   [data-project="terra"] .news-card:nth-child(odd){transform:rotate(-.5deg)}
   [data-project="terra"] .news-card:nth-child(even){transform:rotate(.5deg)}
   [data-project="terra"] .news-card:active{transform:scale(.985)}
-  [data-project="terra"] .modal::before{content:"";position:absolute;inset:0;z-index:0;pointer-events:none;border-radius:inherit;background:
+  /* виньетка вместо граббера: его размер 38×5, сдвиг и неоновое свечение (.modal::before) сбрасываем,
+     иначе от виньетки оставалась тёмная чёрточка в углу */
+  [data-project="terra"] .modal::before{content:"";position:absolute;inset:0;width:auto;height:auto;transform:none;box-shadow:none;z-index:0;pointer-events:none;border-radius:inherit;background:
       radial-gradient(circle at 100% 0%, rgba(24,15,6,.5), transparent 22%),
       radial-gradient(circle at 0% 100%, rgba(24,15,6,.45), transparent 24%)}
   [data-project="terra"] .dr-svg{filter:drop-shadow(0 0 12px rgba(216,208,191,.55)) sepia(.3)}
@@ -1865,7 +1880,6 @@
       radial-gradient(circle at 82% -10%, rgba(207,211,255,.16), transparent 42%),
       linear-gradient(180deg, rgba(160,143,247,.07), transparent 60%),
       var(--surface)}
-  [data-project="legacy"] #view-news .masthead::after{display:none}
   [data-project="legacy"] #view-news .masthead h1{font-family:'Cinzel Decorative',serif;font-weight:900;text-transform:none;letter-spacing:.03em;font-size:1.35rem;text-shadow:0 0 26px rgba(160,143,247,.6)}
   [data-project="legacy"] .masthead .rule{background:linear-gradient(90deg,var(--red),transparent);height:1px;width:120px;-webkit-mask-image:none;mask-image:none}
   [data-project="legacy"] #view-news .masthead p{font-family:var(--f-body);border-left-style:solid}
@@ -1878,7 +1892,6 @@
       linear-gradient(180deg, rgba(232,192,82,.06), transparent 55%),
       var(--surface);
     border-color:rgba(232,192,82,.35)}
-  [data-project="neverland"] #view-news .masthead::after{display:none}
   [data-project="neverland"] #view-news .masthead h1{font-family:'Uncial Antiqua',serif;font-weight:400;text-transform:none;letter-spacing:.04em;font-size:1.4rem;text-shadow:0 0 22px rgba(232,192,82,.55)}
   [data-project="neverland"] .masthead .rule{height:5px;width:130px;background:linear-gradient(180deg,var(--red) 0 1px,transparent 1px 4px,var(--red) 4px 5px);-webkit-mask-image:linear-gradient(90deg,#000 70%,transparent);mask-image:linear-gradient(90deg,#000 70%,transparent)}
   [data-project="neverland"] #view-news .masthead p{font-family:var(--f-body);border-left-style:double;border-left-width:4px}
@@ -1890,7 +1903,6 @@
       repeating-linear-gradient(0deg, transparent 0 26px, rgba(216,208,191,.045) 26px 27px),
       radial-gradient(circle at 12% -14%, rgba(239,232,214,.14), transparent 40%),
       var(--surface)}
-  [data-project="terra"] #view-news .masthead::after{display:none}
   [data-project="terra"] #view-news .masthead h1{font-family:Georgia,'Times New Roman',serif;font-weight:700;text-transform:none;font-variant:small-caps;letter-spacing:.06em;font-size:1.45rem;text-shadow:0 0 18px rgba(216,208,191,.45)}
   [data-project="terra"] .masthead .rule{height:1px;width:140px;background:none;border-top:1px dashed var(--red-dim);-webkit-mask-image:none;mask-image:none;opacity:.8}
   [data-project="terra"] #view-news .masthead p{font-family:Georgia,'Times New Roman',serif;font-size:.98rem;font-style:italic;border-left-style:solid}
@@ -1911,10 +1923,12 @@
       radial-gradient(120% 90% at 50% -20%, rgba(150,140,235,.14), transparent 60%),
       linear-gradient(180deg,#181528 0%,#12101d 100%);
     box-shadow:0 18px 40px rgba(0,0,0,.5), inset 0 1px 0 rgba(190,182,255,.14);}
-  /* гравированная двойная рамка + засечки-руны по углам */
-  [data-project="legacy"] #view-news .masthead::before{content:"";position:absolute;inset:9px;border:1px solid rgba(168,158,235,.28);border-radius:10px;
+  /* гравированная двойная рамка + засечки-руны по углам.
+     width/height/background сбрасываем явно: иначе от общей красной полосы слева (.masthead::before, 3 px)
+     и уголка ASSIMILATION (::after, 22×22) наследуются размеры, и рамка становится полоской */
+  [data-project="legacy"] #view-news .masthead::before{content:"";position:absolute;inset:9px;width:auto;background:none;border:1px solid rgba(168,158,235,.28);border-radius:10px;
     box-shadow:inset 0 0 0 4px rgba(0,0,0,.25), inset 0 0 22px rgba(120,110,200,.12);pointer-events:none;z-index:-1}
-  [data-project="legacy"] #view-news .masthead::after{content:"";position:absolute;inset:9px;pointer-events:none;z-index:-1;
+  [data-project="legacy"] #view-news .masthead::after{content:"";position:absolute;inset:9px;width:auto;height:auto;pointer-events:none;z-index:-1;
     background:
       linear-gradient(rgba(190,182,255,.5),rgba(190,182,255,.5)) left 3px top -1px/16px 1px no-repeat,
       linear-gradient(rgba(190,182,255,.5),rgba(190,182,255,.5)) left -1px top 3px/1px 16px no-repeat,
@@ -1939,14 +1953,15 @@
       linear-gradient(180deg,#3a2f18,#2c2211);
     box-shadow:inset 0 0 60px rgba(0,0,0,.42), 0 16px 34px rgba(0,0,0,.5)}
   [data-project="neverland"] #view-news .masthead>*{position:relative;z-index:1}
-  /* витые золотые стержни свитка сверху и снизу */
+  /* витые золотые стержни свитка сверху и снизу (width:auto и top/bottom:auto — не наследовать
+     полосу 3 px и верхний уголок от общих правил, иначе вместо стержней торчала палочка) */
   [data-project="neverland"] #view-news .masthead::before,
-  [data-project="neverland"] #view-news .masthead::after{content:"";position:absolute;left:-8px;right:-8px;height:20px;z-index:2;
+  [data-project="neverland"] #view-news .masthead::after{content:"";position:absolute;left:-8px;right:-8px;width:auto;height:20px;z-index:2;
     background:linear-gradient(180deg,#ffe9a6 0%,#e0b452 44%,#a5761f 100%);
     box-shadow:0 3px 9px rgba(0,0,0,.5), inset 0 2px 0 rgba(255,248,214,.85), inset 0 -3px 6px rgba(70,48,14,.55);
     border-radius:11px/50%}
-  [data-project="neverland"] #view-news .masthead::before{top:-11px}
-  [data-project="neverland"] #view-news .masthead::after{bottom:-11px}
+  [data-project="neverland"] #view-news .masthead::before{top:-11px;bottom:auto}
+  [data-project="neverland"] #view-news .masthead::after{top:auto;bottom:-11px}
   [data-project="neverland"] #view-news .masthead h1{color:#ffe6a0;text-shadow:0 1px 0 #000, 0 0 20px rgba(244,207,92,.45)}
   [data-project="neverland"] #view-news .masthead p{font-family:var(--f-body);color:#e6d3a6;background:none;border:none;padding:0;margin-top:6px}
   [data-project="neverland"] #view-news .masthead .rule{height:11px;width:66%;margin:14px auto;border:none;-webkit-mask-image:none;mask-image:none;
@@ -1962,10 +1977,11 @@
       radial-gradient(circle at 0% 100%, rgba(20,13,5,.5), transparent 22%),
       linear-gradient(180deg,#221d13,#1b160e);
     box-shadow:0 12px 26px rgba(0,0,0,.45), inset 0 0 40px rgba(120,90,45,.06);}
-  /* обугленные углы */
-  [data-project="terra"] #view-news .masthead::before{content:"";position:absolute;top:-1px;right:-1px;width:46px;height:46px;pointer-events:none;z-index:2;
+  /* обугленные углы: общие left:0 (::before) и top/right (::after) снимаем, иначе оба угла
+     садились в левый верхний; свечение полосы ASSIMILATION уголку тоже ни к чему */
+  [data-project="terra"] #view-news .masthead::before{content:"";position:absolute;top:-1px;right:-1px;left:auto;bottom:auto;width:46px;height:46px;pointer-events:none;z-index:2;box-shadow:none;
     background:radial-gradient(circle at 100% 0%, rgba(10,6,2,.92), rgba(48,30,12,.5) 48%, transparent 70%)}
-  [data-project="terra"] #view-news .masthead::after{content:"";position:absolute;bottom:-1px;left:-1px;width:40px;height:40px;pointer-events:none;z-index:2;
+  [data-project="terra"] #view-news .masthead::after{content:"";position:absolute;bottom:-1px;left:-1px;top:auto;right:auto;width:40px;height:40px;pointer-events:none;z-index:2;
     background:radial-gradient(circle at 0% 100%, rgba(10,6,2,.88), rgba(48,30,12,.45) 48%, transparent 70%)}
   [data-project="terra"] #view-news .masthead h1{color:#e6dcc4;text-shadow:0 1px 0 rgba(0,0,0,.5)}
   [data-project="terra"] #view-news .masthead p{font-family:Georgia,'Times New Roman',serif;font-style:italic;color:#cabfa4;background:none;border:none;border-left:2px solid rgba(200,180,140,.45);padding:2px 0 2px 13px;margin-top:8px}
@@ -2183,9 +2199,10 @@
   .cs-vit-btn:hover{color:var(--red-ink)}
   .cs-vit-btn svg{width:19px;height:19px}
   /* ── ВИТРИНА: выезжающая справа панель со «столбиком» листа (только просмотр) ── */
-  .vit-drawer{position:fixed;inset:0 0 0 auto;z-index:80;width:min(440px,94vw);transform:translateX(calc(100% + 90px));transition:transform .4s cubic-bezier(.22,1,.36,1);pointer-events:none;will-change:transform}
+  /* закрытые выезжающие панели уезжают за край, но их кнопки ловили Tab — снимаем visibility после отъезда */
+  .vit-drawer{position:fixed;inset:0 0 0 auto;z-index:80;width:min(440px,94vw);transform:translateX(calc(100% + 90px));visibility:hidden;transition:transform .4s cubic-bezier(.22,1,.36,1),visibility 0s .4s;pointer-events:none;will-change:transform}
   .vit-drawer:not(.open) .vit-panel{box-shadow:none}   /* закрытая панель не отбрасывает тень на край экрана */
-  .vit-drawer.open{transform:translateX(0);pointer-events:auto}
+  .vit-drawer.open{transform:translateX(0);pointer-events:auto;visibility:visible;transition-delay:0s}
   .vit-panel{display:flex;flex-direction:column;height:100%;background:var(--glass2);backdrop-filter:blur(32px) saturate(180%);-webkit-backdrop-filter:blur(32px) saturate(180%);border-left:var(--hair) solid var(--line2);box-shadow:-18px 0 55px rgba(0,0,0,.5)}
   .vit-bar{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:var(--hair) solid var(--line);flex:none}
   .vit-title{font-family:var(--f-mono);font-size:.66rem;letter-spacing:.16em;text-transform:uppercase;color:var(--red-ink)}
@@ -2232,16 +2249,16 @@
   /* широкий десктоп (≥1180 — тот же порог, что у постоянного рейла): узкая панель слева; лист сдвигается вправо, чтобы не прятался под ней */
   @media(min-width:1180px){
     /* z-index ниже .scrim (70): карточка, открытая из панели, ложится поверх неё, а не под неё */
-    .ma-drawer{display:block;position:fixed;inset:70px auto 0 0;z-index:68;width:min(360px,92vw);transform:translateX(calc(-100% - 90px));transition:transform .4s cubic-bezier(.22,1,.36,1);pointer-events:none;will-change:transform}
-    .ma-drawer.open{transform:translateX(0);pointer-events:auto}
+    .ma-drawer{display:block;position:fixed;inset:70px auto 0 0;z-index:68;width:min(360px,92vw);transform:translateX(calc(-100% - 90px));visibility:hidden;transition:transform .4s cubic-bezier(.22,1,.36,1),visibility 0s .4s;pointer-events:none;will-change:transform}
+    .ma-drawer.open{transform:translateX(0);pointer-events:auto;visibility:visible;transition-delay:0s}
     #view-players.ma-open{padding-left:384px}   /* лист уезжает правее панели, не прячась под ней */
     #view-players.calc-open{padding-right:calc(min(440px,94vw) - 24px)}   /* «липкий» калькулятор справа — лист сдвигается, а не прячется под ним */
   }
   /* мобилка/планшет/узкий десктоп (<1180): широкая панель ВЫЕЗЖАЕТ СЛЕВА и перекрывает лист.
      z-index ниже модалки карточки (scrim=70), чтобы карточка открывалась поверх архива */
   @media(max-width:1179px){
-    .ma-drawer{display:block;position:fixed;inset:0 auto 0 0;z-index:68;width:min(440px,92vw);transform:translateX(calc(-100% - 30px));transition:transform .35s cubic-bezier(.22,1,.36,1);pointer-events:none;will-change:transform}
-    .ma-drawer.open{transform:translateX(0);pointer-events:auto}
+    .ma-drawer{display:block;position:fixed;inset:0 auto 0 0;z-index:68;width:min(440px,92vw);transform:translateX(calc(-100% - 30px));visibility:hidden;transition:transform .35s cubic-bezier(.22,1,.36,1),visibility 0s .35s;pointer-events:none;will-change:transform}
+    .ma-drawer.open{transform:translateX(0);pointer-events:auto;visibility:visible;transition-delay:0s}
     /* поверх листа — панель непрозрачная, чтобы контент из-под неё не просвечивал */
     .ma-panel{padding-top:env(safe-area-inset-top);background:var(--bg2);backdrop-filter:none;-webkit-backdrop-filter:none}
     .ma-cats{max-height:36vh}
@@ -2817,7 +2834,7 @@
   /* плашка уходит, чтобы не мешать: при открытом меню/поиске/модалке */
   .nav-open .music-bar,.dice-open .music-bar{opacity:0;pointer-events:none;transform:translateY(20px)}
   /* единственная причина сузить плашку — плавающая кнопка в правом нижнем углу
-     (импорт листа в «Игроках», кубы на «Доске ходов»). Класс вешает go(),
+     (импорт листа в «Игроках», кубы на «Доске ходов», календарь в «Новостях»). Класс вешает go(),
      раньше это делал body:has(...) — он пересчитывался на каждый переход. */
   .fab-right .music-bar{right:calc(12px + 58px + 10px)}
   body:has(#scrim.open) .music-bar,body:has(#scrim2.open) .music-bar,body:has(.hp-prompt) .music-bar{opacity:0;pointer-events:none;transform:translateY(20px)}
@@ -3529,6 +3546,10 @@ html.dr-live body{overflow-x:clip}
 
 /* полотно при открытой шторке — цельная карточка со скруглением по всем углам */
 #appPane{background:var(--bg)}
+/* Сплошной фон нужен полотну, только пока шторка едет или открыта (иначе сквозь него видна она сама).
+   В покое он закрывал фон сеттинга под собой — #ambient, виньетки body::before, сканлайны body::after:
+   анимации крутились, а видно их не было ни в одном сеттинге */
+html:not(.dr-live) #appPane{background:transparent}
 html.dr-live #appPane{box-shadow:-2px 0 0 0 var(--line2), 0 0 46px rgba(0,0,0,.55);
   border-radius:22px;will-change:transform;
   /* именно clip-path, а не overflow:hidden: overflow отключает position:sticky */
@@ -3764,7 +3785,7 @@ addEventListener('beforeinstallprompt', function(e){ e.preventDefault(); DEFERRE
   var b=document.getElementById('iapGo'); if(b) b.hidden=false; });
 </script>
 
-<aside id="sideDrawer" role="navigation" aria-label="Разделы" aria-hidden="true">
+<aside id="sideDrawer" role="navigation" aria-label="Разделы">
   <div class="dr-top">
     <a class="dr-logo" href="#" onclick="drNav(function(){rebootFX()});return false" aria-label="КОМИК"></a>
   </div>
@@ -4189,9 +4210,6 @@ if(/Android/i.test(navigator.userAgent||'')) d.classList.add('lite');}catch(e){}
 
 </main>
 
-<div class="dice-result" id="diceResult" onclick="this.classList.remove('show')"></div>
-<div class="glitch-overlay" id="glitchOverlay" aria-hidden="true"></div>
-
 <footer>
   <!-- предложение поставить приложение: только в мобильном браузере, скрипт ниже решает -->
   <button class="app-cta" id="appCta" hidden onclick="openInstallHelp()">
@@ -4240,6 +4258,11 @@ if(/Android/i.test(navigator.userAgent||'')) d.classList.add('lite');}catch(e){}
 </footer>
 <script>(function(){var k=document.querySelector('.komik'),l=document.getElementById('splashLogo');if(k&&l){l.src=k.src;document.documentElement.style.setProperty('--logo-url','url("'+k.src+'")');}})();</script>
 </div><!-- /#appPane -->
+
+<!-- результат броска и глитч — вне полотна: тряска на крите (transform на #appPane) уводила
+     fixed-слои в координаты документа, и кубик улетал за экран; да и z-index их был заперт под плавающими кнопками -->
+<div class="dice-result" id="diceResult" onclick="this.classList.remove('show')"></div>
+<div class="glitch-overlay" id="glitchOverlay" aria-hidden="true"></div>
 
 <button class="dice-circle" id="searchCircle" onclick="toggleSearchBar(event)" aria-label="Поиск">
   <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
@@ -7211,8 +7234,9 @@ function openGameBrief(id){
     </div>`;
   document.getElementById(scr).classList.add('open');
 }
-/* на первом экране раздел «Новости» активен без вызова go() — ставим класс, по которому живёт кнопка календаря */
-(function(){ const v=document.getElementById('view-news'); if(v && v.classList.contains('active')) document.documentElement.classList.add('view-news'); })();
+/* на первом экране раздел «Новости» активен без вызова go() — ставим класс, по которому живёт кнопка календаря,
+   и fab-right: плашка музыки сужается и не ложится на эту кнопку */
+(function(){ const v=document.getElementById('view-news'); if(v && v.classList.contains('active')) document.documentElement.classList.add('view-news','fab-right'); })();
 
 /* --- игрок: список анонсов и запись --- */
 function openGameSignup(){
@@ -11154,7 +11178,7 @@ function go(view, opts){
   const R=document.documentElement;
   R.classList.remove('view-news','view-world','view-players','view-combat','view-settings','view-chrono','view-music');
   R.classList.add('view-'+view);
-  R.classList.toggle('fab-right', view==='players' || view==='combat');
+  R.classList.toggle('fab-right', view==='players' || view==='combat' || view==='news');   // в «Новостях» в углу календарь
   closeCalc(); closeStatCalc(); if(view!=='players') closeMiniArch();
   if(view==='combat') renderToolsPage();
   if(view==='settings') renderSettings();
@@ -15177,6 +15201,11 @@ boot();
     }
   });
   var _live=null, _open=null;
+  // с 1180 шторка стоит постоянным рейлом и другой навигации нет — прятать её от скринридера
+  // можно только закрытой шторкой телефона
+  var railMQ=matchMedia('(min-width:1180px)');
+  function drAria(){ if(railMQ.matches || _open) dr.removeAttribute('aria-hidden'); else dr.setAttribute('aria-hidden','true'); }
+  if(railMQ.addEventListener) railMQ.addEventListener('change', drAria); else if(railMQ.addListener) railMQ.addListener(drAria);
   function paint(p){
     prog=Math.max(0,Math.min(1,p));
     var live=prog>0.001 || root.classList.contains('dr-anim'), open=prog>0.5;
@@ -15198,7 +15227,7 @@ boot();
     if(open!==_open){
       _open=open;
       sc.style.pointerEvents=open?'auto':'none';
-      dr.setAttribute('aria-hidden', open?'false':'true');
+      drAria();
       var b=document.getElementById('drBurger'); if(b) b.setAttribute('aria-expanded', open?'true':'false');
       root.classList.toggle('dr-open', open);
     }
@@ -16402,7 +16431,8 @@ function openInstallHelp(){
     bottom:calc(12px + env(safe-area-inset-bottom) + var(--pdock-h) + var(--pdtabs-h))}
   html.pdock-on .dice-calc{bottom:calc(80px + env(safe-area-inset-bottom) + var(--pdock-h) + var(--pdtabs-h))}
   html.pdock-on .toast{bottom:calc(var(--botnav-h) + 14px + env(safe-area-inset-bottom) + var(--pdock-h) + var(--pdtabs-h))}
-  html.pdock-on .search-float{bottom:calc(22px + var(--botnav-h) + env(safe-area-inset-bottom) + var(--pdock-h) + var(--pdtabs-h))}
+  /* поиску отступ снизу не нужен: он давно открывается из шапки (top задан), и bottom
+     растягивал его пустой прозрачной стеной до самого пульта — нажатия под ней пропадали */
   /* колонка панели персонажа на телефоне пустеет — пульт стоит внизу экрана */
   .trk-pside:empty{display:none}
   /* плавающий «+» на телефоне не нужен: кнопка «Добавить персонажа» — сверху страницы */
@@ -16746,6 +16776,8 @@ function openInstallHelp(){
     font-family:var(--f-mono);font-size:.72rem;letter-spacing:.04em;color:var(--dim);
     box-shadow:0 -6px 20px rgba(0,0,0,.3)}
   html.dock-on #shelf{right:var(--dock-w)}
+  /* карман открыт и на «Доске ходов» (он раздела не смотрит) — пульт игрока тоже уступает ему место */
+  html.dock-on #pdock{right:var(--dock-w)}
   #shelf > *{flex:none}
   #shelf .sh-sep{width:1px;height:18px;background:var(--line2);margin:0 12px;flex:none}
   #shelf button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;
@@ -16854,11 +16886,13 @@ function openInstallHelp(){
    человек, идущий табом, почти нигде не видел, где стоит. Правило намеренно
    лежит последним: у точечных «outline:none» такая же специфичность, и спор
    решает порядок. :focus-visible включается только при навигации клавишами,
-   мышь его не зажигает, поэтому обычные нажатия выглядят как раньше. */
+   мышь его не зажигает, поэтому обычные нажатия выглядят как раньше.
+   Радиус не трогаем: обводка и так повторяет скругление элемента, а border-radius:inherit
+   подменял его радиусом родителя — круглые кнопки на фокусе становились квадратными. */
 a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
 select:focus-visible,summary:focus-visible,[tabindex]:focus-visible,
 [contenteditable="true"]:focus-visible{
-  outline:2px solid var(--red-ink);outline-offset:2px;border-radius:inherit}
+  outline:2px solid var(--red-ink);outline-offset:2px}
 /* поля, спрятанные внутри «таблетки», подсвечивают саму таблетку, а не себя */
 .sec-q-row:has(input:focus-visible),.search-float .sf-row:has(input:focus-visible){
   outline:2px solid var(--red-ink);outline-offset:2px}
