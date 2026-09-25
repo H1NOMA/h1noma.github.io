@@ -7885,7 +7885,9 @@ let PROF_TMP={name:'',bg:'',ink:'',adapt:false};
 function openProfileCard(){
   if(!SESSION){ openAccessModal(null,'account'); return; }
   const p=profGet(SESSION);
-  PROF_TMP={name:p.name||'', bg:(PROFILE_COLORS.indexOf(p.bg||p.color)>=0?(p.bg||p.color):PROFILE_COLORS[0]), ink:(INK_COLORS.indexOf(p.ink)>=0?p.ink:'#ffffff'), adapt:!!p.adapt};
+  // цвета не выбраны — оставляем пустыми (умолчание шапки: акцент сеттинга и буква цветом фона). Раньше сюда
+  // подставлялись #ff4757/#ffffff, пресет подсвечивался выбранным, и «Сохранить» ради одного имени перекрашивал аватар
+  PROF_TMP={name:p.name||'', bg:(PROFILE_COLORS.indexOf(p.bg||p.color)>=0?(p.bg||p.color):''), ink:(INK_COLORS.indexOf(p.ink)>=0?p.ink:''), adapt:!!p.adapt};
   const m=document.getElementById('modal');
   const initial=esc(profInitial(SESSION));
   const presetHtml=PROFILE_PRESETS.map(pr=>{
@@ -7915,8 +7917,9 @@ function openProfileCard(){
   document.getElementById('scrim').classList.add('open');
 }
 function pcAvApply(){ const av=document.getElementById('pcAv'); if(!av) return;
-  av.style.background = PROF_TMP.adapt ? 'var(--surface2)' : PROF_TMP.bg;
-  av.style.color = PROF_TMP.adapt ? 'var(--red)' : PROF_TMP.ink; }
+  // те же краски, что возьмёт аватар в шапке (profBg/profInk), — превью не должно врать
+  av.style.background = PROF_TMP.adapt ? 'var(--surface2)' : (PROF_TMP.bg||'var(--red)');
+  av.style.color = PROF_TMP.adapt ? 'var(--red-ink)' : (PROF_TMP.ink||'var(--bg)'); }
 function pcName(v){ PROF_TMP.name=v; const init=((v.trim()||dispTag(SESSION)).charAt(0)||'?').toUpperCase();
   const av=document.getElementById('pcAv'); if(av) av.textContent=init;
   const nm=document.getElementById('pcName'); if(nm) nm.textContent=(v.trim()||dispTag(SESSION));
@@ -7944,7 +7947,13 @@ function authTimeout(p, ms=13000){ return Promise.race([ p, new Promise((_,rej)=
 function afterAuthChange(){ renderAcct(); renderPlayers(); renderCats(); applyView(); updateDevUI(); renderSettings(); bmCloudSync(); }
 function currentTag(){ return SESSION ? normTag(SESSION) : null; }
 function isOwner(c){ return !!(SESSION && c && c.owner && normTag(c.owner)===currentTag()); }
-function canEdit(c){ return isOwner(c) || (!!c && !c.owner && !!c.codeHash); }
+/* Лист «под кодом» (старый, без владельца) правит только тот, кто ввёл код в этой вкладке (tryEditPlayer).
+   Раньше хватало самого факта кода: плитку видят все, и лист открывался в редактор без проверки */
+const CODE_OK=new Set();
+function canEdit(c){ return isOwner(c) || (!!c && !c.owner && !!c.codeHash && CODE_OK.has(c.id)); }
+/* id листа уходит в onclick строкой ('…'). Облачный JSON с кавычкой в id вышел бы из строки, а esc() тут
+   не спасает: &#39; раскодируется обратно в кавычку до разбора обработчика. Такие листы не рисуем вовсе */
+const charIdOk = id => typeof id==='string' && /^[A-Za-z0-9_-]{1,64}$/.test(id);
 function cyrb53(str, seed=0){
   let h1=0xdeadbeef^seed, h2=0x41c6ce57^seed;
   for(let i=0,ch;i<str.length;i++){ ch=str.charCodeAt(i); h1=Math.imul(h1^ch,2654435761); h2=Math.imul(h2^ch,1597334677); }
@@ -8037,11 +8046,21 @@ async function doLogin(){
     if(/invalid login credentials|invalid credentials|invalid email or password/i.test(String(res.error.message||''))){ toast('Неверный логин или пароль'); return; }
     toast('Supabase: '+String(res.error.message||'ошибка входа')); return;
   }
+  inlineDropForAuth().catch(()=>{});   // лист, открытый до входа, к новому аккаунту не относится
   SESSION=tag; await sset(KEY_SESSION, SESSION, false);
   if(!USERS.some(u=>normTag(u.tag)===tag)){ USERS.push({ tag, createdAt:Date.now() }); sset(KEY_USERS, USERS, true).catch(()=>{}); }
   closeModal(); afterAuthChange(); toast('Вы вошли как '+dispTag(tag));
 }
+/* Смена аккаунта сворачивает открытый лист. Раньше он оставался в «Игроках» (и в памяти вкладки): на общем
+   ноутбуке следующий вошедший видел чужой лист с полями ввода, а свой список был скрыт под ним */
+function inlineDropForAuth(){
+  const was=INLINE_ID; try{ sessionStorage.removeItem('comik:openChar'); }catch(e){}
+  return was ? closeInlineSheet() : Promise.resolve();   // closeInlineSheet сперва дописывает правки — пока сессия прежняя
+}
 async function logout(){
+  // правки открытого листа и начатые записи листов (уход из раздела, «+1 зм») — в облако, пока сессия жива:
+  // после signOut та же запись уйдёт анонимом, и RLS её отобьёт
+  try{ await withTimeout(inlineDropForAuth().then(()=>CHARS_PERSIST_NEXT||CHARS_PERSIST), 5000); }catch(e){}
   if(supa){ try{ await authTimeout(supa.auth.signOut()); }catch(e){} }
   SESSION=null; await sset(KEY_SESSION, null, false);
   if(ADMIN_VIA_DEV){ ADMIN=false; ADMIN_VIA_DEV=false; adminSideFX(); }
@@ -8051,13 +8070,28 @@ async function logout(){
 /* ====================== Игроки / персонажи ====================== */
 // сохранение персонажей с защитой от гонки: подтягиваем свежую облачную карту и сливаем по id
 let CHARS_DIRTY=false, CHARS_DIRTY_TOLD=false;   // лист не ушёл в облако (офлайн) — ждёт повторной отправки
-async function persistChars(retry){
+/* Тапы по «+1 зм», пипсам и автосейв листа зовут запись подряд. Раньше каждый вызов шёл своей
+   параллельной выборкой+записью, и запись, собранная раньше, могла лечь в облако позже свежей.
+   Теперь запись одна за раз, а всё, что пришло во время неё, догоняет одной следующей записью */
+let CHARS_PERSIST=null, CHARS_PERSIST_NEXT=null, CHARS_PERSIST_QUIET=true;
+function persistChars(retry){
+  if(CHARS_PERSIST){
+    CHARS_PERSIST_QUIET=CHARS_PERSIST_QUIET && !!retry;   // тихая досылка — только если тихими были все дождавшиеся
+    return CHARS_PERSIST_NEXT || (CHARS_PERSIST_NEXT=CHARS_PERSIST.then(()=>{ const q=CHARS_PERSIST_QUIET; CHARS_PERSIST_NEXT=null; CHARS_PERSIST_QUIET=true; return persistChars(q); }));
+  }
+  CHARS_PERSIST=persistCharsNow(retry).finally(()=>{ CHARS_PERSIST=null; });
+  return CHARS_PERSIST;
+}
+async function persistCharsNow(retry){
   try{
     const tag=currentTag();
     if(supa && tag){
-      // сливаем свежее из облака (свои пер-юзерные + легаси), чтобы не затереть удаления/чужое
+      // сливаем свежее из облака, чтобы не затереть удаления/листы с другого своего устройства.
+      // Пишем только свою строку — и читаем только её (плюс легаси-блоб, пока он ни разу не слит):
+      // раньше каждая правка качала листы ВСЕХ игроков с портретами; чужие подтягивает фоновый тик
       try{
-        const cloud=await withTimeout(fetchCloudChars(), CLOUD_TMO);
+        const keys=['comik:chars:'+tag]; if(CHARS_SEEN_AT[KEY_CHARS]===undefined) keys.push(KEY_CHARS);
+        const cloud=await withTimeout(fetchCloudChars(keys), CLOUD_TMO);
         if(cloud){
           ALL_GAMES.forEach(g=>{
             CHARS_ALL[g]=mergeChars(CHARS_ALL[g], cloud[g]);
@@ -8168,8 +8202,8 @@ function renderPlayers(){
   const el=document.getElementById('players-list'); if(!el) return;
   // листы привязаны к профилю: в списке — только собственные персонажи;
   // ГМ дополнительно видит листы всех игроков текущего сеттинга (read-only)
-  const visible = CHARS.filter(c=>!c.deleted && (isOwner(c) || (!c.owner && c.codeHash)));
-  const gmOthers = ADMIN ? CHARS.filter(c=>!c.deleted && c.owner && !isOwner(c))
+  const visible = CHARS.filter(c=>!c.deleted && charIdOk(c.id) && (isOwner(c) || (!c.owner && c.codeHash)));
+  const gmOthers = ADMIN ? CHARS.filter(c=>!c.deleted && charIdOk(c.id) && c.owner && !isOwner(c))
     .sort((a,b)=>(normTag(a.owner)+(a.name||'')).localeCompare(normTag(b.owner)+(b.name||''),'ru')) : [];
   if(!visible.length && !gmOthers.length){
     // На десктопе кнопка «Добавить» уехала в плавающий «＋» внизу справа,
@@ -8187,7 +8221,7 @@ function renderPlayers(){
     const lock = isOwner(c) ? '' :
       `<span class="pt-lock" title="${c.owner?('владелец '+esc(dispTag(c.owner))):'под кодом'}">🔒</span>`;
     const ph = (c.name||'?').trim().charAt(0).toUpperCase()||'?';
-    return `<div class="ptile${isOwner(c)?' mine':''}" onclick="openInlineSheet('${c.id}', this)" title="${esc(c.name)}">
+    return `<div class="ptile${isOwner(c)?' mine':''}" onclick="openInlineSheet('${esc(c.id)}', this)" title="${esc(c.name)}">
       <div class="pt-ava">${c.ava?`<img src="${esc(safeUrl(c.ava))}" alt="">`:`<span class="pt-ph">${esc(ph)}</span>`}${lock}</div>
       <div class="pt-name">${esc(c.name)}</div>
       ${sub?`<div class="pt-sub">${sub}</div>`:''}
@@ -8196,6 +8230,7 @@ function renderPlayers(){
   el.innerHTML = visible.slice().sort((a,b)=>(a.name||'').localeCompare(b.name||'','ru')).map(tileHtml).join('')
     + (gmOthers.length?`<div class="players-sep">Листы игроков · ГМ</div>`+gmOthers.map(tileHtml).join(''):'');
   kickLayout(el);
+  inlineRefreshIfStale();   // листы перечитаны (тик, дозагрузка облака) — открытый лист тоже не должен отставать
 }
 
 /* --- страховки отрисовки для WKWebView --- */
@@ -8270,7 +8305,7 @@ function bindProfAuto(p){
     if(!prof.dataset.manual) prof.value = (!isNaN(n)&&n>0) ? '+'+profByLvl(n) : '';
     if(typeof edRecalcProf==='function') edRecalcProf(p);
     if(typeof updateSpLimits==='function') updateSpLimits();
-    if(typeof edGuidedSync==='function') edGuidedSync(p);   // уровень меняет доступность подкласса и ячейки
+    if(typeof edGuidedSync==='function') edGuidedSync(p, true);   // уровень меняет доступность подкласса и ячейки (спасброски — нет)
   });
 }
 
@@ -8416,6 +8451,14 @@ function edAcManual(p, el){
   el.dataset.manual = el.value.trim() ? '1' : '';
   if(!el.value.trim()) edCalcAC(p);
 }
+/* флаг acManual появился 10.09.2026: у листов старше него ручной КД ничем не помечен, и открытие листа
+   молча меняло его на расчётный (17 со стилем «Оборона» → 16). Как с хитами (edHpSeedManual): сохранённый
+   КД, не совпадающий с расчётом, считаем введённым руками */
+function edAcSeedManual(p, c){
+  const el=pf(p+'-ac'); if(!el || el.dataset.manual==='1' || !c || c.acManual!=null) return;
+  const v=el.value.trim(); if(!v) return;
+  edCalcAC(p); if(el.value.trim()!==v){ el.value=v; el.dataset.manual='1'; }
+}
 /* инициатива = модификатор Ловкости (в том же формате «+2»/«-1»);
    отличное от модификатора сохранённое значение считается ручным и не трогается */
 function edAutoInit(p){
@@ -8504,7 +8547,8 @@ function collectSlots(old){
 }
 /* пипсы ячеек в просмотре листа */
 function slotsViewHtml(c){
-  const s=c.slots||{}; const lvls=Object.keys(s).filter(k=>s[k]&&s[k].max>0).sort((a,b)=>a-b);
+  // круг идёт и в разметку, и в onclick числом — из облачного JSON берём только ключи 1…9
+  const s=c.slots||{}; const lvls=Object.keys(s).filter(k=>/^[1-9]$/.test(k)&&s[k]&&s[k].max>0).sort((a,b)=>a-b);
   if(!lvls.length) return '';
   const own=canEdit(c);
   return `<div class="kv"><div class="k">Ячейки заклинаний${own?` <button class="btn ghost sm" style="margin-left:8px" onclick="restSlots('${c.id}')">Долгий отдых</button>`:''}</div>
@@ -8546,7 +8590,8 @@ const ABIL_RU={str:'СИЛ',dex:'ЛОВ',con:'ТЕЛ',int:'ИНТ',wis:'МДР',
 let SP={cls:[],lvls:{},known:[],prep:[]}, SP_PFX='np', SP_Q='';
 function spInit(p, sc){
   SP_PFX=p; sc=sc||{}; SP_Q='';
-  SP={cls:(sc.cls||[]).slice(), lvls:Object.assign({},sc.lvls||{}), known:(sc.known||[]).slice(), prep:(sc.prep||[]).slice()};
+  const strs=a=>Array.isArray(a)?a.filter(x=>typeof x==='string'):[];   // лист из облака/файла: берём только строки
+  SP={cls:strs(sc.cls), lvls:Object.assign({},sc.lvls||{}), known:strs(sc.known), prep:strs(sc.prep)};
 }
 function dndSpellCards(){ return ARCHIVE.filter(c=>c.cat==='spells'); }
 function spellClassesOf(e){
@@ -8627,8 +8672,9 @@ function sheetSpellBlock(p){
 function renderSpellUI(){
   const w=document.getElementById(SP_PFX+'-spellui'); if(!w) return;
   const chips=casterNames().map(cn=>`<button type="button" class="sp-cls${SP.cls.indexOf(cn)>=0?' on':''}" onclick="spClsToggle('${cn}')">${cn}</button>`).join('');
-  const lvlIn = SP.cls.length>1 ? `<div class="sp-lvls">${SP.cls.map(cn=>`
-      <span class="sp-lvl"><label>${cn}</label><input inputmode="numeric" maxlength="2" placeholder="ур." value="${esc(SP.lvls[cn]||'')}" oninput="spLvlSet('${cn}',this.value)"></span>`).join('')}
+  // SP.cls приходит из листа (импорт, облако) — в разметке экранируем, а в обработчик отдаём номер, не строку
+  const lvlIn = SP.cls.length>1 ? `<div class="sp-lvls">${SP.cls.map((cn,i)=>`
+      <span class="sp-lvl"><label>${esc(cn)}</label><input inputmode="numeric" maxlength="2" placeholder="ур." value="${esc(SP.lvls[cn]||'')}" oninput="spLvlSet(${i},this.value)"></span>`).join('')}
       <span class="opt" style="align-self:center">уровни в классах (пусто = общий уровень)</span></div>` : '';
   w.innerHTML=`
     <div class="sp-clsrow">${chips}</div>
@@ -8657,7 +8703,7 @@ function spClsToggle(cn){
   else SP.cls.push(cn);
   renderSpellUI();
 }
-function spLvlSet(cn,v){ SP.lvls[cn]=v.trim(); updateSpLimits(); }
+function spLvlSet(i,v){ const cn=SP.cls[i]; if(cn==null) return; SP.lvls[cn]=v.trim(); updateSpLimits(); }
 function spSearch(v){ SP_Q=(v||'').trim().toLowerCase(); renderSpPickList(); }
 function renderSpPickList(){
   const el=document.getElementById(SP_PFX+'-sp-picklist'); if(!el) return;
@@ -8787,7 +8833,7 @@ const SUBRACES={
     {name:'Тёмный эльф (дроу)', asi:{cha:1}, desc:'Улучшенное тёмное зрение, врождённые заклинания, помеха при ярком свете; владеет рапирой, коротким мечом и ручным арбалетом.'}
   ],
   'Дварф':[
-    {name:'Холмовой дварф', asi:{wis:1}, desc:'Дополнительно +1 к максимуму хитов и ещё +1 за каждый следующий уровень (дварфийская стойкость).'},
+    {name:'Холмовой дварф', asi:{wis:1}, hpLvl:1, desc:'Дополнительно +1 к максимуму хитов и ещё +1 за каждый следующий уровень (дварфийская стойкость).'},
     {name:'Горный дварф', asi:{str:2}, desc:'Владение лёгкими и средними доспехами.'}
   ],
   'Полурослик':[
@@ -9207,21 +9253,25 @@ function randomizeNewChar(){
     if(mainRow){ for(const [ru,k] of Object.entries(ABIL_RU_MAP)) if(mainRow.v.includes(ru)){ mainKey=k; break; } }
     if(mainKey && Math.random()>=0.15){ const rest=keys.filter(k=>k!==mainKey).sort(()=>Math.random()-.5); assign[mainKey]=scores[0]; rest.forEach((k,i)=>assign[k]=scores[i+1]); }
     else keys.slice().sort(()=>Math.random()-.5).forEach((k,i)=>assign[k]=scores[i]);
+    // случайная подраса (если есть) — до бонусов: она их дополняет (горный дварф +2 СИЛ), а то и меняет раскладку
+    // (альтернативный человек: два +1 вместо +1 ко всем). Раньше подраса выбиралась, но бонусов не давала
+    const subs=subracesFor(race.title);
+    const chosenSub=(subs && subs.length && Math.random()<0.85) ? rpick(subs).name : '';
+    const SR=subraceInfo(race.title, chosenSub)||{};
     // бонусы расы: фиксированные и «ко всем» — как есть, свободные — в сильнейшие статы
-    const AR=pbAsi(race);
+    const AR=pbAsiEff(race, chosenSub);
     for(const k in (AR.fixed||{})) assign[k]+=AR.fixed[k];
     if(AR.all) keys.forEach(k=>assign[k]+=AR.all);
-    const fixedK=Object.keys(AR.fixed||{});
+    for(const k in (SR.asi||{})) assign[k]+=SR.asi[k];
+    const fixedK=Object.keys(AR.fixed||{}).concat(Object.keys(SR.asi||{}));
     const sorted=keys.slice().sort((a,b)=>assign[b]-assign[a]).filter(k=>!fixedK.includes(k));
-    if(AR.choose2>0 && sorted.length) assign[sorted[0]]+=2;
-    if(AR.choose1>0 && sorted.length>1) assign[sorted[1]]+=1;
-    if(AR.choose1>1 && sorted.length>2) assign[sorted[2]]+=1;
+    let si=0;   // свободные бонусы — по очереди в сильнейшие, без пропуска первого, если +2 нет
+    if(AR.choose2>0 && si<sorted.length) assign[sorted[si++]]+=2;
+    for(let j=0;j<(AR.choose1||0) && si<sorted.length;j++) assign[sorted[si++]]+=1;
     keys.forEach(k=>set('np-ab-'+k, assign[k]));
     const conM=Math.floor((assign.con-10)/2), dexM=Math.floor((assign.dex-10)/2);
     const hd=parseInt((((cls.dossier||[]).find(r=>r.k==='Кость Хитов')||{}).v||'d8').replace(/\D/g,''),10)||8;
-    // случайная подраса (если есть) и случайный подкласс (если уровень уже даёт архетип)
-    const subs=subracesFor(race.title);
-    const chosenSub=(subs && subs.length && Math.random()<0.85) ? rpick(subs).name : '';
+    // случайный подкласс (если уровень уже даёт архетип)
     const need=SUBCLS_LVL[cls.title]||3;
     const archs=(cls.archs||[]).filter(a=>cls.srcOk || !srcBlocked(CUR_PROJECT,'classes',a.src));
     const chosenSubcls=(level>=need && archs.length && Math.random()<0.9) ? rpick(archs).name : '';
@@ -9334,6 +9384,9 @@ function avaPick(inp){
     if(!src) return;   // отмена — прежний аватар остаётся
     AVA_TMP=src;
     const p=document.getElementById('avaPrev'); if(p) p.innerHTML=`<img src="${src}" alt="">`;
+    // инлайн-лист: автосейв сработал ещё на клике «Фото» (со старым портретом), а «Готово» в оверлее кадрирования
+    // до листа не доходит — без этого новый портрет висел с «Сохранено» и пропадал после выгрузки страницы
+    if(INLINE_ID && p && p.closest('#playerEditor')) inlineAutosave(INLINE_ID);
   }).catch(()=>toast('⚠ Не удалось обработать фото: такой формат телефон не открыл (попробуй JPG/PNG)'));
 }
 /* ── Кадрирование аватара: рамка фиксированной пропорции (как постер персонажа 4:5), фото под ней
@@ -9444,6 +9497,7 @@ function coinsView(c, game){
 function charFind(id){ let c=CHARS.find(x=>x.id===id); if(!c){ for(const g of Object.keys(CHARS_ALL)){ c=(CHARS_ALL[g]||[]).find(x=>x && x.id===id); if(c) break; } } return c; }
 function coinShort(cur, k){ const e=cur.find(x=>x[0]===k); return e?e[1].split(' ').pop():k; }
 function invMoneyHtml(c, G, own){
+  own=own && charIdOk(c.id);   // кнопки несут id в onclick — у листа с «кривым» id только просмотр
   const cur=moneyCurr(G), o=charCoins(c,G);
   const bal=cur.map(([k,lbl])=>`<span class="im-coin"><b>${esc(o[k]||'0')}</b> ${esc(lbl.split(' ').pop())}</span>`).join('');
   const txForm = own?`<div class="tx-form">
@@ -9814,12 +9868,16 @@ function edRefreshSlots(p){
   }
 }
 // авто-подгонка магии под класс+уровень: выбрать список класса, заполнить ячейки, показать число заговоров
-function edAutoFill(p){
+function edAutoFill(p, lvlOnly){
   if(CORE_GAMES.indexOf(CUR_PROJECT)<0) return;
   const name=pval(p+'-role'), total=parseInt(pval(p+'-level'),10)||1;
   const mc=edMc(p);
   const lvl2=mc?Math.min(parseInt(mc.lvl,10)||1, Math.max(1,total-1)):0;
   const lvl1=Math.max(1, total-lvl2);
+  // Сменился только уровень, а таблицы ячеек у класса нет (Мистический рыцарь, Плут-мистификатор):
+  // ячейки и классы книги человек выставил сам — не обнуляем их, как раньше на каждый ввод в поле уровня
+  const keep=lvlOnly && !CASTERS[name] && !(mc && CASTERS[mc.cls]);
+  const slotsWas=keep?Object.assign({},SLOTS_TMP):null, spWas=keep?{cls:SP.cls.slice(), lvls:Object.assign({},SP.lvls)}:null;
   // классы-заклинатели и их уровни (уровень первого = общий − второй)
   SP.cls=[]; SP.lvls={};
   if(CASTERS[name]){ SP.cls.push(name); SP.lvls[name]=lvl1; }
@@ -9845,6 +9903,7 @@ function edAutoFill(p){
   // ячейки от расы/подрасы (если раса их даёт) — поверх классовых
   const rmag=raceMagic(pval(p+'-origin'), pval(p+'-subrace'));
   for(const k in rmag.slots){ const ci=parseInt(k,10); if(ci>=1&&ci<=9) SLOTS_TMP[ci]=(SLOTS_TMP[ci]||0)+rmag.slots[k]; }
+  if(keep) SLOTS_TMP=slotsWas;
   edRefreshSlots(p);
   // кость хитов: «3к8 + 2к6» при мультиклассе
   const die1=edClassDie(name), die2=mc?edClassDie(mc.cls):0;
@@ -9868,11 +9927,14 @@ function edAutoFill(p){
                    :(name?`⚙ «${esc(name)}» — не заклинатель, ячеек заклинаний нет.`:''));
     }
   }
+  if(keep){ SP.cls=spWas.cls; SP.lvls=spWas.lvls; }
   if(document.getElementById(p+'-spellui')) renderSpellUI();
 }
-function edGuidedSync(p){
+/* lvlOnly — сменился только уровень. Спасброски тогда не приводим к списку класса: ручные (черта «Стойкий»,
+   «Алмазная душа» Монаха, Плут 15+) снимались на каждом вводе в поле уровня. Их задаёт смена класса */
+function edGuidedSync(p, lvlOnly){
   if(CORE_GAMES.indexOf(CUR_PROJECT)<0) return;
-  edRenderSubclass(p); edRenderMulticlass(p); edAutoFill(p); edAutoSaves(p);
+  edRenderSubclass(p); edRenderMulticlass(p); edAutoFill(p, lvlOnly); if(!lvlOnly) edAutoSaves(p);
 }
 /* спасброски по классу: при выборе класса владения проставляются из строки «Спасброски»
    карточки класса (напр. «Сила, Телосложение») — вручную потом можно поменять */
@@ -10010,11 +10072,12 @@ function featEnter(p){ const inp=document.getElementById(p+'-feat-inp'); if(inp)
 function featLvlSet(p,i,v){ if(FEATS_TMP[i]){ FEATS_TMP[i].lvl=Math.max(1,Math.min(20,parseInt(v,10)||1)); edHpCalcRefresh(p); } }
 function featRemove(p, i){ FEATS_TMP.splice(i,1); renderFeatChips(p); edHpCalcRefresh(p); }
 function collectFeats(){ return FEATS_TMP.map(f=>({n:f.n, lvl:f.lvl})); }
-// прибавка ХП от черт: Крепыш и аналоги дают +2 ХП за каждый уровень начиная с того, на котором взяты
+// прибавка ХП от черт: «Крепкий» (PHB) при взятии даёт удвоенный текущий уровень и потом +2 за каждый новый —
+// итого 2 × уровень персонажа, считая с уровня получения черты (раньше выходило +2 за уровни после неё)
 function featHpBonus(list, charLevel){
   const lv=Math.max(1,parseInt(charLevel,10)||1); let bonus=0;
   (list||[]).forEach(f0=>{ const f=featNorm(f0);
-    if(/крепк|крепыш|tough/i.test(f.n) && lv>=f.lvl) bonus += 2*(lv-f.lvl+1);
+    if(/крепк|крепыш|tough/i.test(f.n) && lv>=f.lvl) bonus += 2*lv;
   });
   return bonus;
 }
@@ -10033,6 +10096,8 @@ function edHpTotal(p){
   let hp=die1+conMod;                                  // 1-й уровень — максимум кости основного класса
   for(let L=2; L<=level; L++){ const d=dieAt(L); const avg=Math.floor(d/2)+1; const r=HP_ROLLS[L]!=null?HP_ROLLS[L]:avg; hp+=r+conMod; }
   hp += featHpBonus(FEATS_TMP, level);                 // Крепыш и аналоги — с уровня получения
+  const sr=subraceInfo(pval(p+'-origin'), pval(p+'-subrace'));
+  if(sr && sr.hpLvl) hp += sr.hpLvl*level;             // дварфийская стойкость холмового дварфа: +1 за каждый уровень
   return Math.max(1,hp);
 }
 function edRenderHpCalc(p){
@@ -10050,7 +10115,8 @@ function edRenderHpCalc(p){
     rows.push(`<div class="hpc-row"><span class="hpc-lv">Ур. ${L}</span><input class="hpc-in" inputmode="numeric" maxlength="2" placeholder="ср. ${avg} · к${d}" value="${esc(String(v))}" oninput="edHpRollSet('${p}',${L},this.value)"><span class="hpc-con">${fmtBonus(conMod)} ТЕЛ</span></div>`);
   }
   const tough=featHpBonus(FEATS_TMP, level);
-  el.innerHTML=`<div class="hpc-head">Расчёт хитов · кость к${die1}${mcLv?` + к${die2}`:''}${tough?` · черты +${tough} ХП`:''}</div>
+  const srHp=((subraceInfo(pval(p+'-origin'), pval(p+'-subrace'))||{}).hpLvl||0)*level;
+  el.innerHTML=`<div class="hpc-head">Расчёт хитов · кость к${die1}${mcLv?` + к${die2}`:''}${tough?` · черты +${tough} ХП`:''}${srHp?` · подраса +${srHp} ХП`:''}</div>
     <div class="hpc-rows">${rows.join('')}</div>
     <div class="hpc-foot"><span>Итого: <b class="hpc-total">${edHpTotal(p)}</b> ХП</span><button type="button" class="btn primary sm" onclick="edHpApply('${p}')">Применить</button></div>`;
 }
@@ -10168,7 +10234,12 @@ function sheetEditorBody(p, c, game){
 async function createPlayer(){
   if(!SESSION){ toast('Сначала войдите в аккаунт'); openAuth('login'); return; }
   const name=pval('np-name'); let player=pval('np-player');
-  pf('np-f-name').classList.toggle('invalid', !name); if(!name) return;
+  pf('np-f-name').classList.toggle('invalid', !name);
+  if(!name){   // поле имени — во вкладке «Обзор»; с другой вкладки подсветки не видно, и «Создать» молчал
+    const t=document.querySelector('#modal .ed-tab'); if(t) edTab(t,'np-panel-main');
+    toast('Введите имя персонажа'); try{ pf('np-name').focus(); }catch(e){}
+    return;
+  }
   if(!player) player=dispTag(SESSION);
   const ch={ id:uid(), name, player, owner:SESSION,
     role:pval('np-role'), subcls:pval('np-subcls'), mc:edMc('np'), origin:pval('np-origin'), subrace:pval('np-subrace'), bg:pval('np-bg'), align:pval('np-align'),
@@ -10317,6 +10388,7 @@ function openClassFeat(id, ai, encH){
 /* лист приложен к заявке на игру? — только такие чужие листы открываются Мастеру */
 function charInSignups(id){ return GAMES.some(s=>(s.players||[]).some(p=>p.charId===id)); }
 function openPlayer(id){
+  if(!charIdOk(id)) return;   // id уходит в onclick кнопок листа (см. charIdOk)
   // ГМ открывает приложенный к заявке лист из любой игры (из расписания сессий)
   let c=CHARS.find(x=>x.id===id);
   if(!c && ADMIN){ for(const g of Object.keys(CHARS_ALL)){ c=(CHARS_ALL[g]||[]).find(x=>x.id===id); if(c) break; } }
@@ -10396,7 +10468,7 @@ function openPlayer(id){
   const armLink=c.armor?(armC?`<button type="button" class="sp-link" onclick="openModal('${armC.id}',true)" title="Открыть карточку доспеха">${esc(c.armor)}</button>`:esc(c.armor)):'';
   const armHtml=(c.armor||c.shield)?`<div class="kv"><div class="k">Доспех</div><div class="v">${armLink}${c.shield?(c.armor?' · щит (+2)':'Щит (+2)'):''}</div></div>`:'';
   let editBlock;
-  if(isOwner(c)){
+  if(ownW){   // владелец — или лист под кодом, код к которому уже введён
     editBlock = `<div class="unlock"><button class="btn primary" onclick="renderPlayerEditor('${c.id}')">Редактировать</button>
       <button class="btn ghost" style="margin-top:8px" onclick="openLevelUp('${c.id}')">⬆ Новый уровень</button></div>`;
   } else if(!c.owner && c.codeHash){
@@ -10598,11 +10670,13 @@ function printSheet(id){
   const spellById=idv=>ARCHIVE.find(x=>x.id===idv)||(typeof CORE!=='undefined'?CORE.find(x=>x.id===idv):null);
   const sc=c.spellcasting||{}; const slots=c.slots||{};
   const known=(sc.known||[]).map(spellById).filter(Boolean);
-  const hasMagic=dnd && (known.length || Object.values(slots).some(n=>parseInt(n,10)>0));
+  // ячейки в листе — {max,used} (parseInt объекта давал NaN, и ячейки не печатались никогда); голое число — старый вид
+  const slotMax=v=>parseInt(v&&typeof v==='object'?v.max:v,10)||0;
+  const hasMagic=dnd && (known.length || Object.values(slots).some(n=>slotMax(n)>0));
   let page3='';
   if(hasMagic){
     const slotBoxes=[];
-    for(let i=1;i<=9;i++){ const n=parseInt(slots[i],10)||0; if(n>0) slotBoxes.push(`<div class="psh-slot"><div class="n">${n}</div><div class="l">${i}-й круг</div></div>`); }
+    for(let i=1;i<=9;i++){ const n=slotMax(slots[i]); if(n>0) slotBoxes.push(`<div class="psh-slot"><div class="n">${n}</div><div class="l">${i}-й круг</div></div>`); }
     const byLvl={}; known.forEach(e=>{ const lv=spellLvlOf(e); (byLvl[lv]=byLvl[lv]||[]).push(e); });
     const prep=new Set(sc.prep||[]);
     const lvlGroups=Object.keys(byLvl).map(Number).sort((a,b)=>a-b).map(lv=>{
@@ -10639,7 +10713,7 @@ function deathReset(id){
 function tryEditPlayer(id){
   const c=CHARS.find(x=>x.id===id); if(!c) return;
   const v=(pf('pp-code')?.value||'').trim();
-  if(v && hashCode(v)===c.codeHash) renderPlayerEditor(id);
+  if(v && hashCode(v)===c.codeHash){ CODE_OK.add(c.id); renderPlayerEditor(id); }   // код верный — лист открыт для правки до перезагрузки
   else { if(pf('pp-code')) pf('pp-code').value=''; toast('Неверный код доступа'); }
 }
 
@@ -10659,34 +10733,50 @@ function renderPlayerEditor(id){
       <button class="btn ghost" onclick="openPlayer('${c.id}')">Назад</button>
       <button class="btn danger" onclick="confirmDeletePlayer('${c.id}')">Удалить</button>
     </div>`;
-  ensureItemDatalists(); bindAbilMods('ep'); bindProfAuto('ep'); edRecalcProf('ep'); edCalcAC('ep'); edSpeedAuto('ep'); edAutoInit('ep'); edInitGuided('ep'); edHpSeedManual('ep');
+  ensureItemDatalists(); bindAbilMods('ep'); bindProfAuto('ep'); edRecalcProf('ep'); edAcSeedManual('ep', c); edCalcAC('ep'); edSpeedAuto('ep'); edAutoInit('ep'); edInitGuided('ep'); edHpSeedManual('ep');
   if(sheetHasMagic()) renderSpellUI();
 }
 /* собрать правки из формы 'ep' в объект персонажа. allowEmptyName — для автосейва,
    чтобы пустое поле имени в момент набора не блокировало сохранение остального. */
+/* поля формы 'ep' в виде полей листа; src — откуда брать то, чего в форме нет (поля другого сеттинга) */
+function collectPlayerEdits(src, name){
+  return { name:name||src.name, player:pval('ep-player'), role:pval('ep-role'), subcls:pval('ep-subcls'), mc:(pf('ep-mc-cls')?edMc('ep'):(src.mc||null)),
+    origin:pval('ep-origin'), subrace:(pf('ep-subrace')?pval('ep-subrace'):(src.subrace||'')), bg:pval('ep-bg'), align:pval('ep-align'),
+    level:pval('ep-level'), prof:pval('ep-prof'), xp:pval('ep-xp'),
+    hp:pval('ep-hp'), hpManual:(pf('ep-hp')&&pf('ep-hp').dataset.manual==='1')?1:0, ac:pval('ep-ac'), acManual:(pf('ep-ac')&&pf('ep-ac').dataset.manual==='1')?1:0, speed:pval('ep-speed'), init:pval('ep-init'), hd:pval('ep-hd'),
+    armor:pval('ep-armor'), shield:(document.getElementById('ep-shield')&&document.getElementById('ep-shield').checked)?1:0,
+    will:sheetHasWill()?pval('ep-will'):(src.will||''),
+    hum:sheetHasHum()?(pval('ep-hum')||humDefault(collectAbil('ep'))):(src.hum||''),
+    coins:collectCoins('ep', charGame(src)), ava:AVA_TMP,
+    abil:collectAbil('ep'), saves:collectSaves('ep'), skills:collectSkills('ep'),
+    profs:pval('ep-profs'), weapons:collectWpns('ep'),
+    cfeats:pval('ep-cfeats'), rfeats:pval('ep-rfeats'), tfeats:pval('ep-tfeats'), feats:'',
+    featsList:collectFeats(), hpRolls:Object.assign({},HP_ROLLS),
+    path:pf('ep-path')?pval('ep-path'):(src.path||''), traits:pval('ep-traits'), ideals:pval('ep-ideals'), bonds:pval('ep-bonds'), flaws:pval('ep-flaws'),
+    spells:sheetHasFreeSpells()?pval('ep-spells'):(src.spells||''),
+    spellcasting:sheetHasMagic()?collectSpellcasting():(src.spellcasting||null),
+    slots:sheetHasMagic()?collectSlots(src.slots):(src.slots||{}),
+    bio:pval('ep-bio'), notes:pval('ep-notes'), gear:pval('ep-gear'), inv:collectInv('ep') };
+}
+/* Возвращает true — правки легли в лист, false — не вышло, null — инлайн-лист не менялся (писать нечего). */
 function applyPlayerEdits(id, allowEmptyName){
   const i=CHARS.findIndex(x=>x.id===id); if(i<0) return false;
   if(!canEdit(CHARS[i])) return false;
   if(!pf('ep-name')) return false;                       // форма 'ep' не отрисована — нечего собирать
   const name=pval('ep-name'); if(!name && !allowEmptyName) return false;
-  Object.assign(CHARS[i], { name:name||CHARS[i].name, player:pval('ep-player'), role:pval('ep-role'), subcls:pval('ep-subcls'), mc:(pf('ep-mc-cls')?edMc('ep'):(CHARS[i].mc||null)),
-    origin:pval('ep-origin'), subrace:(pf('ep-subrace')?pval('ep-subrace'):(CHARS[i].subrace||'')), bg:pval('ep-bg'), align:pval('ep-align'),
-    level:pval('ep-level'), prof:pval('ep-prof'), xp:pval('ep-xp'),
-    hp:pval('ep-hp'), hpManual:(pf('ep-hp')&&pf('ep-hp').dataset.manual==='1')?1:0, ac:pval('ep-ac'), acManual:(pf('ep-ac')&&pf('ep-ac').dataset.manual==='1')?1:0, speed:pval('ep-speed'), init:pval('ep-init'), hd:pval('ep-hd'),
-    armor:pval('ep-armor'), shield:(document.getElementById('ep-shield')&&document.getElementById('ep-shield').checked)?1:0,
-    will:sheetHasWill()?pval('ep-will'):(CHARS[i].will||''),
-    hum:sheetHasHum()?(pval('ep-hum')||humDefault(collectAbil('ep'))):(CHARS[i].hum||''),
-    coins:collectCoins('ep', charGame(CHARS[i])), ava:AVA_TMP,
-    abil:collectAbil('ep'), saves:collectSaves('ep'), skills:collectSkills('ep'),
-    profs:pval('ep-profs'), weapons:collectWpns('ep'),
-    cfeats:pval('ep-cfeats'), rfeats:pval('ep-rfeats'), tfeats:pval('ep-tfeats'), feats:'',
-    featsList:collectFeats(), hpRolls:Object.assign({},HP_ROLLS),
-    path:pf('ep-path')?pval('ep-path'):(CHARS[i].path||''), traits:pval('ep-traits'), ideals:pval('ep-ideals'), bonds:pval('ep-bonds'), flaws:pval('ep-flaws'),
-    spells:sheetHasFreeSpells()?pval('ep-spells'):(CHARS[i].spells||''),
-    spellcasting:sheetHasMagic()?collectSpellcasting():(CHARS[i].spellcasting||null),
-    slots:sheetHasMagic()?collectSlots(CHARS[i].slots):(CHARS[i].slots||{}),
-    bio:pval('ep-bio'), notes:pval('ep-notes'), gear:pval('ep-gear'), inv:collectInv('ep'),
-    updatedAt:Date.now() });
+  const c=CHARS[i], ed=collectPlayerEdits(c, name);
+  let stale=false;
+  if(id===INLINE_ID && INLINE_BASE){
+    // Автосейв инлайн-листа ловит и клики (вкладки, «Фото»): без правок ничего не пишем и updatedAt не трогаем —
+    // иначе форма со старыми деньгами/инвентарём перетирала версию, пришедшую с телефона
+    const touched=inlineTouched(name); if(!touched.length) return null;
+    // пока форма была открыта, лист обновился (другое устройство, доска) — переносим только тронутые поля;
+    // остальные в форме так и остаются старыми, поэтому этот режим держим до перерисовки листа
+    stale=inlineStale(c);
+    if(stale) Object.keys(ed).forEach(k=>{ if(touched.indexOf(k)<0) delete ed[k]; });
+  }
+  Object.assign(c, ed, {updatedAt:Date.now()});
+  if(id===INLINE_ID){ inlineMarkClean(c); INLINE_STALE=stale; }
   return true;
 }
 async function savePlayer(id){
@@ -10699,6 +10789,39 @@ async function savePlayer(id){
 }
 /* ====== инлайн-дашборд персонажа на странице «Игроки»: редактируемый, с автосохранением ====== */
 let INLINE_ID=null, INLINE_T=null;
+/* Версия листа, с которой отрисована форма (копия без портрета), и снимок полей формы на тот момент
+   (после каждой записи — заново). По ним автосейв видит, что человек правда что-то поменял и что именно */
+let INLINE_BASE=null, INLINE_SNAP=null, INLINE_STALE=false;
+function inlineSnapOf(ed){ const o={}; Object.keys(ed).forEach(k=>{ o[k]=JSON.stringify(ed[k]); }); return o; }
+function inlineMarkClean(c){
+  INLINE_BASE=JSON.parse(JSON.stringify(Object.assign({}, c, {ava:''}))); INLINE_STALE=false;
+  INLINE_SNAP=inlineSnapOf(collectPlayerEdits(INLINE_BASE, pval('ep-name')));
+}
+// форма отстаёт от листа: пришла версия новее той, с которой её рисовали (или уже писали поверх такой)
+function inlineStale(c){ return INLINE_STALE || (c.updatedAt||0)>(INLINE_BASE.updatedAt||0); }
+// поля, которые человек тронул в форме после отрисовки/последней записи
+function inlineTouched(name){
+  if(!INLINE_BASE || !INLINE_SNAP || !pf('ep-name')) return [];
+  const now=inlineSnapOf(collectPlayerEdits(INLINE_BASE, name!=null?name:pval('ep-name')));
+  return Object.keys(now).filter(k=>now[k]!==INLINE_SNAP[k]);
+}
+/* Фоновый тик подтянул более свежую версию открытого листа (с телефона, с доски), а форма всё показывает
+   старые деньги и хиты. Правок в форме нет и человек ничего не вводит — перерисовываем на той же вкладке */
+function inlineRefreshIfStale(){
+  const id=INLINE_ID; if(!id || !INLINE_BASE) return;
+  const view=document.getElementById('view-players'), host=document.getElementById('playerEditor');
+  if(!view || !view.classList.contains('active') || !host || host.hidden) return;
+  const c=CHARS.find(x=>x.id===id); if(!c || c.deleted || !inlineStale(c)) return;
+  const ae=document.activeElement; if(ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName)) return;
+  if(inlineTouched().length) return;   // несохранённые правки допишет автосейв — только тронутые поля
+  const ti=[...host.querySelectorAll('.ed-tab')].findIndex(b=>b.classList.contains('on')), y=window.scrollY;
+  const sx=(host.querySelector('.ed-tabs')||{}).scrollLeft||0;   // на телефоне ряд вкладок прокручен вбок
+  openInlineSheet(id, null, false);
+  const nt=host.querySelectorAll('.ed-tab')[ti], np=host.querySelectorAll('.ed-panel')[ti];
+  if(ti>0 && nt && np) edTab(nt, np.id);
+  const tr=host.querySelector('.ed-tabs'); if(tr) tr.scrollLeft=sx;
+  try{ window.scrollTo(0,y); }catch(e){}
+}
 function setInlineSaveState(st){
   const el=document.getElementById('isaveStatus'); if(!el) return;
   el.dataset.st=st; if(st!=='error') el.removeAttribute('title');
@@ -10713,19 +10836,24 @@ function setInlineSaveState(st){
     el.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-label="Сохранено"><path d="M7 18a4.2 4.2 0 01-.5-8.37A5.6 5.6 0 0117.6 11a3.4 3.4 0 01.4 7"/><path d="M9.4 14.3l1.9 1.9 3.6-3.9"/></svg>';
   }
 }
-function inlineAutosave(id){
+function inlineAutosave(id, quiet){
   if(INLINE_ID!==id) return;
-  setInlineSaveState('saving');
+  if(!quiet || inlineTouched().length) setInlineSaveState('saving');   // клик (quiet) — не всегда правка: вкладки, «Фото»
   clearTimeout(INLINE_T);
   INLINE_T=setTimeout(()=>{
     if(INLINE_ID!==id) return;
+    const r=applyPlayerEdits(id, true);
+    if(r===null){   // форма не менялась — писать нечего; идёт прежняя запись — значок поправит она
+      const st=pf('isaveStatus'); if(st && st.dataset.st==='saving' && !CHARS_PERSIST) setInlineSaveState(CHARS_DIRTY?'error':'saved');
+      return;
+    }
     // «Сохранено» показываем только если запись действительно прошла. Раньше
     // строка стояла вне проверки, и при любом рассогласовании (лист от другого
     // сеттинга, пропавшие права) человек видел «Сохранено» на потерянных правках.
     // «Сохранено» ставим ПОСЛЕ того, как запись дошла: раньше галочка
     // появлялась сразу, и при отказе облака человек видел зелёный значок
     // рядом с тостом «облако недоступно» — значок и тост противоречили друг другу
-    if(applyPlayerEdits(id, true)){
+    if(r){
       setInlineSaveState('saving');
       // На устройство запись ложится сразу, а облако ждёт своего тайм-аута до
       // пятнадцати секунд. Крутить значок всё это время незачем: через четыре
@@ -10740,16 +10868,21 @@ function inlineAutosave(id){
     else { setInlineSaveState('error'); }
   }, 1200);
 }
+// свернули PWA / закрыли вкладку — дописываем правки сразу, не дожидаясь секундной паузы автосейва
+document.addEventListener('visibilitychange', ()=>{ if(document.hidden && INLINE_ID) flushInlineSave(); });
+window.addEventListener('pagehide', ()=>{ if(INLINE_ID) flushInlineSave(); });
 function flushInlineSave(){
   if(!INLINE_ID) return;
   clearTimeout(INLINE_T);
   const id=INLINE_ID;
   if(applyPlayerEdits(id, true)){
-    persistChars().then(ok => { if(ok === false) setInlineSaveState('error'); })
+    setInlineSaveState('saving');   // сброс при сворачивании: лист остаётся на экране — значок должен дойти до итога
+    persistChars().then(ok => setInlineSaveState(ok === false ? 'error' : 'saved'))
                   .catch(() => setInlineSaveState('error'));
   }
 }
 function openInlineSheet(id, tileEl, animate){
+  if(!charIdOk(id)) return;   // id уходит в onclick кнопок листа (см. charIdOk)
   const c=CHARS.find(x=>x.id===id); if(!c||c.deleted) return;
   if(!canEdit(c)){ openPlayer(id); return; }   // не владелец — просмотр в модалке
   const host=document.getElementById('playerEditor'); if(!host) return;
@@ -10774,11 +10907,12 @@ function openInlineSheet(id, tileEl, animate){
     </div>`;
   host.hidden=false;
   const view=document.getElementById('view-players'); if(view) view.classList.add('inline-open');
-  ensureItemDatalists(); bindAbilMods('ep'); bindProfAuto('ep'); edRecalcProf('ep'); edCalcAC('ep'); edSpeedAuto('ep'); edAutoInit('ep'); edInitGuided('ep'); edHpSeedManual('ep');
+  ensureItemDatalists(); bindAbilMods('ep'); bindProfAuto('ep'); edRecalcProf('ep'); edAcSeedManual('ep', c); edCalcAC('ep'); edSpeedAuto('ep'); edAutoInit('ep'); edInitGuided('ep'); edHpSeedManual('ep');
   if(sheetHasMagic()) renderSpellUI();
+  inlineMarkClean(c);   // форма отрисована и досчитана — отсюда автосейв считает правки
   host.oninput=()=>inlineAutosave(id);
   host.onchange=()=>inlineAutosave(id);
-  host.onclick=()=>inlineAutosave(id);   // ловим и кнопочные правки (заговоры, ячейки, +/-)
+  host.onclick=()=>inlineAutosave(id, true);   // ловим и кнопочные правки (заговоры, ячейки, +/-)
   INLINE_ID=id; try{ sessionStorage.setItem('comik:openChar', id); }catch(e){}
   setInlineSaveState('saved');
   if(animate!==false) inlineExpandAnim(tileEl, host);
@@ -10806,9 +10940,9 @@ function inlineExpandAnim(tileEl, host){
 async function closeInlineSheet(){
   const id=INLINE_ID;
   clearTimeout(INLINE_T);
-  if(id) applyPlayerEdits(id, true);
+  const changed=id ? applyPlayerEdits(id, true) : null;
   closeMiniArch(); closeStatCalc();   // прячем боковые панели вместе с листом
-  INLINE_ID=null; try{ sessionStorage.removeItem('comik:openChar'); }catch(e){}
+  INLINE_ID=null; INLINE_BASE=INLINE_SNAP=null; INLINE_STALE=false; try{ sessionStorage.removeItem('comik:openChar'); }catch(e){}
   const host=document.getElementById('playerEditor');
   const view=document.getElementById('view-players');
   const finish=()=>{ if(host){ host.hidden=true; host.innerHTML=''; host.style.cssText=''; } if(view) view.classList.remove('inline-open'); renderPlayers(); ensurePlayersVisible(); };
@@ -10817,7 +10951,7 @@ async function closeInlineSheet(){
     host.style.transform='scale(.6)'; host.style.opacity='0';
     setTimeout(finish, 260);
   } else finish();
-  if(id){ try{ await persistChars(); }catch(e){} }
+  if(id && changed!==null){ try{ await persistChars(); }catch(e){} }   // лист не менялся — и писать нечего
 }
 function confirmDeleteInline(id){
   const el=document.querySelector('#playerEditor .pacts'); if(!el) return;
@@ -10830,7 +10964,7 @@ function confirmDeleteInlineCancel(id){
 }
 async function deleteInline(id){
   const c=CHARS.find(x=>x.id===id); if(c && !canEdit(c)){ toast('Нет прав на удаление'); return; }
-  clearTimeout(INLINE_T); INLINE_ID=null; try{ sessionStorage.removeItem('comik:openChar'); }catch(e){}
+  clearTimeout(INLINE_T); INLINE_ID=null; INLINE_BASE=INLINE_SNAP=null; INLINE_STALE=false; try{ sessionStorage.removeItem('comik:openChar'); }catch(e){}
   closeMiniArch(); closeStatCalc();
   CHARS=CHARS.filter(x=>x.id!==id).concat([{id, owner:(c&&c.owner)||'', deleted:true, updatedAt:Date.now()}]);
   CHARS_ALL[CUR_PROJECT]=CHARS;
@@ -11162,7 +11296,8 @@ function go(view, opts){
     renderPlayers(); ensurePlayersVisible();
     // вернулись на «Игроки», а лист был открыт — снова разворачиваем дашборд из данных (без анимации)
     let keep=INLINE_ID; if(!keep){ try{ keep=sessionStorage.getItem('comik:openChar'); }catch(e){} }
-    if(keep && CHARS.some(x=>x.id===keep && !x.deleted)) openInlineSheet(keep, null, false);
+    // только лист, который можно править: чужой (после смены аккаунта) или запертый кодом всплывал бы модалкой/тостом
+    if(keep && CHARS.some(x=>x.id===keep && !x.deleted && canEdit(x))) openInlineSheet(keep, null, false);
   }
   const av=document.getElementById('view-'+view); if(av) kickLayout(av);
   try{ window.scrollTo(0,0); }catch(e){}
@@ -11657,8 +11792,16 @@ function sanitizeImportedChar(s){
   if(s.skills && typeof s.skills==='object') Object.keys(s.skills).slice(0,40).forEach(k=>{ const lv=parseInt(s.skills[k],10); if(lv>0) out.skills[String(k).slice(0,40)]=Math.min(2,lv); });
   if(s.coins && typeof s.coins==='object') Object.keys(s.coins).slice(0,8).forEach(k=>{ const v=String(s.coins[k]).replace(/[^\d]/g,'').slice(0,9); if(v) out.coins[String(k).slice(0,6)]=v; });
   if(Array.isArray(s.weapons)) out.weapons=s.weapons.slice(0,20).map(w=>({ n:str(w&&w.n,60), b:str(w&&w.b,20), d:str(w&&w.d,30), x:str(w&&w.x,80) }));
-  if(s.slots && typeof s.slots==='object') Object.keys(s.slots).slice(0,9).forEach(k=>{ const n=parseInt(s.slots[k],10); if(n>0) out.slots[String(k).slice(0,4)]=n; });
-  if(s.spellcasting && typeof s.spellcasting==='object'){ try{ out.spellcasting=JSON.parse(JSON.stringify(s.spellcasting).slice(0,200000)); }catch(e){ out.spellcasting=null; } }
+  // ячейки в листе — {круг:{max,used}} (так их и выгружает exportChar); число по старинке тоже принимаем.
+  // Раньше parseInt(объекта) давал NaN, и импорт своего же JSON терял все ячейки
+  if(s.slots && typeof s.slots==='object') Object.keys(s.slots).forEach(k=>{ const ci=parseInt(k,10); if(!(ci>=1&&ci<=9)) return;
+    const o=s.slots[k], mx=Math.min(9, parseInt(o&&typeof o==='object'?o.max:o,10)||0);
+    if(mx>0) out.slots[ci]={max:mx, used:Math.max(0,Math.min(mx, parseInt(o&&o.used,10)||0))}; });
+  // книга заклинаний: классы — только известные заклинатели (имя класса идёт в разметку редактора), остальное — строки
+  if(s.spellcasting && typeof s.spellcasting==='object'){ const sc=s.spellcasting, ids=a=>Array.isArray(a)?a.filter(x=>typeof x==='string').slice(0,400).map(x=>x.slice(0,80)):[];
+    const cls=(Array.isArray(sc.cls)?sc.cls:[]).filter(cn=>typeof cn==='string' && Object.prototype.hasOwnProperty.call(CASTERS, cn)).slice(0,4), lvls={}, known=ids(sc.known);
+    cls.forEach(cn=>{ const v=sc.lvls&&sc.lvls[cn]; if(v!=null) lvls[cn]=str(v,2); });
+    out.spellcasting=(cls.length||known.length)?{cls, lvls, known, prep:ids(sc.prep)}:null; }
   return out;
 }
 /* распаковка значения: поддерживаем «сырое» значение, {value:...} и {value:{data:...}} (формат LSS),
