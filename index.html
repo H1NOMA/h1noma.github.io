@@ -3587,6 +3587,7 @@ html.dr-live #appPane{box-shadow:-2px 0 0 0 var(--line2), 0 0 46px rgba(0,0,0,.5
 .mpg-ic{width:34px;height:34px;flex:none;border-radius:10px;display:grid;place-items:center;cursor:pointer;
   color:var(--muted);background:none;border:0}
 .mpg-ic:hover{color:var(--red-ink);background:var(--surface2)}
+.mpg-ic.sure,.mpg-ic.sure:hover{color:#fff;background:#b3261e}
 .mpg-ic svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
 .mpg-empty{padding:26px 18px;text-align:center;color:var(--muted);font-size:.88rem;
   border:var(--hair) dashed var(--line2);border-radius:var(--r-md)}
@@ -4974,7 +4975,7 @@ async function supaLateInit(){
     if(u){ SESSION=emailToLogin(u.email); ssetLocal(KEY_SESSION, SESSION, false); if(!USERS.some(x=>normTag(x.tag)===normTag(SESSION))) USERS.push({tag:normTag(SESSION), createdAt:Date.now()}); }
   }catch(e){}
   try{ refreshAdmin(); }catch(e){}
-  try{ const gm=await withTimeout(cloudGet(KEY_GAMES), CLOUD_TMO); if(Array.isArray(gm)) GAMES=gm; }catch(e){}
+  try{ const gm=await withTimeout(cloudGet(KEY_GAMES), CLOUD_TMO); if(Array.isArray(gm)) gamesMergeRemote(gm); }catch(e){}
   CLOUD_REPULL_AT=0; try{ await cloudRepull('late'); }catch(e){}
   try{ afterAuthChange(); }catch(e){}          // аккаунт, листы, настройки, а на «Доске ходов» — переподписка и дочитывание стола
   try{ if(document.getElementById('trkBox')){ trkLiveStart(); trkLiveCatchup(true); } }catch(e){}
@@ -5016,17 +5017,40 @@ async function fetchCloudChars(keys){
   let tg=currentTag();
   if(!tg && !SESSION_READY){ try{ const s=await sgetLocal(KEY_SESSION, false); if(s) tg=normTag(s); }catch(e){} }
   const own='comik:chars:'+(tg||'');
+  /* Строку comik:chars:<тег> пишет только её владелец (RLS), а читают все. Раньше листы из ВСЕХ строк
+     сливались по одному id: игрок клал в свою строку «лист» с чужим id и штампом из будущего —
+     и чужой персонаж пропадал или подменялся у всех, а у самой жертвы подделка уезжала в её строку.
+     Теперь лист с владельцем принимаем только из строки владельца (легаси-блоб v1 заморожен — из него
+     всё), лист без владельца — лишь если такого id нет среди листов с владельцем. id — только безопасные
+     (он попадает в разметку) */
+  const owned=[], loose=[];
   rows.forEach(r=>{
     let v=r && r.value; if(typeof v==='string'){ try{ v=JSON.parse(v); }catch(e){ return; } }
     if(!v || typeof v!=='object') return;
     // свою строку зеркалим на устройство: старт без сети покажет свои листы, даже если на этом устройстве
-    // их ни разу не сохраняли (чужие не зеркалим — портреты всех игроков в квоту localStorage не влезут)
-    if(r.key===own){ try{ ssetLocal(r.key, r.value, true); }catch(e){} }
+    // их ни разу не сохраняли (чужие не зеркалим — портреты всех игроков в квоту localStorage не влезут).
+    // Но не поверх своих неотправленных правок: у зеркала штамп at новее облачного — значит, запись
+    // в облако тогда не дошла; оставляем зеркало (boot сольёт его) и помечаем «дослать»
+    if(r.key===own){
+      let newer=false;
+      try{ const l=JSON.parse(localStorage.getItem(r.key)||'null'); newer=!!(l && typeof l==='object' && (+l.at||0)>(+(v.at)||0)); }catch(e){}
+      if(newer){ try{ CHARS_DIRTY=true; }catch(e){} }
+      else { try{ ssetLocal(r.key, r.value, true); }catch(e){} }
+    }
     // штамп — в том же виде, что отдаёт зонд value->>at (текст; у старых строк без штампа — пусто)
     if(r.key) stamps[r.key]=(r.value && typeof r.value==='object' && r.value.at!=null) ? String(r.value.at) : '';
+    const rowTag=(r.key && r.key!==KEY_CHARS) ? normTag(String(r.key).slice(12)) : null;   // 'comik:chars:'.length
     const rm=normGameMap(v);
-    ALL_GAMES.forEach(g=>{ merged[g]=mergeChars(merged[g], rm[g]); });
+    ALL_GAMES.forEach(g=>(rm[g]||[]).forEach(c=>{
+      if(!c || typeof c!=='object' || !SAFE_ID.test(String(c.id||''))) return;
+      const o=c.owner ? normTag(c.owner) : '';
+      if(o){ if(rowTag===null || o===rowTag) owned.push([g,c]); }
+      else loose.push([g,c]);
+    }));
   });
+  owned.forEach(([g,c])=>{ merged[g]=mergeChars(merged[g], [c]); });
+  const ownedIds=new Set(owned.map(([,c])=>c.id));
+  loose.forEach(([g,c])=>{ if(!ownedIds.has(c.id)) merged[g]=mergeChars(merged[g], [c]); });
   // штампы едут вместе с картой, а запоминает их тот, кто слил карту в CHARS_ALL (charsSeen):
   // чтение, брошенное по тайм-ауту, не должно пометить непринятые листы как виденные
   Object.defineProperty(merged, 'stamps', {value:stamps});
@@ -5322,6 +5346,7 @@ async function boot(){
   // Иначе на медленной/заблокированной сети архив ждал таймаутов облака и монстры появлялись
   // через десятки секунд, хотя лежат прямо в файле.
   const D=startDataLoad();   // файлы данных качаются с preboot; облако читаем параллельно с ними
+  const BLOB_LOCAL=blobLocalSnapshot();   // свои неотправленные правки общих блобов — до того, как облако перезапишет зеркало
   await initSupa();
   // все ключи читаются параллельно: быстрее и один таймаут не тянет за собой остальные.
   // Легаси-блоб листов comik:chars:v1 в облаке заморожен и приходит вместе с пер-юзерными строками
@@ -5339,6 +5364,9 @@ async function boot(){
   let bootMiss = !!supa && (arc==null || nws==null || users==null);   // что-то не дочиталось (тайм-аут) — дочитаем позже (см. ниже, после листов)
   await loadChronoEmbedded();
   if(chr) CHRONO_DATA = Object.assign(CHRONO_DATA, chr);
+  if(BLOB_LOCAL[KEY_CHRONO]){   // хроника без штампов — возвращаем только ветки, которые правили здесь
+    try{ (JSON.parse(localStorage.getItem('comik:chrono:edited')||'[]')||[]).forEach(k=>{ if(k in BLOB_LOCAL[KEY_CHRONO]){ CHRONO_DATA[k]=BLOB_LOCAL[KEY_CHRONO][k]; CHRONO_EDITED.add(k); } }); }catch(e){}
+  }
   // миграция веток хронологии: Мир/Путешествие/Гости → единственная ветка «Приключения»
   ['legacy','neverland','assimilation','terra'].forEach(camp=>{
     const adv=camp+':Приключения';
@@ -5356,6 +5384,7 @@ async function boot(){
   let embN=null; try{ embN=await D.news; }catch(e){}
   // облако (со свежестью) в приоритете над файлом; надгробия глушат «воскрешение», старые чистим
   NEWS = mergeChars(nws||[], embN||[]).filter(n=>n && !(n.deleted && (Date.now()-(n.updatedAt||0))>90*864e5));
+  if(BLOB_LOCAL[KEY_NEWS]) newsMergeIn(BLOB_LOCAL[KEY_NEWS]);
   // общее ядро SRD (data/core.json) — одна копия на все D&D-игры; уже разобрано выше
   const coreIds=new Set(CORE.map(c=>c.id));
   let embA=null; try{ embA=await D.archive; }catch(e){}
@@ -5366,11 +5395,12 @@ async function boot(){
     ARCHIVE_ALL[g] = own;
     CHARS_ALL[g]   = mergeChars(chMap[g], CHARS_ALL[g]);
   });
+  if(BLOB_LOCAL[KEY_ARCHIVE]) archiveMergeIn(BLOB_LOCAL[KEY_ARCHIVE]);
   // Локальное зеркало своих листов. persistChars пишет их в 'comik:chars:<тег>',
   // а читалось это раньше только из облака — поэтому без связи (или без VPN)
   // залогиненный игрок видел пустой раздел «Игрок», хотя данные лежали на устройстве.
   try{
-    const tg=currentTag();
+    const tg=currentTag() || (sess ? normTag(sess) : '');   // SESSION присваивается ниже — без этого блок не срабатывал никогда
     if(tg){
       const local=await sgetLocal('comik:chars:'+tg, true);
       if(local && typeof local==='object'){
@@ -5399,6 +5429,7 @@ async function boot(){
     if(looksPerGame){ CORE_OVER={}; CORE_GAMES.forEach(g=>Object.assign(CORE_OVER, cov[g]||{})); }
     else CORE_OVER=cov;
   }
+  if(BLOB_LOCAL[KEY_COREOVER]) coreOverMergeIn(BLOB_LOCAL[KEY_COREOVER]);
   bindGameData(true);
   USERS = users || [];
   SESSION = sess || null;
@@ -5449,13 +5480,17 @@ async function boot(){
   if(acc) ACCESS=Object.assign(ACCESS, acc);
   // три облачных чтения — параллельно: последовательно они складывали свои таймауты (до 45 с на мёртвой сети)
   try{
+    // своя запись, не дошедшая до облака в прошлый раз, лежит только в локальном зеркале —
+    // берём её ДО чтения облака (sget перезапишет зеркало облачной копией) и досливаем
+    let gl=null; if(GAMES_DIRTY){ try{ gl=await sgetLocal(KEY_GAMES, true); }catch(e){} }
     const [bm, gm] = await Promise.all([
       sget(KEY_BM,false).catch(()=>null),
       sget(KEY_GAMES,true).catch(()=>null),
       chronoGamesLoad().catch(()=>null),   // архив игр ГМа в хронологии
     ]);
     if(Array.isArray(bm)) BMARKS=bm;
-    if(Array.isArray(gm)) GAMES=gm;
+    gamesAdopt(gm);
+    if(Array.isArray(gl)){ gamesMergeRemote(gl); setTimeout(()=>{ try{ persistGames(true); }catch(e){} }, 1500); }
   }catch(e){}
   // миграция заявок: теги игроков «@login» → «login»
   let gamesMigrated=false;
@@ -6344,13 +6379,25 @@ const CHRONO_SECTIONS=[
   ['other','Прочее'],
 ];
 async function chronoGamesLoad(){
+  let loc=null; if(BLOB_PENDING.has(KEY_CHRONO_GAMES)){ try{ loc=JSON.parse(localStorage.getItem(KEY_CHRONO_GAMES)||'null'); }catch(e){} }
   try{ const v=await sget(KEY_CHRONO_GAMES,true); if(v && typeof v==='object') CHRONO_GAMES=Object.assign({legacy:[],neverland:[],terra:[],assimilation:[],skazki:[],gw:[]}, v); }catch(e){}
+  if(loc) chronoGamesMergeIn(loc);
 }
-async function persistChronoGames(){ await sset(KEY_CHRONO_GAMES, CHRONO_GAMES, true).catch(()=>{}); }
+/* архив игр хроники правят три разработчика с разных устройств — пишем слиянием по updatedAt
+   (раньше строка переписывалась целиком, и вкладка со вчерашней копией стирала чужие игры с заметками);
+   удаление — надгробием {id, deleted, updatedAt}, чтобы игра не вернулась из чужой копии */
+function chronoGamesMergeIn(remote){
+  if(!remote || typeof remote!=='object' || Array.isArray(remote)) return;
+  Object.keys(remote).forEach(camp=>{ if(!Array.isArray(remote[camp])) return;
+    CHRONO_GAMES[camp]=mergeChars(CHRONO_GAMES[camp]||[], remote[camp]).filter(g=>g && !(g.deleted && (Date.now()-(g.updatedAt||0))>90*864e5)); });
+}
+async function persistChronoGames(quiet){
+  try{ return await blobPersist(KEY_CHRONO_GAMES, chronoGamesMergeIn, ()=>CHRONO_GAMES, quiet); }catch(e){ return false; }
+}
 /* список игр кампании */
 function openChronoCampaign(camp){
   if(!isDev()){ toast('Раздел разработчиков'); return; }
-  const list=(CHRONO_GAMES[camp]||[]).slice().sort((a,b)=>(b.at||0)-(a.at||0));
+  const list=(CHRONO_GAMES[camp]||[]).filter(g=>g && !g.deleted).sort((a,b)=>(b.at||0)-(a.at||0));
   const rows=list.length ? `<div class="tline">${list.map((g,i)=>`
     <div class="tline-ev${i===list.length-1?' first':''}">
       <button class="tline-card" onclick="openChronoGame('${camp}','${g.id}')">
@@ -6371,7 +6418,7 @@ function openChronoCampaign(camp){
 function openChronoGame(camp, id){
   if(!isDev()) return;
   const arr=CHRONO_GAMES[camp]=CHRONO_GAMES[camp]||[];
-  let g=id ? arr.find(x=>x.id===id) : null;
+  let g=id ? arr.find(x=>x && x.id===id && !x.deleted) : null;
   const isNew=!g;
   if(!g) g={ id:'cg'+Date.now().toString(36)+Math.random().toString(36).slice(2,5), title:'', date:'', loc:'', time:'', seats:'5', played:false, sec:{}, at:Date.now() };
   CHRONO_EDIT={camp, id:g.id, isNew, g};
@@ -6416,7 +6463,7 @@ function delChronoGame(){
   const b=document.getElementById('cgDelBtn');
   if(b && !b.dataset.arm){ b.dataset.arm='1'; b.textContent='Точно удалить?'; return; }
   const e=CHRONO_EDIT; if(!e) return;
-  CHRONO_GAMES[e.camp]=(CHRONO_GAMES[e.camp]||[]).filter(x=>x.id!==e.id);
+  CHRONO_GAMES[e.camp]=(CHRONO_GAMES[e.camp]||[]).filter(x=>x && x.id!==e.id).concat([{id:e.id, deleted:true, updatedAt:Date.now()}]);
   persistChronoGames(); toast('Игра удалена'); openChronoCampaign(e.camp);
 }
 /* «Анонсировать» → сохраняем игру и открываем создание анонса в новостях с предзаполнением и связью */
@@ -6643,23 +6690,58 @@ function ceImgPick(inp){
   inp.value='';
 }
 function ceImgClear(){ EDIT_IMG=''; const t=document.getElementById('ceThumb'); if(t) t.innerHTML=''; }
+/* Общие блобы (архив, новости, хроника, правки ядра, архив игр хроники) пишутся целиком, поэтому
+   перед записью — чтение и слияние. Раньше тайм-аут чтения считался «сливать нечего», и строка
+   переписывалась копией из памяти: пропадало всё, что за это время добавил другой ГМ. Теперь без
+   удачного чтения в облако не пишем: правка ложится на устройство, ключ встаёт в BLOB_PENDING
+   (переживает перезагрузку), а тик дошлёт его тем же путём — снова через чтение и слияние. */
+const BLOB_PENDING=new Set();
+try{ (JSON.parse(localStorage.getItem('comik:blob:pending')||'[]')||[]).forEach(k=>BLOB_PENDING.add(k)); }catch(e){}
+function blobPendingSave(){ try{ BLOB_PENDING.size ? localStorage.setItem('comik:blob:pending', JSON.stringify([...BLOB_PENDING])) : localStorage.removeItem('comik:blob:pending'); }catch(e){} }
+let BLOB_TOLD=0;
+async function blobPersist(key, merge, value, quiet){
+  if(!supa) return sset(key, value(), true);
+  let remote;
+  try{ remote=await withTimeout(cloudGet(key), CLOUD_TMO); }catch(e){ remote=undefined; }
+  if(remote===undefined){
+    await ssetLocal(key, value(), true);
+    BLOB_PENDING.add(key); blobPendingSave();
+    if(!quiet && Date.now()-BLOB_TOLD>8000){ BLOB_TOLD=Date.now(); toast('⚠ Облако не ответило — сохранено на этом устройстве, отправим, когда связь вернётся'); }
+    return false;
+  }
+  if(remote!==null){ try{ merge(remote); }catch(e){} }
+  const ok=await sset(key, value(), true, quiet);
+  if(ok) BLOB_PENDING.delete(key); else if(SSET_LAST_ERR!=='noperm') BLOB_PENDING.add(key);
+  blobPendingSave();
+  return ok;
+}
+/* дослать отложенные блобы (тик, возврат сети) */
+async function blobFlush(){
+  if(!supa || !BLOB_PENDING.size) return;
+  const fn={[KEY_ARCHIVE]:persistArchive, [KEY_NEWS]:persistNews, [KEY_CHRONO]:persistChrono, [KEY_COREOVER]:persistCoreOver, [KEY_CHRONO_GAMES]:persistChronoGames};
+  for(const k of [...BLOB_PENDING]){ if(fn[k]){ try{ await fn[k](true); }catch(e){} } else { BLOB_PENDING.delete(k); blobPendingSave(); } }
+}
+/* Своя неотправленная правка лежит в локальном зеркале ключа, а стартовое чтение облака это зеркало
+   перезаписывает — поэтому для отложенных ключей зеркало читаем ДО облака, а после слияния
+   досливаем (по updatedAt: своё свежее выигрывает, чужое свежее не теряется) */
+function blobLocalSnapshot(){
+  const out={};
+  BLOB_PENDING.forEach(k=>{ try{ const v=localStorage.getItem(k); if(v) out[k]=JSON.parse(v); }catch(e){} });
+  return out;
+}
 /* Запись архива слиянием: перед сохранением подтягиваем свежее облако и мержим по свежести
    (updatedAt), чтобы правка на одном устройстве не затирала карточки, добавленные на другом.
    Удаление хранится надгробием {deleted:true}. */
-async function persistArchive(){
-  if(supa){
-    try{
-      const remote=await withTimeout(cloudGet(KEY_ARCHIVE), CLOUD_TMO);
-      if(remote && typeof remote==='object'){
-        const rmap=normGameMap(remote), coreIds=new Set(CORE.map(c=>c.id));
-        ALL_GAMES.forEach(g=>{
-          ARCHIVE_ALL[g]=mergeChars(ARCHIVE_ALL[g], rmap[g])
-            .filter(c=>c && !coreIds.has(c.id) && !(c.deleted && (Date.now()-(c.updatedAt||0))>90*864e5));
-        });
-      }
-    }catch(e){}
-  }
-  return sset(KEY_ARCHIVE, ARCHIVE_ALL, true);
+function archiveMergeIn(remote){
+  if(!remote || typeof remote!=='object') return;
+  const rmap=normGameMap(remote), coreIds=new Set(CORE.map(c=>c.id));
+  ALL_GAMES.forEach(g=>{
+    ARCHIVE_ALL[g]=mergeChars(ARCHIVE_ALL[g], rmap[g])
+      .filter(c=>c && !coreIds.has(c.id) && !(c.deleted && (Date.now()-(c.updatedAt||0))>90*864e5));
+  });
+}
+async function persistArchive(quiet){
+  return blobPersist(KEY_ARCHIVE, archiveMergeIn, ()=>ARCHIVE_ALL, quiet);
 }
 /* ── Дозагрузка облачных данных после старта ──
    На десктопе первое чтение при загрузке иногда «отваливается» по таймауту (медленная/дёрганая
@@ -6723,43 +6805,27 @@ function cloudRepullBind(){
   window.addEventListener('online', ()=>{ if(CHARS_DIRTY && typeof currentTag==='function' && currentTag() && typeof persistChars==='function') persistChars(true).catch(()=>{}); cloudRepull('online'); });
 }
 /* Правки/скрытия карточек ядра — тем же слиянием (свежее чужое подхватываем, своё в приоритете) */
-async function persistCoreOver(){
-  if(supa){
-    try{
-      const remote=await withTimeout(cloudGet(KEY_COREOVER), CLOUD_TMO);
-      if(remote && typeof remote==='object'){
-        Object.keys(remote).forEach(id=>{ const r=remote[id], l=CORE_OVER[id];
-          if(!l || (r && (r.updatedAt||0)>(l.updatedAt||0))) CORE_OVER[id]=r; });
-      }
-    }catch(e){}
-  }
-  return sset(KEY_COREOVER, CORE_OVER, true);
+function coreOverMergeIn(remote){
+  if(!remote || typeof remote!=='object') return;
+  Object.keys(remote).forEach(id=>{ const r=remote[id], l=CORE_OVER[id];
+    if(!l || (r && (r.updatedAt||0)>(l.updatedAt||0))) CORE_OVER[id]=r; });
+}
+async function persistCoreOver(quiet){
+  return blobPersist(KEY_COREOVER, coreOverMergeIn, ()=>CORE_OVER, quiet);
 }
 /* Новости — слияние по свежести (updatedAt) + надгробия, чтобы правки разных
    устройств не затирали друг друга, а удалённая новость не «воскресала» */
-async function persistNews(){
-  if(supa){
-    try{
-      const remote=await withTimeout(cloudGet(KEY_NEWS), CLOUD_TMO);
-      if(Array.isArray(remote)){
-        NEWS = mergeChars(NEWS, remote).filter(n=>n && !(n.deleted && (Date.now()-(n.updatedAt||0))>90*864e5));
-      }
-    }catch(e){}
-  }
-  return sset(KEY_NEWS, NEWS, true);
+function newsMergeIn(remote){
+  if(Array.isArray(remote)) NEWS = mergeChars(NEWS, remote).filter(n=>n && !(n.deleted && (Date.now()-(n.updatedAt||0))>90*864e5));
+}
+async function persistNews(quiet){
+  return blobPersist(KEY_NEWS, newsMergeIn, ()=>NEWS, quiet);
 }
 /* Хронология — по-ключевое слияние: чужие правки подхватываем, свои (этой сессии) храним */
 const CHRONO_EDITED=new Set();
-async function persistChrono(){
-  if(supa){
-    try{
-      const remote=await withTimeout(cloudGet(KEY_CHRONO), CLOUD_TMO);
-      if(remote && typeof remote==='object'){
-        Object.keys(remote).forEach(k=>{ if(!CHRONO_EDITED.has(k)) CHRONO_DATA[k]=remote[k]; });
-      }
-    }catch(e){}
-  }
-  return sset(KEY_CHRONO, CHRONO_DATA, true);
+async function persistChrono(quiet){
+  try{ localStorage.setItem('comik:chrono:edited', JSON.stringify([...CHRONO_EDITED])); }catch(e){}   // какие ветки свои — на случай досылки после перезагрузки
+  return blobPersist(KEY_CHRONO, remote=>{ if(remote && typeof remote==='object') Object.keys(remote).forEach(k=>{ if(!CHRONO_EDITED.has(k)) CHRONO_DATA[k]=remote[k]; }); }, ()=>CHRONO_DATA, quiet);
 }
 function saveCard(id){
   if(!isDev()) return;   // архив меняет только разработчик
@@ -7025,54 +7091,196 @@ function delNews(id){
    кнопкой «Записаться на игру» — имя + прикреплённый персонаж. */
 const KEY_GAMES='comik:games:v1';
 let GAMES=[], SCHED_GAME='terra';
-/* Слияние облачной записи на игру с локальной. Раньше жило только внутри
-   persistGames, а фоновый тик подменял ячейку целиком (GAMES[i]=r) — и чужая
-   копия могла стереть того, кто только что записался. Теперь путь один. */
+/* ── Целостность записи на игры ──
+   Строку comik:games:v1 правят все сразу: ГМ — ячейки, игроки — свои записи. Раньше слияние умело
+   только объединять: отменённые записи, выгнанные игроки и удалённые сессии возвращались из чужих
+   устаревших вкладок, правки ГМа (время, место) не доходили, а при тайм-ауте чтения строка
+   переписывалась вслепую. Теперь:
+   · удалённая/сыгранная сессия остаётся в строке надгробием {id, deleted, updatedAt} (90 дней);
+   · снятая запись оставляет в ячейке отметку gone[тег]=время — запись не новее неё не воскресает;
+   · свежесть записи — upd (правка) или at (время записи), порядок мест — по at;
+   · поля ячейки берутся по updatedAt, который ставит только редактор ГМа;
+   · запись в облако: прочитать → слить → записать → перечитать, пока облако не совпадёт с итогом.
+   Всё, что пришло из облака, проходит gameClean: id и цвета попадают в разметку, а строку
+   может переписать любой вошедший игрок. */
+const SAFE_ID=/^[A-Za-z0-9_-]{1,64}$/, SAFE_COLOR=/^(#[0-9a-fA-F]{3,8}|var\(--[a-z0-9-]{1,30}\))$/, SAFE_GAME=/^[a-z0-9_-]{1,24}$/;
+let GAMES_GONE={};                 // id удалённой сессии → время удаления
+const GAME_TOMB_TTL=90*864e5;
+const gameFresh=p=>Math.max(+(p&&p.upd)||0, +(p&&p.at)||0);
+function gameClean(r){
+  if(!r || typeof r!=='object' || Array.isArray(r) || !SAFE_ID.test(String(r.id||''))) return null;
+  if(r.deleted){
+    const t={id:r.id, deleted:true, updatedAt:+r.updatedAt||1};
+    // «сыграна»: клиент игрока по этой отметке сам допишет игру в историю своих персонажей
+    const pl=r.played;
+    if(pl && typeof pl==='object' && Array.isArray(pl.chars)) t.played={t:String(pl.t||'Игра').slice(0,120), g:SAFE_GAME.test(String(pl.g||''))?pl.g:'', at:+pl.at||t.updatedAt, chars:pl.chars.filter(x=>SAFE_ID.test(String(x||''))).slice(0,40)};
+    return t;
+  }
+  if(!SAFE_GAME.test(String(r.game||''))) return null;
+  const s=Object.assign({}, r), now=Date.now();
+  const gone={};
+  if(s.gone && typeof s.gone==='object' && !Array.isArray(s.gone)) Object.keys(s.gone).forEach(t=>{ const v=+s.gone[t]; if(v>0 && now-v<GAME_TOMB_TTL) gone[normTag(t)]=v; });
+  s.gone=gone;
+  s.players=(Array.isArray(s.players)?s.players:[]).filter(p=>p && typeof p==='object' && typeof p.tag==='string' && p.tag.trim()).map(p=>{
+    const q=Object.assign({}, p);
+    if(q.charId!=null && q.charId!=='' && !SAFE_ID.test(String(q.charId))) q.charId='';
+    if(q.bg!=null && !SAFE_COLOR.test(String(q.bg))) delete q.bg;
+    if(q.ink!=null && !SAFE_COLOR.test(String(q.ink))) delete q.ink;
+    return q;
+  });
+  if(s.chronoRef!=null && !(typeof s.chronoRef==='object' && SAFE_GAME.test(String(s.chronoRef.camp||'')) && SAFE_ID.test(String(s.chronoRef.id||'')))) delete s.chronoRef;
+  return s;
+}
+/* массив из облака → живые сессии + надгробия (всё уже очищено) */
+function gamesSplit(arr){
+  const live=[], gone={}, played=[], byId=new Map();
+  (Array.isArray(arr)?arr:[]).forEach(r=>{
+    const c=gameClean(r); if(!c) return;
+    if(c.deleted){ gone[c.id]=Math.max(gone[c.id]||0, c.updatedAt); if(c.played) played.push(c); return; }
+    const was=byId.get(c.id); if(was){ gameMergeInto(was, c); return; }
+    byId.set(c.id, c); live.push(c);
+  });
+  return {live, gone, played};
+}
+/* слить облачную копию ячейки r в свою mine */
+function gameMergeInto(mine, r){
+  const gone=Object.assign({}, mine.gone||{});
+  Object.keys(r.gone||{}).forEach(t=>{ if((r.gone[t]||0)>(gone[t]||0)) gone[t]=r.gone[t]; });
+  const seen=new Map();
+  (mine.players||[]).concat(r.players||[]).forEach(p=>{
+    if(!p || !p.tag) return;
+    const k=normTag(p.tag), cur=seen.get(k);
+    if(!cur || gameFresh(p)>gameFresh(cur)) seen.set(k, p);
+  });
+  const players=[...seen.values()].filter(p=>gameFresh(p)>(gone[normTag(p.tag)]||0)).sort((a,b)=>(a.at||0)-(b.at||0));
+  // поля ячейки (время, место, места) — по правке ГМа; списки уже слиты
+  if((r.updatedAt||0)>(mine.updatedAt||0)) Object.assign(mine, r);
+  // Двое заняли последнее место одновременно (каждый видел его свободным) — лишних снимаем по порядку
+  // записи, одинаково на любом клиенте. Только тех, кто записался ПОСЛЕ последней правки ячейки:
+  // если ГМ сам уменьшил число мест, уже записавшихся это не выкидывает
+  const lim=parseInt(mine.seats,10)||0, since=+mine.updatedAt||0;
+  for(let i=players.length-1; lim && i>=lim; i--){
+    const p=players[i]; if((+p.at||0)<=since) continue;
+    const k=normTag(p.tag); gone[k]=Math.max(gone[k]||0, gameFresh(p)+1); players.splice(i,1);
+  }
+  mine.players=players; mine.gone=gone;
+}
+/* что пишем в облако: живые сессии + свежие надгробия (с отметкой «сыграна», если была) */
+let GAMES_PLAYED={};               // id → {t,g,at,chars} для надгробия сыгранной сессии
+function gamesPayload(){
+  const cut=Date.now()-GAME_TOMB_TTL;
+  const tomb=Object.keys(GAMES_GONE).filter(id=>GAMES_GONE[id]>cut).map(id=>{
+    const t={id, deleted:true, updatedAt:GAMES_GONE[id]}; if(GAMES_PLAYED[id]) t.played=GAMES_PLAYED[id]; return t; });
+  return GAMES.filter(g=>g && !GAMES_GONE[g.id]).concat(tomb);
+}
+/* канонический вид для сравнения «облако уже совпадает»: jsonb в Postgres переставляет ключи */
+function canonJson(v){
+  if(Array.isArray(v)) return '['+v.map(canonJson).join(',')+']';
+  if(v && typeof v==='object') return '{'+Object.keys(v).sort().filter(k=>v[k]!==undefined).map(k=>JSON.stringify(k)+':'+canonJson(v[k])).join(',')+'}';
+  return JSON.stringify(v===undefined?null:v);
+}
+const gamesCanon=arr=>{ const {live,gone,played}=gamesSplit(arr); return canonJson({l:live.slice().sort((a,b)=>a.id<b.id?-1:1), g:gone, p:played.map(x=>x.id).sort()}); };
+/* принять надгробия: помнить удаление, убрать сессию из списка, дописать историю своим персонажам */
+function gamesTakeGone(gone, played){
+  Object.keys(gone||{}).forEach(id=>{ if((gone[id]||0)>(GAMES_GONE[id]||0)) GAMES_GONE[id]=gone[id]; });
+  (played||[]).forEach(t=>{ if(t && t.played && !GAMES_PLAYED[t.id]) GAMES_PLAYED[t.id]=t.played; });
+  GAMES=GAMES.filter(g=>g && !GAMES_GONE[g.id]);
+  if(played && played.length) gamePlayedHistory(played);
+}
+/* Слияние облачной записи на игру с локальной — единственный путь (сохранение, тик, старт) */
 function gamesMergeRemote(remote){
   if(!Array.isArray(remote)) return false;
-  let changed=false;
+  const before=canonJson(GAMES)+'|'+Object.keys(GAMES_GONE).length;
+  const {live, gone, played}=gamesSplit(remote);
+  gamesTakeGone(gone, played);
   const byId=new Map(); GAMES.forEach(g=>{ if(g&&g.id) byId.set(g.id,g); });
-  remote.forEach(r=>{
-    if(!r || DELETED_GAMES.has(r.id)) return;
+  const me=currentTag(), lost=[];
+  live.forEach(r=>{
+    if(GAMES_GONE[r.id]) return;
     const mine=byId.get(r.id);
-    if(!mine){ GAMES.push(r); changed=true; return; }
-    // Сессия есть и там и там: сливаем записавшихся по тегу, а не берём
-    // чей-то список целиком. Раньше совпавшая ячейка отбрасывалась вместе
-    // со всеми, кто успел записаться, — второй записавшийся стирал первого.
-    const before=JSON.stringify(mine);
-    const seen=new Map();
-    (mine.players||[]).forEach(p=>{ if(p&&p.tag) seen.set(normTag(p.tag), p); });
-    (r.players||[]).forEach(p=>{
-      if(!p||!p.tag) return;
-      const k=normTag(p.tag);
-      // своя запись главнее: если человек только что снял себя, копия из
-      // облака не должна его воскрешать
-      if(SESSION && k===normTag(SESSION)) return;
-      const cur=seen.get(k);
-      if(!cur || (p.at||0)>(cur.at||0)) seen.set(k, p);
-    });
-    mine.players=[...seen.values()].sort((a,b)=>(a.at||0)-(b.at||0));
-    // саму ячейку (время, место, ведущий) берём более свежую, список — уже слитый
-    if((r.updatedAt||0)>(mine.updatedAt||0)){
-      const keep=mine.players; Object.assign(mine, r); mine.players=keep;
-    }
-    if(JSON.stringify(mine)!==before) changed=true;
+    if(!mine){ GAMES.push(r); byId.set(r.id, r); return; }
+    const had=!!me && (mine.players||[]).some(p=>normTag(p.tag)===me);
+    gameMergeInto(mine, r);
+    if(had && !(mine.players||[]).some(p=>normTag(p.tag)===me)) lost.push(mine);
   });
-  return changed;
+  // свою запись сняли не мы сами (ГМ, гонка за последнее место, отмена с другого устройства) — скажем
+  lost.forEach(s=>{ const full=(parseInt(s.seats,10)||0) && (s.players||[]).length>=(parseInt(s.seats,10)||0);
+    toast(full ? 'Мест не осталось — запись на «'+(s.title||'сессию')+'» снята: кто-то успел раньше' : 'Запись на «'+(s.title||'сессию')+'» снята'); });
+  return canonJson(GAMES)+'|'+Object.keys(GAMES_GONE).length!==before;
 }
-async function persistGames(){
+/* принять строку целиком (старт): своё несохранённое досливается отдельно, см. boot() */
+function gamesAdopt(arr){
+  if(!Array.isArray(arr)) return;
+  const {live, gone, played}=gamesSplit(arr);
+  GAMES=live; gamesTakeGone(gone, played);
+}
+/* Сыгранная сессия → запись в историю персонажей. Раньше её дописывал только ГМ, а его persistChars
+   пишет лишь свои листы — у игроков история не появлялась. Теперь каждый клиент дописывает её
+   СВОИМ персонажам по отметке в надгробии (hid 'gp:<id>' — повторно не добавится) */
+function gamePlayedHistory(tombs){
+  const me=currentTag(); if(!me) return;
+  let touched=false;
+  tombs.forEach(t=>{ const pl=t.played; if(!pl || !pl.chars || !pl.chars.length) return;
+    const hid='gp:'+t.id;
+    ALL_GAMES.forEach(g=>(CHARS_ALL[g]||[]).forEach(c=>{
+      if(!c || c.deleted || pl.chars.indexOf(c.id)<0) return;
+      if(!(c.owner ? normTag(c.owner)===me : ADMIN)) return;          // чужие листы дописывают их владельцы
+      c.history=Array.isArray(c.history)?c.history:[];
+      if(c.history.some(h=>h && h.hid===hid)) return;
+      c.history.push({hid, t:pl.t||'Игра', g:pl.g||g, at:pl.at||Date.now(), note:''});
+      if(c.history.length>200) c.history=c.history.slice(-200);
+      c.updatedAt=Date.now(); touched=true;
+    }));
+  });
+  if(touched && typeof persistChars==='function') setTimeout(()=>{ persistChars(true).catch(()=>{}); }, 300);
+}
+/* Запись в облако. Очередь: вторая просьба ждёт первую и делает свой круг со всеми правками.
+   Без удачного чтения строку не переписываем: правка лежит на устройстве, флаг comik:games:dirty
+   дошлёт её тиком (или при следующем старте). */
+let GAMES_Q=Promise.resolve(), GAMES_DIRTY=false;
+try{ GAMES_DIRTY=localStorage.getItem('comik:games:dirty')==='1'; }catch(e){}
+function gamesDirty(on){ GAMES_DIRTY=!!on; try{ on ? localStorage.setItem('comik:games:dirty','1') : localStorage.removeItem('comik:games:dirty'); }catch(e){} }
+function persistGames(quiet){
+  const p=GAMES_Q.then(()=>persistGamesOnce(quiet)).catch(()=>{});
+  GAMES_Q=p; return p;
+}
+async function persistGamesOnce(quiet){
+  let ok=false, why='';
   try{
-    if(supa){
-      let remote=null;
-      try{ remote=await withTimeout(cloudGet(KEY_GAMES), 4000); }catch(e){}
-      gamesMergeRemote(remote);
+    await ssetLocal(KEY_GAMES, gamesPayload(), true);
+    if(!supa){ ok=true; }
+    else for(let i=0;i<5 && !ok;i++){
+      let remote;
+      try{ remote=await withTimeout(cloudGet(KEY_GAMES), 8000); }catch(e){ remote=undefined; }
+      if(remote===undefined){ why='net'; break; }
+      if(remote!==null && !Array.isArray(remote)){ why='format'; break; }
+      gamesMergeRemote(remote||[]);
+      const val=gamesPayload();
+      if(remote && gamesCanon(remote)===gamesCanon(val)){ ok=true; break; }   // облако уже такое, как надо
+      const w=await sset(KEY_GAMES, val, true, true);
+      if(!w){ why=SSET_LAST_ERR||'net'; break; }
+      // перечитаем на следующем круге: если кто-то писал одновременно, сольём и его правку
+      await new Promise(r=>setTimeout(r, 150+Math.random()*350));
     }
-    const ok=await sset(KEY_GAMES, GAMES, true);
-    if(!ok && supa && SSET_LAST_ERR!=='noperm') toast('⚠ Облако недоступно — сохранено локально');   // при отказе в правах sset уже сказал «Нет прав на запись»
-  }catch(e){}
+  }catch(e){ why=why||'net'; }
+  if(ok) gamesDirty(false);
+  else if(supa){
+    gamesDirty(true);
+    if(!quiet){
+      if(why==='noperm') toast('⚠ Нет прав на запись — запись на игру не сохранена в облаке');
+      else toast('⚠ Облако не ответило — запись сохранена на устройстве, отправим, когда связь вернётся');
+    }
+  }
   try{ renderNews(); }catch(e){} // обновить баннер «Ближайшая игра» и кнопку записи сразу после изменения игр
+  return ok;
 }
-const DELETED_GAMES=new Set();
+/* подтянуть свежую запись перед решением «есть ли места» (форма записи живёт на старых данных:
+   фоновый тик не ходит, пока открыта модалка) */
+async function gamesPull(ms){
+  if(!supa) return false;
+  try{ const r=await withTimeout(cloudGet(KEY_GAMES), ms||5000); if(Array.isArray(r)) return gamesMergeRemote(r); }catch(e){}
+  return false;
+}
 const gameTitle = id => (PROJECT_TITLES[id]||id).replace(/<[^>]*>/g,'');
 function seatsLeft(s){ return Math.max(0, (parseInt(s.seats,10)||0) - (s.players||[]).length); }
 function myEntry(s){ return SESSION ? (s.players||[]).find(p=>normTag(p.tag)===currentTag()) : null; }
@@ -7284,14 +7492,22 @@ function openSignupForm(id){
     </div>`;
 }
 async function doSignup(id){
-  const s=GAMES.find(x=>x.id===id); if(!s || !SESSION) return;
+  if(!GAMES.find(x=>x.id===id) || !SESSION) return;
   const name=pval('gs-name');
   pf('gs-f-name').classList.toggle('invalid', !name); if(!name) return;
-  const _mineSeat=(s.players||[]).some(p=>normTag(p.tag)===currentTag()); if(!_mineSeat && seatsLeft(s)<=0){ toast('Мест не осталось'); openGameSignup(); return; }
   const charId=pf('gs-char')?.value||'';
+  const btn=document.querySelector('#modal .pacts .btn.primary'); if(btn) btn.disabled=true;
+  await gamesPull(4000);   // места считаем по свежей копии: форма могла провисеть открытой долго
+  const s=GAMES.find(x=>x.id===id); if(!s){ toast('Эта сессия уже снята с расписания'); openGameSignup(); return; }
+  const me=currentTag(), prev=(s.players||[]).find(p=>normTag(p.tag)===me);
+  const _mineSeat=!!prev; if(!_mineSeat && seatsLeft(s)<=0){ toast('Мест не осталось'); openGameSignup(); return; }
   const ch=charId ? (CHARS_ALL[s.game]||[]).find(c=>c.id===charId && !c.deleted) : null;
-  s.players=(s.players||[]).filter(p=>normTag(p.tag)!==currentTag());
-  s.players.push({tag:SESSION, name, charId:ch?ch.id:'', charName:ch?ch.name:'', bg:profBg(SESSION), ink:profInk(SESSION), at:Date.now()});
+  // at — место в очереди (при правке своей записи не меняется), upd — свежесть правки для слияния;
+  // обе строго новее отметки о снятии: иначе запись после отмены/кика не пережила бы слияние
+  const now=Math.max(Date.now(), ((s.gone||{})[me]||0)+1);
+  s.players=(s.players||[]).filter(p=>normTag(p.tag)!==me);
+  s.players.push({tag:SESSION, name, charId:ch?ch.id:'', charName:ch?ch.name:'', bg:profBg(SESSION), ink:profInk(SESSION), at:prev?(prev.at||now):now, upd:now});
+  s.players.sort((a,b)=>(a.at||0)-(b.at||0));
   openGameSignup(); toast(_mineSeat ? 'Запись обновлена' : 'Вы записаны!');
   renderNews();   // баннер/календарь — сразу по локальным данным, облако догоняет в фоне (persistGames перерисует ещё раз)
   await persistGames();
@@ -7311,9 +7527,16 @@ async function trkJoinLive(s, ch){
     toast('Партия уже идёт — Мастер увидит вас на доске через несколько секунд');
   }catch(e){}
 }
+/* снять запись с отметкой: gone[тег] — время снятия, строго новее самой записи (часы устройств
+   расходятся), чтобы её копия из чужой устаревшей вкладки не воскресила игрока */
+function gameDropPlayer(s, tag){
+  const k=normTag(tag), ps=s.players||[], p=ps.find(x=>normTag(x.tag)===k);
+  s.gone=Object.assign({}, s.gone); s.gone[k]=Math.max(Date.now(), (p?gameFresh(p):0)+1, (s.gone[k]||0));
+  s.players=ps.filter(x=>normTag(x.tag)!==k);
+}
 async function cancelSignup(id){
   const s=GAMES.find(x=>x.id===id); if(!s || !SESSION) return;
-  s.players=(s.players||[]).filter(p=>normTag(p.tag)!==currentTag());
+  gameDropPlayer(s, currentTag());
   openGameSignup(); toast('Запись отменена');
   renderNews();
   await persistGames();
@@ -7364,7 +7587,7 @@ function openSchedule(game){
       ${(s.players||[]).length?`<div class="gs-players">${s.players.map((p,i)=>`<span class="tag">${esc(p.name)}${p.charId?` · <button class="gs-charlink" onclick="openPlayer('${p.charId}')">${esc(p.charName||'персонаж')}</button>`:(p.charName?` · ${esc(p.charName)}`:'')} <button class="gs-kick" onclick="kickPlayer('${s.id}',${i})" title="Убрать">✕</button></span>`).join('')}</div>`:'<div class="opt">Записей пока нет</div>'}
       <div class="gs-act">
         <button class="btn ghost sm" onclick="openCellEditor('${s.id}')">Редактировать</button>
-        <button class="btn primary sm" onclick="gamePlayed('${s.id}')">Игра сыграна</button>
+        <button class="btn primary sm" onclick="gamePlayed(this.dataset.id,this)" data-id="${esc(s.id)}">Игра сыграна</button>
       </div>
     </div>`).join('')
     : '<div class="empty" style="margin-top:14px">[ ПУСТО ] В этой игре нет анонсов.</div>';
@@ -7378,28 +7601,24 @@ function openSchedule(game){
   document.getElementById('scrim').classList.add('open');
 }
 /* «Игра сыграна»: сессия просто удаляется, её заметка стирается, партия в трекерах отвязывается */
-async function gamePlayed(id){
+async function gamePlayed(id, btn){
   if(!ADMIN) return;
   const s=GAMES.find(x=>x && x.id===id); if(!s) return;
   if(!canManageGame(s)){ toast('Завершать можно только свои игры'); return; }
-  // сыгранную игру записываем в историю каждого участвовавшего персонажа
-  let charsTouched=false;
-  (s.players||[]).forEach(p=>{
-    if(!p || !p.charId) return;
-    const c=(CHARS_ALL[s.game]||[]).find(x=>x && x.id===p.charId && !x.deleted);
-    if(!c) return;
-    c.history=Array.isArray(c.history)?c.history:[];
-    c.history.push({ hid:uid(), t:s.title||'Игра', g:s.game, at:Date.now(), note:'' });
-    if(c.history.length>200) c.history=c.history.slice(-200);
-    c.updatedAt=Date.now(); charsTouched=true;
-  });
-  if(charsTouched) persistChars().catch(()=>{});
+  // необратимо (сессия, записи, доска и фон карты) — как и удаление, со второго нажатия
+  if(btn && !btn.dataset.arm){ btn.dataset.arm='1'; btn.textContent='Точно сыграна?';
+    setTimeout(()=>{ if(btn.isConnected && btn.dataset.arm){ delete btn.dataset.arm; btn.textContent='Игра сыграна'; } }, 5000); return; }
+  // сыгранную игру записываем в историю каждого участвовавшего персонажа: отметка едет в надгробии,
+  // и каждый клиент дописывает её своим листам (ГМ — своим и безхозным) — см. gamePlayedHistory
+  const now=Date.now();
+  GAMES_PLAYED[id]={t:String(s.title||'Игра').slice(0,120), g:s.game, at:now, chars:(s.players||[]).map(p=>p&&p.charId).filter(x=>x && SAFE_ID.test(x)).slice(0,40)};
+  gamePlayedHistory([{id, played:GAMES_PLAYED[id]}]);
   // если игра анонсирована из хронологии — не теряем её, а помечаем «пройдено» в архиве ГМа
   if(s.chronoRef && s.chronoRef.camp && s.chronoRef.id){
-    const cg=(CHRONO_GAMES[s.chronoRef.camp]||[]).find(x=>x && x.id===s.chronoRef.id);
-    if(cg){ cg.played=true; cg.playedAt=Date.now(); persistChronoGames().catch(()=>{}); }
+    const cg=(CHRONO_GAMES[s.chronoRef.camp]||[]).find(x=>x && x.id===s.chronoRef.id && !x.deleted);
+    if(cg){ cg.played=true; cg.playedAt=now; cg.updatedAt=now; persistChronoGames().catch(()=>{}); }
   }
-  DELETED_GAMES.add(id);
+  GAMES_GONE[id]=now;
   GAMES=GAMES.filter(x=>x && x.id!==id);
   delete GMNOTES[id];
   try{ localStorage.setItem('comik:gmnotes:local', JSON.stringify(GMNOTES)); }catch(e){}
@@ -7462,7 +7681,8 @@ async function saveCell(id){
   const cell=Object.assign(s||{id:'gm'+Date.now().toString(36), game:cellGame, owner:currentTag(), players:[], createdAt:Date.now()},{
     title, seats:Math.max(1,parseInt(pval('gc-seats'),10)||1),
     price:pval('gc-price'), loc:pval('gc-loc'), time:pval('gc-time'),
-    date:(/^\d{4}-\d{2}-\d{2}$/.test(pval('gc-date')) ? pval('gc-date') : '')   // календарь игр читает это поле
+    date:(/^\d{4}-\d{2}-\d{2}$/.test(pval('gc-date')) ? pval('gc-date') : ''),   // календарь игр читает это поле
+    updatedAt:Date.now()   // по нему слияние берёт поля ячейки: без штампа правка ГМа не доходила и откатывалась игроками
   });
   if(!s){ const cr=pval('gc-chrono'); if(cr){ try{ cell.chronoRef=JSON.parse(cr); }catch(e){} } GAMES.push(cell); }
   const notify = !s && (document.getElementById('gc-notify')||{}).checked;
@@ -7475,8 +7695,8 @@ async function delCell(id){
   if(g && !canManageGame(g)){ toast('Удалять можно только свои анонсы'); return; }
   const b=document.getElementById('gcDel');
   if(b && !b.dataset.arm){ b.dataset.arm='1'; b.textContent='Точно удалить?'; return; }
+  GAMES_GONE[id]=Date.now();                     // надгробие: чужая устаревшая вкладка не вернёт сессию
   GAMES=GAMES.filter(x=>x.id!==id);
-  DELETED_GAMES.add(id);
   openSchedule(); toast('Сессия удалена'); renderNews();
   await persistGames();
 }
@@ -7484,7 +7704,8 @@ async function kickPlayer(id,i){
   if(!ADMIN) return;
   const s=GAMES.find(x=>x.id===id); if(!s||!s.players) return;
   if(!canManageGame(s)){ toast('Управлять записями можно только в своих играх'); return; }
-  s.players.splice(i,1);
+  const p=s.players[i]; if(!p) return;
+  gameDropPlayer(s, p.tag);
   openSchedule(); toast('Запись убрана'); renderNews();
   await persistGames();
 }
@@ -8135,6 +8356,8 @@ async function cloudTickOnce(){
     const scrim=document.getElementById('scrim');
     if(scrim && scrim.classList.contains('open')) return;
     if(CHARS_DIRTY && currentTag()){ try{ await persistChars(true); }catch(e){} }   // лист, не ушедший в облако офлайн, — дошлём до чтения (тихо), иначе облачная копия его перекроет
+    if(GAMES_DIRTY){ try{ await persistGames(true); }catch(e){} }                   // запись на игру, не дошедшая до облака, — так же
+    if(BLOB_PENDING.size){ try{ await blobFlush(); }catch(e){} }                    // архив/новости/хроника, отложенные без связи
     const [ch,gm]=await Promise.all([
       withTimeout(fetchCloudCharsChanged(), CLOUD_TMO).catch(()=>null),   // зонд по штампам: полные строки — только изменившиеся
       withTimeout(cloudGet(KEY_GAMES),4000).catch(()=>null)
@@ -12287,8 +12510,7 @@ async function trkPartyCatchup(force){
   try{
     if(force && supa){   // стук пришёл прямо сейчас — не ждём фонового тика, читаем запись сразу
       try{ const gm=await withTimeout(cloudGet(KEY_GAMES), CLOUD_TMO);
-        if(Array.isArray(gm)) gm.forEach(r=>{ if(!r || DELETED_GAMES.has(r.id)) return;
-          const i=GAMES.findIndex(x=>x && x.id===r.id); if(i>=0) GAMES[i]=r; else GAMES.push(r); });
+        if(Array.isArray(gm)) gamesMergeRemote(gm);   // тот же слив с надгробиями: подмена ячейки целиком теряла свежих записавшихся
       }catch(e){}
     }
     const now=trkPartyIds(TRK.party), was=TRK_PARTY_SEEN[TRK.party];
@@ -14637,8 +14859,10 @@ async function pushEnable(){
     // иначе сервер шлёт, а push-служба молча отвергает
     if(sub && !pushSameKey(sub, key)){ try{ await pushRemoveSub(sub); await sub.unsubscribe(); }catch(_){} sub=null; }
     if(!sub) sub=await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:urlB64ToU8(key)});
-    try{ localStorage.setItem(PUSH_WANT_LS,'1'); localStorage.setItem(PUSH_CHECK_LS, String(Date.now())); }catch(e){}
+    try{ localStorage.setItem(PUSH_WANT_LS,'1'); }catch(e){}
     const ok=await pushSaveSub(sub);
+    // отметку проверки — только при успехе: иначе pushHeal решил бы, что всё в порядке, и не повторял 12 часов
+    if(ok) try{ localStorage.setItem(PUSH_CHECK_LS, String(Date.now())); }catch(e){}
     toast(ok ? 'Уведомления включены' : '⚠ Подписка не сохранилась в облаке — попробуем при следующем открытии');
   }catch(e){ toast('Не удалось подписаться'); }
   pushRenderBtn();
@@ -14661,19 +14885,37 @@ async function pushToggle(){
   if(st==='unsupported'){ toast('Уведомления недоступны на этом устройстве'); pushRenderBtn(); return; }
   if(st==='on') pushDisable(); else pushEnable();
 }
+/* push:subs — один массив на всех: «прочитать → поправить → записать» у двух устройств сразу
+   (ГМ просит стол включить уведомления) оставлял в облаке только последнего. Поэтому после записи
+   перечитываем и, если нас затёрли, пишем снова — до 5 кругов с паузой вразнобой */
+async function pushReadSubs(){
+  try{ const cur=await withTimeout(cloudGet('push:subs'), CLOUD_TMO); if(Array.isArray(cur)) return cur; if(cur===null) return []; }catch(e){}   // null — строки ещё нет; undefined — облако не ответило
+  return null;
+}
+const pushNap=()=>new Promise(r=>setTimeout(r, 200+Math.random()*450));
 async function pushSaveSub(sub){
   const j=sub.toJSON(); j.tag=currentTag()||''; j.at=Date.now(); j.dev=pushDevId();
-  let arr=null; try{ const cur=await withTimeout(cloudGet('push:subs'), CLOUD_TMO); if(Array.isArray(cur)) arr=cur; else if(cur===null) arr=[]; }catch(e){}   // null — строки ещё нет; undefined — облако не ответило
-  if(!arr) return false;   // список не прочитан — записью «только себя» затёрли бы чужие подписки
-  if(j.dev) arr=arr.filter(x=>!(x && x.dev===j.dev && x.endpoint!==j.endpoint));   // прежние адреса этого же устройства
-  const i=arr.findIndex(x=>x&&x.endpoint===j.endpoint); if(i>=0) arr[i]=j; else arr.push(j);
-  return !!(await sset('push:subs', arr, true, true).catch(()=>false));
+  for(let i=0;i<5;i++){
+    let arr=await pushReadSubs();
+    if(!arr) return false;   // список не прочитан — записью «только себя» затёрли бы чужие подписки
+    const has=arr.find(x=>x && x.endpoint===j.endpoint);
+    const orphans=!!j.dev && arr.some(x=>x && x.dev===j.dev && x.endpoint!==j.endpoint);
+    if(i>0 && has && (has.tag||'')===j.tag && has.dev===j.dev && !orphans) return true;   // перечитали — мы в списке
+    if(j.dev) arr=arr.filter(x=>!(x && x.dev===j.dev && x.endpoint!==j.endpoint));   // прежние адреса этого же устройства
+    const k=arr.findIndex(x=>x && x.endpoint===j.endpoint); if(k>=0) arr[k]=j; else arr.push(j);
+    if(!(await sset('push:subs', arr, true, true).catch(()=>false))) return false;
+    await pushNap();
+  }
+  return false;
 }
 async function pushRemoveSub(sub){
-  let arr=null; try{ const cur=await withTimeout(cloudGet('push:subs'), CLOUD_TMO); if(Array.isArray(cur)) arr=cur; }catch(e){}
   const dev=pushDevId(), mine=x=>x && (x.endpoint===sub.endpoint || (dev && x.dev===dev));
-  if(!arr || !arr.some(mine)) return;   // не прочитали или нас там и нет — писать нечего
-  await sset('push:subs', arr.filter(x=>!mine(x)), true, true).catch(()=>{});
+  for(let i=0;i<4;i++){
+    const arr=await pushReadSubs();
+    if(!arr || !arr.some(mine)) return;   // не прочитали или нас там уже нет — писать нечего
+    if(!(await sset('push:subs', arr.filter(x=>!mine(x)), true, true).catch(()=>false))) return;
+    await pushNap();
+  }
 }
 /* Самовосстановление подписки при каждом открытии (не чаще раза в 12 ч, если всё в порядке):
    — ключ на сервере сменился → переоформляем подписку под новый (разрешение уже дано, повторно не спрашиваем);
@@ -14697,7 +14939,7 @@ async function pushHeal(force){
       try{ sub=await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:urlB64ToU8(key)}); }
       catch(e){ toast('Уведомления нужно переподключить', {action:{label:'Включить', fn:()=>pushEnable()}, ms:9000}); return; }
     }
-    let list=null; try{ const cur=await withTimeout(cloudGet('push:subs'), CLOUD_TMO); if(Array.isArray(cur)) list=cur; else if(cur===null) list=[]; }catch(e){}
+    const list=await pushReadSubs();
     if(!list) return;                                          // облако не ответило — попробуем в другой раз
     const mine=list.find(x=>x && x.endpoint===sub.endpoint), dev=pushDevId();
     const orphans=list.some(x=>x && dev && x.dev===dev && x.endpoint!==sub.endpoint);
@@ -15592,7 +15834,7 @@ function mplDelete(id){
   const n=p.tracks.length;
   MPL=MPL.filter(x=>x.id!==id); mplSave(); MPL_OPEN.delete(id); mplOpenSave();
   renderMusicPage(); musRenderBar();
-  toast(n ? 'Плейлист удалён — '+mplPlural(n)+' вернулись в общий список' : 'Плейлист удалён');
+  toast(n ? 'Плейлист удалён — '+mplPlural(n)+((n%10===1&&n%100!==11)?' вернулся':' вернулись')+' в общий список' : 'Плейлист удалён');
 }
 function mplRename(id){ mplEdit(id); }
 /* раскрыть/свернуть — переключаем класс на месте, без перерисовки: так работает анимация */
@@ -15704,7 +15946,31 @@ function mpgDrop(e, pid){
   e.preventDefault(); e.stopPropagation();
   const tid=MPG_DRAG, s=mpgSpot(e);
   mpgDragEnd();
+  // отпустили на самом себе или в щель своего же списка — это «передумал», а не «в конец списка»
+  const own=e.target && e.target.closest ? e.target.closest('.mpg-tr') : null;
+  if(own && own.dataset.tid===tid) return;
+  if(!s.row){ const cur=mplOf(tid); if(pid ? (cur && cur.id===pid) : !cur) return; }
   mplMove(tid, pid, s.row ? s.at : '$end');
+}
+/* файл, брошенный мимо рамок (на заголовок, кнопки): браузер открыл бы его вместо сайта —
+   принимаем в общий список. Рамки плейлистов и общего списка ловят бросок раньше (stopPropagation) */
+function mpgPageOver(e){ if(!mpgIsFiles(e)) return; e.preventDefault(); try{ e.dataTransfer.dropEffect='copy'; }catch(_){} }
+function mpgPageDrop(e){
+  if(!mpgIsFiles(e)) return;
+  e.preventDefault(); mpgDragEnd();
+  const fl=[...(e.dataTransfer.files||[])]; if(!fl.length) return;
+  MUS_ADD_TO=''; musicAddFiles({files:fl, value:''});
+}
+/* корзина у трека общего списка — в два нажатия, как «Удалить трек» в окне переноса:
+   она стоит вплотную к «В плейлист», а удаление стирает файл с устройства без отмены */
+function mplTrashTap(tid, btn){
+  if(btn && !btn.classList.contains('sure')){
+    btn.classList.add('sure'); btn.title='Нажмите ещё раз — удалить'; btn.setAttribute('aria-label','Точно удалить трек?');
+    toast('Нажмите корзину ещё раз, чтобы удалить трек');
+    setTimeout(()=>{ if(btn.isConnected){ btn.classList.remove('sure'); btn.title='Удалить'; btn.setAttribute('aria-label','Удалить трек'); } }, 3000);
+    return;
+  }
+  musDelete(tid);
 }
 function mplTrackRow(t, i, pid, curId, playing){
   const on=t.id===curId, pause=on&&playing;
@@ -15713,7 +15979,7 @@ function mplTrackRow(t, i, pid, curId, playing){
     ? `<button class="mpg-ic" onclick="mplMoveMenu('${t.id}')" aria-label="Перенести" title="Перенести">${MP_ICO.move}</button>
        <button class="mpg-ic" onclick="mplMovePick('${t.id}','')" aria-label="Вернуть в общий список" title="Вернуть в общий список">${MP_ICO.eject}</button>`
     : `<button class="mpg-ic" onclick="mplMoveMenu('${t.id}')" aria-label="В плейлист" title="В плейлист">${MP_ICO.toPl}</button>
-       <button class="mpg-ic" onclick="musDelete('${t.id}')" aria-label="Удалить трек" title="Удалить">${MP_ICO.trash}</button>`;
+       <button class="mpg-ic" onclick="mplTrashTap('${t.id}',this)" aria-label="Удалить трек" title="Удалить">${MP_ICO.trash}</button>`;
   return `<div class="mpg-row mpg-tr${on?' playing':''}" data-tid="${t.id}"${drag}>
       <button class="mpg-play" onclick="mpPlayTrack(${i})" aria-label="${pause?'Пауза':'Играть'}">${pause?MP_ICO.pause:MP_ICO.play}</button>
       <span class="mpg-nm">${esc(t.name)}</span>${acts}
@@ -15755,7 +16021,7 @@ function renderMusicPage(){
   const genEmpty = !MUSIC.length
     ? `<div class="mpg-empty">Пока пусто. Нажмите «Добавить треки» и выберите аудиофайлы${MPG_DND?' или перетащите их сюда':''} — они сохранятся на этом устройстве.</div>`
     : `<div class="mpg-empty">Все треки разложены по плейлистам.${MPG_DND?' Перетащите трек сюда, чтобы вынуть его.':''}</div>`;
-  el.innerHTML = `<div class="mpg${MPG_DND?' can-dnd':''}">
+  el.innerHTML = `<div class="mpg${MPG_DND?' can-dnd':''}" ondragover="mpgPageOver(event)" ondrop="mpgPageDrop(event)">
     <div class="mpg-head">
       <h2 class="mpg-h">Музыка Мастера</h2>
     </div>

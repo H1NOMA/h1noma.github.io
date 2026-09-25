@@ -38,6 +38,9 @@ jobs:
             -H "apikey: $SUPA_KEY" -H "Authorization: Bearer $SUPA_KEY" \
             | gzip -9 > "$SNAP"
           echo "Снапшот: $(du -h "$SNAP" | cut -f1)"
+          # пустой ответ или ошибка вместо таблицы (облако лежит, ключ сменился) — не коммитим:
+          # иначе ротация вытеснила бы настоящие копии пустыми
+          gzip -dc "$SNAP" | python3 -c 'import json,sys; d=json.load(sys.stdin); assert isinstance(d,list) and len(d)>0, "пустой снапшот"; print("строк:", len(d))'
 
           # переключаемся на ветку backups (создаём при первом запуске)
           git fetch origin backups:backups 2>/dev/null || true

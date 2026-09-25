@@ -192,11 +192,34 @@ grant select on public.devs to anon, authenticated;
 drop policy if exists devs_read on public.devs;
 create policy devs_read on public.devs for select using (true);
 
--- тег пользователя — локальная часть e-mail из JWT (<тег>@komikdnd.ru, нижний регистр)
+-- тег пользователя — локальная часть e-mail из JWT (<тег>@komikdnd.ru, нижний регистр);
+-- чужой домен — пустой тег: регистрация открыта, hinoma@gmail.com не должен стать разработчиком
 create or replace function public.my_tag() returns text
 language sql stable as $$
-  select lower(split_part(coalesce(auth.jwt()->>'email',''),'@',1))
+  select case
+    when lower(coalesce(auth.jwt()->>'email','')) ~ '^[^@]+@komikdnd\.ru$'
+      then lower(split_part(auth.jwt()->>'email','@',1))
+    else ''
+  end
 $$;
+-- и заводить аккаунты можно только на @komikdnd.ru (так их создаёт сайт)
+create or replace function public.komik_email_guard() returns trigger
+language plpgsql as $$
+begin
+  if new.email is null or lower(new.email) !~ '^[^@]+@komikdnd\.ru$' then
+    raise exception 'Аккаунты КОМИК заводятся только через сайт (адрес вида тег@komikdnd.ru)'
+      using errcode = '22023';
+  end if;
+  return new;
+end
+$$;
+do $$ begin
+  if to_regclass('auth.users') is not null then   -- таблицу создаёт образ базы; на всякий случай не падаем без неё
+    drop trigger if exists komik_email_guard on auth.users;
+    create trigger komik_email_guard before insert or update of email on auth.users
+      for each row execute function public.komik_email_guard();
+  end if;
+end $$;
 grant execute on function public.my_tag() to authenticated, service_role;
 
 -- запись: разработчик — всё; игрок — доска, расписание, реестр логинов, пуш-подписки и свои листы/закладки

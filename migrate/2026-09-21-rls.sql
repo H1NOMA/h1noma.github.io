@@ -32,9 +32,15 @@ create policy devs_read on public.devs for select using (true);
 
 -- 3. Тег текущего пользователя — локальная часть e-mail из JWT
 --    (index.html: loginToEmail → <тег>@komikdnd.ru, emailToLogin/normTag → нижний регистр).
+--    Только для адреса на @komikdnd.ru: регистрация открыта, и hinoma@gmail.com иначе стал бы «hinoma»
+--    (см. 2026-09-25-email-domain.sql — там же триггер на auth.users).
 create or replace function public.my_tag() returns text
 language sql stable as $$
-  select lower(split_part(coalesce(auth.jwt()->>'email',''),'@',1))
+  select case
+    when lower(coalesce(auth.jwt()->>'email','')) ~ '^[^@]+@komikdnd\.ru$'
+      then lower(split_part(auth.jwt()->>'email','@',1))
+    else ''
+  end
 $$;
 grant execute on function public.my_tag() to authenticated, service_role;
 

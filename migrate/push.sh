@@ -50,7 +50,7 @@ while d:
 print(base64.urlsafe_b64encode(bytes([4])+R[0].to_bytes(32,"big")+R[1].to_bytes(32,"big")).rstrip(b"=").decode())
 ' "$1" 2>/dev/null || true; }
 
-say "1/4 · Что сейчас в docker-compose.override.yml"
+say "1/5 · Что сейчас в docker-compose.override.yml"
 VPUB=""; VPRIV=""
 if [ -f "$OVR" ]; then
   VPUB=$(clean "$(grep 'VAPID_PUBLIC:' "$OVR" | sed 's/.*VAPID_PUBLIC://' || true)")
@@ -67,7 +67,7 @@ if [ $PRIV_OK = 1 ]; then
   else warn "текущий приватный ключ НЕ от пары сайта — после починки устройства переподпишутся сами при открытии сайта"; fi
 fi
 
-say "2/4 · Приватный ключ"
+say "2/5 · Приватный ключ"
 echo "Enter — оставить текущий приватный ключ (если выше он «ок»)."
 echo "Вставить ключ — если сохранился приватный ключ пары сайта (43 символа, без кавычек):"
 echo "  тогда прежние подписки игроков заработают сразу, без переподписки."
@@ -99,7 +99,7 @@ fi
 [ "$(b64len "$VPUB")" = 65 ] || { warn "не удалось вычислить публичный ключ из приватного — это не ключ P-256? отмена"; exit 1; }
 [ "$(pubof "$VPRIV")" = "$VPUB" ] || { warn "проверка пары не сошлась: публичный ключ не от этого приватного — отмена"; exit 1; }
 
-say "3/4 · Записываю ключи и обновляю функцию"
+say "3/5 · Записываю ключи и обновляю функцию"
 # тот же формат, что пишет setup.sh — повторный запуск setup.sh его подхватит
 {
   echo 'services:'
@@ -119,10 +119,17 @@ grep -q '^COMPOSE_FILE=docker-compose.yml:docker-compose.override.yml' .env \
 mkdir -p volumes/functions/notify-game
 # сначала с сайта (он же отдал этот скрипт), потом с GitHub: raw.githubusercontent.com из России открывается не всегда.
 # Качаем во временный файл и проверяем, что пришла наша функция, а не страница ошибки.
+# Явно заданная ветка (KOMIK_REF=…) — первой: сайт всегда отдаёт main, и проверить ветку до слияния иначе нельзя.
+# Маркер свежей версии проверяем у каждого источника: старая index.ts с одного не должна отменять другой.
 FN_TMP=$(mktemp)
-if { curl -sSf --max-time 30 -o "$FN_TMP" "https://komikdnd.ru/supabase/functions/notify-game/index.ts" \
-     || curl -sSf --max-time 30 -o "$FN_TMP" "https://raw.githubusercontent.com/H1NOMA/h1noma.github.io/$REF/supabase/functions/notify-game/index.ts"; } \
-   && grep -q 'vapidPublicFromPrivate' "$FN_TMP"; then
+GH_URL="https://raw.githubusercontent.com/H1NOMA/h1noma.github.io/$REF/supabase/functions/notify-game/index.ts"
+SITE_URL="https://komikdnd.ru/supabase/functions/notify-game/index.ts"
+if [ -n "${KOMIK_REF:-}" ]; then FN_SRC="$GH_URL $SITE_URL"; else FN_SRC="$SITE_URL $GH_URL"; fi
+FN_OK=""
+for u in $FN_SRC; do
+  curl -sSf --max-time 30 -o "$FN_TMP" "$u" && grep -q 'vapidPublicFromPrivate' "$FN_TMP" && { FN_OK=1; break; }
+done
+if [ -n "$FN_OK" ]; then
   mv "$FN_TMP" volumes/functions/notify-game/index.ts
   echo "  notify-game обновлена ✓"
 else
@@ -133,7 +140,7 @@ fi
 docker compose up -d --force-recreate functions >/dev/null
 echo "  контейнер functions пересоздан ✓"
 
-say "4/4 · Проверка"
+say "4/5 · Проверка"
 ANON=$(grep '^ANON_KEY=' .env | cut -d= -f2-)
 sleep 4
 # без пользовательского токена функция обязана ответить 403 forbidden:
@@ -152,6 +159,23 @@ GOT=$(curl -s -H "apikey: $ANON" -H "Authorization: Bearer $ANON" http://127.0.0
       | python3 -c "import json,sys;print(json.load(sys.stdin).get('publicKey',''))" 2>/dev/null || true)
 if [ "$GOT" = "$VPUB" ]; then echo "  функция отдаёт сайту верный публичный ключ ✓"
 else warn "функция отдаёт ключ «${GOT:-<ничего>}», ожидался $VPUB"; fi
+
+say "5/5 · Защита аккаунтов: тег — только с адреса @komikdnd.ru"
+# Регистрация открыта, и без этой миграции аккаунт hinoma@<любой домен> получал права разработчика в базе
+# (migrate/2026-09-25-email-domain.sql). Идемпотентна: повторный запуск ничего не ломает.
+MIG=$(mktemp); MIG_OK=""
+MIG_GH="https://raw.githubusercontent.com/H1NOMA/h1noma.github.io/$REF/migrate/2026-09-25-email-domain.sql"
+MIG_SITE="https://komikdnd.ru/migrate/2026-09-25-email-domain.sql"
+if [ -n "${KOMIK_REF:-}" ]; then MIG_SRC="$MIG_GH $MIG_SITE"; else MIG_SRC="$MIG_SITE $MIG_GH"; fi
+for u in $MIG_SRC; do
+  curl -sSf --max-time 30 -o "$MIG" "$u" && grep -q 'komik_email_guard' "$MIG" && { MIG_OK=1; break; }
+done
+if [ -n "$MIG_OK" ] && docker exec -i supabase-db psql -q -v ON_ERROR_STOP=1 -U postgres -d postgres < "$MIG" 2>&1 | sed 's/^/  /'; then
+  echo "  миграция применена ✓"
+else
+  warn "миграцию не применил — выполни вручную (migrate/README.md, раздел 2026-09-25)"
+fi
+rm -f "$MIG"
 if [ "$VPUB" != "$SITE_PUB" ]; then
   say "Пара ключей отличается от прежней"
   echo "Ничего делать не нужно: сайт берёт ключ у функции, и каждое устройство переподпишется"

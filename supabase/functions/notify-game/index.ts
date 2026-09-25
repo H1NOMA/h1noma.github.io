@@ -113,8 +113,11 @@ Deno.serve(async (req) => {
   // проверяет только анон-ключ в Authorization и не спотыкается о новые ключи проекта.
   const jwt = (req.headers.get("x-user-token") || "").replace(/^Bearer\s+/i, "");
   const { data: u } = jwt ? await supa.auth.getUser(jwt) : { data: null };
-  const login = (u?.user?.email || "").split("@")[0].toLowerCase();
-  if (!DEV.includes(login)) return new Response("forbidden", { status: 403, headers: cors });
+  // только адрес вида <тег>@komikdnd.ru: регистрация открыта, и hinoma@gmail.com иначе прошёл бы как dev
+  const email = (u?.user?.email || "").toLowerCase();
+  const m = /^([^@]+)@komikdnd\.ru$/.exec(email);
+  const login = m ? m[1] : "";
+  if (!login || !DEV.includes(login)) return new Response("forbidden", { status: 403, headers: cors });
 
   const v = initVapid();
   if (v.err) return json({ error: v.err }, 500);

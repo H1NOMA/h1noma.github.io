@@ -37,14 +37,17 @@ self.addEventListener('install', e => {
     // Статика — по одному файлу и только недостающие: addAll работает «всё или ничего», и один пропавший
     // файл (или обрыв на нём) раньше оставлял кэш пустым целиком; а то, что уже лежит в STATIC,
     // при смене версии перекачивать незачем — оно обновляется само при первом запросе.
-    caches.open(STATIC).then(c => Promise.allSettled(PRECACHE.map(u => c.match(u).then(hit => hit || c.add(u))))),
+    caches.open(STATIC).then(c => Promise.allSettled(PRECACHE.map(u => c.match(u).then(hit => hit || c.add(u))))).catch(() => {}),
     // Сама страница — в ВЕРСИОННЫЙ кэш уже при установке. Первый заход воркер не перехватывает
     // (он ещё не управляет страницей), и без этого офлайн-копия index.html появлялась лишь после
     // второго онлайн-захода — офлайн работал с третьего. Запрос условный (no-cache): если HTML
     // не менялся с момента загрузки страницы, придёт 304 и копия возьмётся из HTTP-кэша браузера
     // без повторной закачки 1,2 МБ; если сайт обновился — в кэш ляжет свежая версия.
+    // Ошибку прогрева страницы НЕ глотаем: иначе установка «удавалась» без копии страницы, activate
+    // стирал прежний кэш вместе с единственной офлайн-копией, и без сети приложение не открывалось.
+    // Упавшая установка оставляет старый воркер с его кэшем, а браузер повторит обновление позже.
     caches.open(CACHE).then(c => c.add(new Request('./', { cache: 'no-cache' }))),
-  ]).catch(() => {}));
+  ]));
 });
 
 self.addEventListener('activate', e => {
@@ -108,9 +111,12 @@ self.addEventListener('fetch', e => {
       // кэш служит лишь офлайн-фолбэком. Иначе SW отдавал старый index.html из кэша и правки
       // «не доезжали» до пользователя до второй перезагрузки — казалось, что ничего не изменилось.
       if (isNav) {
-        // './' — тот же ключ, под которым страница прогрета при установке (относительно воркера, а не корня домена):
-        // сюда же попадает заход по ссылке с параметрами (?g=…), для которого точного совпадения в кэше нет
-        const fromCache = () => cache.match(e.request).then(c => c || cache.match('./') || cache.match('index.html'));
+        // Сама страница живёт в кэше под одним ключом './' — тем же, что при установке (относительно воркера,
+        // а не корня домена). Раньше заход по ссылке из уведомления (?g=…) клал под свой адрес ещё одну
+        // копию на 1,5 МБ на каждую игру, а сравнение «пришла новая сборка» для него не срабатывало
+        const root = new URL('./', self.location.href);
+        const key = (url.pathname === root.pathname || url.pathname === root.pathname + 'index.html') ? root.href : e.request;
+        const fromCache = () => cache.match(key).then(c => c || cache.match(root.href)).then(c => c || cache.match('index.html'));
         // что отдали странице: 'net' — свежую с сети, 'cache' — копию по таймауту
         let served = null;
         // страницу спрашиваем у сервера С ПРОВЕРКОЙ: без no-cache запрос уходил в HTTP-кэш
@@ -118,10 +124,10 @@ self.addEventListener('fetch', e => {
         // возвращало ту же сборку. Условный запрос с ETag стоит один заголовок, а не мегабайт.
         const network = fetch(new Request(e.request.url, {cache:'no-cache', credentials:'same-origin', mode:'same-origin'})).then(async res => {
           if (res && res.ok) {
-            const prev = await cache.match(e.request).catch(() => null);
+            const prev = await cache.match(key).catch(() => null);
             const changed = !!prev && (prev.headers.get('etag') || prev.headers.get('content-length') || '') !==
                                        (res.headers.get('etag') || res.headers.get('content-length') || '');
-            await cache.put(e.request, res.clone()).catch(() => {});
+            await cache.put(key, res.clone()).catch(() => {});
             // Страница уже открыта из старого кэша, а с сети пришла новая версия: раньше она
             // ждала следующего запуска (на телефоне — второго-третьего), теперь страница
             // узнаёт об этом сразу и перезапускается сама, как только это безопасно.
