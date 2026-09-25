@@ -42,24 +42,30 @@ jobs:
           # иначе ротация вытеснила бы настоящие копии пустыми
           gzip -dc "$SNAP" | python3 -c 'import json,sys; d=json.load(sys.stdin); assert isinstance(d,list) and len(d)>0, "пустой снапшот"; print("строк:", len(d))'
 
-          # переключаемся на ветку backups (создаём при первом запуске)
-          git fetch origin backups:backups 2>/dev/null || true
-          if git show-ref --verify --quiet refs/heads/backups; then
-            git checkout backups
-          else
-            git checkout --orphan backups
-            git rm -rf . --quiet 2>/dev/null || true
-            printf '# Резервные копии базы KOMIK\n\nАвтоснапшоты таблицы Supabase `kv` (gzip). Хранятся последние 30.\n' > README.md
+          # Ветка backups хранит ТОЛЬКО последний месяц. Раньше старые файлы удалялись из дерева, но каждый
+          # ежедневный коммит навсегда оставался в истории (~2,5 МБ в день в публичном репозитории).
+          # Теперь ветка каждый раз собирается заново одним коммитом: снапшоты за последние 31 день + README,
+          # и перезаписывается (force push) — всё, что старше, уходит из истории целиком.
+          KEEP=$(mktemp -d); mkdir -p "$KEEP/backups"
+          if git fetch -q --depth=1 origin backups 2>/dev/null; then
+            git archive FETCH_HEAD backups | tar -x -C "$KEEP" || true
           fi
-
-          mkdir -p backups
-          cp "$SNAP" backups/
-          # оставляем последние 30 снапшотов
-          ls -1t backups/kv-*.json.gz 2>/dev/null | tail -n +31 | xargs -r rm -f
+          cp "$SNAP" "$KEEP/backups/"
+          CUT=$(date -u -d '30 days ago' +%Y-%m-%d)   # сегодня + 30 предыдущих дней
+          for f in "$KEEP"/backups/kv-*.json.gz; do
+            d=$(basename "$f" .json.gz); d=${d#kv-}
+            if [[ "$d" < "$CUT" ]]; then echo "Удаляю старый: $(basename "$f")"; rm -f "$f"; fi
+          done
+          N=$(ls -1 "$KEEP"/backups/kv-*.json.gz | wc -l)
 
           git config user.name  "komik-backup-bot"
           git config user.email "backup@users.noreply.github.com"
-          git add backups README.md 2>/dev/null || git add backups
-          git commit -q -m "Бэкап kv $DATE" || { echo "Изменений нет — пропуск."; exit 0; }
-          git push origin backups
-          echo "Готово: backups/kv-$DATE.json.gz"
+          git checkout -q --orphan backups-fresh
+          git rm -rf -q --cached . 2>/dev/null || true
+          git clean -fdxq
+          cp -r "$KEEP/backups" .
+          printf '# Резервные копии базы KOMIK\n\nАвтоснапшоты таблицы Supabase `kv` (gzip), по одному в день.\nХранится только последний месяц (31 день): ветка каждый день пересобирается одним коммитом,\nболее старые копии удаляются вместе с историей.\n\nСейчас копий: %s, самая старая — %s.\n' "$N" "$(ls -1 backups/kv-*.json.gz | head -1 | xargs basename)" > README.md
+          git add backups README.md
+          git commit -q -m "Бэкап kv $DATE (копий: $N, с $CUT)"
+          git push -q --force origin HEAD:backups
+          echo "Готово: backups/kv-$DATE.json.gz, всего копий $N"
