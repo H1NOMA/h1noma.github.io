@@ -233,6 +233,32 @@
   .set-row .rl small{display:block;color:var(--muted);font-size:.72rem;margin-top:2px;white-space:normal}
   .set-row .chev{color:var(--muted);flex:none;transition:transform .2s}
   .set-row .chev.open{transform:rotate(90deg)}
+  /* ── «Сеттинги»: кто видит каждый мир (только владелец) ── */
+  .pv-head{margin:4px 4px 16px}
+  .pv-h{font-family:var(--f-disp);font-weight:700;font-size:1.5rem;letter-spacing:.04em;margin:0 0 6px}
+  .pv-sub,.pv-note,.pv-meta{font-size:.84rem;line-height:1.5;color:var(--muted);margin:0}
+  .pv-note{margin:0 4px 6px}
+  .pv-meta{margin:0 4px;font-family:var(--f-mono);font-size:.62rem;letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}
+  .pv-row{display:flex;align-items:center;gap:14px;padding:14px 15px}
+  .pv-row+.pv-row{border-top:var(--hair) solid var(--line)}
+  .pv-main{flex:1;min-width:0}
+  .pv-name{display:block;font-size:1.02rem;line-height:1.25;overflow-wrap:anywhere}
+  .pv-name i{font-style:normal}
+  .pv-st{display:block;font-size:.74rem;line-height:1.4;color:var(--muted);margin-top:4px}
+  .pv-row.lv-all .pv-st{color:var(--dim)}
+  .pv-seg{display:flex;flex:none;gap:2px;padding:3px;border-radius:12px;background:var(--bg2);border:var(--hair) solid var(--line2)}
+  .pv-seg button{border:0;background:none;color:var(--muted);font:600 .76rem/1 var(--f-body);padding:8px 11px;border-radius:9px;cursor:pointer;white-space:nowrap;transition:background .15s,color .15s}
+  .pv-seg button:hover{color:var(--txt)}
+  .pv-seg button.on{background:var(--red);color:var(--bg)}
+  .pv-row.lv-team .pv-seg button.on{background:rgba(var(--accent-rgb),.28);color:var(--txt)}
+  .pv-row.lv-owner .pv-seg button.on{background:var(--surface2);color:var(--txt);box-shadow:0 0 0 1px var(--line2) inset}
+  .pv-row:not(.lv-all) .pv-name{opacity:.72}
+  @media(max-width:560px){
+    .pv-row{flex-wrap:wrap;gap:10px}
+    .pv-seg{width:100%}
+    .pv-seg button{flex:1;padding:9px 6px}
+  }
+  .set-page.pv-page{columns:auto;max-width:760px}
   .set-iconprev{width:34px;height:34px;border-radius:9px;flex:none;border:var(--hair) solid var(--line2);background-size:cover;background-position:center}
   .set-sw{width:44px;height:26px;border-radius:99px;background:var(--surface2);border:var(--hair) solid var(--line2);position:relative;flex:none;transition:.2s}
   .set-sw.on{background:var(--red);border-color:var(--red)}
@@ -3500,7 +3526,7 @@ html.dr-live body{overflow-x:clip}
 
 /* музыка в шторке — отдельной группой под разделами */
 .dr-sep{height:1px;background:var(--line);margin:10px 0 8px;border-radius:1px}  /* по одной линии с разделителем внизу */
-.dr-it.dr-music.active{color:var(--red-ink)}
+.dr-it.dr-music.active,.dr-it.dr-worlds.active{color:var(--red-ink)}
 
 /* ── Прямоугольный плеер в левом рейле (над профилем и «Закладками») ──────
    На десктопе музыка живёт здесь, а не плавающей плашкой снизу: рейл — это
@@ -3728,7 +3754,17 @@ html.is-web .app-cta:not([hidden]){display:flex}
 </style>
 </head>
 <body>
-<script>try{var __ps=localStorage.getItem('comik:ui:project');var __p=__ps?JSON.parse(__ps):'classic';document.documentElement.setAttribute('data-project',__p);}catch(e){}
+<script>/* сохранённый сеттинг — сразу, ещё до скриптов (по нему играет заставка). Закрытый владельцем
+   (правило comik:projects:v1, последнее известное устройству) — ближайший открытый, как в projectVisible */
+try{var __ps=localStorage.getItem('comik:ui:project');var __p=__ps?JSON.parse(__ps):'classic';
+var __O=['classic','terra','legacy','neverland','assimilation','skazki','gw'];if(__O.indexOf(__p)<0)__p='classic';
+var __c=null;try{__c=JSON.parse(localStorage.getItem('comik:projects:v1')||'null');}catch(e){}
+var __D={assimilation:'owner',gw:'team'},__T=['hinoma','herr_teo','arlissss'];
+var __lv=function(g){var l=__c&&__c.lv&&__c.lv[g];return(l==='all'||l==='team'||l==='owner')?l:(__D[g]||'all');};
+var __t='';try{__t=String(JSON.parse(localStorage.getItem('comik:session:v1')||'""')||'').trim().replace(/^@+/,'').toLowerCase();}catch(e){}
+var __ok=function(g){var l=__lv(g);return l==='all'||__t==='hinoma'||(l==='team'&&__T.indexOf(__t)>=0);};
+if(!__ok(__p)){var __i=__O.indexOf(__p),__f='classic';for(var __d=1;__d<__O.length;__d++){if(__O[__i-__d]&&__ok(__O[__i-__d])){__f=__O[__i-__d];break;}if(__O[__i+__d]&&__ok(__O[__i+__d])){__f=__O[__i+__d];break;}}__p=__f;}
+document.documentElement.setAttribute('data-project',__p);}catch(e){}
 try{localStorage.removeItem('comik:ui:spgw');}catch(e){}</script>
 <div id="ambient" aria-hidden="true"></div>
 <div class="splash" id="splash" aria-hidden="true">
@@ -3834,6 +3870,7 @@ addEventListener('beforeinstallprompt', function(e){ e.preventDefault(); DEFERRE
       <button data-nav="players" onclick="go('players')">Игрок</button>
       <button data-nav="world" onclick="go('world')">Архив</button>
       <button data-nav="settings" onclick="go('settings')">Настройки</button>
+      <button data-nav="worlds" id="navWorlds" hidden onclick="go('worlds')">Сеттинги</button>
       <button data-nav="music" id="navMusic" hidden onclick="go('music')">Музыка</button>
         </nav>
     <button class="hdr-search" id="hdrSearch" onclick="toggleSearchBar(event)" aria-label="Поиск">
@@ -4201,6 +4238,11 @@ if(/Android/i.test(navigator.userAgent||'')) d.classList.add('lite');}catch(e){}
     <div id="toolsPage"></div>
   </section>
 
+  <!-- СЕТТИНГИ: кто видит какой сеттинг (только hinoma) -->
+  <section id="view-worlds" class="view">
+    <div id="worldsPage"></div>
+  </section>
+
   <!-- MUSIC (только dev/ГМ) -->
   <section id="view-music" class="view">
     <div id="musicPage"></div>
@@ -4476,7 +4518,7 @@ const CAT_TRAUMA= {id:'trauma', label:'Болезни и медицина', type
 /* теги разработчиков: видят dev-разделы; список пополняется по указанию владельца */
 const DEV_TAGS=['hinoma','herr_teo','arlissss'];
 function isDev(){ return !!(SESSION && DEV_TAGS.indexOf(normTag(SESSION))>=0); }
-/* архив ASSIMILATION открыт всем, кто видит сам сеттинг (а сеттинг — только @hinoma, см. assimVisible) */
+/* архив ASSIMILATION открыт всем, кто видит сам сеттинг (кто видит — решает владелец, см. projectVisible) */
 function assimArchLocked(){ return false; }
 function updateArchLock(){
   const locked=assimArchLocked();
@@ -4998,6 +5040,7 @@ async function supaLateInit(){
     if(u){ SESSION=emailToLogin(u.email); ssetLocal(KEY_SESSION, SESSION, false); if(!USERS.some(x=>normTag(x.tag)===normTag(SESSION))) USERS.push({tag:normTag(SESSION), createdAt:Date.now()}); }
   }catch(e){}
   try{ refreshAdmin(); }catch(e){}
+  try{ const pv=await withTimeout(cloudGet(KEY_PROJECTS), CLOUD_TMO); if(pv && typeof pv==='object') projCfgApply(pv); }catch(e){}
   try{ const gm=await withTimeout(cloudGet(KEY_GAMES), CLOUD_TMO); if(Array.isArray(gm)) gamesMergeRemote(gm); }catch(e){}
   CLOUD_REPULL_AT=0; try{ await cloudRepull('late'); }catch(e){}
   try{ afterAuthChange(); }catch(e){}          // аккаунт, листы, настройки, а на «Доске ходов» — переподписка и дочитывание стола
@@ -5382,12 +5425,13 @@ async function boot(){
   // Легаси-блоб листов comik:chars:v1 в облаке заморожен и приходит вместе с пер-юзерными строками
   // (fetchCloudChars, префикс comik:chars:) — отдельно читаем его только без облака, с устройства
   const cloudP = Promise.all([
-    sget(KEY_ARCHIVE, true), supa ? null : sgetLocal(KEY_CHARS, true), sget(KEY_USERS, true), sget(KEY_SESSION, false), sget(KEY_CHRONO, true), sget(KEY_DIRTY, false), sget(KEY_NEWS, true), sget(KEY_ACCESS, false), sget(KEY_HERO, true)
+    sget(KEY_ARCHIVE, true), supa ? null : sgetLocal(KEY_CHARS, true), sget(KEY_USERS, true), sget(KEY_SESSION, false), sget(KEY_CHRONO, true), sget(KEY_DIRTY, false), sget(KEY_NEWS, true), sget(KEY_ACCESS, false), sget(KEY_HERO, true), sget(KEY_PROJECTS, true)
   ]);
   try{ CORE = (await D.core) || CORE || []; }catch(e){ CORE=CORE||[]; }
   gwSeedInto(CORE);   // стартовые карточки GALACTIC WAR — тем же механизмом правок/скрытий, что и ядро
   scheduleBestiary();
-  let [arc, chars, users, sess, chr, dirty, nws, acc, hero] = await cloudP;
+  let [arc, chars, users, sess, chr, dirty, nws, acc, hero, pvis] = await cloudP;
+  if(pvis && typeof pvis==='object') projCfgApply(pvis, {boot:true});   // видимость сеттингов — до строгих проверок ниже
   // диагностика синхронизации: видно в консоли браузера (F12 → Console). Если облако не читается —
   // supa:false ИЛИ значения null при живом supa → проблема со связью/доступом, а не с кодом.
   try{ console.info('[КОМИК] облако', {supa:!!supa, архив:arc!=null, листы:chars!=null, новости:nws!=null, аккаунты:users!=null}); }catch(_){}
@@ -6304,7 +6348,7 @@ async function bmCloudSync(){
 }
 function openBookmarks(){
   const list=bmLive().filter(bmVisible).map(b=>ARCHIVE.find(x=>x.id===b.id)).filter(Boolean);
-  const hidden=bmLive().length - list.length;
+  const hidden=Math.max(0, bmLive().filter(b=>b && (!PROJECT_TITLES[b.scope] || projectVisible(b.scope))).length - list.length);   // закладки закрытых сеттингов не считаем
   // группировка: категория / подкатегория как в архиве
   const groups={};
   list.forEach(e=>{
@@ -6406,13 +6450,20 @@ document.addEventListener('keydown',e=>{ if(e.key!=='Escape') return;
 const CHRONO_NAMES={legacy:'LEGACY',neverland:'NEVERLAND',assimilation:'ASSIMILATION',terra:'TERRA AETERNA',classic:'КЛАССИКА',skazki:'РУССКИЕ СКАЗКИ',gw:'GALACTIC WAR'};
 function initChrono(){
   const wrap=document.getElementById('chrono-list'); if(!wrap || wrap.children.length) return;
-  ['terra','legacy','neverland','assimilation','skazki','gw'].forEach(id=>{
+  wrap.dataset.vis=visibleProjects().join(',');
+  ['terra','legacy','neverland','assimilation','skazki','gw'].filter(id=>projectVisible(id)).forEach(id=>{
     const src=document.querySelector('#plogo-templates .p-'+id); if(!src) return;
     const node=src.cloneNode(true);
     node.setAttribute('onclick', "openChronoCampaign('"+id+"')");   // клик → архив игр ГМа этой кампании
     node.style.cursor='pointer';
     wrap.appendChild(node);
   });
+}
+/* список кампаний хроники — заново, если сменился набор видимых сеттингов (правило владельца, вход/выход) */
+function chronoRebuild(){
+  const wrap=document.getElementById('chrono-list'); if(!wrap || !wrap.children.length) return;
+  if(wrap.dataset.vis===visibleProjects().join(',')) return;
+  wrap.innerHTML=''; initChrono();
 }
 /* ====================== Архив игр ГМа (в хронологии, только разработчикам) ====================== */
 const KEY_CHRONO_GAMES='comik:chrono:games:v1';
@@ -6447,6 +6498,7 @@ async function persistChronoGames(quiet){
 /* список игр кампании */
 function openChronoCampaign(camp){
   if(!isDev()){ toast('Раздел разработчиков'); return; }
+  if(!projectVisible(camp)){ toast('Этот сеттинг сейчас закрыт'); return; }
   const list=(CHRONO_GAMES[camp]||[]).filter(g=>g && !g.deleted).sort((a,b)=>(b.at||0)-(a.at||0));
   const rows=list.length ? `<div class="tline">${list.map((g,i)=>`
     <div class="tline-ev${i===list.length-1?' first':''}">
@@ -6466,7 +6518,7 @@ function openChronoCampaign(camp){
 }
 /* редактор одной игры */
 function openChronoGame(camp, id){
-  if(!isDev()) return;
+  if(!isDev() || !projectVisible(camp)) return;
   const arr=CHRONO_GAMES[camp]=CHRONO_GAMES[camp]||[];
   let g=id ? arr.find(x=>x && x.id===id && !x.deleted) : null;
   const isNew=!g;
@@ -7530,6 +7582,7 @@ function gsCardHtml(s, past){
 }
 function openSignupForm(id){
   const s=GAMES.find(x=>x.id===id); if(!s) return;
+  if(s.game && !projectVisible(s.game)){ toast('Запись на эту игру сейчас закрыта'); return; }
   if(!SESSION){ toast('Сначала войдите в аккаунт'); openAuth('login'); return; }
   const _mineSeat=(s.players||[]).some(p=>normTag(p.tag)===currentTag()); if(!_mineSeat && seatsLeft(s)<=0){ toast('Мест не осталось'); openGameSignup(); return; }
   const myChars=(CHARS_ALL[s.game]||[]).filter(c=>!c.deleted && c.owner && normTag(c.owner)===currentTag());
@@ -7560,6 +7613,7 @@ async function doSignup(id){
   const btn=document.querySelector('#modal .pacts .btn.primary'); if(btn) btn.disabled=true;
   await gamesPull(4000);   // места считаем по свежей копии: форма могла провисеть открытой долго
   const s=GAMES.find(x=>x.id===id); if(!s){ toast('Эта сессия уже снята с расписания'); openGameSignup(); return; }
+  if(s.game && !projectVisible(s.game)){ toast('Запись на эту игру сейчас закрыта'); return; }
   const me=currentTag(), prev=(s.players||[]).find(p=>normTag(p.tag)===me);
   const _mineSeat=!!prev; if(!_mineSeat && seatsLeft(s)<=0){ toast('Мест не осталось'); openGameSignup(); return; }
   const ch=charId ? (CHARS_ALL[s.game]||[]).find(c=>c.id===charId && !c.deleted) : null;
@@ -7630,7 +7684,8 @@ function myManagedGames(list){ return (list||GAMES||[]).filter(s=>s && canManage
 function openSchedule(game){
   if(!ADMIN){ toast('Раздел доступен Мастеру'); return; }
   // игрок-ГМ (не разработчик) может анонсировать игры ТОЛЬКО по «Классике»
-  const allowed = isDev() ? PROJECT_ORDER : ['classic'];
+  const allowed = isDev() ? visibleProjects() : ['classic'].filter(g=>projectVisible(g));
+  if(!allowed.length){ toast('Нет открытых сеттингов для анонса'); return; }
   // кнопка на новостях передаёт текущий сеттинг: без него расписание открывалось на прошлом выборе
   // (по умолчанию TERRA), и «+ Ячейка сессии» из LEGACY создавала игру в TERRA
   if(game && allowed.includes(game)) SCHED_GAME=game;
@@ -7726,7 +7781,9 @@ function openCellEditor(id){
       <div class="field"><label>Дата игры</label><input type="date" id="gc-date" value="${s?esc(s.date||gameDateOf(s)||''):''}"></div>
       <div class="field"><label>Время проведения</label><input id="gc-time" maxlength="60" placeholder="18:00" value="${s?esc(s.time||''):''}"></div>
     </div>
-    ${!s?`<label class="ck-line" style="margin-bottom:6px"><input type="checkbox" id="gc-notify" checked> 🔔 Оповестить подписчиков о новой игре</label>`:''}
+    ${!s ? (projLevel(SCHED_GAME)==='all'
+      ? `<label class="ck-line" style="margin-bottom:6px"><input type="checkbox" id="gc-notify" checked> 🔔 Оповестить подписчиков о новой игре</label>`
+      : `<p class="note" style="margin:0 0 8px">🔕 ${esc(gameTitle(SCHED_GAME))} скрыт от игроков — оповещение не отправляется</p>`) : ''}
     <div class="pacts">
       <button class="btn primary" onclick="saveCell(${s?`'${s.id}'`:'null'})">Сохранить</button>
       <button class="btn ghost" onclick="openSchedule()">Назад</button>
@@ -7741,6 +7798,7 @@ async function saveCell(id){
   if(s && !canManageGame(s)){ toast('Редактировать можно только свои анонсы'); return; }
   // игрок-ГМ (не разработчик) анонсирует только «Классику»
   const cellGame = isDev() ? SCHED_GAME : 'classic';
+  if(!s && !projectVisible(cellGame)){ toast('Этот сеттинг сейчас закрыт — анонс не создан'); return; }
   const cell=Object.assign(s||{id:'gm'+Date.now().toString(36), game:cellGame, owner:currentTag(), players:[], createdAt:Date.now()},{
     title, seats:Math.max(1,parseInt(pval('gc-seats'),10)||1),
     price:pval('gc-price'), loc:pval('gc-loc'), time:pval('gc-time'),
@@ -7748,7 +7806,7 @@ async function saveCell(id){
     updatedAt:Date.now()   // по нему слияние берёт поля ячейки: без штампа правка ГМа не доходила и откатывалась игроками
   });
   if(!s){ const cr=pval('gc-chrono'); if(cr){ try{ cell.chronoRef=JSON.parse(cr); }catch(e){} } GAMES.push(cell); }
-  const notify = !s && (document.getElementById('gc-notify')||{}).checked;
+  const notify = !s && projLevel(cell.game)==='all' && (document.getElementById('gc-notify')||{}).checked;   // по скрытому сеттингу пуш всем не шлём
   openSchedule(); toast('Сессия сохранена'); renderNews();
   await persistGames();
   if(notify && typeof notifyNewGame==='function') notifyNewGame(cell);   // пуш подписчикам о новой игре
@@ -7785,7 +7843,7 @@ const PLAYER_HASHES={
 const KEY_ACCESS='comik:access:v1', KEY_COREHID='comik:corehid:v1', KEY_COREOVER='comik:coreover:v1';
 let ACCESS={legacy:false,neverland:false,assimilation:false,terra:false,classic:false,skazki:false,gw:false};
 /* хронология в общем доступе, пароли упразднены */
-function hasChronoAccess(camp){ return isDev() && CUR_PROJECT!=='classic'; }   // хронология — только разработчикам и не в «Классике»
+function hasChronoAccess(camp){ return isDev() && CUR_PROJECT!=='classic' && (!camp || projectVisible(camp)); }   // хронология — только разработчикам и не в «Классике»
 function updateChronoLocks(){ /* замки упразднены: хронология — раздел Мастера целиком */ }
 async function sha256(str){
   if(window.crypto && crypto.subtle){
@@ -7886,6 +7944,9 @@ function updateDevUI(){
   // хронология — только разработчикам и НИКОГДА в «Классике»
   const ce=document.getElementById('chronoEntry'); if(ce) ce.hidden=!(isDev() && CUR_PROJECT!=='classic');
   const nm=document.getElementById('navMusic'); if(nm) nm.hidden=!isDev();   // музыка — только разработчикам и ГМ
+  const nw=document.getElementById('navWorlds'); if(nw) nw.hidden=!projOwner();   // «Сеттинги» — только владельцу
+  const vw=document.getElementById('view-worlds'); if(vw && vw.classList.contains('active') && !projOwner()) go('news');
+  try{ chronoRebuild(); }catch(e){}
   updateArchLock();
   // вышел из аккаунта, находясь в закрытом сеттинге (ASSIMILATION, GW) — уводим в доступный.
   // До чтения сессии (запуск, preboot) проверка мягкая: иначе сохранённый GW сбрасывался в «Классику»
@@ -8467,10 +8528,12 @@ async function cloudTickOnce(){
     if(CHARS_DIRTY && currentTag()){ try{ await persistChars(true); }catch(e){} }   // лист, не ушедший в облако офлайн, — дошлём до чтения (тихо), иначе облачная копия его перекроет
     if(GAMES_DIRTY){ try{ await persistGames(true); }catch(e){} }                   // запись на игру, не дошедшая до облака, — так же
     if(BLOB_PENDING.size){ try{ await blobFlush(); }catch(e){} }                    // архив/новости/хроника, отложенные без связи
-    const [ch,gm]=await Promise.all([
+    const [ch,gm,pv]=await Promise.all([
       withTimeout(fetchCloudCharsChanged(), CLOUD_TMO).catch(()=>null),   // зонд по штампам: полные строки — только изменившиеся
-      withTimeout(cloudGet(KEY_GAMES),4000).catch(()=>null)
+      withTimeout(cloudGet(KEY_GAMES),4000).catch(()=>null),
+      withTimeout(cloudGet(KEY_PROJECTS),4000).catch(()=>null)          // владелец закрыл/открыл сеттинг — узнаём за один тик
     ]);
+    if(pv && typeof pv==='object') projCfgApply(pv);
     let chChanged=false, gmChanged=false;
     if(ch && typeof ch==='object'){
       const fp=a=>(a||[]).map(c=>c&&(c.id+':'+(c.updatedAt||0))).join(',');   // отпечаток id:updatedAt (как в cloudRepull) вместо JSON.stringify всего массива
@@ -11402,18 +11465,127 @@ function resetHero(){
 }
 const PROJECT_ORDER=['classic','terra','legacy','neverland','assimilation','skazki','gw'];
 let CUR_PROJECT='classic';   // дефолт до boot: публичный сеттинг, чтобы под заставкой не мелькала ASSIMILATION
-/* Видимость сеттингов. ASSIMILATION — только @hinoma (архив внутри открыт).
-   «Русские сказки» — всем. GALACTIC WAR — только dev-аккаунтам (DEV_TAGS). Остальные — всем. */
-function assimVisible(){ return typeof normTag==='function' && normTag(SESSION||'')==='hinoma'; }
-function skazkiVisible(){ return true; }
-function gwVisible(){ return typeof isDev==='function' && isDev(); }
-const PROJECT_GATE={assimilation:assimVisible, skazki:skazkiVisible, gw:gwVisible};
-/* lenient — для восстановления сохранённого сеттинга при старте: сессия ещё не прочитана,
-   и dev с сохранённым GW иначе улетал бы в «Классику» при каждом запуске. После чтения
-   сессии boot() перепроверяет строго. */
-function projectVisible(g, lenient){ if(!PROJECT_TITLES[g]) return false; const f=PROJECT_GATE[g]; if(!f) return true; if(lenient && !SESSION_READY) return true; return f(); }
-function fallbackProject(){ return visibleProjects()[0] || 'classic'; }
+/* ── Видимость сеттингов — решает владелец (hinoma) на странице «Сеттинги» ──
+   Уровни: 'all' — всем, и гостям; 'team' — команде (DEV_TAGS); 'owner' — только hinoma.
+   Правило лежит в облаке (KEY_PROJECTS: читают все, пишет только hinoma — migrate/2026-09-26-projects-owner.sql)
+   и зеркалится на устройство: старт без сети и заставка (скрипт в начале <body>) берут последнее известное.
+   Строки в облаке нет — прежние правила: ASSIMILATION только hinoma, GALACTIC WAR команде, остальные всем.
+   hinoma видит всё всегда (иначе запер бы сам себя), и хотя бы один сеттинг открыт всем — иначе игрокам некуда. */
+const KEY_PROJECTS='comik:projects:v1', PROJ_OWNER='hinoma', PROJ_LEVELS=['all','team','owner'];
+const PROJ_DEFAULT={classic:'all',terra:'all',legacy:'all',neverland:'all',assimilation:'owner',skazki:'all',gw:'team'};
+function projCfgParse(v){
+  const lv=Object.assign({}, PROJ_DEFAULT);
+  const src=(v && typeof v==='object' && v.lv && typeof v.lv==='object') ? v.lv : {};
+  PROJECT_ORDER.forEach(g=>{ if(PROJ_LEVELS.indexOf(src[g])>=0) lv[g]=src[g]; });   // только известные сеттинги и уровни
+  if(!PROJECT_ORDER.some(g=>lv[g]==='all')) lv.classic='all';
+  return lv;
+}
+let PROJ_CFG=projCfgParse(null), PROJ_CFG_AT=0, PROJ_CFG_BY='';
+try{ const m=JSON.parse(localStorage.getItem(KEY_PROJECTS)||'null'); if(m && typeof m==='object'){ PROJ_CFG=projCfgParse(m); PROJ_CFG_AT=+m.at||0; PROJ_CFG_BY=String(m.by||''); } }catch(e){}
+function projLevel(g){ return PROJ_CFG[g]||'all'; }
+function projOwner(){ return typeof normTag==='function' && normTag(SESSION||'')===PROJ_OWNER; }
+function projCanSee(g, tag){
+  const l=projLevel(g);
+  return l==='all' || tag===PROJ_OWNER || (l==='team' && DEV_TAGS.indexOf(tag)>=0);
+}
+/* lenient — до чтения сессии (preboot, восстановление выбора): берём вход, сохранённый на устройстве.
+   Раньше тут пускало во всё подряд — игрок с сохранённым закрытым сеттингом видел его заставку и мир */
+function projectVisible(g, lenient){
+  if(!PROJECT_TITLES[g]) return false;
+  if(projLevel(g)==='all') return true;
+  if(lenient && !SESSION_READY){
+    let t=''; try{ t=normTag(JSON.parse(localStorage.getItem(KEY_SESSION)||'null')||''); }catch(e){}
+    return projCanSee(g, t);
+  }
+  return projCanSee(g, normTag(SESSION||''));
+}
 function visibleProjects(){ return PROJECT_ORDER.filter(g=>projectVisible(g)); }   // строго: filter передал бы индекс вторым аргументом (lenient)
+/* ближайший открытый по порядку сеттингов: соседи на шаг (сначала левый, потом правый), потом на два… */
+function nearestVisibleProject(from, lenient, see){
+  see=see||(g=>projectVisible(g, lenient));
+  const i=PROJECT_ORDER.indexOf(from);
+  if(i>=0) for(let d=1; d<PROJECT_ORDER.length; d++){
+    for(const j of [i-d, i+d]){ const g=PROJECT_ORDER[j]; if(g && see(g)) return g; }
+  }
+  return PROJECT_ORDER.find(g=>see(g)) || 'classic';
+}
+function fallbackProject(from){ return nearestVisibleProject(from||CUR_PROJECT); }
+/* принять правило (облако, другая вкладка, своя правка). Более старое, чем уже принятое, — пропускаем:
+   своя правка могла ещё не долететь до облака, а тик уже принёс прежнюю версию */
+function projCfgApply(v, opts){
+  opts=opts||{};
+  if(!v || typeof v!=='object') return false;
+  const at=+v.at||0;
+  if(!opts.force && at<PROJ_CFG_AT) return false;
+  const next=projCfgParse(v);
+  PROJ_CFG_AT=at; PROJ_CFG_BY=String(v.by||'');
+  try{ localStorage.setItem(KEY_PROJECTS, JSON.stringify(v)); }catch(e){}
+  if(JSON.stringify(next)===JSON.stringify(PROJ_CFG)) return false;
+  PROJ_CFG=next;
+  projCfgRefresh(!opts.boot);
+  return true;
+}
+/* правило сменилось: игрока из закрытого сеттинга — в ближайший открытый, списки сеттингов — заново */
+function projCfgRefresh(live){
+  if(SESSION_READY && !projectVisible(CUR_PROJECT)){
+    const from=CUR_PROJECT, to=nearestVisibleProject(from);
+    setProject(to);   // выбор сохраняем: следующий запуск сразу откроется там, где можно
+    if(live) toast('«'+gameTitle(from)+'» сейчас закрыт — вы перешли в «'+gameTitle(to)+'»');
+  }
+  try{ if(window.projRowSync) projRowSync(); }catch(e){}
+  try{ const pm=document.getElementById('projMenu'); if(pm && pm.classList.contains('open')) projMenuRender(); }catch(e){}
+  try{ calRefresh(); }catch(e){}
+  try{ chronoRebuild(); }catch(e){}
+  try{ updateDevUI(); }catch(e){}
+  try{ const v=document.getElementById('view-worlds'); if(v && v.classList.contains('active')) renderWorldsPage(); }catch(e){}
+}
+/* та же вкладка на другом устройстве не узнает без тика, а другие вкладки этого — сразу: зеркало в localStorage */
+addEventListener('storage', e=>{ if(e.key===KEY_PROJECTS && e.newValue){ try{ projCfgApply(JSON.parse(e.newValue)); }catch(_){} } });
+
+/* ── Страница «Сеттинги» (только hinoma): кто видит каждый сеттинг ── */
+const PROJ_LV_TXT={all:'Всем', team:'Команде', owner:'Только мне'};
+const projNearestForPlayer=g=>nearestVisibleProject(g, false, x=>projLevel(x)==='all');
+function renderWorldsPage(){
+  const el=document.getElementById('worldsPage'); if(!el) return;
+  if(!projOwner()){ el.innerHTML=''; return; }
+  const rows=PROJECT_ORDER.map(g=>{
+    const lv=projLevel(g), t=esc(gameTitle(g)), to=lv==='all'?'':esc(gameTitle(projNearestForPlayer(g)));
+    const st = lv==='all' ? 'Видят все, в том числе гости'
+      : (lv==='team' ? 'Видит команда' : 'Видите только вы') + ` · игроков перенесёт в «${to}»`;
+    const seg=PROJ_LEVELS.map(l=>`<button type="button" role="radio" aria-checked="${l===lv}" class="${l===lv?'on':''}" onclick="projSetLevel('${g}','${l}')">${PROJ_LV_TXT[l]}</button>`).join('');
+    return `<div class="pv-row lv-${lv}">
+      <div class="pv-main"><span class="pv-name pm-item pm-${g}">${PROJECT_TITLES[g]}</span><span class="pv-st">${st}</span></div>
+      <div class="pv-seg" role="radiogroup" aria-label="Кто видит ${t}">${seg}</div>
+    </div>`;
+  }).join('');
+  const when = PROJ_CFG_AT ? new Date(PROJ_CFG_AT).toLocaleString('ru-RU',{day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'}) : '';
+  el.innerHTML=`<div class="set-page pv-page">
+    <div class="pv-head"><h2 class="pv-h">Сеттинги</h2>
+      <p class="pv-sub">Кто видит каждый сеттинг. Закрытый пропадает у игроков из шапки, календаря и поиска, а тех, кто в нём сейчас, сразу переносит в ближайший открытый.</p></div>
+    <div class="set-grp pv-grp">${rows}</div>
+    <p class="pv-note">Вы видите все сеттинги всегда. «Команда» — ${DEV_TAGS.join(', ')}. Хотя бы один сеттинг должен быть открыт всем.</p>
+    ${when?`<p class="pv-meta">Последнее изменение: ${esc(when)}</p>`:'<p class="pv-meta">Пока действуют правила по умолчанию</p>'}
+  </div>`;
+}
+let PROJ_Q=Promise.resolve();
+function projSetLevel(g, lv){
+  if(!projOwner()){ toast('Раздел владельца'); return; }
+  if(!PROJECT_TITLES[g] || PROJ_LEVELS.indexOf(lv)<0 || projLevel(g)===lv) return;
+  const next=Object.assign({}, PROJ_CFG, {[g]:lv});
+  if(!PROJECT_ORDER.some(x=>next[x]==='all')){ toast('Хотя бы один сеттинг должен быть открыт всем — иначе игрокам некуда'); return; }
+  const val={v:1, at:Math.max(Date.now(), PROJ_CFG_AT+1), by:PROJ_OWNER, lv:next};
+  projCfgApply(val, {force:true});   // у себя — сразу: страница, шапка, календарь
+  renderWorldsPage();
+  // записи по очереди: быстрые тапы не должны лечь в облако в обратном порядке
+  PROJ_Q=PROJ_Q.then(async ()=>{
+    const ok=await sset(KEY_PROJECTS, val, true, true);
+    if(ok){ if(val.at===PROJ_CFG_AT) toast('«'+gameTitle(g)+'» — '+(lv==='all'?'видят все':lv==='team'?'видит команда':'видите только вы')); return; }
+    toast(SSET_LAST_ERR==='noperm' ? '⚠ Облако не приняло правило: нет прав на запись' : '⚠ Облако не ответило — правило не сохранено, повторите');
+    // вернуть то, что на самом деле в облаке: иначе здесь было бы одно правило, а у игроков — другое
+    try{ const cur=await withTimeout(cloudGet(KEY_PROJECTS), 8000); if(cur!==undefined) projCfgApply(cur && typeof cur==='object' ? cur : {v:1, at:0, lv:PROJ_DEFAULT}, {force:true}); }catch(e){}
+    renderWorldsPage();
+  }).catch(()=>{});
+}
 /* тематический фон по краям экрана (десктоп): частицы под каждый сеттинг, медленно и плавно */
 const AMB_RUNES=['ᚠ','ᚢ','ᚦ','ᚨ','ᚱ','ᚲ','ᚷ','ᚹ','ᚾ','ᛃ','ᛈ','ᛉ','ᛋ','ᛏ','ᛒ','ᛗ','ᛚ','ᛜ','ᛟ','ᛞ'];
 const AMB_BITS=['0','1','0','1','//','#','[]','01','10','+','×','}'];
@@ -11442,7 +11614,7 @@ function renderAmbient(){
 }
 function setProject(id, silent, dir){
   if(!PROJECT_TITLES[id]) return;
-  if(!projectVisible(id, true)) id=fallbackProject();   // скрытый сеттинг — уводим в первый доступный
+  if(!projectVisible(id, true)) id=nearestVisibleProject(id, true);   // закрытый сеттинг — в ближайший открытый
   CUR_PROJECT=id;
   try{ renderAmbient(); }catch(e){}
   if(typeof refreshAdmin==='function') refreshAdmin();   // режим ГМ обычного игрока действует только в «Классике»
@@ -11565,6 +11737,7 @@ document.addEventListener('click', e=>{ const n=document.getElementById('botnav'
 function go(view, opts){
   if(view==='music' && !(typeof isDev==='function' && isDev())){ toast('Раздел для разработчиков'); view='news'; }
   if(view==='music' && typeof renderMusicPage==='function') setTimeout(renderMusicPage,0);
+  if(view==='worlds' && !(typeof projOwner==='function' && projOwner())){ toast('Раздел владельца'); view='news'; }
   if(view==='world' && assimArchLocked()){ toast('Архив ASSIMILATION пока закрыт'); view='news'; }
   if(view==='chrono' && !hasChronoAccess()){ view='world'; }   // хронология — только разработчикам и не в «Классике»
   // история вкладок для жеста «свайп вправо = назад» (кроме самого возврата)
@@ -11574,7 +11747,7 @@ function go(view, opts){
   if(!(opts&&opts.noHist) && _pv && _pv!==view){ _nh.push(_pv); if(_nh.length>30) _nh.shift(); }
   // сменили раздел — фоновая синхронизация подстраивает темп под то, что сейчас на экране
   try{ setTimeout(()=>document.dispatchEvent(new CustomEvent('komik-view-change',{detail:view})),0); }catch(e){}
-  ['news','world','players','combat','settings','chrono','music'].forEach(v=>{
+  ['news','world','players','combat','settings','chrono','music','worlds'].forEach(v=>{
     const el=document.getElementById('view-'+v); if(!el) return;
     el.classList.toggle('active', v===view);
   });
@@ -11592,12 +11765,13 @@ function go(view, opts){
   const ic=document.getElementById('importCircle'); if(ic) ic.classList.toggle('show', view==='players');
   // текущий раздел и «есть ли кнопка в углу» — обычными классами на <html>
   const R=document.documentElement;
-  R.classList.remove('view-news','view-world','view-players','view-combat','view-settings','view-chrono','view-music');
+  R.classList.remove('view-news','view-world','view-players','view-combat','view-settings','view-chrono','view-music','view-worlds');
   R.classList.add('view-'+view);
   R.classList.toggle('fab-right', view==='players' || view==='combat' || view==='news');   // в «Новостях» в углу календарь
   closeCalc(); closeStatCalc(); if(view!=='players') closeMiniArch();
   if(view==='combat') renderToolsPage();
   if(view==='settings') renderSettings();
+  if(view==='worlds') renderWorldsPage();
   if(view==='players'){
     renderPlayers(); ensurePlayersVisible();
     // вернулись на «Игроки», а лист был открыт — снова разворачиваем дашборд из данных (без анимации)
@@ -13622,7 +13796,7 @@ function trkIdleCaption(){
   let other=null;   // активная доска другого сеттинга (сначала — та, где стоит свой персонаж)
   for(const k in TRK_SHARED){
     const s=TRK_SHARED[k]; if(!(s && s.active && Array.isArray(s.list) && s.list.length)) continue;
-    const p=boardProj(k); if(p===CUR_PROJECT || !PROJECT_TITLES[p]) continue;
+    const p=boardProj(k); if(p===CUR_PROJECT || !PROJECT_TITLES[p] || !projectVisible(p)) continue;
     if(playerMyCard(k)){ other=p; break; }
     if(!other) other=p;
   }
@@ -15272,6 +15446,7 @@ function openGameDeep(gid, fresh){
   const attempt=()=>{
     const s=(typeof GAMES!=='undefined'?GAMES:[]).find(x=>x&&x.id===gid);
     if(!s) return false;
+    if(s.game && !projectVisible(s.game)){ toast('Эта игра сейчас недоступна'); return true; }   // сеттинг закрыт владельцем
     if(s.game && s.game!==CUR_PROJECT) setProject(s.game);
     go('news'); openSignupForm(gid);
     // openSignupForm только заполняет #modal — с холодного старта/из календаря оверлей надо открыть самим
@@ -15778,6 +15953,7 @@ boot();
              ['combat','Доска ходов','M12 3l8 4.5v9L12 21l-8-4.5v-9z M12 9.5l3.5 2v4L12 17.5 8.5 15.5v-4z'],
              ['players','Игрок','M9 11a3 3 0 100-6 3 3 0 000 6z M3.5 19.5a5.5 5.5 0 0111 0 M16 6.5a3 3 0 010 6 M21.5 19.5a5.6 5.6 0 00-4-5.4'],
              ['world','Архив','M12 3a9 9 0 100 18 9 9 0 000-18z M3 12h18 M12 3c3 4 3 14 0 18 M12 3c-3 4-3 14 0 18']];
+  var WORLDS_ICO='M12 3.5l8.5 4.5-8.5 4.5L3.5 8z M3.5 12l8.5 4.5 8.5-4.5 M3.5 16l8.5 4.5 8.5-4.5';
   var MUSIC_ICO='M9 18V6l10-2v12 M9 18a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z M19 16a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z';
   var SETTINGS_ICO='M12 15a3 3 0 100-6 3 3 0 000 6z M19.4 13a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.6 1.7 1.7 0 00-1.9.4l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1A1.7 1.7 0 004.7 8.6a1.7 1.7 0 00-.4-1.9l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.9.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.9-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.9V10a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z';
   function drItem(id,name,ico,extra){
@@ -15788,6 +15964,8 @@ boot();
     var html=NAV.map(function(n){ return drItem(n[0],n[1],n[2]); }).join('');
     // нижняя группа за чертой: настройки, под ними музыка (музыка — только ГМ)
     html+='<div class="dr-sep"></div>'+drItem('settings','Настройки',SETTINGS_ICO);
+    if(typeof projOwner==='function' && projOwner())   // «Сеттинги» — кто видит какой мир (только владелец)
+      html+=drItem('worlds','Сеттинги',WORLDS_ICO,' dr-worlds');
     if(typeof isDev==='function' && isDev())
       html+=drItem('music','Музыка',MUSIC_ICO,' dr-music');
     document.getElementById('drList').innerHTML=html;
@@ -16507,6 +16685,7 @@ function openInstallHelp(){
   #view-players{max-width:1560px}
   #view-combat{max-width:1680px}
   #view-settings{max-width:1120px;margin:0 auto}
+  #view-worlds{max-width:1120px;margin:0 auto}
   #view-music{max-width:1360px;margin:0 auto}
   #view-chrono{max-width:780px}
 

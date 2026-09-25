@@ -238,6 +238,18 @@ create policy kv_write_player on public.kv for all to authenticated
        key in ('comik:tracker:shared:v1', 'comik:games:v1', 'comik:users:v1', 'push:subs')
     or (public.my_tag() <> '' and key in ('comik:chars:' || public.my_tag(), 'comik:bm:' || public.my_tag()))
   );
+-- правило видимости сеттингов (comik:projects:v1) пишет только владелец — ограничивающие политики,
+-- складываются с разрешительными через И (migrate/2026-09-26-projects-owner.sql)
+drop policy if exists kv_projects_owner_ins on public.kv;
+create policy kv_projects_owner_ins on public.kv as restrictive for insert to authenticated
+  with check (key <> 'comik:projects:v1' or public.my_tag() = 'hinoma');
+drop policy if exists kv_projects_owner_upd on public.kv;
+create policy kv_projects_owner_upd on public.kv as restrictive for update to authenticated
+  using      (key <> 'comik:projects:v1' or public.my_tag() = 'hinoma')
+  with check (key <> 'comik:projects:v1' or public.my_tag() = 'hinoma');
+drop policy if exists kv_projects_owner_del on public.kv;
+create policy kv_projects_owner_del on public.kv as restrictive for delete to authenticated
+  using (key <> 'comik:projects:v1' or public.my_tag() = 'hinoma');
 SQL
 echo "схема применена ✓"
 

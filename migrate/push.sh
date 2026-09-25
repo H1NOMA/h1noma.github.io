@@ -160,22 +160,25 @@ GOT=$(curl -s -H "apikey: $ANON" -H "Authorization: Bearer $ANON" http://127.0.0
 if [ "$GOT" = "$VPUB" ]; then echo "  функция отдаёт сайту верный публичный ключ ✓"
 else warn "функция отдаёт ключ «${GOT:-<ничего>}», ожидался $VPUB"; fi
 
-say "5/5 · Защита аккаунтов: тег — только с адреса @komikdnd.ru"
-# Регистрация открыта, и без этой миграции аккаунт hinoma@<любой домен> получал права разработчика в базе
-# (migrate/2026-09-25-email-domain.sql). Идемпотентна: повторный запуск ничего не ломает.
-MIG=$(mktemp); MIG_OK=""
-MIG_GH="https://raw.githubusercontent.com/H1NOMA/h1noma.github.io/$REF/migrate/2026-09-25-email-domain.sql"
-MIG_SITE="https://komikdnd.ru/migrate/2026-09-25-email-domain.sql"
-if [ -n "${KOMIK_REF:-}" ]; then MIG_SRC="$MIG_GH $MIG_SITE"; else MIG_SRC="$MIG_SITE $MIG_GH"; fi
-for u in $MIG_SRC; do
-  curl -sSf --max-time 30 -o "$MIG" "$u" && grep -q 'komik_email_guard' "$MIG" && { MIG_OK=1; break; }
+say "5/5 · Защита аккаунтов и правил сайта"
+# Регистрация открыта, и без первой миграции аккаунт hinoma@<любой домен> получал права разработчика в базе
+# (2026-09-25-email-domain.sql); вторая даёт писать правило видимости сеттингов только hinoma
+# (2026-09-26-projects-owner.sql). Обе идемпотентны: повторный запуск ничего не ломает.
+for MIG_NAME in 2026-09-25-email-domain.sql 2026-09-26-projects-owner.sql; do
+  MIG=$(mktemp); MIG_OK=""
+  MIG_GH="https://raw.githubusercontent.com/H1NOMA/h1noma.github.io/$REF/migrate/$MIG_NAME"
+  MIG_SITE="https://komikdnd.ru/migrate/$MIG_NAME"
+  if [ -n "${KOMIK_REF:-}" ]; then MIG_SRC="$MIG_GH $MIG_SITE"; else MIG_SRC="$MIG_SITE $MIG_GH"; fi
+  for u in $MIG_SRC; do
+    curl -sSf --max-time 30 -o "$MIG" "$u" && grep -q 'комик\|КОМИК' "$MIG" && grep -q 'commit;' "$MIG" && { MIG_OK=1; break; }
+  done
+  if [ -n "$MIG_OK" ] && docker exec -i supabase-db psql -q -v ON_ERROR_STOP=1 -U postgres -d postgres < "$MIG" 2>&1 | sed 's/^/  /'; then
+    echo "  $MIG_NAME — применена ✓"
+  else
+    warn "$MIG_NAME не применена — выполни вручную (migrate/README.md)"
+  fi
+  rm -f "$MIG"
 done
-if [ -n "$MIG_OK" ] && docker exec -i supabase-db psql -q -v ON_ERROR_STOP=1 -U postgres -d postgres < "$MIG" 2>&1 | sed 's/^/  /'; then
-  echo "  миграция применена ✓"
-else
-  warn "миграцию не применил — выполни вручную (migrate/README.md, раздел 2026-09-25)"
-fi
-rm -f "$MIG"
 if [ "$VPUB" != "$SITE_PUB" ]; then
   say "Пара ключей отличается от прежней"
   echo "Ничего делать не нужно: сайт берёт ключ у функции, и каждое устройство переподпишется"
