@@ -1607,6 +1607,8 @@
   .ob-steps{margin:0 0 12px 18px;display:flex;flex-direction:column;gap:7px;font-size:.86rem;color:var(--muted)}
   .ob-steps b{color:var(--txt)}
   .ob-x{position:absolute;top:8px;right:8px;width:30px;height:30px;background:none;border:none;color:var(--dim);cursor:pointer;font-size:.9rem}
+  /* колонка новостей на десктопе узкая: две кнопки в ряд не помещались, «Калькулятор» вылезал за карточку */
+  .ob-card .row{grid-template-columns:1fr;gap:8px}
   .dc-result{display:none;text-align:center;border-top:1px dashed var(--line);padding-top:10px}
   .dc-result.show{display:block;animation:fade .2s}
   .dc-total{font-family:var(--f-disp);font-weight:700;font-size:2.1rem;line-height:1;color:var(--red-ink);text-shadow:0 0 16px rgba(var(--accent-rgb),.55)}
@@ -5473,6 +5475,7 @@ async function boot(){
   window.__bootReady=true;   // облачные данные слиты и отрисованы — заставку можно убирать
   updateDevUI();
   if(typeof pushDeepLinkFromUrl==='function') pushDeepLinkFromUrl();   // открытие по ссылке из уведомления
+  if(typeof pushHeal==='function') setTimeout(()=>pushHeal(), 4000);    // подписка на пуши чинит себя сама (ключ сервера, список рассылки)
   bmCloudSync();
   gmNotesLoad();
   // автокопия последнего состояния — страховка на случай проблем с облаком
@@ -6893,7 +6896,8 @@ document.getElementById('searchM').addEventListener('keydown', e=>{ if(e.key==='
 
 /* ---------- Новости ---------- */
 function fmtDate(iso){
-  try{ return new Date(iso).toLocaleDateString('ru-RU',{day:'numeric',month:'long',year:'numeric'}); }
+  // новость без даты (или с битой) показывала «Invalid Date» прямо в ленте — лучше не показывать ничего
+  try{ const d=new Date(iso); if(!iso || isNaN(d)) return ''; return d.toLocaleDateString('ru-RU',{day:'numeric',month:'long',year:'numeric'}); }
   catch(e){ return ''; }
 }
 /* баннер «Ближайшая игра» — ближайшая по дате открытая заявка текущего сеттинга (без даты — в конец) */
@@ -7260,18 +7264,22 @@ function openSignupForm(id){
   if(!SESSION){ toast('Сначала войдите в аккаунт'); openAuth('login'); return; }
   const _mineSeat=(s.players||[]).some(p=>normTag(p.tag)===currentTag()); if(!_mineSeat && seatsLeft(s)<=0){ toast('Мест не осталось'); openGameSignup(); return; }
   const myChars=(CHARS_ALL[s.game]||[]).filter(c=>!c.deleted && c.owner && normTag(c.owner)===currentTag());
+  // уже записан — открываем СВОЮ запись: имя и персонаж подставлены, кнопка «Сохранить».
+  // Раньше форма открывалась пустой, и нажатие «Записаться» молча сбрасывало выбранного персонажа
+  const mine=(s.players||[]).find(p=>normTag(p.tag)===currentTag());
+  const selId=mine ? (mine.charId||'') : (myChars.length===1 ? myChars[0].id : '');
   document.getElementById('modal').innerHTML=`
     <button class="x" onclick="closeModal()" aria-label="Закрыть">✕</button>
-    <div class="top">${rune('character',24)}<span class="clabel">${esc(gameTitle(s.game))} · запись</span></div>
+    <div class="top">${rune('character',24)}<span class="clabel">${esc(gameTitle(s.game))} · ${mine?'ваша запись':'запись'}</span></div>
     <h2>${esc(s.title||'Сессия')}</h2>
-    <div class="field" id="gs-f-name"><label>Ваше имя <span class="req">*</span></label><input id="gs-name" maxlength="40" value="${esc(profName(SESSION))}"></div>
+    <div class="field" id="gs-f-name"><label>Ваше имя <span class="req">*</span></label><input id="gs-name" maxlength="40" value="${esc((mine&&mine.name)||profName(SESSION))}"></div>
     <div class="field"><label>Персонаж</label><select id="gs-char">
       <option value="">Без персонажа (пока)</option>
-      ${myChars.map(c=>`<option value="${c.id}">${esc(c.name)}${c.role?` — ${esc(roleLabel(c))}`:''}</option>`).join('')}
+      ${myChars.map(c=>`<option value="${c.id}"${c.id===selId?' selected':''}>${esc(c.name)}${c.role?` — ${esc(roleLabel(c))}`:''}</option>`).join('')}
     </select></div>
     ${myChars.length?'':`<p class="note">В игре ${esc(gameTitle(s.game))} у вас пока нет персонажей — создать можно в разделе «Игроки».</p>`}
     <div class="pacts">
-      <button class="btn primary" onclick="doSignup('${s.id}')">Записаться</button>
+      <button class="btn primary" onclick="doSignup('${s.id}')">${mine?'Сохранить':'Записаться'}</button>
       <button class="btn ghost" onclick="openGameSignup()">Назад</button>
     </div>`;
 }
@@ -7284,7 +7292,7 @@ async function doSignup(id){
   const ch=charId ? (CHARS_ALL[s.game]||[]).find(c=>c.id===charId && !c.deleted) : null;
   s.players=(s.players||[]).filter(p=>normTag(p.tag)!==currentTag());
   s.players.push({tag:SESSION, name, charId:ch?ch.id:'', charName:ch?ch.name:'', bg:profBg(SESSION), ink:profInk(SESSION), at:Date.now()});
-  openGameSignup(); toast('Вы записаны!');
+  openGameSignup(); toast(_mineSeat ? 'Запись обновлена' : 'Вы записаны!');
   renderNews();   // баннер/календарь — сразу по локальным данным, облако догоняет в фоне (persistGames перерисует ещё раз)
   await persistGames();
   trkJoinLive(s, ch);   // партия уже идёт — просимся за стол, не дожидаясь фонового тика
@@ -7941,7 +7949,7 @@ const AUTH_EMAIL_DOMAIN='komikdnd.ru';  // реальный домен прое�
 function loginToEmail(login){ return normTag(login)+'@'+AUTH_EMAIL_DOMAIN; }
 function emailToLogin(email){ return String(email||'').split('@')[0].toLowerCase(); }
 function authTimeout(p, ms=13000){ return Promise.race([ p, new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')), ms)) ]); }
-function afterAuthChange(){ renderAcct(); renderPlayers(); renderCats(); applyView(); updateDevUI(); renderSettings(); bmCloudSync(); }
+function afterAuthChange(){ renderAcct(); renderPlayers(); renderCats(); applyView(); updateDevUI(); renderSettings(); bmCloudSync(); updateOnboard(); }   // «С чего начать» — только гостям: после входа прячем сразу, а не после перезагрузки
 function currentTag(){ return SESSION ? normTag(SESSION) : null; }
 function isOwner(c){ return !!(SESSION && c && c.owner && normTag(c.owner)===currentTag()); }
 function canEdit(c){ return isOwner(c) || (!!c && !c.owner && !!c.codeHash); }
@@ -8045,7 +8053,7 @@ async function logout(){
   if(supa){ try{ await authTimeout(supa.auth.signOut()); }catch(e){} }
   SESSION=null; await sset(KEY_SESSION, null, false);
   if(ADMIN_VIA_DEV){ ADMIN=false; ADMIN_VIA_DEV=false; adminSideFX(); }
-  renderAcct(); renderPlayers(); renderCats(); applyView(); updateDevUI(); renderSettings(); toast('Вы вышли из аккаунта');
+  renderAcct(); renderPlayers(); renderCats(); applyView(); updateDevUI(); renderSettings(); updateOnboard(); toast('Вы вышли из аккаунта');
 }
 
 /* ====================== Игроки / персонажи ====================== */
@@ -14583,7 +14591,28 @@ function toast(msg, opts){
    Подписка на устройстве → эндпоинт хранится в облаке (kv «push:subs»).
    Рассылку делает серверная функция notify-game (Supabase Edge Function) с секретным
    VAPID-ключом. На iOS работает только если сайт добавлен на главный экран (PWA, iOS 16.4+). */
-const VAPID_PUBLIC='BJjgF7Dfj-PGEBho4AK_eec8YivMgnT5Oux8KdfLOx3sDcqpEBJ22tYzdsQ0fhx3S5IlRr-y3zTqsnOszzEpFI4';
+const VAPID_PUBLIC='BJjgF7Dfj-PGEBho4AK_eec8YivMgnT5Oux8KdfLOx3sDcqpEBJ22tYzdsQ0fhx3S5IlRr-y3zTqsnOszzEpFI4';   // запасной: настоящий ключ отдаёт сервер
+const PUSH_KEY_LS='comik:push:key', PUSH_WANT_LS='comik:push:want', PUSH_CHECK_LS='comik:push:check';
+/* метка устройства: у одного устройства в списке рассылки — ровно одна запись. Без неё
+   переподписка при сбое связи оставляла в списке «сироту» со старым адресом */
+function pushDevId(){ try{ let d=localStorage.getItem('comik:push:dev'); if(!d){ d=Math.random().toString(36).slice(2)+Date.now().toString(36); localStorage.setItem('comik:push:dev', d); } return d; }catch(e){ return ''; } }
+/* Ключ, которым сервер ПОДПИСЫВАЕТ пуши, — берём у самой функции рассылки (GET notify-game).
+   Раньше ключ был только вшит в сайт: стоило серверной паре разойтись с ним (ключ обрезался при
+   переносе на своё облако), и push-службы молча отвергали каждую рассылку. Теперь сервер —
+   источник правды, а вшитый ключ — запасной, пока сервер недоступен. */
+async function pushServerKey(){
+  let cached=''; try{ cached=localStorage.getItem(PUSH_KEY_LS)||''; }catch(e){}
+  try{
+    const r=await withTimeout(fetch(SUPA_URL+'/functions/v1/notify-game', { headers:{ apikey:SUPA_KEY, Authorization:'Bearer '+SUPA_KEY } }), 5000);
+    if(r && r.ok){ const j=await r.json(); const k=String((j&&j.publicKey)||'');
+      if(/^[A-Za-z0-9_-]{86,88}$/.test(k)){ try{ localStorage.setItem(PUSH_KEY_LS, k); }catch(e){} return k; } }
+  }catch(e){}
+  return cached || VAPID_PUBLIC;
+}
+function pushSameKey(sub, key){
+  try{ const cur=new Uint8Array(sub.options.applicationServerKey), want=urlB64ToU8(key);
+    return cur.length===want.length && cur.every((v,i)=>v===want[i]); }catch(e){ return true; }   // браузер не отдал ключ — не трогаем
+}
 function urlB64ToU8(b64){ const pad='='.repeat((4-b64.length%4)%4); const s=(b64+pad).replace(/-/g,'+').replace(/_/g,'/'); const raw=atob(s); const a=new Uint8Array(raw.length); for(let i=0;i<raw.length;i++) a[i]=raw.charCodeAt(i); return a; }
 function pushSupported(){ return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window; }
 async function pushStatus(){
@@ -14594,25 +14623,29 @@ async function pushStatus(){
 }
 async function pushEnable(){
   if(!pushSupported()){ toast('Устройство не поддерживает уведомления'); return; }
+  // подписку хранит облако, а писать в него может только вошедший — иначе устройство
+  // «подписано», но в списке рассылки его нет, и уведомления не приходят никогда
+  if(!SESSION || !supa){ toast('Войдите в аккаунт, чтобы получать уведомления'); return; }
   let perm=Notification.permission; if(perm!=='granted') perm=await Notification.requestPermission();
   if(perm!=='granted'){ toast('Уведомления не разрешены'); pushRenderBtn(); return; }
   try{
     const reg=await withTimeout(navigator.serviceWorker.ready, 4000);
     if(!reg){ toast('Уведомления недоступны: сервис-воркер не запущен'); pushRenderBtn(); return; }
+    const key=await pushServerKey();
     let sub=await reg.pushManager.getSubscription();
-    // подписка оформлена под другой серверный ключ (пара VAPID сменилась) — пересоздаём,
+    // подписка оформлена под другой ключ (пара на сервере сменилась) — пересоздаём,
     // иначе сервер шлёт, а push-служба молча отвергает
-    if(sub && sub.options && sub.options.applicationServerKey){
-      const cur=new Uint8Array(sub.options.applicationServerKey), want=urlB64ToU8(VAPID_PUBLIC);
-      if(cur.length!==want.length || cur.some((v,i)=>v!==want[i])){ try{ await pushRemoveSub(sub); await sub.unsubscribe(); }catch(_){} sub=null; }
-    }
-    if(!sub) sub=await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:urlB64ToU8(VAPID_PUBLIC)});
-    await pushSaveSub(sub); toast('Уведомления включены');
+    if(sub && !pushSameKey(sub, key)){ try{ await pushRemoveSub(sub); await sub.unsubscribe(); }catch(_){} sub=null; }
+    if(!sub) sub=await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:urlB64ToU8(key)});
+    try{ localStorage.setItem(PUSH_WANT_LS,'1'); localStorage.setItem(PUSH_CHECK_LS, String(Date.now())); }catch(e){}
+    const ok=await pushSaveSub(sub);
+    toast(ok ? 'Уведомления включены' : '⚠ Подписка не сохранилась в облаке — попробуем при следующем открытии');
   }catch(e){ toast('Не удалось подписаться'); }
   pushRenderBtn();
 }
 async function pushDisable(){
-  try{ const reg=await navigator.serviceWorker.ready; const sub=await reg.pushManager.getSubscription();
+  try{ localStorage.removeItem(PUSH_WANT_LS); }catch(e){}
+  try{ const reg=await withTimeout(navigator.serviceWorker.ready, 4000); const sub=reg && await reg.pushManager.getSubscription();
     if(sub){ await pushRemoveSub(sub); await sub.unsubscribe(); } }catch(e){}
   toast('Уведомления выключены'); pushRenderBtn();
 }
@@ -14629,14 +14662,49 @@ async function pushToggle(){
   if(st==='on') pushDisable(); else pushEnable();
 }
 async function pushSaveSub(sub){
-  const j=sub.toJSON(); j.tag=currentTag()||''; j.at=Date.now();
-  let arr=[]; try{ const cur=await cloudGet('push:subs'); if(Array.isArray(cur)) arr=cur; }catch(e){}
+  const j=sub.toJSON(); j.tag=currentTag()||''; j.at=Date.now(); j.dev=pushDevId();
+  let arr=null; try{ const cur=await withTimeout(cloudGet('push:subs'), CLOUD_TMO); if(Array.isArray(cur)) arr=cur; else if(cur===null) arr=[]; }catch(e){}   // null — строки ещё нет; undefined — облако не ответило
+  if(!arr) return false;   // список не прочитан — записью «только себя» затёрли бы чужие подписки
+  if(j.dev) arr=arr.filter(x=>!(x && x.dev===j.dev && x.endpoint!==j.endpoint));   // прежние адреса этого же устройства
   const i=arr.findIndex(x=>x&&x.endpoint===j.endpoint); if(i>=0) arr[i]=j; else arr.push(j);
-  await sset('push:subs', arr, true).catch(()=>{});
+  return !!(await sset('push:subs', arr, true, true).catch(()=>false));
 }
 async function pushRemoveSub(sub){
-  let arr=[]; try{ const cur=await cloudGet('push:subs'); if(Array.isArray(cur)) arr=cur; }catch(e){}
-  await sset('push:subs', arr.filter(x=>x&&x.endpoint!==sub.endpoint), true).catch(()=>{});
+  let arr=null; try{ const cur=await withTimeout(cloudGet('push:subs'), CLOUD_TMO); if(Array.isArray(cur)) arr=cur; }catch(e){}
+  const dev=pushDevId(), mine=x=>x && (x.endpoint===sub.endpoint || (dev && x.dev===dev));
+  if(!arr || !arr.some(mine)) return;   // не прочитали или нас там и нет — писать нечего
+  await sset('push:subs', arr.filter(x=>!mine(x)), true, true).catch(()=>{});
+}
+/* Самовосстановление подписки при каждом открытии (не чаще раза в 12 ч, если всё в порядке):
+   — ключ на сервере сменился → переоформляем подписку под новый (разрешение уже дано, повторно не спрашиваем);
+   — устройство подписано, но из списка рассылки выпало (сервер вычистил, чужая запись перетёрла) → досохраняем;
+   — человек включал уведомления, а браузер подписку потерял → оформляем заново.
+   Если браузер требует нажатия (Safari), просим один раз тостом с кнопкой. */
+async function pushHeal(force){
+  try{
+    if(!pushSupported() || Notification.permission!=='granted' || !SESSION || !supa) return;
+    const want=localStorage.getItem(PUSH_WANT_LS)==='1';
+    const reg=await withTimeout(navigator.serviceWorker.ready, 6000); if(!reg) return;
+    let sub=await reg.pushManager.getSubscription();
+    if(!sub && !want) return;                                   // не подписывался — не навязываем
+    const last=+(localStorage.getItem(PUSH_CHECK_LS)||0);
+    const key=await pushServerKey();
+    const stale = sub && !pushSameKey(sub, key);
+    if(!force && sub && !stale && Date.now()-last < 12*3600e3) return;
+    if(sub && !want){ try{ localStorage.setItem(PUSH_WANT_LS,'1'); }catch(e){} }   // подписан с прошлых версий — запоминаем намерение
+    if(stale){ try{ await pushRemoveSub(sub); await sub.unsubscribe(); }catch(e){} sub=null; }
+    if(!sub){
+      try{ sub=await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:urlB64ToU8(key)}); }
+      catch(e){ toast('Уведомления нужно переподключить', {action:{label:'Включить', fn:()=>pushEnable()}, ms:9000}); return; }
+    }
+    let list=null; try{ const cur=await withTimeout(cloudGet('push:subs'), CLOUD_TMO); if(Array.isArray(cur)) list=cur; else if(cur===null) list=[]; }catch(e){}
+    if(!list) return;                                          // облако не ответило — попробуем в другой раз
+    const mine=list.find(x=>x && x.endpoint===sub.endpoint), dev=pushDevId();
+    const orphans=list.some(x=>x && dev && x.dev===dev && x.endpoint!==sub.endpoint);
+    const ok = (mine && (mine.tag||'')===(currentTag()||'') && mine.dev===dev && !orphans) ? true : await pushSaveSub(sub);
+    if(ok) try{ localStorage.setItem(PUSH_CHECK_LS, String(Date.now())); }catch(e){}
+    pushRenderBtn();
+  }catch(e){}
 }
 function pushRenderBtn(){
   const el=document.getElementById('pushBtn'); if(!el) return;
@@ -14711,17 +14779,26 @@ async function pushCall(body){
 async function pushTest(){
   let tokKind='anon'; try{ if(supa){ const s=await supa.auth.getSession(); if(s.data.session&&s.data.session.access_token) tokKind='user'; } }catch(e){}
   let subN='?'; try{ const cur=await cloudGet('push:subs'); subN=Array.isArray(cur)?cur.length:0; }catch(e){ subN='ошибка чтения'; }
-  let out;
+  let out, keyInfo='?';
+  try{ const r=await withTimeout(fetch(SUPA_URL+'/functions/v1/notify-game', { headers:{ apikey:SUPA_KEY, Authorization:'Bearer '+SUPA_KEY } }), 6000);
+    const j=r&&await r.json().catch(()=>null); keyInfo = r&&r.ok&&j&&j.publicKey ? (j.publicKey.slice(0,10)+'…'+(j.site?' (совпадает с сайтом)':' (новая пара — устройства переподпишутся сами)')) : ('нет — '+((j&&j.error)||('HTTP '+(r&&r.status)))); }
+  catch(e){ keyInfo='нет ответа'; }
   try{ const r=await pushCall({ setting:'ТЕСТ', game:'Проверка уведомлений', time:'' }); out='HTTP '+r.status+'\n'+(await r.text()); }
   catch(e){ out='Сеть/ошибка: '+e.message; }
-  alert('Токен: '+tokKind+'\nПодписок в облаке: '+subN+'\nОтвет функции:\n'+out);
+  alert('Токен: '+tokKind+'\nКлюч сервера: '+keyInfo+'\nПодписок в облаке: '+subN+'\nОтвет функции:\n'+out);
 }
 /* ГМ создал игру с галочкой «Оповестить» → дёргаем серверную функцию рассылки */
 async function notifyNewGame(cell){
+  // раньше итог молча проглатывался: сервер лежал неделями, а ГМ думал, что оповещение ушло
   try{
     const setting=(PROJECT_TITLES[cell.game]||cell.game).replace(/<[^>]*>/g,'');
-    await pushCall({ setting, game:cell.title||'Новая игра', time:cell.time||'', gid:cell.id||'' });
-  }catch(e){}
+    const r=await pushCall({ setting, game:cell.title||'Новая игра', time:cell.time||'', gid:cell.id||'' });
+    let j=null; try{ j=await r.json(); }catch(e){}
+    if(r.ok && j && typeof j.sent==='number'){
+      const n=j.sent, w=(n%10===1&&n%100!==11)?'устройство':(n%10>=2&&n%10<=4&&(n%100<12||n%100>14))?'устройства':'устройств';
+      toast(n ? '🔔 Оповещение ушло на '+n+' '+w : '🔕 Оповещение: подписанных устройств нет');
+    } else toast('⚠ Оповещение не отправлено'+(j&&j.error?' — '+String(j.error).split('.')[0]:(r.status?' (сервер '+r.status+')':'')), {ms:6000});
+  }catch(e){ toast('⚠ Оповещение не отправлено — нет связи с сервером', {ms:5000}); }
 }
 
 /* ====================== Музыка ГМа ======================
