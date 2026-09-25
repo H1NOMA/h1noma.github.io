@@ -3441,6 +3441,8 @@ html.dr-live body{overflow-x:clip}
 .dr-open #musicToggle,.dr-open .music-bar{
   opacity:0 !important;pointer-events:none !important;transform:scale(.6);
   transition:opacity .18s,transform .18s}
+/* пульт игрока лежит выше шторки и закрывал её низ (профиль, закладки, плеер) */
+.dr-open #pdock{opacity:0 !important;pointer-events:none !important;transition:opacity .18s}
 
 /* поиск в шапке — обычная кнопка, а не плавающая */
 .hdr-search{width:40px;height:40px;flex:none;display:grid;place-items:center;border:0;background:none;
@@ -15573,8 +15575,15 @@ boot();
     // шторку тянем с любого места полотна, но не поверх шапки (там свой
     // переключатель сеттинга) и не поверх того, что само скроллится вбок
     if(prog<0.5 && !fromEdge && e.target && e.target.closest &&
-       e.target.closest('header,.lvl-wrap,.tbl,.abil-wrap,.ed-tabs,.sec-src-row,.mp-grid,.chips,.seg,input,textarea,select,[data-noswipe]')) return;
+       (e.target.closest('header,.lvl-wrap,.tbl,.abil-wrap,.ed-tabs,.sec-src-row,.mp-grid,.bv2-strip,.bv2-view,.tb-strip,.chips,.seg,input,textarea,select,[data-noswipe]') || hScrollable(e.target))) return;
     pend=true; drag=false; ax=''; sx=lx=t.clientX; sy=t.clientY; sp=prog; lt=performance.now(); vel=0;
+  }
+  // лента, которая сама листается вбок (карточки доски, вкладки, таблицы): жест шторки её не забирает
+  function hScrollable(el){
+    for(var n=el, k=0; n && n!==document.body && k<12; n=n.parentElement, k++){
+      if(n.scrollWidth>n.clientWidth+1){ var o=getComputedStyle(n).overflowX; if(o==='auto'||o==='scroll') return true; }
+    }
+    return false;
   }
   function claim(x){
     pend=false; drag=true; sx=lx=x;   // отсчёт с точки захвата, чтобы полотно не прыгнуло
@@ -17232,7 +17241,8 @@ select:focus-visible,summary:focus-visible,[tabindex]:focus-visible,
 
   function E(s){ return (typeof esc==='function') ? esc(s) : String(s==null?'':s)
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-  function gm(){ try{ return !!ADMIN; }catch(e){ return false; } }
+  // ГМ «в гостях» за чужим столом для доски — игрок: полка и карман показывают тот стол, что на экране
+  function gm(){ try{ return typeof trkPlayerMode==='function' ? !trkPlayerMode() : !!ADMIN; }catch(e){ return false; } }
 
   /* Доска подтягивается только внутри renderToolsPage: до первого захода в
      раздел у ГМа TRK пуст, а у игрока пуст TRK_SHARED. Полка обязана быть
@@ -17282,7 +17292,8 @@ select:focus-visible,summary:focus-visible,[tabindex]:focus-visible,
     var hp=0, th=0; if(b) for(var i=0;i<b.list.length;i++){ hp+=parseInt(b.list[i].hp,10)||0; th+=parseInt(b.list[i].thp,10)||0; }
     /* className несёт и текущий раздел (view-*), и режим ГМ (is-gm):
        смена любого из них меняет то, что показывает полка */
-    var keys=''; if(b) for(var j=0;j<b.list.length;j++) keys+=(b.list[j]&&(b.list[j].charId||b.list[j].uid||b.list[j].name))+',';
+    // инициатива, имя, максимум ХП и провалы спасбросков — тоже: без них карман держал старый порядок и числа
+    var keys=''; if(b) for(var j=0;j<b.list.length;j++){ var x=b.list[j]; keys+=(x ? [x.charId||x.uid||x.name, x.init, x.name, x.max, x.ds&&x.ds.f].join(':') : '')+','; }
     return [b?b.key:'', b?b.round:'', b?b.activeKey:'', b?b.list.length:'', hp, th, keys,
             l?l.at:'', m?m.name:'', m?m.paused:'', dockOpen?1:0, R.className].join('|');
   }
@@ -17432,7 +17443,8 @@ select:focus-visible,summary:focus-visible,[tabindex]:focus-visible,
      нажатие закрывало бы и карман, и статью в читальне разом. */
   addEventListener('keydown', function(e){
     if(e.key!=='Escape' || !dockOpen || !MQ.matches) return;
-    if(document.querySelector('.scrim.open')) return;   // поверх модалки Escape принадлежит ей
+    // поверх модалки, окна урона, кадрирования, витрины, калькулятора и инспектора доски Escape принадлежит им
+    if(document.querySelector('.scrim.open,.hp-prompt,.crop-ov,#csVitrine.open,#statCalcDrawer.open,#bv2Insp')) return;
     e.stopPropagation(); window.shelfDock(false);
   }, true);
   if(document.readyState==='complete') setTimeout(start,600);
