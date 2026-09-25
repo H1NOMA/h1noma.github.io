@@ -235,10 +235,7 @@
   .set-row .chev.open{transform:rotate(90deg)}
   /* ── «Сеттинги»: кто видит каждый мир (только владелец) ── */
   .pv-head{margin:4px 4px 16px}
-  .pv-h{font-family:var(--f-disp);font-weight:700;font-size:1.5rem;letter-spacing:.04em;margin:0 0 6px}
-  .pv-sub,.pv-note,.pv-meta{font-size:.84rem;line-height:1.5;color:var(--muted);margin:0}
-  .pv-note{margin:0 4px 6px}
-  .pv-meta{margin:0 4px;font-family:var(--f-mono);font-size:.62rem;letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}
+  .pv-h{font-family:var(--f-disp);font-weight:700;font-size:1.5rem;letter-spacing:.04em;margin:0}
   .pv-row{display:flex;align-items:center;gap:14px;padding:14px 15px}
   .pv-row+.pv-row{border-top:var(--hair) solid var(--line)}
   .pv-main{flex:1;min-width:0}
@@ -11591,13 +11588,9 @@ function renderWorldsPage(){
       <div class="pv-seg" role="radiogroup" aria-label="Кто видит ${t}">${seg}</div>
     </div>`;
   }).join('');
-  const when = PROJ_CFG_AT ? new Date(PROJ_CFG_AT).toLocaleString('ru-RU',{day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'}) : '';
   el.innerHTML=`<div class="set-page pv-page">
-    <div class="pv-head"><h2 class="pv-h">Сеттинги</h2>
-      <p class="pv-sub">Кто видит каждый сеттинг. Закрытый пропадает у игроков из шапки, календаря и поиска, а тех, кто в нём сейчас, в течение минуты переносит в ближайший открытый.</p></div>
+    <div class="pv-head"><h2 class="pv-h">Сеттинги</h2></div>
     <div class="set-grp pv-grp">${rows}</div>
-    <p class="pv-note">Вы видите все сеттинги всегда. «Команда» — ${DEV_TAGS.join(', ')}. Хотя бы один сеттинг должен быть открыт всем.</p>
-    ${when?`<p class="pv-meta">Последнее изменение: ${esc(when)}</p>`:'<p class="pv-meta">Пока действуют правила по умолчанию</p>'}
   </div>`;
 }
 let PROJ_Q=Promise.resolve();
