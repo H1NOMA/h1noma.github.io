@@ -252,7 +252,6 @@
   .pv-seg button.on{background:var(--red);color:var(--bg)}
   .pv-row.lv-team .pv-seg button.on{background:rgba(var(--accent-rgb),.28);color:var(--txt)}
   .pv-row.lv-owner .pv-seg button.on{background:var(--surface2);color:var(--txt);box-shadow:0 0 0 1px var(--line2) inset}
-  .pv-row:not(.lv-all) .pv-name{opacity:.72}
   @media(max-width:560px){
     .pv-row{flex-wrap:wrap;gap:10px}
     .pv-seg{width:100%}
@@ -2527,6 +2526,24 @@
     .topnav button{display:flex;align-items:center;height:40px;background:none;border:none;color:var(--dim);font-family:var(--f-disp);font-weight:600;font-size:.85rem;letter-spacing:.01em;padding:0 10px;border-radius:10px;cursor:pointer;white-space:nowrap;transition:color .15s,background .15s}
     .topnav button:hover{color:var(--txt);background:rgba(255,255,255,.05)}
     .topnav button.active{color:var(--red-ink);background:var(--red-soft)}
+    /* Меню должно уместиться между пилюлей сеттинга и поиском. У владельца семь пунктов («Сеттинги»),
+       у команды шесть («Музыка»), у остальных пять — где по центру не влезает, ставим меню сразу за пилюлей
+       (а пилюлю ограничиваем 140px — длинное имя сеттинга уходит в многоточие, а не под «Новости»);
+       до 960 — у всех мельче и поиск короче. Раньше последние пункты уходили под поиск и не нажимались */
+    @media(max-width:1179px){ .topnav:has(#navWorlds:not([hidden])) button{padding:0 7px;font-size:.8rem;letter-spacing:0} }
+    @media(max-width:1099px){
+      .topnav:has(#navWorlds:not([hidden])){left:176px;transform:translateY(-50%)}
+      :root:has(#navWorlds:not([hidden])) .lock{max-width:140px}
+    }
+    @media(max-width:1039px){
+      .topnav:has(#navMusic:not([hidden])){left:176px;transform:translateY(-50%)}
+      :root:has(#navMusic:not([hidden])) .lock{max-width:140px}
+    }
+    @media(max-width:959px){
+      .topnav button{padding:0 6px;font-size:.78rem;letter-spacing:0}
+      :root{--search-w:170px}
+      .topnav:has(#navWorlds:not([hidden])) button{padding:0 5px;font-size:.76rem}
+    }
     /* на просторных экранах — крупнее и с воздухом */
     @media(min-width:1280px){
       .lock .project{font-size:1.12rem;letter-spacing:.22em}
@@ -3101,6 +3118,10 @@
   /* шапка 1180–1319: шесть сеттингов разработчика в ряд не влезали до фиксированного поля поиска
      (шестой чип лежал под ним и не нажимался) — ужимаем чипы на этой полосе */
   @media(min-width:1180px) and (max-width:1319px){ #projRow{gap:2px} #projRow .hdr-proj{padding:7px 8px;font-size:.74rem;letter-spacing:0} }
+  /* все семь сеттингов в ряду (у владельца всегда, у всех — если он открыл всё): до 1459 компактно, иначе
+     GALACTIC WAR уходил под поиск. Меняем только поля по бокам — вертикальные у «Русских сказок» свои */
+  @media(min-width:1180px) and (max-width:1199px){ #projRow:has(> .hdr-proj:nth-child(7)) .hdr-proj{padding-left:6px;padding-right:6px} }
+  @media(min-width:1320px) and (max-width:1459px){ #projRow:has(> .hdr-proj:nth-child(7)){gap:2px} #projRow:has(> .hdr-proj:nth-child(7)) .hdr-proj{padding-left:9px;padding-right:9px;font-size:.78rem;letter-spacing:.02em} }
   .tool-title.trk{display:flex;align-items:center;justify-content:center;gap:16px;font-family:var(--f-disp);font-weight:700;font-size:1.05rem;letter-spacing:.14em;margin-bottom:14px}
   .tool-title.trk .tt-ico{width:30px;height:30px;flex:none;color:var(--red-ink);opacity:.55}
   .tool-title.trk .tt-ico svg{width:100%;height:100%;display:block}
@@ -5040,7 +5061,7 @@ async function supaLateInit(){
     if(u){ SESSION=emailToLogin(u.email); ssetLocal(KEY_SESSION, SESSION, false); if(!USERS.some(x=>normTag(x.tag)===normTag(SESSION))) USERS.push({tag:normTag(SESSION), createdAt:Date.now()}); }
   }catch(e){}
   try{ refreshAdmin(); }catch(e){}
-  try{ const pv=await withTimeout(cloudGet(KEY_PROJECTS), CLOUD_TMO); if(pv && typeof pv==='object') projCfgApply(pv); }catch(e){}
+  try{ const pv=await withTimeout(cloudGet(KEY_PROJECTS), CLOUD_TMO); if(pv!==undefined) projCfgApply(pv && typeof pv==='object' ? pv : {v:1, rev:0, at:0, lv:PROJ_DEFAULT}, {force:true}); }catch(e){}
   try{ const gm=await withTimeout(cloudGet(KEY_GAMES), CLOUD_TMO); if(Array.isArray(gm)) gamesMergeRemote(gm); }catch(e){}
   CLOUD_REPULL_AT=0; try{ await cloudRepull('late'); }catch(e){}
   try{ afterAuthChange(); }catch(e){}          // аккаунт, листы, настройки, а на «Доске ходов» — переподписка и дочитывание стола
@@ -5431,7 +5452,10 @@ async function boot(){
   gwSeedInto(CORE);   // стартовые карточки GALACTIC WAR — тем же механизмом правок/скрытий, что и ядро
   scheduleBestiary();
   let [arc, chars, users, sess, chr, dirty, nws, acc, hero, pvis] = await cloudP;
-  if(pvis && typeof pvis==='object') projCfgApply(pvis, {boot:true});   // видимость сеттингов — до строгих проверок ниже
+  // видимость сеттингов — до строгих проверок ниже. Облако на старте — правда (force): копия на устройстве
+  // могла остаться от строки, которую потом пересоздали; строки нет — правила по умолчанию
+  if(pvis===null) projCfgApply({v:1, rev:0, at:0, lv:PROJ_DEFAULT}, {force:true, boot:true});
+  else if(pvis && typeof pvis==='object') projCfgApply(pvis, {force:true, boot:true});
   // диагностика синхронизации: видно в консоли браузера (F12 → Console). Если облако не читается —
   // supa:false ИЛИ значения null при живом supa → проблема со связью/доступом, а не с кодом.
   try{ console.info('[КОМИК] облако', {supa:!!supa, архив:arc!=null, листы:chars!=null, новости:nws!=null, аккаунты:users!=null}); }catch(_){}
@@ -6375,7 +6399,7 @@ function openBookmarks(){
     ${hidden>0?`<p class="note" style="margin-top:12px">Ещё ${hidden} закл. относятся к другим играм — переключи игру в шапке, чтобы увидеть их.</p>`:''}`;
   document.getElementById('scrim').classList.add('open');
 }
-function closeModal(){ closeVitrine(); document.getElementById('scrim').classList.remove('open'); }
+function closeModal(){ closeVitrine(); document.getElementById('scrim').classList.remove('open'); try{ tickSoon(800); }catch(e){} }   // пока окно было открыто, фоновая синхронизация стояла
 function openTerms(overlay){
   document.getElementById(overlay?'modal2':'modal').innerHTML = `
     <button class="x" onclick="${overlay?'closeOverlay()':'closeModal()'}" aria-label="Закрыть">✕</button>
@@ -6461,7 +6485,7 @@ function initChrono(){
 }
 /* список кампаний хроники — заново, если сменился набор видимых сеттингов (правило владельца, вход/выход) */
 function chronoRebuild(){
-  const wrap=document.getElementById('chrono-list'); if(!wrap || !wrap.children.length) return;
+  const wrap=document.getElementById('chrono-list'); if(!wrap || wrap.dataset.vis===undefined) return;   // ещё не строился — построит initChrono
   if(wrap.dataset.vis===visibleProjects().join(',')) return;
   wrap.innerHTML=''; initChrono();
 }
@@ -7509,6 +7533,7 @@ function calRefresh(){
 /* краткая инфа об игре: поверх открытого календаря — во втором слое, иначе — в основной модалке */
 function openGameBrief(id){
   const s=(GAMES||[]).find(x=>x&&x.id===id); if(!s) return;
+  if(s.game && !projectVisible(s.game)) return;   // сеттинг закрыт владельцем (устаревшая строка календаря)
   const inModal=document.getElementById('scrim').classList.contains('open');
   const tgt=inModal?'modal2':'modal', scr=inModal?'scrim2':'scrim', closeFn=inModal?'closeOverlay()':'closeModal()';
   const d=gameDateOf(s), col=CAL_COLORS[s.game]||'#fff';
@@ -7612,8 +7637,9 @@ async function doSignup(id){
   const charId=pf('gs-char')?.value||'';
   const btn=document.querySelector('#modal .pacts .btn.primary'); if(btn) btn.disabled=true;
   await gamesPull(4000);   // места считаем по свежей копии: форма могла провисеть открытой долго
+  try{ projCfgFromCloud(await withTimeout(cloudGet(KEY_PROJECTS), 4000)); }catch(e){}   // и правило видимости: тик при открытой форме не ходит
   const s=GAMES.find(x=>x.id===id); if(!s){ toast('Эта сессия уже снята с расписания'); openGameSignup(); return; }
-  if(s.game && !projectVisible(s.game)){ toast('Запись на эту игру сейчас закрыта'); return; }
+  if(s.game && !projectVisible(s.game)){ toast('Запись на эту игру сейчас закрыта'); closeModal(); return; }
   const me=currentTag(), prev=(s.players||[]).find(p=>normTag(p.tag)===me);
   const _mineSeat=!!prev; if(!_mineSeat && seatsLeft(s)<=0){ toast('Мест не осталось'); openGameSignup(); return; }
   const ch=charId ? (CHARS_ALL[s.game]||[]).find(c=>c.id===charId && !c.deleted) : null;
@@ -7947,6 +7973,8 @@ function updateDevUI(){
   const nw=document.getElementById('navWorlds'); if(nw) nw.hidden=!projOwner();   // «Сеттинги» — только владельцу
   const vw=document.getElementById('view-worlds'); if(vw && vw.classList.contains('active') && !projOwner()) go('news');
   try{ chronoRebuild(); }catch(e){}
+  // вход/выход меняет набор видимых сеттингов — календарь (легенда, «Ближайшие игры») пересобираем
+  try{ const sig=visibleProjects().join(','); if(sig!==window.__projVisSig){ window.__projVisSig=sig; calRefresh(); } }catch(e){}
   updateArchLock();
   // вышел из аккаунта, находясь в закрытом сеттинге (ASSIMILATION, GW) — уводим в доступный.
   // До чтения сессии (запуск, preboot) проверка мягкая: иначе сохранённый GW сбрасывался в «Классику»
@@ -8531,9 +8559,9 @@ async function cloudTickOnce(){
     const [ch,gm,pv]=await Promise.all([
       withTimeout(fetchCloudCharsChanged(), CLOUD_TMO).catch(()=>null),   // зонд по штампам: полные строки — только изменившиеся
       withTimeout(cloudGet(KEY_GAMES),4000).catch(()=>null),
-      withTimeout(cloudGet(KEY_PROJECTS),4000).catch(()=>null)          // владелец закрыл/открыл сеттинг — узнаём за один тик
+      withTimeout(cloudGet(KEY_PROJECTS),4000).catch(()=>undefined)     // владелец закрыл/открыл сеттинг — узнаём за один тик
     ]);
-    if(pv && typeof pv==='object') projCfgApply(pv);
+    projCfgFromCloud(pv);
     let chChanged=false, gmChanged=false;
     if(ch && typeof ch==='object'){
       const fp=a=>(a||[]).map(c=>c&&(c.id+':'+(c.updatedAt||0))).join(',');   // отпечаток id:updatedAt (как в cloudRepull) вместо JSON.stringify всего массива
@@ -11480,8 +11508,10 @@ function projCfgParse(v){
   if(!PROJECT_ORDER.some(g=>lv[g]==='all')) lv.classic='all';
   return lv;
 }
-let PROJ_CFG=projCfgParse(null), PROJ_CFG_AT=0, PROJ_CFG_BY='';
-try{ const m=JSON.parse(localStorage.getItem(KEY_PROJECTS)||'null'); if(m && typeof m==='object'){ PROJ_CFG=projCfgParse(m); PROJ_CFG_AT=+m.at||0; PROJ_CFG_BY=String(m.by||''); } }catch(e){}
+/* PROJ_CFG_REV — ревизия строки в облаке: её ведёт CAS-запись (kvCasUpdate), а не часы устройства владельца.
+   PROJ_PENDING — сколько своих правок ещё летит: пока летят, облако и другие вкладки несут прежнее правило */
+let PROJ_CFG=projCfgParse(null), PROJ_CFG_AT=0, PROJ_CFG_BY='', PROJ_CFG_REV=0, PROJ_PENDING=0, PROJ_CONFIRMED=null;
+try{ const m=JSON.parse(localStorage.getItem(KEY_PROJECTS)||'null'); if(m && typeof m==='object'){ PROJ_CFG=projCfgParse(m); PROJ_CFG_AT=+m.at||0; PROJ_CFG_BY=String(m.by||''); PROJ_CFG_REV=+m.rev||0; PROJ_CONFIRMED=m; } }catch(e){}
 function projLevel(g){ return PROJ_CFG[g]||'all'; }
 function projOwner(){ return typeof normTag==='function' && normTag(SESSION||'')===PROJ_OWNER; }
 function projCanSee(g, tag){
@@ -11509,16 +11539,19 @@ function nearestVisibleProject(from, lenient, see){
   }
   return PROJECT_ORDER.find(g=>see(g)) || 'classic';
 }
-function fallbackProject(from){ return nearestVisibleProject(from||CUR_PROJECT); }
-/* принять правило (облако, другая вкладка, своя правка). Более старое, чем уже принятое, — пропускаем:
-   своя правка могла ещё не долететь до облака, а тик уже принёс прежнюю версию */
+function fallbackProject(from){ return nearestVisibleProject(from||CUR_PROJECT, true); }   // мягко: до чтения сессии — по сохранённому входу
+/* принять правило (облако, другая вкладка, своя правка). Пропускаем: запоздавшее чтение с ревизией старше
+   принятой и всё, что приходит, пока летит своя правка владельца. force — облако на старте/поздней связи
+   (оно и есть правда), откат и своя оптимистичная правка */
 function projCfgApply(v, opts){
   opts=opts||{};
   if(!v || typeof v!=='object') return false;
-  const at=+v.at||0;
-  if(!opts.force && at<PROJ_CFG_AT) return false;
+  const rev=+v.rev||0;
+  if(!opts.force && PROJ_PENDING>0) return false;
+  if(!opts.force && rev<PROJ_CFG_REV && PROJ_CFG_REV-rev<=5) return false;   // откат больше чем на 5 — строку пересоздали, её и берём
   const next=projCfgParse(v);
-  PROJ_CFG_AT=at; PROJ_CFG_BY=String(v.by||'');
+  PROJ_CFG_AT=+v.at||0; PROJ_CFG_BY=String(v.by||''); PROJ_CFG_REV=rev;
+  if(!opts.optimistic) PROJ_CONFIRMED=v;
   try{ localStorage.setItem(KEY_PROJECTS, JSON.stringify(v)); }catch(e){}
   if(JSON.stringify(next)===JSON.stringify(PROJ_CFG)) return false;
   PROJ_CFG=next;
@@ -11561,30 +11594,60 @@ function renderWorldsPage(){
   const when = PROJ_CFG_AT ? new Date(PROJ_CFG_AT).toLocaleString('ru-RU',{day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'}) : '';
   el.innerHTML=`<div class="set-page pv-page">
     <div class="pv-head"><h2 class="pv-h">Сеттинги</h2>
-      <p class="pv-sub">Кто видит каждый сеттинг. Закрытый пропадает у игроков из шапки, календаря и поиска, а тех, кто в нём сейчас, сразу переносит в ближайший открытый.</p></div>
+      <p class="pv-sub">Кто видит каждый сеттинг. Закрытый пропадает у игроков из шапки, календаря и поиска, а тех, кто в нём сейчас, в течение минуты переносит в ближайший открытый.</p></div>
     <div class="set-grp pv-grp">${rows}</div>
     <p class="pv-note">Вы видите все сеттинги всегда. «Команда» — ${DEV_TAGS.join(', ')}. Хотя бы один сеттинг должен быть открыт всем.</p>
     ${when?`<p class="pv-meta">Последнее изменение: ${esc(when)}</p>`:'<p class="pv-meta">Пока действуют правила по умолчанию</p>'}
   </div>`;
 }
 let PROJ_Q=Promise.resolve();
+/* Правка одного сеттинга. На экране — сразу; в облако — по очереди и через CAS (kvCasUpdate): на свежую строку
+   ложится только этот сеттинг, поэтому второй телефон/вкладка владельца не затирает чужую правку целым
+   правилом из своей памяти, а ревизию ведёт сама строка, а не часы устройства. Не вышло — экран возвращается
+   к тому, что на самом деле в облаке (или к последнему подтверждённому), и повторное нажатие снова работает */
 function projSetLevel(g, lv){
   if(!projOwner()){ toast('Раздел владельца'); return; }
+  if(!supa){ toast('Нет связи с облаком — правило сейчас не сохранить'); return; }
   if(!PROJECT_TITLES[g] || PROJ_LEVELS.indexOf(lv)<0 || projLevel(g)===lv) return;
   const next=Object.assign({}, PROJ_CFG, {[g]:lv});
   if(!PROJECT_ORDER.some(x=>next[x]==='all')){ toast('Хотя бы один сеттинг должен быть открыт всем — иначе игрокам некуда'); return; }
-  const val={v:1, at:Math.max(Date.now(), PROJ_CFG_AT+1), by:PROJ_OWNER, lv:next};
-  projCfgApply(val, {force:true});   // у себя — сразу: страница, шапка, календарь
+  projCfgApply({v:1, rev:PROJ_CFG_REV, at:Date.now(), by:PROJ_OWNER, lv:next}, {force:true, optimistic:true});
   renderWorldsPage();
-  // записи по очереди: быстрые тапы не должны лечь в облако в обратном порядке
+  PROJ_PENDING++;
   PROJ_Q=PROJ_Q.then(async ()=>{
-    const ok=await sset(KEY_PROJECTS, val, true, true);
-    if(ok){ if(val.at===PROJ_CFG_AT) toast('«'+gameTitle(g)+'» — '+(lv==='all'?'видят все':lv==='team'?'видит команда':'видите только вы')); return; }
-    toast(SSET_LAST_ERR==='noperm' ? '⚠ Облако не приняло правило: нет прав на запись' : '⚠ Облако не ответило — правило не сохранено, повторите');
-    // вернуть то, что на самом деле в облаке: иначе здесь было бы одно правило, а у игроков — другое
-    try{ const cur=await withTimeout(cloudGet(KEY_PROJECTS), 8000); if(cur!==undefined) projCfgApply(cur && typeof cur==='object' ? cur : {v:1, at:0, lv:PROJ_DEFAULT}, {force:true}); }catch(e){}
+    let res=null, err=null;
+    try{
+      res=await kvCasUpdate(KEY_PROJECTS, v=>{
+        const cur=projCfgParse(v); cur[g]=lv;
+        if(!PROJECT_ORDER.some(x=>cur[x]==='all')){ const e=new Error('last'); e.code='last'; throw e; }
+        v.v=1; v.by=PROJ_OWNER; v.lv=cur;
+      });
+    }catch(e){ err=e; }
+    PROJ_PENDING=Math.max(0, PROJ_PENDING-1);
+    const name='«'+gameTitle(g)+'»';
+    if(res){
+      // строка из облака: ревизия и, возможно, чужие правки с другого устройства. Пока летят следующие тапы,
+      // не накрываем ими экран (переключатель мигнул бы назад): последняя запись вернёт строку со всеми
+      if(!PROJ_PENDING) projCfgApply(res, {force:true}); else PROJ_CONFIRMED=res;
+      if(!PROJ_PENDING) toast(name+' — '+(lv==='all'?'видят все':lv==='team'?'видит команда':'видите только вы'));
+    } else {
+      toast(err && err.code==='last' ? '⚠ '+name+' не закрыт: в облаке это последний сеттинг, открытый всем'
+        : (err && (err.code==='noperm' || cloudNoPerm(err))) ? '⚠ '+name+': облако не приняло правило — нет прав на запись'
+        : '⚠ '+name+': облако не ответило — правило не сохранено, повторите');
+      if(!PROJ_PENDING){   // вернуть то, что на самом деле в облаке; не прочиталось — последнее подтверждённое
+        let cur; try{ cur=await withTimeout(cloudGet(KEY_PROJECTS), 8000); }catch(e){ cur=undefined; }
+        if(!PROJ_PENDING) projCfgApply(cur===undefined ? (PROJ_CONFIRMED||{v:1, rev:0, at:0, lv:PROJ_DEFAULT}) : (cur && typeof cur==='object' ? cur : {v:1, rev:0, at:0, lv:PROJ_DEFAULT}), {force:true});
+      }
+    }
     renderWorldsPage();
-  }).catch(()=>{});
+  }).catch(()=>{ PROJ_PENDING=Math.max(0, PROJ_PENDING-1); });
+}
+/* строки правила в облаке нет (удалили, перенос базы) — действуют правила по умолчанию и на устройствах,
+   где лежит старая копия. Только при точном «нет строки» (null), не при сбое чтения (undefined) */
+function projCfgFromCloud(v){
+  if(v===null) return PROJ_PENDING ? false : projCfgApply({v:1, rev:0, at:0, lv:PROJ_DEFAULT}, {force:true});
+  if(v && typeof v==='object') return projCfgApply(v);
+  return false;
 }
 /* тематический фон по краям экрана (десктоп): частицы под каждый сеттинг, медленно и плавно */
 const AMB_RUNES=['ᚠ','ᚢ','ᚦ','ᚨ','ᚱ','ᚲ','ᚷ','ᚹ','ᚾ','ᛃ','ᛈ','ᛉ','ᛋ','ᛏ','ᛒ','ᛗ','ᛚ','ᛜ','ᛟ','ᛞ'];
