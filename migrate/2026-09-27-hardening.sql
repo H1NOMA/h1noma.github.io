@@ -1,11 +1,15 @@
 -- ═══════════════════════════════════════════════════════════════════════════════
 --  КОМИК · 2026-09-27 · укрепление прав: права команды — у аккаунтов, а не у текста логина;
---                        игроки не удаляют строки и не раздувают их; адрес аккаунта не меняется
+--                        игроки не удаляют, не переименовывают и не раздувают строки; адрес аккаунта не меняется
 --
 --  Запуск:  docker exec -i supabase-db psql -v ON_ERROR_STOP=1 -U postgres -d postgres < migrate/2026-09-27-hardening.sql
 --       (push.sh применяет её сам на шаге 5/5 — последней, после 09-21, 09-25 и 09-26).
---  Идемпотентно. Верна и без предыдущих миграций, но push.sh каждый раз гонит все четыре подряд:
---  09-21/09-25/09-26 пересоздают свои (более слабые) версии функций и политик, эта — возвращает строгие.
+--  Идемпотентно. Верна и без предыдущих миграций, но push.sh и setup.sh каждый раз гонят все четыре —
+--  ОДНОЙ транзакцией (свои begin;/commit; у файлов снимаются, обёртка — одна на всех): 09-21/09-25/09-26
+--  пересоздают свои (более слабые) версии функций и политик, эта — возвращает строгие. Снаружи промежуточного
+--  состояния никто не видит, а ошибка в любом файле откатывает всё — база остаётся как была.
+--  Поэтому здесь (как и в остальных трёх) begin; и commit; — отдельными строками, и ничего, что нельзя выполнять
+--  внутри транзакции (vacuum, create index concurrently и т.п.).
 --
 --  Дыры, которые закрывает:
 --   1) логин «v1»: my_tag() принимал любой адрес @komikdnd.ru, а строка comik:chars:v1 — старое общее
@@ -31,6 +35,9 @@
 --      ¹ 27.08, когда в строке ещё жил фон карты; с 03.09 фон в отдельной строке, и доска — до 5 000.
 --      Замер: все 30 снапшотов ветки backups (27.08–25.09) и ещё 19 из её прежней истории.
 --      Разработчиков потолки не касаются (kv_write_dev).
+--      Ключ строки через API не меняется ни у кого (триггер kv_key_fixed): иначе игрок «переименовал» бы общую
+--      строку (расписание, доску) в свою пустую comik:bm:<тег> — и она пропала бы без всякого DELETE.
+--      Upsert сайта (PostgREST: on conflict (key) do update set key = excluded.key, …) ключ не меняет — проходит.
 --   5) comik:projects:v1 пишет только аккаунт, привязанный к тегу hinoma (а не любой с логином «hinoma»).
 -- ═══════════════════════════════════════════════════════════════════════════════
 begin;
@@ -168,7 +175,23 @@ create policy kv_write_player_upd on public.kv for update to authenticated
   using      (public.kv_player_cap(key) is not null)
   with check (pg_column_size(value) <= public.kv_player_cap(key));
 
--- 6. Итог — коротко, по-русски.
+-- 6. Ключ строки не меняется. Политика UPDATE проверяет старую строку и новую, но не запрещает сменить сам ключ:
+--    «update kv set key = 'comik:bm:<мой тег>' where key = 'comik:games:v1'» проходил бы обе проверки, и общая строка
+--    исчезала бы. Клиент ключи не переименовывает никогда; upsert PostgREST (set key = excluded.key) пишет тот же ключ —
+--    это не смена, пропускаем. Владельцу сервера (postgres, service_role — restore.sh) не мешаем.
+create or replace function public.kv_key_fixed() returns trigger
+language plpgsql as $$
+begin
+  if new.key is distinct from old.key and current_user in ('anon', 'authenticated') then
+    raise exception 'kv: ключ строки менять нельзя' using errcode = '42501';
+  end if;
+  return new;
+end
+$$;
+create or replace trigger kv_key_fixed before update of key on public.kv
+  for each row execute function public.kv_key_fixed();
+
+-- 7. Итог — коротко, по-русски.
 set local client_min_messages = notice;
 do $$
 declare n int; list text; r record; s text := ''; pol text; odd text;

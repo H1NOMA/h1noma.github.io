@@ -65,17 +65,25 @@ fi
 
 say "Вход по SSH-ключу вместо пароля (сделай сам, когда будет время)"
 IP=$(hostname -I 2>/dev/null | awk '{print $1}'); IP=${IP:-<IP-сервера>}
+# пароль принимают два способа входа: PasswordAuthentication и keyboard-interactive (через PAM) —
+# на части образов хостингов второй включён, и тогда «PasswordAuthentication no» пароль не выключает
+PWSTATE=$(sshd -T 2>/dev/null | awk '
+  $1=="passwordauthentication"{p=$2} $1=="kbdinteractiveauthentication"||$1=="challengeresponseauthentication"{if(k=="")k=$2}
+  END{ if(p=="") print "не удалось узнать (sshd -T)";
+       else print ((p=="yes"||k=="yes")?"включён":"выключен") " (PasswordAuthentication " p ", KbdInteractiveAuthentication " (k==""?"?":k) ")" }' || true)
 cat <<EOF
-Сейчас вход по паролю: $(sshd -T 2>/dev/null | awk '/^passwordauthentication/{print ($2=="yes")?"включён":"выключен"}' || true)
+Сейчас вход по паролю: $PWSTATE
 На своём компьютере (Windows) открой PowerShell:
   1) ssh-keygen -t ed25519
      (Enter на все вопросы; ключ появится в папке .ssh твоего пользователя)
   2) type \$env:USERPROFILE\\.ssh\\id_ed25519.pub | ssh root@$IP "mkdir -p ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys"
      (последний раз спросит пароль сервера)
   3) ssh root@$IP — должен пустить БЕЗ пароля.
-Только если шаг 3 сработал, можно выключить вход по паролю (на сервере):
-  echo 'PasswordAuthentication no' > /etc/ssh/sshd_config.d/00-komik.conf && sshd -t && systemctl restart ssh
+Только если шаг 3 сработал, можно выключить вход по паролю (на сервере; обе строки — иначе пароль
+всё ещё примут через keyboard-interactive; sshd -t проверяет настройки до перезапуска):
+  printf 'PasswordAuthentication no\nKbdInteractiveAuthentication no\n' > /etc/ssh/sshd_config.d/00-komik.conf && sshd -t && systemctl restart ssh
   и, НЕ закрывая это окно, проверь вход в новом окне PowerShell: ssh root@$IP
+  проверка на сервере: sshd -T | grep -E '^(passwordauthentication|kbdinteractiveauthentication) ' — обе строки «no»
 Ключ живёт на этом компьютере: скопируй папку .ssh в надёжное место. Потерял ключ и пароль выключен —
 вход только через консоль в панели хостинга (там же вернуть пароль: rm /etc/ssh/sshd_config.d/00-komik.conf && systemctl restart ssh).
 Если сам себя заблокировал паролями — подожди час или в консоли хостинга: fail2ban-client set sshd unbanip ТВОЙ_IP

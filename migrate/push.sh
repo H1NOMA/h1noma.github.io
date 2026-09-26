@@ -72,8 +72,22 @@ verify(){
     EXTRA=""; X=" kv_read kv_write kv_write_player kv_write_dev kv_write_player_ins kv_write_player_upd kv_projects_owner_ins kv_projects_owner_upd kv_projects_owner_del "
     for p in $POL; do [[ "$X" == *" $p "* ]] || EXTRA="$EXTRA $p"; done
     if [ -n "$EXTRA" ]; then bad "лишние правила на kv:$EXTRA — они могут открыть запись всем, покажи программисту"; OK=0; fi
+    # правила действуют, только пока RLS включён: «Disable RLS» в Studio открывает запись всем (права таблиц
+    # Supabase по умолчанию — ALL для anon и authenticated), а список правил при этом остаётся прежним
+    X=$(q "select string_agg(c.relname || '=' || c.relrowsecurity, ' ' order by c.relname) from pg_class c
+           where c.oid in (to_regclass('public.kv'), to_regclass('public.devs'))")
+    if [ "$X" = 'devs=true kv=true' ]; then echo "  правила строк (RLS) на kv и devs включены ✓"
+    else bad "RLS выключен (таблицы kv/devs: ${X:-нет ответа}): правила не действуют, запись открыта всем — запусти push.sh (без check)"; OK=0; fi
+    # в devs через API — только чтение: иначе игрок дописал бы себя в команду или перепривязал чужой тег
+    X=$(q "select 'ok:' || coalesce(string_agg(r || ' ' || p, ', ' order by r, p), '')
+             from unnest(array['anon', 'authenticated']) r, unnest(array['INSERT', 'UPDATE', 'DELETE', 'TRUNCATE']) p
+            where case when p in ('INSERT', 'UPDATE') then has_any_column_privilege(r, 'public.devs', p)
+                       else has_table_privilege(r, 'public.devs', p) end")
+    if [ "$X" != 'ok:' ]; then bad "в таблицу команды (devs) можно писать через API (${X#ok:}) — запусти push.sh (без check)"; OK=0; fi
     RPC=$(q "select count(*) from pg_proc where pronamespace = 'public'::regnamespace and proname in ('kv_deep_merge','trk_card_patch','trk_log_push','jsonb_deep_merge')")
     if [ "$RPC" != 0 ]; then bad "остались старые функции записи в обход правил (kv_deep_merge и др.)"; OK=0; fi
+    X=$(q "select count(*) from pg_trigger t join pg_proc f on f.oid = t.tgfoid where t.tgrelid = to_regclass('public.kv') and t.tgname = 'kv_key_fixed' and t.tgenabled <> 'D' and f.prosrc ~ 'менять нельзя'")
+    if [ "$X" != 1 ]; then bad "нет запрета переименовывать строки kv (триггер kv_key_fixed): игрок может «увести» расписание или доску в свою строку"; OK=0; fi
     X=$(q "select prosrc ~ '4,32' from pg_proc where oid = to_regprocedure('public.my_tag()')")
     if [ "$X" != t ]; then bad "функция my_tag() старая: логины вроде «v1» получают права игрока"; OK=0; fi
     X=$(q "select count(*) from pg_trigger t join pg_proc f on f.oid = t.tgfoid where t.tgrelid = to_regclass('auth.users') and t.tgname = 'komik_email_guard' and t.tgenabled <> 'D' and f.prosrc ~ 'сменить нельзя'")
@@ -231,10 +245,31 @@ say "5/5 · Защита аккаунтов и правил сайта"
 # Все миграции базы, строго по порядку, при каждом запуске (каждая идемпотентна):
 #   09-21 — права записи по ролям (снимает kv_write «любой пишет всё» и RPC в обход правил);
 #   09-25 — тег только с адреса @komikdnd.ru;  09-26 — comik:projects:v1 пишет только hinoma;
-#   09-27 — права команды у аккаунтов, игроки без удаления и с потолком размера, адрес аккаунта не меняется.
+#   09-27 — права команды у аккаунтов, игроки без удаления, переименования и с потолком размера, адрес не меняется.
 # 09-21..09-26 пересоздают свои (более мягкие) версии, 09-27 возвращает строгие — поэтому она последняя,
 # а применяем только если скачались ВСЕ четыре: иначе повторный запуск ослабил бы уже укреплённую базу.
+# И применяем ОДНОЙ транзакцией (mig_sql): снаружи мягкого промежуточного состояния никто не видит,
+# а сбой или Ctrl+C в любом месте откатывает всё — база остаётся как была.
 MIGS="2026-09-21-rls.sql 2026-09-25-email-domain.sql 2026-09-26-projects-owner.sql 2026-09-27-hardening.sql"
+# скачанный файл годится, если он наш и целый: ровно одна строка «begin;» и одна «commit;» — последней
+# (обрезанный файл её не содержит; по этим строкам mig_sql и склеивает файлы в одну транзакцию)
+mig_ok(){ sed -i 's/\r$//' "$1" && grep -q 'комик\|КОМИК' "$1" && [ "$(grep -cx 'begin;' "$1")" = 1 ] \
+  && [ "$(grep -cx 'commit;' "$1")" = 1 ] && [ "$(grep -v '^[[:space:]]*$' "$1" | tail -1)" = 'commit;' ]; }
+# все файлы — в одну транзакцию: свои begin;/commit; снимаем, оборачиваем один раз. Перед каждым файлом —
+# его имя (видно, на каком упало) и уровень сообщений по умолчанию, как при отдельном запуске
+mig_sql(){ local f
+  echo 'begin;'
+  for f in "$@"; do
+    echo "set local client_min_messages = notice;"
+    echo "do \$komik\$ begin raise notice '· %', '$f'; end \$komik\$;"
+    sed -e '/^begin;$/d' -e '/^commit;$/d' "$MIG_DIR/$f"
+  done
+  echo 'commit;'
+}
+# NOTICE/WARNING от базы — без служебных приставок и без «… does not exist / already exists, skipping»
+# (первый и повторный запуски)
+apply_migs(){ mig_sql "$@" | docker exec -i supabase-db psql -q -v ON_ERROR_STOP=1 -U postgres -d postgres 2>&1 \
+  | sed -e '/does not exist, skipping/d' -e '/already exists, skipping/d' -e 's/^NOTICE:  //' -e 's/^WARNING:  /⚠ /' -e 's/^/  /'; }
 MIG_DIR=$(mktemp -d); MIG_ALL=1
 for MIG_NAME in $MIGS; do
   MIG="$MIG_DIR/$MIG_NAME"; MIG_OK=""
@@ -242,20 +277,17 @@ for MIG_NAME in $MIGS; do
   MIG_SITE="https://komikdnd.ru/migrate/$MIG_NAME"
   if [ -n "${KOMIK_REF:-}" ]; then MIG_SRC="$MIG_GH $MIG_SITE"; else MIG_SRC="$MIG_SITE $MIG_GH"; fi
   for u in $MIG_SRC; do
-    curl -sSf --max-time 30 -o "$MIG" "$u" && grep -q 'комик\|КОМИК' "$MIG" && grep -q 'commit;' "$MIG" && { MIG_OK=1; break; }
+    curl -sSf --max-time 30 -o "$MIG" "$u" && mig_ok "$MIG" && { MIG_OK=1; break; }
   done
   [ -n "$MIG_OK" ] || { warn "не смог скачать $MIG_NAME"; MIG_ALL=""; }
 done
 if [ -n "$MIG_ALL" ]; then
-  for MIG_NAME in $MIGS; do
-    # NOTICE/WARNING от базы — без служебных приставок и без «… does not exist, skipping» первого запуска
-    if docker exec -i supabase-db psql -q -v ON_ERROR_STOP=1 -U postgres -d postgres < "$MIG_DIR/$MIG_NAME" 2>&1 \
-         | sed -e '/does not exist, skipping/d' -e 's/^NOTICE:  //' -e 's/^WARNING:  /⚠ /' -e 's/^/  /'; then
-      echo "  $MIG_NAME — применена ✓"
-    else
-      warn "$MIG_NAME не применена — пришли вывод выше программисту"
-    fi
-  done
+  # shellcheck disable=SC2086   # MIGS — список имён через пробел
+  if apply_migs $MIGS; then
+    echo "  все четыре миграции применены ✓ (одной транзакцией: ${MIGS// / → })"
+  else
+    warn "миграции НЕ применены — база осталась как была (транзакция откатилась). Пришли вывод выше программисту"
+  fi
 else
   warn "миграции базы в этот раз НЕ применялись (ни одна) — проверь интернет и запусти push.sh ещё раз"
 fi

@@ -9,8 +9,8 @@
 #    komik-env.backup, komik-override.backup, auth-ДАТА.sql.gz — тогда ключи и пароли прежние.
 #  Запуск:  bash <(curl -fsS https://komikdnd.ru/migrate/setup.sh)
 #  Своя копия данных вместо свежей: KOMIK_KV_FILE=/root/kv-2026-09-20.json.gz bash <(curl …setup.sh)
-#  Повторный запуск безопасен: готовые шаги пропускаются,
-#  непустые kv и auth.users повторно НЕ перезаписываются.
+#  Повторный запуск безопасен: готовые шаги пропускаются, в непустые (или не ответившие
+#  на подсчёт строк) kv и auth.users ничего НЕ заливается, и уже лежащая строка не перезаписывается.
 # ══════════════════════════════════════════════════════════════════════
 set -euo pipefail
 
@@ -168,7 +168,7 @@ docker compose pull -q || true
 docker compose up -d
 echo "жду готовности базы…"
 DB_OK=""
-for i in $(seq 1 90); do
+for _ in $(seq 1 90); do
   docker exec supabase-db pg_isready -h 127.0.0.1 -U postgres >/dev/null 2>&1 && { DB_OK=1; break; }
   sleep 5
 done
@@ -176,7 +176,7 @@ done
 echo "жду готовности API-шлюза…"
 # корень /rest/v1/ в этой ревизии Envoy пускает только сервисный ключ — им и проверяем
 GW_OK=""
-for i in $(seq 1 60); do
+for _ in $(seq 1 60); do
   curl -sf -o /dev/null http://127.0.0.1:8000/rest/v1/ -H "apikey: $SERVICE" -H "Authorization: Bearer $SERVICE" && { GW_OK=1; break; }
   sleep 5
 done
@@ -194,11 +194,29 @@ do $$ begin
   alter publication supabase_realtime add table public.kv;
 exception when duplicate_object then null; end $$;
 SQL
-# Права записи — те же четыре файла и в том же порядке, что применяет push.sh при каждом запуске:
-# конечное состояние у свежего и у давно работающего сервера одинаковое, а правится оно в одном месте (migrate/*.sql).
-# Не скачались/не применились — запись в kv закрыта всем (RLS без разрешающих правил), сайт только читает;
-# это чинит push.sh. Ставить дальше Caddy и функции это не мешает — поэтому не выходим.
+# Права записи — те же четыре файла, в том же порядке и так же ОДНОЙ транзакцией, что применяет push.sh
+# при каждом запуске: конечное состояние у свежего и у давно работающего сервера одинаковое, а правится оно
+# в одном месте (migrate/*.sql). Не скачались/не применились — запись в kv закрыта всем (RLS без разрешающих
+# правил), сайт только читает; это чинит push.sh. Ставить дальше Caddy и функции это не мешает — поэтому не выходим.
 MIGS="2026-09-21-rls.sql 2026-09-25-email-domain.sql 2026-09-26-projects-owner.sql 2026-09-27-hardening.sql"
+# скачанный файл годится, если он наш и целый: ровно одна строка «begin;» и одна «commit;» — последней
+mig_ok(){ sed -i 's/\r$//' "$1" && grep -q 'комик\|КОМИК' "$1" && [ "$(grep -cx 'begin;' "$1")" = 1 ] \
+  && [ "$(grep -cx 'commit;' "$1")" = 1 ] && [ "$(grep -v '^[[:space:]]*$' "$1" | tail -1)" = 'commit;' ]; }
+# файлы — в одну транзакцию: свои begin;/commit; снимаем, оборачиваем один раз (как в push.sh);
+# ошибка в любом файле откатывает всё. Перед каждым файлом — его имя и уровень сообщений по умолчанию
+mig_sql(){ local f
+  echo 'begin;'
+  for f in "$@"; do
+    echo "set local client_min_messages = notice;"
+    echo "do \$komik\$ begin raise notice '· %', '$f'; end \$komik\$;"
+    sed -e '/^begin;$/d' -e '/^commit;$/d' "$MIG_DIR/$f"
+  done
+  echo 'commit;'
+}
+# NOTICE/WARNING от базы — без служебных приставок и без «… does not exist / already exists, skipping»
+# (первый и повторный запуски)
+apply_migs(){ mig_sql "$@" | docker exec -i supabase-db psql -q -v ON_ERROR_STOP=1 -U postgres -d postgres 2>&1 \
+  | sed -e '/does not exist, skipping/d' -e '/already exists, skipping/d' -e 's/^NOTICE:  //' -e 's/^WARNING:  /⚠ /' -e 's/^/  /'; }
 MIG_DIR=$(mktemp -d); MIG_ALL=1
 for MIG_NAME in $MIGS; do
   MIG_OK=""
@@ -206,18 +224,14 @@ for MIG_NAME in $MIGS; do
   MIG_SITE="https://komikdnd.ru/migrate/$MIG_NAME"
   if [ -n "${KOMIK_REF:-}" ]; then MIG_SRC="$MIG_GH $MIG_SITE"; else MIG_SRC="$MIG_SITE $MIG_GH"; fi
   for u in $MIG_SRC; do
-    curl -sSf --max-time 30 -o "$MIG_DIR/$MIG_NAME" "$u" && grep -q 'комик\|КОМИК' "$MIG_DIR/$MIG_NAME" \
-      && grep -q 'commit;' "$MIG_DIR/$MIG_NAME" && { MIG_OK=1; break; }
+    curl -sSf --max-time 30 -o "$MIG_DIR/$MIG_NAME" "$u" && mig_ok "$MIG_DIR/$MIG_NAME" && { MIG_OK=1; break; }
   done
   [ -n "$MIG_OK" ] || { warn "не смог скачать $MIG_NAME"; MIG_ALL=""; }
 done
-# NOTICE/WARNING от базы — без служебных приставок и без «… does not exist, skipping» первого запуска
-apply_mig(){ docker exec -i supabase-db psql -q -v ON_ERROR_STOP=1 -U postgres -d postgres < "$MIG_DIR/$1" 2>&1 \
-  | sed -e '/does not exist, skipping/d' -e 's/^NOTICE:  //' -e 's/^WARNING:  /⚠ /' -e 's/^/  /'; }
 if [ -n "$MIG_ALL" ]; then
-  for MIG_NAME in $MIGS; do
-    if apply_mig "$MIG_NAME"; then echo "  $MIG_NAME ✓"; else warn "$MIG_NAME не применена"; MIG_ALL=""; fi
-  done
+  # shellcheck disable=SC2086   # MIGS — список имён через пробел
+  if apply_migs $MIGS; then echo "  все четыре миграции применены ✓ (одной транзакцией)"
+  else warn "миграции не применены (транзакция откатилась)"; MIG_ALL=""; fi
 fi
 if [ -n "$MIG_ALL" ]; then echo "схема и права применены ✓"
 else warn "права записи настроены не полностью — после установки запусти push.sh (bash <(curl -fsS https://komikdnd.ru/migrate/push.sh))"; fi
@@ -226,9 +240,12 @@ say "8/9 · Данные и аккаунты"
 # 8а. данные kv — ТОЛЬКО в пустую таблицу, из свежей ежедневной копии (ветка backups на GitHub)
 #     или из своего файла (KOMIK_KV_FILE=…). Старое облако supabase.co больше не источник: там могут
 #     лежать устаревшие или испорченные данные.
-KVCNT=$(docker exec supabase-db psql -U postgres -d postgres -tAc "select count(*) from public.kv" || echo 0)
-if [ "${KVCNT:-0}" -gt 0 ]; then
-  echo "  kv уже содержит $KVCNT ключей — восстановление пропускаю (данные не трогаю)"
+#     Строки не посчитались (база перезапускается, нет памяти) — НЕ заливаем: вдруг таблица не пустая.
+#     И даже в пустую — «ignore-duplicates»: уже существующую строку заливка не перезапишет никогда.
+KVCNT=$(docker exec supabase-db psql -U postgres -d postgres -tAc "select count(*) from public.kv" 2>/dev/null) || KVCNT=""
+if [ "$KVCNT" != 0 ]; then
+  if [ -n "$KVCNT" ]; then echo "  kv уже содержит $KVCNT ключей — восстановление пропускаю (данные не трогаю)"
+  else warn "kv: не удалось посчитать строки — восстановление пропускаю (данные не трогаю). Если таблица пустая — запусти setup.sh ещё раз"; fi
 else
   BK_DIR=$(mktemp -d); KV_SRC=""
   if [ -n "${KOMIK_KV_FILE:-}" ]; then
@@ -257,7 +274,7 @@ PY
     # сервисный ключ — файлом заголовков: не светится ни на экране, ни в списке процессов
     ( umask 077; printf 'apikey: %s\nAuthorization: Bearer %s\n' "$SERVICE" "$SERVICE" > "$BK_DIR/hdr" )
     CODE=$(curl -sS -o "$BK_DIR/resp" -w '%{http_code}' --max-time 180 -X POST http://127.0.0.1:8000/rest/v1/kv \
-      -H @"$BK_DIR/hdr" -H "Content-Type: application/json" -H "Prefer: resolution=merge-duplicates,return=minimal" \
+      -H @"$BK_DIR/hdr" -H "Content-Type: application/json" -H "Prefer: resolution=ignore-duplicates,return=minimal" \
       --data-binary @"$BK_DIR/payload.json" 2>/dev/null || echo 000)
     if [[ "$CODE" == 2?? ]]; then
       echo "  kv восстановлен: $(docker exec supabase-db psql -U postgres -d postgres -tAc 'select count(*) from public.kv') ключей ✓"
@@ -270,23 +287,34 @@ PY
   rm -rf "$BK_DIR"
 fi
 
-# 8б. аккаунты игроков — из последней копии /root/auth-*.sql.gz (restore.sh accounts; пароли — bcrypt-хэши)
-CNT=$(docker exec supabase-db psql -U postgres -d postgres -tAc "select count(*) from auth.users" || echo 0)
-if [ "${CNT:-0}" -gt 0 ]; then
-  echo "  в auth.users уже $CNT записей — аккаунты не трогаю"
+# 8б. аккаунты игроков — из последней копии /root/auth-*.sql.gz (restore.sh accounts; пароли — bcrypt-хэши).
+#     Там же состав команды (public.devs: тег → аккаунт) — снятые и добавленные люди переезжают как были.
+#     Только в пустую auth.users; не посчиталось — не трогаем (иначе перепривязали бы команду на живом сервере).
+CNT=$(docker exec supabase-db psql -U postgres -d postgres -tAc "select count(*) from auth.users" 2>/dev/null) || CNT=""
+if [ "$CNT" != 0 ]; then
+  if [ -n "$CNT" ]; then echo "  в auth.users уже $CNT записей — аккаунты не трогаю"
+  else warn "не удалось посчитать аккаунты — загрузку пропускаю (ничего не трогаю). Запусти setup.sh ещё раз"; fi
 else
-  DUMP=$(ls -1 /root/auth-*.sql.gz 2>/dev/null | sort | tail -1 || true)
+  DUMP=$(find /root/ -maxdepth 1 -name 'auth-*.sql.gz' 2>/dev/null | sort | tail -1 || true)
   if [ -n "$DUMP" ]; then
     echo "  загружаю аккаунты из $DUMP…"
-    # одной транзакцией и с выключенными триггерами (проверка адреса, внешние ключи): это уже проверенные аккаунты.
+    # ОДНОЙ транзакцией (begin/commit — явно, прямо в потоке: не зависит от ключей и версии psql) и с выключенными
+    # триггерами (проверка адреса, внешние ключи): это уже проверенные аккаунты. Команда (devs) — в той же
+    # транзакции: не загрузилось что-то одно — не загрузилось ничего.
     # session_replication_role для postgres разрешает supautils; не вышло — пробуем суперпользователем образа.
     ERRF=$(mktemp)
-    load_auth(){ { echo 'SET session_replication_role = replica;'; gzip -dc "$DUMP"; } \
-      | docker exec -i supabase-db psql -1 -q -v ON_ERROR_STOP=1 -U "$1" -d postgres >/dev/null 2>>"$ERRF"; }
+    load_auth(){ { echo 'begin;'; echo 'SET session_replication_role = replica;'; gzip -dc "$DUMP"; echo 'commit;'; } \
+      | docker exec -i supabase-db psql -q -v ON_ERROR_STOP=1 -U "$1" -d postgres >/dev/null 2>>"$ERRF"; }
     if load_auth postgres || load_auth supabase_admin; then
       echo "  аккаунтов загружено: $(docker exec supabase-db psql -U postgres -d postgres -tAc 'select count(*) from auth.users') ✓"
-      # права команды привязываются к аккаунтам — та же 09-27, теперь аккаунты есть
-      if [ -f "$MIG_DIR/2026-09-27-hardening.sql" ]; then apply_mig 2026-09-27-hardening.sql || warn "привязка команды не прошла — запусти push.sh"; fi
+      # grep -c, а не -q: -q бросает чтение на первом совпадении, и pipefail счёл бы SIGPIPE у gzip ошибкой
+      [ "$(gzip -dc "$DUMP" | grep -c '^-- komik:devs')" -gt 0 ] \
+        || warn "в этой копии аккаунтов нет состава команды (копия старая) — если кого-то снимал или добавлял, повтори migrate/RESTORE.md, пункты 6–7"
+      # права команды привязываются к аккаунтам — та же 09-27, теперь аккаунты есть. Она привязывает только
+      # пустые uid, поэтому снятые (нули) и привязанные из копии остаются как были
+      if mig_ok "$MIG_DIR/2026-09-27-hardening.sql" 2>/dev/null; then
+        apply_migs 2026-09-27-hardening.sql || warn "привязка команды не прошла — запусти push.sh"
+      fi
     else
       warn "аккаунты не загрузились: $(tail -3 "$ERRF")"
       echo "  пришли этот вывод программисту; до тех пор игроки не смогут войти"
@@ -302,9 +330,10 @@ rm -rf "$MIG_DIR"
 
 say "9/9 · Пуш-функция и Caddy"
 mkdir -p "$SB_DIR/volumes/functions/notify-game"
-curl -sSf -o "$SB_DIR/volumes/functions/notify-game/index.ts" \
-  https://raw.githubusercontent.com/H1NOMA/h1noma.github.io/main/supabase/functions/notify-game/index.ts \
-  && echo "  notify-game скачана ✓" || warn "не смог скачать notify-game — пуши не заработают"
+if curl -sSf -o "$SB_DIR/volumes/functions/notify-game/index.ts" \
+     https://raw.githubusercontent.com/H1NOMA/h1noma.github.io/main/supabase/functions/notify-game/index.ts; then
+  echo "  notify-game скачана ✓"
+else warn "не смог скачать notify-game — пуши не заработают"; fi
 docker compose up -d functions >/dev/null 2>&1 || docker compose up -d
 
 if ! grep -q "$CLOUD_DOMAIN" /etc/caddy/Caddyfile 2>/dev/null; then

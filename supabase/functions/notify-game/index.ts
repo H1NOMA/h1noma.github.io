@@ -56,6 +56,11 @@ function pushTarget(s: any): Target | null {
   if (u.protocol !== "https:" || u.port || u.username || u.password) return null;
   const h = u.hostname.toLowerCase();
   if (!PUSH_HOSTS.includes(h) && !PUSH_SUFFIXES.some((x) => h.endsWith(x))) return null;
+  // Соединяется web-push не по new URL, а по старому url.parse, и некоторые строки они читают по-разному:
+  // «https://evil.example=x.notify.windows.com/p» для new URL — поддомен WNS, а для url.parse — хост evil.example
+  // (то же с «;», «%2e», обратной косой и т.п.). Поэтому сама строка обязана начинаться ровно с https://<хост>/,
+  // где хост — тот, что проверен выше, и только из латиницы, цифр, точек и дефисов (без порта, логина, %-кодов).
+  if (!/^[a-z0-9.-]+$/.test(h) || s.endpoint.slice(0, 9 + h.length).toLowerCase() !== "https://" + h + "/") return null;
   return { endpoint: s.endpoint, keys: { p256dh, auth } };
 }
 
