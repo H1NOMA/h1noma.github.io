@@ -4986,7 +4986,8 @@ const withTimeout = (p, ms=1500) => Promise.race([p, new Promise(res=>setTimeout
      localStorage.setItem('comik:cloud', JSON.stringify(
        {url:'https://cloud2.komikdnd.ru', key:'АНОН_КЛЮЧ_НОВОГО'}))
    и обновить страницу — только этот браузер начнёт ходить в новое облако
-   (принимается только адрес на домене komikdnd.ru, см. CLOUD ниже).
+   (принимается только адрес на домене komikdnd.ru, см. CLOUD ниже; для адреса, отличного от
+   cloud.komikdnd.ru, его придётся дописать и в connect-src строки CSP — иначе браузер запросы не пустит).
    Вернуть как было: localStorage.removeItem('comik:cloud'). */
 const CLOUD_DEFAULT = {
   url: 'https://cloud.komikdnd.ru',
@@ -5135,10 +5136,10 @@ async function fetchCloudChars(keys){
      и чужой персонаж пропадал или подменялся у всех, а у самой жертвы подделка уезжала в её строку.
      Теперь: лист принимаем только из строки его владельца; лист без владельца считается листом владельца
      строки (иначе он расползался по строкам всех, кто его видел); легаси-блоб comik:chars:v1 не читаем
-     вовсе (заморожен, в облаке его нет, а тег «v1» мог бы его завести); один id у РАЗНЫХ владельцев —
-     свой лист всегда остаётся своим (mergeSheets), остальные показываем под id «<id>__<тег>» с пометкой alias —
-     ничего не скрыто и не подменено, а сохранять такие копии некому (persistCharsNow их пропускает).
-     id — только безопасные (он в разметке) */
+     вовсе (заморожен, в облаке его нет, а тег «v1» мог бы его завести). Один id у РАЗНЫХ владельцев (подделка):
+     у владельца его лист остаётся под своим id, все прочие копии — под «<id>__<тег>» (alias: исходный id);
+     кто из них «настоящий», по полям листа не решаем — их пишет сам подделывающий. Ничего не скрыто и не
+     подменено, а сохранять копии некому (persistCharsNow их пропускает). id — только безопасные (он в разметке) */
   const owned=[];
   rows.forEach(r=>{
     if(r && r.key===KEY_CHARS){ stamps[r.key]=''; return; }
@@ -5166,16 +5167,19 @@ async function fetchCloudChars(keys){
       c=o ? c : {...c, owner:rowTag};
       // имя/игрок — строкой: число в имени роняло список игроков (.trim/.localeCompare)
       ['name','player'].forEach(f=>{ if(c[f]!=null && typeof c[f]!=='string') c={...c, [f]:(typeof c[f]==='number'?String(c[f]):'')}; });
-      owned.push([g, c, rowTag, o?0:1]);   // [3]: 1 — владелец не был записан в самом листе
+      owned.push([g, c, rowTag, !o]);   // [3]: владелец не был записан в самом листе, а приписан по строке
     }));
   });
-  // один id — один владелец: свой лист выигрывает всегда; затем лист, где владелец записан в нём самом (а не
-  // приписан по строке), затем созданный раньше, при равенстве — по тегу
-  const idOwner=new Map(), me=tg||'';
-  owned.slice().sort((a,b)=>((a[2]===me)?0:1)-((b[2]===me)?0:1) || a[3]-b[3] || (+a[1].createdAt||0)-(+b[1].createdAt||0) || (a[2]<b[2]?-1:a[2]>b[2]?1:0))
-    .forEach(x=>{ const id=String(x[1].id); if(!idOwner.has(id)) idOwner.set(id, x[2]); });
-  owned.forEach(([g,c,t])=>{
-    if(idOwner.get(String(c.id))!==t) c={...c, id:String(c.id).slice(0,30)+'__'+t.slice(0,32), alias:1};
+  // лист без владельца с тем же id, что у листа с владельцем, — как и раньше, не принимаем вовсе
+  const me=tg||'', explicitIds=new Set(owned.filter(x=>!x[3]).map(x=>String(x[1].id)));
+  const take=owned.filter(x=>!(x[3] && explicitIds.has(String(x[1].id))));
+  // спорность id помним и по уже виденным листам: фоновый тик перечитывает только изменившиеся строки
+  const owners=new Map(), note=(id,o)=>{ if(!o) return; let st=owners.get(id); if(!st) owners.set(id, st=new Set()); st.add(o); };
+  ALL_GAMES.forEach(g=>(CHARS_ALL[g]||[]).forEach(c=>{ if(c && c.id) note(String(c.alias||c.id), normTag(c.owner||'')); }));
+  take.forEach(([,c,t])=>note(String(c.id), t));
+  take.forEach(([g,c,t])=>{
+    const id=String(c.id), st=owners.get(id);
+    if(st && st.size>1 && t!==me) c={...c, id:id.slice(0,30)+'__'+t.slice(0,32), alias:id};
     merged[g]=mergeChars(merged[g], [c]);
   });
   // штампы едут вместе с картой, а запоминает их тот, кто слил карту в CHARS_ALL (charsSeen):
@@ -5475,14 +5479,18 @@ const mergeById = (stored, local) => { const ids=new Set((stored||[]).map(x=>x&&
 /* персонажи сливаются по свежести: удаление хранится надгробием {deleted:true} и не воскресает из облака */
 /* Слияние по id (листы, новости, архив). id уходит в разметку — в onclick="…('id')" и data-атрибуты, —
    поэтому записи с id из чего-то, кроме букв, цифр, «_» и «-», не принимаем (кириллица в id архива есть).
-   Штамп из будущего (подделка «updatedAt: 9e15») больше не побеждает навсегда: считаем его не дальше суток вперёд */
+   Штамп дальше суток в будущем (подделка «updatedAt: 9e15») считаем пустым: иначе он побеждал бы любые
+   честные правки (а зажатый до «сейчас + сутки» — побеждал бы их вечно) */
 const MERGE_ID=/^[\p{L}\p{N}_-]{1,80}$/u;
-const mergeTs=c=>Math.min(+c.updatedAt||0, Date.now()+864e5);
+const mergeTs=c=>{ const t=+c.updatedAt||0; return t>Date.now()+864e5 ? 0 : t; };
 /* Листы персонажей: как mergeChars, но один id у РАЗНЫХ владельцев (подделка из чужой строки) не подменяет лист:
    свой лист всегда остаётся своим, а уже виденный чужой — прежним. Иначе «лист» со штампом из будущего
    заслонял настоящий, и клиент самой жертвы при сохранении выкидывал её лист из её строки */
 const mergeSheets = (a,b) => { const me=(typeof currentTag==='function' && currentTag()) || '', m=new Map();
+  // пришли копии под alias — значит, id спорный: прежний «голый» чужой лист с этим id больше не показываем
+  const contested=new Set((b||[]).filter(c=>c && c.alias).map(c=>String(c.alias)));
   (a||[]).concat(b||[]).forEach(c=>{ if(!c||typeof c!=='object'||!c.id||!MERGE_ID.test(String(c.id))) return;
+    if(!c.alias && contested.has(String(c.id)) && normTag(c.owner||'')!==me) return;
     const p=m.get(c.id); if(!p){ m.set(c.id,c); return; }
     const po=normTag(p.owner||''), co=normTag(c.owner||'');
     if(po && co && po!==co){ if(co===me && po!==me) m.set(c.id,c); return; }
@@ -7654,7 +7662,7 @@ function openGameSignup(){
 // цвета участника идут в style="…" — проверяем ещё раз на месте вывода, а не только при чтении
 function gsColors(p){ return { bg:SAFE_COLOR.test(String(p&&p.bg||''))?p.bg:'var(--red)', ink:SAFE_COLOR.test(String(p&&p.ink||''))?p.ink:'#fff' }; }
 function gsAvaHtml(p, i, sid){
-  const ch=p.charId?findCharAny(p.charId):null;
+  const ch=p.charId?findCharAny(p.charId, p.tag):null;
   const photo=ch&&ch.ava;
   const {bg, ink}=gsColors(p);
   const initial=esc((p.name||p.tag||'?').charAt(0).toUpperCase());
@@ -7763,7 +7771,7 @@ async function cancelSignup(id){
 function gsPlayerInfo(sid, idx){
   const s=GAMES.find(x=>x.id===sid); if(!s) return;
   const p=(s.players||[])[idx]; if(!p) return;
-  const ch=p.charId?findCharAny(p.charId):null;
+  const ch=p.charId?findCharAny(p.charId, p.tag):null;
   const photo=ch&&ch.ava; const {bg, ink}=gsColors(p);
   const initial=esc((p.name||p.tag||'?').charAt(0).toUpperCase());
   const gm=canManageGame(s);
@@ -8415,7 +8423,9 @@ function authTimeout(p, ms=13000){ return Promise.race([ p, new Promise((_,rej)=
 function afterAuthChange(){ renderAcct(); renderPlayers(); renderCats(); applyView(); updateDevUI(); renderSettings(); bmCloudSync(); updateOnboard();
   // кто «свой» — поменялось: при одинаковом id у разных владельцев выбор зависел от того, кто смотрит (fetchCloudChars),
   // поэтому строки листов перечитываем целиком ближайшим тиком
-  try{ ALL_GAMES.forEach(g=>{ CHARS_ALL[g]=(CHARS_ALL[g]||[]).filter(c=>!(c && c.alias)); }); CHARS_SEEN_AT={}; tickSoon(1500); }catch(e){} }   // «С чего начать» — только гостям: после входа прячем сразу, а не после перезагрузки
+  // (чистим на месте: CHARS указывает на тот же массив, и новый лист, добавленный в CHARS, не должен потеряться)
+  try{ ALL_GAMES.forEach(g=>{ const a=CHARS_ALL[g]; if(Array.isArray(a)) for(let i=a.length-1;i>=0;i--) if(a[i] && a[i].alias) a.splice(i,1); });
+    CHARS_SEEN_AT={}; tickSoon(1500); }catch(e){} }   // «С чего начать» — только гостям: после входа прячем сразу, а не после перезагрузки
 function currentTag(){ return SESSION ? normTag(SESSION) : null; }
 function isOwner(c){ return !!(SESSION && c && c.owner && normTag(c.owner)===currentTag()); }
 /* Лист «под кодом» (старый, без владельца) правит только тот, кто ввёл код в этой вкладке (tryEditPlayer).
@@ -10108,8 +10118,12 @@ const EXHAUSTION=[
   'Скорость перемещения становится равной 0',
   'Смерть'
 ];
-function findCharAny(id){ let c=(CHARS||[]).find(x=>x&&x.id===id); if(c) return c;
-  for(const g of Object.keys(CHARS_ALL||{})){ c=(CHARS_ALL[g]||[]).find(x=>x&&x.id===id); if(c) return c; } return null; }
+// tag — чей лист ищем (запись на игру): при спорном id берём копию этого владельца, а не чужую
+function findCharAny(id, tag){
+  const all=[].concat(CHARS||[], ...Object.keys(CHARS_ALL||{}).map(g=>CHARS_ALL[g]||[])).filter(Boolean);
+  if(tag){ const t=normTag(tag);
+    return all.find(x=>x.id===id && normTag(x.owner||'')===t) || all.find(x=>x.id===id+'__'+t) || all.find(x=>x.id===id && !x.owner) || null; }
+  return all.find(x=>x.id===id) || null; }
 function openExhaustion(id){
   const c=findCharAny(id); const lvl=Math.max(0,Math.min(6,parseInt(c&&c.exh,10)||0));
   const rows=EXHAUSTION.map((t,i)=>{ const n=i+1;
@@ -10737,7 +10751,7 @@ async function createPlayer(){
     slots:sheetHasMagic()?collectSlots(null):{},
     bio:pval('np-bio'), notes:pval('np-notes'), gear:pval('np-gear'), inv:collectInv('np'),
     fields:{}, createdAt:Date.now(), updatedAt:Date.now() };
-  CHARS.push(ch);
+  CHARS.push(ch); CHARS_ALL[CUR_PROJECT]=CHARS;   // CHARS и CHARS_ALL — один массив (как в addCharInline и импорте)
   if(NEW_TO_BOARD){
     NEW_TO_BOARD=false;
     // NPC сразу на боевую доску: карточка с фото и статами, помечена pin (партийная синхронизация её не тронет)
