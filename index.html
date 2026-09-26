@@ -5166,12 +5166,13 @@ async function fetchCloudChars(keys){
       c=o ? c : {...c, owner:rowTag};
       // имя/игрок — строкой: число в имени роняло список игроков (.trim/.localeCompare)
       ['name','player'].forEach(f=>{ if(c[f]!=null && typeof c[f]!=='string') c={...c, [f]:(typeof c[f]==='number'?String(c[f]):'')}; });
-      owned.push([g, c, rowTag]);
+      owned.push([g, c, rowTag, o?0:1]);   // [3]: 1 — владелец не был записан в самом листе
     }));
   });
-  // один id — один владелец: свой лист выигрывает всегда; из чужих — созданный раньше (при равенстве — по тегу)
+  // один id — один владелец: свой лист выигрывает всегда; затем лист, где владелец записан в нём самом (а не
+  // приписан по строке), затем созданный раньше, при равенстве — по тегу
   const idOwner=new Map(), me=tg||'';
-  owned.slice().sort((a,b)=>((a[2]===me)?0:1)-((b[2]===me)?0:1) || (+a[1].createdAt||0)-(+b[1].createdAt||0) || (a[2]<b[2]?-1:a[2]>b[2]?1:0))
+  owned.slice().sort((a,b)=>((a[2]===me)?0:1)-((b[2]===me)?0:1) || a[3]-b[3] || (+a[1].createdAt||0)-(+b[1].createdAt||0) || (a[2]<b[2]?-1:a[2]>b[2]?1:0))
     .forEach(x=>{ const id=String(x[1].id); if(!idOwner.has(id)) idOwner.set(id, x[2]); });
   owned.forEach(([g,c,t])=>{
     if(idOwner.get(String(c.id))!==t) c={...c, id:String(c.id).slice(0,30)+'__'+t.slice(0,32), alias:1};
