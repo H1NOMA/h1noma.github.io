@@ -2339,6 +2339,13 @@
   .prof-grid.ro{margin-top:6px}
   .prof-grid.ro .pdot{display:block;cursor:default}
   .prof-grid.skills{grid-template-columns:1fr}
+  /* пассивные чувства: 10 + бонус навыка, считаются сами */
+  .pass-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin-top:6px}
+  .pass-cell{display:flex;flex-direction:column;align-items:center;gap:3px;background:var(--surface);border:var(--hair) solid var(--line2);border-radius:11px;padding:9px 6px;text-align:center;min-width:0}
+  .pass-cell.on{border-color:rgba(var(--accent-rgb),.5);background:var(--red-soft)}
+  .pass-v{font-family:var(--f-disp);font-weight:700;font-size:1.3rem;line-height:1;color:var(--red-ink)}
+  .pass-l{font-family:var(--f-body);font-size:.72rem;line-height:1.2;color:var(--dim);overflow-wrap:anywhere}
+  @media(max-width:520px){ .pass-l{font-size:.6rem;letter-spacing:-.01em} }   /* «Проницательность» — целым словом в трети ширины телефона */
   .prof-cell{display:flex;align-items:center;gap:10px;background:var(--surface);border:var(--hair) solid var(--line2);border-radius:11px;padding:9px 12px;transition:background .14s,border-color .14s}
   .prof-cell.on{border-color:rgba(var(--accent-rgb),.5);background:var(--red-soft)}
   .prof-dots{display:flex;gap:6px;flex:none}
@@ -10178,9 +10185,27 @@ function sheetSavesBlock(p, c){
       <span class="prof-dots"><button type="button" class="pdot${on?' on':''}" onclick="edSaveDot('${p}','${k}')" aria-label="Владение ${lbl}"></button></span>
       <span class="prof-l">${lbl}</span><span class="prof-v" id="${p}-saveval-${k}">${fmtBonus(abilModNum(ab[k])+(on?pb:0))}</span></div>`; }).join('')}</div>`;
 }
+/* Пассивные чувства: 10 + модификатор характеристики + бонус мастерства за владение (×2 за компетентность) —
+   то же значение, что у навыка, плюс 10 */
+const PASSIVE_SKILLS=[['Внимательность','wis'],['Проницательность','wis'],['Анализ','int']];
+function passiveHtml(vals){   // vals: [{v, on, id?}] по порядку PASSIVE_SKILLS
+  return `<div class="pass-grid">${PASSIVE_SKILLS.map(([name],j)=>{ const x=vals[j];
+    return `<div class="pass-cell${x.on?' on':''}"${x.id?` id="${x.id}-cell"`:''}><span class="pass-v"${x.id?` id="${x.id}"`:''}>${x.v}</span><span class="pass-l">${name}</span></div>`; }).join('')}</div>`;
+}
+function edPassRecalc(p){
+  const pb=profOf(p);
+  PASSIVE_SKILLS.forEach(([name,abk],j)=>{
+    const row=document.getElementById(p+'-skrow-'+PSH_SKILLS.findIndex(x=>x[0]===name));
+    const lvl=row?parseInt(row.dataset.lvl,10)||0:0;
+    const v=document.getElementById(p+'-pass-'+j); if(v) v.textContent=10+abilModNum(pval(p+'-ab-'+abk))+lvl*pb;
+    const cell=document.getElementById(p+'-pass-'+j+'-cell'); if(cell) cell.classList.toggle('on', lvl>0);
+  });
+}
 function sheetSkillsBlock(p, c){
   const sk=(c&&c.skills)||{}, pb=parseInt((c&&c.prof),10)||0, ab=(c&&c.abil)||{};
-  return `<div class="ed-sub">Навыки</div>
+  const pass=PASSIVE_SKILLS.map(([name,abk],j)=>{ const lvl=parseInt(sk[name],10)||0; return {v:10+abilModNum(ab[abk])+lvl*pb, on:lvl>0, id:p+'-pass-'+j}; });
+  return `<div class="ed-sub">Пассивные чувства</div>${passiveHtml(pass)}
+    <div class="ed-sub">Навыки</div>
     <div class="prof-grid skills">${PSH_SKILLS.map(([name,abk],i)=>{ const lvl=parseInt(sk[name],10)||0; return `<div class="prof-cell sk${lvl?' on':''}" id="${p}-skrow-${i}" data-lvl="${lvl}" data-ab="${abk}">
       <span class="prof-dots"><button type="button" class="pdot${lvl>=1?' on':''}" onclick="edSkillDot('${p}',${i},1)" aria-label="Владение"></button><button type="button" class="pdot${lvl>=2?' on':''}" onclick="edSkillDot('${p}',${i},2)" aria-label="Компетентность"></button></span>
       <span class="prof-l">${name} <i>${abk.toUpperCase()}</i></span><span class="prof-v" id="${p}-skillval-${i}">${fmtBonus(abilModNum(ab[abk])+lvl*pb)}</span></div>`; }).join('')}</div>`;
@@ -10200,12 +10225,14 @@ function edSkillDot(p, i, idx){
   row.classList.toggle('on', lvl>0);
   row.querySelectorAll('.pdot').forEach((d,n)=>d.classList.toggle('on', lvl>=n+1));
   const v=document.getElementById(p+'-skillval-'+i); if(v) v.textContent=fmtBonus(abilModNum(pval(p+'-ab-'+(row.dataset.ab||'')))+lvl*profOf(p));
+  edPassRecalc(p);
 }
 /* динамический пересчёт: модификатор характеристики + бонус от кружков (при смене характеристик/уровня/бонуса) */
 function edRecalcProf(p){
   const pb=profOf(p);
   abilList().forEach(([k])=>{ const row=document.getElementById(p+'-svrow-'+k), v=document.getElementById(p+'-saveval-'+k); if(row&&v) v.textContent=fmtBonus(abilModNum(pval(p+'-ab-'+k))+(row.dataset.on==='1'?pb:0)); });
   PSH_SKILLS.forEach(([name,abk],i)=>{ const row=document.getElementById(p+'-skrow-'+i), v=document.getElementById(p+'-skillval-'+i); if(row&&v){ const lvl=parseInt(row.dataset.lvl,10)||0; v.textContent=fmtBonus(abilModNum(pval(p+'-ab-'+abk))+lvl*pb); } });
+  edPassRecalc(p);
 }
 function collectSaves(p){ const o={}; abilList().forEach(([k])=>{ const row=document.getElementById(p+'-svrow-'+k); if(row&&row.dataset.on==='1') o[k]=1; }); return o; }
 function collectSkills(p){ const o={}; PSH_SKILLS.forEach(([name],i)=>{ const row=document.getElementById(p+'-skrow-'+i); const lvl=row?parseInt(row.dataset.lvl,10)||0:0; if(lvl>0) o[name]=lvl; }); return o; }
@@ -10941,6 +10968,8 @@ function openPlayer(id){
     const lv=parseInt(c.skills&&c.skills[name],10)||0;
     return roCell(esc(name)+(lv>=2?' <span class="opt">★</span>':''), fmtBonus(abilModNum(abV[abk])+lv*pbNum), lv>0);
   }).join('')}</div></div>`:'';
+  const passHtml=isDnd?`<div class="kv"><div class="k">Пассивные чувства</div>${passiveHtml(PASSIVE_SKILLS.map(([name,abk])=>{
+    const lv=parseInt(c.skills&&c.skills[name],10)||0; return {v:10+abilModNum(abV[abk])+lv*pbNum, on:lv>0}; }))}</div>`:'';
   const featsHtml=featsCards(c);
   const pathCard=c.path?ARCHIVE.find(x=>x && x.cat==='paths' && x.title===c.path):null;
   const pathS0=pathCard&&(pathCard.sections||[])[0];
@@ -10987,6 +11016,7 @@ function openPlayer(id){
     <div class="cs-body">
     ${abilHtml}
     ${savesHtml}
+    ${passHtml}
     ${skillsHtml}
     ${deathHtml}
     ${kv('Кости хитов', c.hd)}
@@ -11066,9 +11096,8 @@ function printSheet(id){
     + '<tr><td>&nbsp;</td><td></td><td></td></tr><tr><td>&nbsp;</td><td></td><td></td></tr>';
   const d=c.death||{s:0,f:0};
   const dpips=t=>[1,2,3].map(i=>`<span class="dot${(d[t]||0)>=i?' on':''}"></span>`).join('');
-  const wisM=modN('wis');
-  const percProf=(c.skills&&c.skills['Внимательность'])||0;
-  const passPerc=dnd&&wisM!=null?10+wisM+percProf*pb:'';
+  const passRows=PASSIVE_SKILLS.map(([n,k])=>{ const m=modN(k), lv=(c.skills&&c.skills[n])||0;
+    return `<div class="psh-skill"><span class="sm">${m==null?'':10+m+lv*pb}</span> ${esc(n)}</div>`; }).join('');
   const invList=(c.inv||[]).filter(it=>it&&it.n);
   const invText=invList.map(it=>`• ${esc(it.n)}${it.q&&it.q>1?' ×'+it.q:''}`).join('\n');
   let ps=document.getElementById('printSheet');
@@ -11094,7 +11123,7 @@ function printSheet(id){
           <div class="psh-box"><div style="font-size:9pt;text-align:center;font-weight:600">${esc(c.prof||('+'+pb))}</div><div class="b-t">${esc(L.prof)}</div></div>
           <div class="psh-box">${saves}<div class="b-t">Спасброски</div></div>
           ${dnd?`<div class="psh-box">${skills}<div class="b-t">Навыки</div></div>
-          <div class="psh-box"><div style="font-size:9pt;text-align:center;font-weight:600">${passPerc}</div><div class="b-t">Пассивная внимательность</div></div>`:''}
+          <div class="psh-box">${passRows}<div class="b-t">Пассивные чувства</div></div>`:''}
         </div>
       </div>
       <div>
