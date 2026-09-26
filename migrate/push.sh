@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 # ══════════════════════════════════════════════════════════════════
-#  КОМИК · пуши: починка VAPID-ключей на сервере + обновление notify-game
+#  КОМИК · пуши: починка VAPID-ключей на сервере + обновление notify-game,
+#          защита входа (GoTrue) и правил базы (все миграции migrate/*.sql)
 #  Запуск на сервере: bash <(curl -fsS https://komikdnd.ru/migrate/push.sh)
+#  Только проверить защиту, ничего не меняя: bash <(curl -fsS https://komikdnd.ru/migrate/push.sh) check
 #  Когда нужен: тест уведомлений отвечает 500 «Vapid public key should be
-#  65 bytes long» / «VAPID_PRIVATE повреждён» / «не задан».
+#  65 bytes long» / «VAPID_PRIVATE повреждён» / «не задан»; после обновления сайта;
+#  после добавления человека в команду (привязка прав). Повторный запуск безопасен.
 #  Спросит одно: приватный VAPID-ключ (Enter — оставить текущий, «new» — новая пара).
 #  Публичный ключ вычисляется из приватного, а сайт берёт его у самой функции —
 #  поэтому даже при новой паре сайт править не нужно: устройства переподпишутся сами.
@@ -11,6 +14,7 @@
 set -euo pipefail
 say(){ printf '\n\033[1;32m══ %s\033[0m\n' "$*"; }
 warn(){ printf '\033[1;33m⚠ %s\033[0m\n' "$*"; }
+bad(){ printf '\033[1;31m✗ %s\033[0m\n' "$*"; }
 SB_DIR=/opt/supabase/docker
 OVR="$SB_DIR/docker-compose.override.yml"
 REF="${KOMIK_REF:-main}"   # ветка репозитория, откуда брать index.ts
@@ -49,6 +53,59 @@ while d:
     Q=add(Q,Q); d>>=1
 print(base64.urlsafe_b64encode(bytes([4])+R[0].to_bytes(32,"big")+R[1].to_bytes(32,"big")).rstrip(b"=").decode())
 ' "$1" 2>/dev/null || true; }
+
+# ── Проверка защиты базы и входа: в конце каждого запуска и отдельно (push.sh check) ──
+q(){ docker exec supabase-db psql -U postgres -d postgres -tAc "$1" 2>/dev/null || true; }
+verify(){
+  say "Проверка защиты"
+  local OK=1 POL p RPC X T S EXTRA
+  POL=" $(q "select string_agg(policyname, ' ' order by policyname) from pg_policies where schemaname = 'public' and tablename = 'kv'") "
+  if [ -z "${POL// /}" ]; then
+    bad "не смог прочитать правила таблицы kv — база не отвечает? (docker compose ps)"; OK=0
+  else
+    echo "  правила kv:${POL% }"
+    for p in kv_read kv_write_dev kv_write_player_ins kv_write_player_upd kv_projects_owner_ins kv_projects_owner_upd kv_projects_owner_del; do
+      if [[ "$POL" != *" $p "* ]]; then bad "нет правила $p"; OK=0; fi
+    done
+    if [[ "$POL" == *" kv_write "* ]]; then bad "ОСТАЛОСЬ старое правило kv_write: ЛЮБОЙ вошедший может переписать и стереть ЛЮБУЮ строку сайта!"; OK=0; fi
+    if [[ "$POL" == *" kv_write_player "* ]]; then bad "осталось старое kv_write_player: игроки могут удалять общие строки и писать без ограничения размера"; OK=0; fi
+    EXTRA=""; X=" kv_read kv_write kv_write_player kv_write_dev kv_write_player_ins kv_write_player_upd kv_projects_owner_ins kv_projects_owner_upd kv_projects_owner_del "
+    for p in $POL; do [[ "$X" == *" $p "* ]] || EXTRA="$EXTRA $p"; done
+    if [ -n "$EXTRA" ]; then bad "лишние правила на kv:$EXTRA — они могут открыть запись всем, покажи программисту"; OK=0; fi
+    RPC=$(q "select count(*) from pg_proc where pronamespace = 'public'::regnamespace and proname in ('kv_deep_merge','trk_card_patch','trk_log_push','jsonb_deep_merge')")
+    if [ "$RPC" != 0 ]; then bad "остались старые функции записи в обход правил (kv_deep_merge и др.)"; OK=0; fi
+    X=$(q "select prosrc ~ '4,32' from pg_proc where oid = to_regprocedure('public.my_tag()')")
+    if [ "$X" != t ]; then bad "функция my_tag() старая: логины вроде «v1» получают права игрока"; OK=0; fi
+    X=$(q "select count(*) from pg_trigger t join pg_proc f on f.oid = t.tgfoid where t.tgrelid = to_regclass('auth.users') and t.tgname = 'komik_email_guard' and t.tgenabled <> 'D' and f.prosrc ~ 'сменить нельзя'")
+    if [ "$X" = 1 ]; then echo "  аккаунты: только тег@komikdnd.ru, сменить адрес нельзя ✓"
+    else bad "нет защиты адресов аккаунтов (триггер komik_email_guard): игрок может переименоваться в логин команды"; OK=0; fi
+    echo "  команда (права — у аккаунта, не у логина):"
+    X=""
+    while IFS='|' read -r T S; do
+      [ -n "$T" ] || continue
+      case "$S" in
+        ok)       echo "    $T ✓" ;;
+        none)     echo "    $T — нет аккаунта: прав нет. Если это человек команды — пусть зарегистрируется, потом запусти push.sh ещё раз" ;;
+        off)      echo "    $T — снят с команды" ;;
+        deleted)  echo "    $T — аккаунт удалён: прав нет (вернуть — migrate/RESTORE.md, «Новый человек в команде»)" ;;
+        *)        echo "    $T — адрес аккаунта не совпадает с тегом: прав нет" ;;
+      esac
+      [ "$T" = hinoma ] && [ "$S" = ok ] && X=1
+    done <<< "$(q "select d.tag || '|' || case when d.uid is null then 'none' when d.uid = '00000000-0000-0000-0000-000000000000' then 'off'
+                    when u.id is null then 'deleted' when lower(u.email) <> d.tag || '@komikdnd.ru' then 'mismatch' else 'ok' end
+                  from public.devs d left join auth.users u on u.id = d.uid order by d.tag")"
+    if [ -z "$X" ]; then bad "hinoma не привязан к аккаунту — у владельца нет прав на запись и на правила сайта"; OK=0; fi
+  fi
+  X=$(docker inspect supabase-auth --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null || true)
+  if grep -qx 'GOTRUE_RATE_LIMIT_HEADER=X-Forwarded-For' <<< "$X" && grep -qx 'GOTRUE_PASSWORD_MIN_LENGTH=8' <<< "$X"; then
+    echo "  вход: ограничение попыток по IP и пароль от 8 символов ✓"
+  else bad "вход (контейнер supabase-auth) без ограничения попыток / длины пароля — запусти push.sh (без check)"; OK=0; fi
+  if grep -q '^DISABLE_SIGNUP=true' "$SB_DIR/.env" 2>/dev/null; then echo "  регистрация: закрыта (новых игроков заводишь в Studio, migrate/RESTORE.md)"
+  else echo "  регистрация: открыта"; fi
+  if [ $OK = 1 ]; then printf '\n\033[1;32mИтог: защита базы включена ✓\033[0m\n'
+  else printf '\n\033[1;31mИтог: ⚠ защита базы включена НЕ полностью — запусти push.sh ещё раз; не помогло — пришли этот вывод программисту\033[0m\n'; return 1; fi
+}
+if [ "${1:-}" = check ]; then verify || exit 1; exit 0; fi
 
 say "1/5 · Что сейчас в docker-compose.override.yml"
 VPUB=""; VPRIV=""
@@ -100,13 +157,20 @@ fi
 [ "$(pubof "$VPRIV")" = "$VPUB" ] || { warn "проверка пары не сошлась: публичный ключ не от этого приватного — отмена"; exit 1; }
 
 say "3/5 · Записываю ключи и обновляю функцию"
-# тот же формат, что пишет setup.sh — повторный запуск setup.sh его подхватит
+# тот же формат, что пишет setup.sh — повторный запуск setup.sh его подхватит.
+# Файл пишется целиком: всё, что должно в нём жить (в том числе настройки входа ниже), — только здесь и в setup.sh.
+# auth: логины команды публичны, поэтому GoTrue ограничивает попытки входа по IP игрока (заголовок ставит Caddy,
+# подделать его снаружи нельзя) и не принимает новые пароли короче 8 символов (старые пароли продолжают работать).
 {
   echo 'services:'
   echo '  supavisor:'
   echo '    ports: !override'
   echo '      - "127.0.0.1:5432:5432"'
   echo '      - "127.0.0.1:6543:6543"'
+  echo '  auth:'
+  echo '    environment:'
+  echo '      GOTRUE_RATE_LIMIT_HEADER: "X-Forwarded-For"'
+  echo '      GOTRUE_PASSWORD_MIN_LENGTH: "8"'
   echo '  functions:'
   echo '    environment:'
   echo "      VAPID_PUBLIC: \"$VPUB\""
@@ -139,6 +203,9 @@ fi
 # изменение переменных окружения подхватывается только пересозданием контейнера (restart не поможет)
 docker compose up -d --force-recreate functions >/dev/null
 echo "  контейнер functions пересоздан ✓"
+# auth пересоздаётся, только если его настройки изменились (первый запуск) — иначе не трогаем; --no-deps: базу не задевать
+if docker compose up -d --no-deps auth >/dev/null 2>&1; then echo "  настройки входа (auth) применены ✓"
+else warn "контейнер auth не обновился — логи: docker compose logs --tail=50 auth"; fi
 
 say "4/5 · Проверка"
 ANON=$(grep '^ANON_KEY=' .env | cut -d= -f2-)
@@ -161,24 +228,38 @@ if [ "$GOT" = "$VPUB" ]; then echo "  функция отдаёт сайту в�
 else warn "функция отдаёт ключ «${GOT:-<ничего>}», ожидался $VPUB"; fi
 
 say "5/5 · Защита аккаунтов и правил сайта"
-# Регистрация открыта, и без первой миграции аккаунт hinoma@<любой домен> получал права разработчика в базе
-# (2026-09-25-email-domain.sql); вторая даёт писать правило видимости сеттингов только hinoma
-# (2026-09-26-projects-owner.sql). Обе идемпотентны: повторный запуск ничего не ломает.
-for MIG_NAME in 2026-09-25-email-domain.sql 2026-09-26-projects-owner.sql; do
-  MIG=$(mktemp); MIG_OK=""
+# Все миграции базы, строго по порядку, при каждом запуске (каждая идемпотентна):
+#   09-21 — права записи по ролям (снимает kv_write «любой пишет всё» и RPC в обход правил);
+#   09-25 — тег только с адреса @komikdnd.ru;  09-26 — comik:projects:v1 пишет только hinoma;
+#   09-27 — права команды у аккаунтов, игроки без удаления и с потолком размера, адрес аккаунта не меняется.
+# 09-21..09-26 пересоздают свои (более мягкие) версии, 09-27 возвращает строгие — поэтому она последняя,
+# а применяем только если скачались ВСЕ четыре: иначе повторный запуск ослабил бы уже укреплённую базу.
+MIGS="2026-09-21-rls.sql 2026-09-25-email-domain.sql 2026-09-26-projects-owner.sql 2026-09-27-hardening.sql"
+MIG_DIR=$(mktemp -d); MIG_ALL=1
+for MIG_NAME in $MIGS; do
+  MIG="$MIG_DIR/$MIG_NAME"; MIG_OK=""
   MIG_GH="https://raw.githubusercontent.com/H1NOMA/h1noma.github.io/$REF/migrate/$MIG_NAME"
   MIG_SITE="https://komikdnd.ru/migrate/$MIG_NAME"
   if [ -n "${KOMIK_REF:-}" ]; then MIG_SRC="$MIG_GH $MIG_SITE"; else MIG_SRC="$MIG_SITE $MIG_GH"; fi
   for u in $MIG_SRC; do
     curl -sSf --max-time 30 -o "$MIG" "$u" && grep -q 'комик\|КОМИК' "$MIG" && grep -q 'commit;' "$MIG" && { MIG_OK=1; break; }
   done
-  if [ -n "$MIG_OK" ] && docker exec -i supabase-db psql -q -v ON_ERROR_STOP=1 -U postgres -d postgres < "$MIG" 2>&1 | sed 's/^/  /'; then
-    echo "  $MIG_NAME — применена ✓"
-  else
-    warn "$MIG_NAME не применена — выполни вручную (migrate/README.md)"
-  fi
-  rm -f "$MIG"
+  [ -n "$MIG_OK" ] || { warn "не смог скачать $MIG_NAME"; MIG_ALL=""; }
 done
+if [ -n "$MIG_ALL" ]; then
+  for MIG_NAME in $MIGS; do
+    # NOTICE/WARNING от базы — без служебных приставок и без «… does not exist, skipping» первого запуска
+    if docker exec -i supabase-db psql -q -v ON_ERROR_STOP=1 -U postgres -d postgres < "$MIG_DIR/$MIG_NAME" 2>&1 \
+         | sed -e '/does not exist, skipping/d' -e 's/^NOTICE:  //' -e 's/^WARNING:  /⚠ /' -e 's/^/  /'; then
+      echo "  $MIG_NAME — применена ✓"
+    else
+      warn "$MIG_NAME не применена — пришли вывод выше программисту"
+    fi
+  done
+else
+  warn "миграции базы в этот раз НЕ применялись (ни одна) — проверь интернет и запусти push.sh ещё раз"
+fi
+rm -rf "$MIG_DIR"
 if [ "$VPUB" != "$SITE_PUB" ]; then
   say "Пара ключей отличается от прежней"
   echo "Ничего делать не нужно: сайт берёт ключ у функции, и каждое устройство переподпишется"
@@ -186,3 +267,4 @@ if [ "$VPUB" != "$SITE_PUB" ]; then
   echo "Приватный ключ хранится только в $OVR — сохрани копию в надёжном месте."
 fi
 echo "Готово. На сайте (аккаунт разработчика) → Настройки → «Тест уведомления» — должно прийти."
+verify || true

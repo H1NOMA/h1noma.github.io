@@ -3,11 +3,17 @@ name: Бэкап базы (Supabase kv)
 # Раз в сутки выгружает всю таблицу kv из Supabase и складывает
 # сжатый снапшот в отдельную ветку `backups` (main не трогается, сайт не пересобирается).
 # Можно запустить вручную: вкладка Actions → этот workflow → Run workflow.
+# Если бэкап упал (GitHub пришлёт письмо), прежние копии целы: в ветку в этот раз ничего не записано.
 
 on:
   schedule:
     - cron: '17 3 * * *'   # ежедневно ~03:17 UTC
   workflow_dispatch:
+    inputs:
+      allow_shrink:
+        description: 'Сохранить копию, даже если строк в базе стало вдвое меньше (только если их удалили нарочно)'
+        type: boolean
+        default: false
 
 concurrency:
   group: backup-kv
@@ -15,6 +21,7 @@ concurrency:
 
 permissions:
   contents: write
+  actions: write     # последний шаг: продлевает расписание (см. ниже)
 
 jobs:
   backup:
@@ -27,10 +34,12 @@ jobs:
           # Публичный anon-ключ (только чтение; запись закрыта RLS) — тот же, что в index.html
           SUPA_URL: https://cloud.komikdnd.ru
           SUPA_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzg5MDg1MzA1LCJleHAiOjIxMDQ0NDUzMDV9.7evXWwQ2bbrEVPTpfMEnrFv8ON5dFC_iU-v7MiVQPyc
+          ALLOW_SHRINK: ${{ inputs.allow_shrink }}   # по расписанию — пусто (= нет)
         run: |
           set -euo pipefail
           DATE=$(date -u +%Y-%m-%d)
           SNAP="/tmp/kv-$DATE.json.gz"
+          KEEP_N=31   # сколько копий хранить: сегодняшняя + 30 предыдущих (≈ месяц)
 
           echo "Выгружаю таблицу kv…"
           curl -sS --fail --max-time 180 \
@@ -40,23 +49,70 @@ jobs:
           echo "Снапшот: $(du -h "$SNAP" | cut -f1)"
           # пустой ответ или ошибка вместо таблицы (облако лежит, ключ сменился) — не коммитим:
           # иначе ротация вытеснила бы настоящие копии пустыми
-          gzip -dc "$SNAP" | python3 -c 'import json,sys; d=json.load(sys.stdin); assert isinstance(d,list) and len(d)>0, "пустой снапшот"; print("строк:", len(d))'
+          ROWS=$(gzip -dc "$SNAP" | python3 -c 'import json,sys; d=json.load(sys.stdin); assert isinstance(d,list) and len(d)>0, "пустой снапшот"; print(len(d))')
+          echo "Строк сегодня: $ROWS"
 
           # Ветка backups хранит ТОЛЬКО последний месяц. Раньше старые файлы удалялись из дерева, но каждый
           # ежедневный коммит навсегда оставался в истории (~2,5 МБ в день в публичном репозитории).
-          # Теперь ветка каждый раз собирается заново одним коммитом: снапшоты за последние 31 день + README,
+          # Теперь ветка каждый раз собирается заново одним коммитом: последние $KEEP_N снапшотов + README,
           # и перезаписывается (force push) — всё, что старше, уходит из истории целиком.
+          # Поэтому прежние копии обязаны скачаться ЦЕЛИКОМ: раньше сбой скачивания молча глотался,
+          # и force push оставил бы в ветке одну сегодняшнюю копию вместо месяца.
           KEEP=$(mktemp -d); mkdir -p "$KEEP/backups"
-          if git fetch -q --depth=1 origin backups 2>/dev/null; then
-            git archive FETCH_HEAD backups | tar -x -C "$KEEP" || true
+          HAD_BRANCH=0; PREV_N=0; PREV_SHA=""
+          # --exit-code: 0 — ветка есть, 2 — ветки нет (первый запуск), другое — сбой связи с GitHub
+          RC=0; git ls-remote --exit-code --heads origin backups >/dev/null || RC=$?
+          if [ "$RC" = 0 ]; then
+            HAD_BRANCH=1
+            git fetch -q --depth=1 origin backups
+            PREV_SHA=$(git rev-parse FETCH_HEAD)
+            TREE=$(git ls-tree --name-only FETCH_HEAD backups/)
+            PREV_N=$(printf '%s\n' "$TREE" | awk '/^backups\/kv-.*\.json\.gz$/ { n++ } END { print n + 0 }')
+            if [ "$PREV_N" -gt 0 ]; then git archive FETCH_HEAD backups | tar -x -C "$KEEP"; fi
+            GOT=$(find "$KEEP/backups" -maxdepth 1 -name 'kv-*.json.gz' | wc -l)
+            echo "Прежних копий в ветке: $PREV_N, скачано: $GOT"
+            if [ "$GOT" -ne "$PREV_N" ]; then
+              echo "::error::Скачались не все прежние копии ($GOT из $PREV_N) — ветку не трогаю"; exit 1
+            fi
+          elif [ "$RC" = 2 ]; then
+            echo "Ветки backups ещё нет — это первый бэкап"
+          else
+            echo "::error::GitHub не ответил на git ls-remote (код $RC) — ветку не трогаю"; exit 1
           fi
+
+          # Защита от вандализма и пустой таблицы: строк стало меньше половины от последней копии —
+          # не записываем (прежние копии целы, GitHub пришлёт письмо о сбое).
+          LAST=$(find "$KEEP/backups" -maxdepth 1 -name 'kv-*.json.gz' -printf '%f\n' | sort | tail -n 1)
+          if [ -n "$LAST" ]; then
+            if PREV_ROWS=$(gzip -dc "$KEEP/backups/$LAST" | python3 -c 'import json,sys; print(len(json.load(sys.stdin)))'); then
+              echo "Строк в последней копии ($LAST): $PREV_ROWS, сегодня: $ROWS"
+              if [ $((ROWS * 2)) -lt "$PREV_ROWS" ]; then
+                if [ "$ALLOW_SHRINK" = true ]; then
+                  echo "::warning::Строк стало $ROWS вместо $PREV_ROWS — сохраняю, потому что при запуске отмечено «данные удалили нарочно»"
+                else
+                  echo "::error::Строк в базе стало $ROWS вместо $PREV_ROWS (меньше половины) — копию НЕ сохраняю, прежние копии целы. Проверьте сайт: не стёрты ли данные. Если строки удалили нарочно — Actions → этот workflow → Run workflow → отметить галочку и запустить."
+                  exit 1
+                fi
+              fi
+            else
+              echo "::warning::Последнюю копию $LAST не удалось прочитать — сравнение числа строк пропущено"
+            fi
+          fi
+
           cp "$SNAP" "$KEEP/backups/"
-          CUT=$(date -u -d '30 days ago' +%Y-%m-%d)   # сегодня + 30 предыдущих дней
-          for f in "$KEEP"/backups/kv-*.json.gz; do
-            d=$(basename "$f" .json.gz); d=${d#kv-}
-            if [[ "$d" < "$CUT" ]]; then echo "Удаляю старый: $(basename "$f")"; rm -f "$f"; fi
+          # Ротация — по количеству, а не по дате: если бэкап не работал несколько дней (облако лежало,
+          # GitHub выключил расписание), старые копии не исчезнут разом. Имя kv-ГГГГ-ММ-ДД сортируется как дата.
+          mapfile -t FILES < <(find "$KEEP/backups" -maxdepth 1 -name 'kv-*.json.gz' -printf '%f\n' | sort)
+          for ((i = 0; i < ${#FILES[@]} - KEEP_N; i++)); do
+            echo "Удаляю старый: ${FILES[i]}"; rm -f "$KEEP/backups/${FILES[i]}"
           done
-          N=$(ls -1 "$KEEP"/backups/kv-*.json.gz | wc -l)
+          N=$(find "$KEEP/backups" -maxdepth 1 -name 'kv-*.json.gz' | wc -l)
+          OLDEST=$(find "$KEEP/backups" -maxdepth 1 -name 'kv-*.json.gz' -printf '%f\n' | sort | head -n 1)
+          # последняя проверка перед перезаписью ветки: уйти могла только одна, самая старая копия
+          MIN_N=$((PREV_N - 1)); [ "$MIN_N" -le $((KEEP_N - 1)) ] || MIN_N=$((KEEP_N - 1))
+          if [ "$HAD_BRANCH" = 1 ] && [ "$N" -lt "$MIN_N" ]; then
+            echo "::error::После ротации копий $N, а было $PREV_N — ветку не перезаписываю"; exit 1
+          fi
 
           git config user.name  "komik-backup-bot"
           git config user.email "backup@users.noreply.github.com"
@@ -64,8 +120,29 @@ jobs:
           git rm -rf -q --cached . 2>/dev/null || true
           git clean -fdxq
           cp -r "$KEEP/backups" .
-          printf '# Резервные копии базы KOMIK\n\nАвтоснапшоты таблицы Supabase `kv` (gzip), по одному в день.\nХранится только последний месяц (31 день): ветка каждый день пересобирается одним коммитом,\nболее старые копии удаляются вместе с историей.\n\nСейчас копий: %s, самая старая — %s.\n' "$N" "$(ls -1 backups/kv-*.json.gz | head -1 | xargs basename)" > README.md
+          printf '# Резервные копии базы KOMIK\n\nАвтоснапшоты таблицы Supabase `kv` (gzip), по одному в день.\nХранятся только последние копии (лимит — %s, около месяца): ветка каждый день пересобирается одним коммитом,\nболее старые копии удаляются вместе с историей.\n\nСейчас копий: %s, самая старая — %s.\n' "$KEEP_N" "$N" "$OLDEST" > README.md
           git add backups README.md
-          git commit -q -m "Бэкап kv $DATE (копий: $N, с $CUT)"
-          git push -q --force origin HEAD:backups
+          O=${OLDEST#kv-}; O=${O%.json.gz}
+          git commit -q -m "Бэкап kv $DATE (копий: $N, с $O)"
+          # --force-with-lease: перезаписываем, только если ветка всё та же, что мы скачали
+          # (пустое значение — ветки быть не должно). Иначе — ошибка, а не потеря чужих копий.
+          git push -q --force-with-lease="refs/heads/backups:$PREV_SHA" origin HEAD:refs/heads/backups
           echo "Готово: backups/kv-$DATE.json.gz, всего копий $N"
+
+      # GitHub сам выключает расписание в публичном репозитории после 60 дней без коммитов в нём.
+      # Повторное «включение» через API на каждом запуске не даёт этому случиться (так работают
+      # keepalive-решения; официально GitHub это не описывает — раз в месяц заглядывайте во вкладку Actions).
+      # Сбой здесь бэкап не роняет.
+      - name: Не дать GitHub выключить расписание
+        if: always()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          CODE=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 30 -X PUT \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/workflows/backup-kv.yml/enable") || CODE="нет связи"
+          if [ "$CODE" = 204 ]; then echo "Расписание продлено ✓"
+          else echo "::warning::Не удалось продлить расписание (ответ: $CODE) — загляните во вкладку Actions"; fi

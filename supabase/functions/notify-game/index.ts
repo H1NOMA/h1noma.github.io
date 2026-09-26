@@ -12,6 +12,10 @@
 //                    Раньше его вписывали руками, он обрезался/расходился с приватным,
 //                    и функция падала на каждом запросе «Vapid public key should be 65 bytes».
 // SUPABASE_URL и SUPABASE_SERVICE_ROLE_KEY подставляются платформой автоматически.
+//
+// Защита рассылки: рассылать может только аккаунт команды (тег из DEV + привязка в public.devs.uid),
+// тело запроса — до 8 КБ, тексты — до 120 символов, не чаще раза в 10 с; пуши уходят только
+// на адреса настоящих push-служб (PUSH_HOSTS), не больше 500 штук и по 20 одновременно.
 
 import webpush from "npm:web-push@3.6.7";
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -24,6 +28,62 @@ const cors = {
 
 // только этим аккаунтам разрешено рассылать (тот же список, что DEV_TAGS на сайте)
 const DEV = ["hinoma", "herr_teo", "arlissss"];
+
+// ── Ограничения рассылки ──
+const MAX_BODY = 8 * 1024;       // тело запроса, байт: сайт шлёт меньше 1 КБ
+const MAX_TEXT = 120;            // setting / game / time, символов (заодно пуш не превысит 4 КБ)
+const MAX_SUBS = 500;            // подписок за одну рассылку
+const BATCH = 20;                // одновременных запросов к push-службам
+const MIN_GAP_MS = 10_000;       // между рассылками
+const SAFE_ID = /^[A-Za-z0-9_-]{1,64}$/;   // gid игры — тот же шаблон, что SAFE_ID в index.html
+// push:subs может переписать любой вошедший игрок, поэтому пуши уходят только на адреса
+// push-служб браузеров, а не на любой сервер из списка. Chrome и браузеры на его движке — FCM
+// (fcm.googleapis.com, изредка jmt17.google.com), Firefox — Mozilla, Safari/iPhone — Apple,
+// Edge — Windows (WNS). Если у какого-то браузера пуши перестали доходить, а в ответе рассылки
+// растёт skipped, — его адрес нужно добавить сюда.
+const PUSH_HOSTS = ["fcm.googleapis.com", "jmt17.google.com", "updates.push.services.mozilla.com", "web.push.apple.com"];
+const PUSH_SUFFIXES = [".push.services.mozilla.com", ".notify.windows.com"];
+const B64U = /^[A-Za-z0-9_-]+=*$/;
+type Target = { endpoint: string; keys: { p256dh: string; auth: string } };
+
+// запись из push:subs → то, что уходит в web-push; null — битая запись или чужой адрес
+function pushTarget(s: any): Target | null {
+  if (!s || typeof s.endpoint !== "string" || s.endpoint.length > 2048 || !s.keys) return null;
+  const { p256dh, auth } = s.keys;
+  if (typeof p256dh !== "string" || typeof auth !== "string" || p256dh.length > 200 || auth.length > 100
+    || !B64U.test(p256dh) || !B64U.test(auth)) return null;
+  let u: URL; try { u = new URL(s.endpoint); } catch { return null; }
+  if (u.protocol !== "https:" || u.port || u.username || u.password) return null;
+  const h = u.hostname.toLowerCase();
+  if (!PUSH_HOSTS.includes(h) && !PUSH_SUFFIXES.some((x) => h.endsWith(x))) return null;
+  return { endpoint: s.endpoint, keys: { p256dh, auth } };
+}
+
+// текст из запроса: только строка/число, не длиннее MAX_TEXT символов (эмодзи пополам не режем)
+const cap = (v: unknown) =>
+  typeof v === "string" || typeof v === "number" ? Array.from(String(v)).slice(0, MAX_TEXT).join("") : "";
+
+// тело не больше MAX_BODY байт (null — больше): ни шлюз, ни Caddy размер запроса не ограничивают
+async function readBody(req: Request): Promise<string | null> {
+  if (Number(req.headers.get("content-length") || 0) > MAX_BODY) return null;
+  if (!req.body) return "";
+  const parts: Uint8Array[] = [];
+  let n = 0;
+  const rd = req.body.getReader();
+  for (let c = await rd.read(); !c.done; c = await rd.read()) {
+    n += c.value.length;
+    if (n > MAX_BODY) { rd.cancel().catch(() => {}); return null; }
+    parts.push(c.value);
+  }
+  const buf = new Uint8Array(n);
+  let o = 0;
+  for (const p of parts) { buf.set(p, o); o += p.length; }
+  return new TextDecoder().decode(buf);
+}
+
+// Время последней рассылки. Живёт в памяти экземпляра функции (перезапуск контейнера обнуляет) —
+// от двойного нажатия и от цикла с украденного аккаунта команды этого хватает.
+let lastSend = 0;
 
 // Ключ, вшитый в сайт как запасной (VAPID_PUBLIC в index.html). Только для подсказок в ответе:
 // подписываем всегда ключом, вычисленным из приватного.
@@ -119,40 +179,77 @@ Deno.serve(async (req) => {
   const login = m ? m[1] : "";
   if (!login || !DEV.includes(login)) return new Response("forbidden", { status: 403, headers: cors });
 
+  // Тег — всего лишь имя: удалённый аккаунт команды мог бы перерегистрировать кто угодно. Поэтому
+  // вдобавок нужна привязка к самому аккаунту — public.devs.uid (миграция 2026-09-27-hardening.sql).
+  // Пока миграция не накатана (нет колонки uid или таблицы devs), остаётся проверка только по тегу.
+  const { data: devRows, error: devErr } = await supa.from("devs").select("tag").eq("uid", u!.user!.id);
+  if (devErr) {
+    if (!["42703", "42P01", "PGRST204", "PGRST205"].includes(devErr.code)) {
+      return json({ error: "Не удалось проверить права команды — база не ответила, попробуйте позже" }, 503);
+    }
+  } else if (!(devRows || []).some((r: any) => r?.tag === login)) {
+    return json({ error: "Этот аккаунт не привязан к команде на сервере — рассылка запрещена" }, 403);
+  }
+
   const v = initVapid();
   if (v.err) return json({ error: v.err }, 500);
 
-  const body = await req.json().catch(() => ({}));
-  const title = "Новая игра · " + (body.setting || "КОМИК");
-  const msg = (body.game || "Открыта запись на игру") + (body.time ? " · " + body.time : "");
+  const raw = await readBody(req).catch(() => "");
+  if (raw === null) return json({ error: "Слишком большой запрос — не больше 8 КБ" }, 413);
+  let body: any = {};
+  try { body = JSON.parse(raw || "{}"); } catch { /* битый JSON — как пустой запрос */ }
+  if (!body || typeof body !== "object" || Array.isArray(body)) body = {};
+
+  const wait = lastSend + MIN_GAP_MS - Date.now();
+  if (wait > 0) return json({ error: `Слишком часто — следующая рассылка через ${Math.ceil(wait / 1000)} сек` }, 429);
+  lastSend = Date.now();
+
+  const time = cap(body.time);
+  const title = "Новая игра · " + (cap(body.setting) || "КОМИК");
+  const msg = (cap(body.game) || "Открыта запись на игру") + (time ? " · " + time : "");
   // gid уходит в data уведомления (в тексте не виден) → по тапу открываем именно эту игру
-  const payload = JSON.stringify({ title, body: msg, tag: "komik-game", gid: String(body.gid || "") });
+  const gid = SAFE_ID.test(String(body.gid ?? "")) ? String(body.gid) : "";
+  const payload = JSON.stringify({ title, body: msg, tag: "komik-game", gid });
 
   const { data: row } = await supa.from("kv").select("value").eq("key", "push:subs").maybeSingle();
-  const subs: any[] = (Array.isArray(row?.value) ? row!.value : []).filter((s: any) => s && s.endpoint && s.keys);
-
-  let sent = 0;
-  const dead: string[] = [];
-  const failed: { code: number | string; msg: string }[] = [];
-  await Promise.all(subs.map(async (s) => {
-    try { await webpush.sendNotification(s, payload, { TTL: 86400, urgency: "high" }); sent++; }
-    catch (err: any) {
-      const code = err?.statusCode;
-      if (code === 404 || code === 410) { dead.push(s.endpoint); return; } // подписка мертва — удалим
-      // 401/403 от push-службы = подпись не принята: подписка оформлена под другой ключ.
-      // Устройство переоформит её само при следующем открытии сайта.
-      failed.push({ code: code ?? "net", msg: String(err?.body || err?.message || err).slice(0, 160) });
-    }
-  }));
-
-  if (dead.length) {
-    // перечитываем перед записью: пока шла рассылка, кто-то мог подписаться — его не теряем
-    const { data: fresh } = await supa.from("kv").select("value").eq("key", "push:subs").maybeSingle();
-    const cur: any[] = Array.isArray(fresh?.value) ? fresh!.value : subs;
-    await supa.from("kv").update({ value: cur.filter((s) => s && !dead.includes(s.endpoint)) }).eq("key", "push:subs");
+  const all: any[] = Array.isArray(row?.value) ? row!.value : [];
+  // только адреса push-служб, без повторов и не больше MAX_SUBS; остальное пропускаем (skipped)
+  const subs: Target[] = [];
+  const seen = new Set<string>();
+  for (const s of all) {
+    const t = pushTarget(s);
+    if (!t || seen.has(t.endpoint) || subs.length >= MAX_SUBS) continue;
+    seen.add(t.endpoint);
+    subs.push(t);
   }
 
-  const out: Record<string, unknown> = { sent, removed: dead.length, failed: failed.length, total: subs.length };
+  let sent = 0;
+  const dead = new Set<string>();
+  const failed: { code: number | string; msg: string }[] = [];
+  // пачками по BATCH: сотни одновременных запросов подвесили бы функцию
+  for (let i = 0; i < subs.length; i += BATCH) {
+    await Promise.all(subs.slice(i, i + BATCH).map(async (s) => {
+      try { await webpush.sendNotification(s, payload, { TTL: 86400, urgency: "high", timeout: 10000 }); sent++; }
+      catch (err: any) {
+        const code = err?.statusCode;
+        if (code === 404 || code === 410) { dead.add(s.endpoint); return; } // подписка мертва — удалим
+        // 401/403 от push-службы = подпись не принята: подписка оформлена под другой ключ.
+        // Устройство переоформит её само при следующем открытии сайта.
+        failed.push({ code: code ?? "net", msg: String(err?.body || err?.message || err).slice(0, 160) });
+      }
+    }));
+  }
+
+  if (dead.size) {
+    // перечитываем перед записью: пока шла рассылка, кто-то мог подписаться — его не теряем
+    const { data: fresh } = await supa.from("kv").select("value").eq("key", "push:subs").maybeSingle();
+    const cur: any[] = Array.isArray(fresh?.value) ? fresh!.value : all;
+    await supa.from("kv").update({ value: cur.filter((s) => s && !dead.has(s.endpoint)) }).eq("key", "push:subs");
+  }
+
+  const out: Record<string, unknown> = {
+    sent, removed: dead.size, failed: failed.length, total: subs.length, skipped: all.length - subs.length,
+  };
   if (failed.length) {
     out.errors = failed.slice(0, 3);
     if (failed.some((f) => f.code === 401 || f.code === 403)) {
