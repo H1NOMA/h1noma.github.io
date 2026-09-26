@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <!-- Безопасность: ограничиваем источники (защита от инъекций/утечек). script/style — только свои + инлайн
      (приложению нужны инлайновые обработчики); подключения — только к себе и Supabase; object/embed запрещены. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; media-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://cloud.komikdnd.ru wss://cloud.komikdnd.ru; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src 'none'; manifest-src 'self'; worker-src 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; media-src 'self' data: blob: https:; connect-src 'self' https://cloud.komikdnd.ru wss://cloud.komikdnd.ru; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src 'none'; manifest-src 'self'; worker-src 'self'">
 <meta name="referrer" content="strict-origin-when-cross-origin">
 <!-- анти-кликджекинг: сайт не должен работать внутри чужого фрейма (GitHub Pages не даёт задать заголовок) -->
 <script>try{if(window.top!==window.self){try{window.top.location=window.self.location;}catch(_){document.documentElement.style.display='none';}}}catch(e){}</script>
@@ -4984,15 +4984,19 @@ const withTimeout = (p, ms=1500) => Promise.race([p, new Promise(res=>setTimeout
    connect-src) и preconnect/dns-prefetch — там прописан домен облака.
    Для проверки НОВОГО сервера до переключения всех: в консоли браузера
      localStorage.setItem('comik:cloud', JSON.stringify(
-       {url:'https://cloud.новый-адрес.ru', key:'АНОН_КЛЮЧ_НОВОГО'}))
-   и обновить страницу — только этот браузер начнёт ходить в новое облако.
+       {url:'https://cloud2.komikdnd.ru', key:'АНОН_КЛЮЧ_НОВОГО'}))
+   и обновить страницу — только этот браузер начнёт ходить в новое облако
+   (принимается только адрес на домене komikdnd.ru, см. CLOUD ниже).
    Вернуть как было: localStorage.removeItem('comik:cloud'). */
 const CLOUD_DEFAULT = {
   url: 'https://cloud.komikdnd.ru',
   key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzg5MDg1MzA1LCJleHAiOjIxMDQ0NDUzMDV9.7evXWwQ2bbrEVPTpfMEnrFv8ON5dFC_iU-v7MiVQPyc'
 };
+// подмена адреса облака — только на наш домен (или локальный стенд): иначе одна XSS навсегда уводила бы
+// входы этого браузера на чужой сервер, и пароль уходил бы туда при каждом входе
 const CLOUD = (()=>{ try{ const o=JSON.parse(localStorage.getItem('comik:cloud')||'null');
-  if(o && o.url && o.key) return o; }catch(e){} return CLOUD_DEFAULT; })();
+  if(o && typeof o.url==='string' && typeof o.key==='string' && o.key
+     && /^(https:\/\/([a-z0-9-]+\.)*komikdnd\.ru|https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?)\/?$/i.test(o.url)) return {url:o.url.replace(/\/$/,''), key:o.key}; }catch(e){} return CLOUD_DEFAULT; })();
 const SUPA_URL = CLOUD.url;
 const SUPA_KEY = CLOUD.key;
 let supa = null;
@@ -5063,11 +5067,23 @@ async function supaLateInit(){
   cloudRetryLater(0);
 }
 
+/* Всё, что читается из облака, могла записать чужая рука (общие строки пишет любой вошедший игрок).
+   JSON.parse создаёт ключ «__proto__» обычным полем, а Object.assign/обход for…in потом подменяют через
+   него прототип копии — и проверка цвета/id «проходила» унаследованным значением. Срезаем такие ключи
+   сразу при чтении; слишком глубокую вложенность (защита от переполнения стека) отбрасываем целиком. */
+function deproto(v, d){   // объявления функций всплывают — годится и для ранних чтений до этой строки
+  if(!v || typeof v!=='object') return v;
+  d=(d|0)+1; if(d>200) return null;
+  if(Array.isArray(v)){ for(let i=0;i<v.length;i++) v[i]=deproto(v[i], d); return v; }
+  for(const k of Object.keys(v)){ if(k==='__proto__' || k==='constructor' || k==='prototype') delete v[k]; else v[k]=deproto(v[k], d); }
+  return v;
+}
+function jsonSafe(t){ return deproto(JSON.parse(t)); }
 /* Облачные аналоги sget/sset: одна таблица kv (key text pk, value jsonb) */
 async function cloudGet(key){
   const {data,error} = await supa.from('kv').select('value').eq('key',key).maybeSingle();
   if(error) throw error;
-  return data ? data.value : null;
+  return data ? deproto(data.value) : null;
 }
 async function cloudSet(key,val){
   const {error} = await supa.from('kv').upsert({key, value: val});
@@ -5078,13 +5094,29 @@ async function cloudSet(key,val){
 async function cloudGetPrefix(prefix){
   const {data,error} = await supa.from('kv').select('key,value').like('key', prefix.replace(/([%_])/g,'\\$1')+'%');
   if(error) throw error;
-  return data || [];
+  return deproto(data || []);
 }
 // точечное чтение нескольких строк — фоновый тик перечитывает только листы, у которых сменился штамп записи
 async function cloudGetKeys(keys){
   const {data,error} = await supa.from('kv').select('key,value').in('key', keys);
   if(error) throw error;
-  return data || [];
+  return deproto(data || []);
+}
+/* Реестр логинов comik:users:v1 — справочный список без паролей, строку пишет любой вошедший.
+   Раньше вход дописывал себя в ЛОКАЛЬНЫЙ список и заливал его целиком: при тайм-ауте чтения список был
+   пуст — и реестр всех игроков затирался одним тегом (в бэкапах: 9 → 3 → 1). Теперь: перечитать облако,
+   дописать себя, записать только если облако ответило. Кривое значение строки (не массив) не роняет старт */
+function usersNorm(v){ return Array.isArray(v) ? v.filter(u=>u && typeof u==='object' && !Array.isArray(u) && typeof u.tag==='string' && u.tag.trim()) : []; }
+async function usersRegister(tag){
+  tag=normTag(tag||''); if(!tag) return;
+  if(!USERS.some(u=>normTag(u.tag)===tag)) USERS.push({ tag, createdAt:Date.now() });
+  if(!supa) return;
+  let cur; try{ cur=await withTimeout(cloudGet(KEY_USERS), 8000); }catch(e){ return; }
+  if(cur===undefined) return;                                // облако молчит — вслепую поверх чужих не пишем
+  const list=usersNorm(cur), had=list.length;
+  USERS.forEach(u=>{ const t=normTag(u.tag); if(t && !list.some(x=>normTag(x.tag)===t)) list.push({ tag:t, createdAt:+u.createdAt||Date.now() }); });
+  USERS=list;
+  if(list.length!==had || !Array.isArray(cur)) sset(KEY_USERS, list, true, true).catch(()=>{});
 }
 // собрать все листы персонажей из облака: легаси-блоб comik:chars:v1 + все пер-юзерные comik:chars:<тег>
 // (keys — только эти строки: остальные не менялись, см. fetchCloudCharsChanged)
@@ -5101,12 +5133,16 @@ async function fetchCloudChars(keys){
   /* Строку comik:chars:<тег> пишет только её владелец (RLS), а читают все. Раньше листы из ВСЕХ строк
      сливались по одному id: игрок клал в свою строку «лист» с чужим id и штампом из будущего —
      и чужой персонаж пропадал или подменялся у всех, а у самой жертвы подделка уезжала в её строку.
-     Теперь лист с владельцем принимаем только из строки владельца (легаси-блоб v1 заморожен — из него
-     всё), лист без владельца — лишь если такого id нет среди листов с владельцем. id — только безопасные
-     (он попадает в разметку) */
-  const owned=[], loose=[];
+     Теперь: лист принимаем только из строки его владельца; лист без владельца считается листом владельца
+     строки (иначе он расползался по строкам всех, кто его видел); легаси-блоб comik:chars:v1 не читаем
+     вовсе (заморожен, в облаке его нет, а тег «v1» мог бы его завести); один id у РАЗНЫХ владельцев —
+     свой лист всегда остаётся своим (mergeSheets), остальные показываем под id «<id>__<тег>» с пометкой alias —
+     ничего не скрыто и не подменено, а сохранять такие копии некому (persistCharsNow их пропускает).
+     id — только безопасные (он в разметке) */
+  const owned=[];
   rows.forEach(r=>{
-    let v=r && r.value; if(typeof v==='string'){ try{ v=JSON.parse(v); }catch(e){ return; } }
+    if(r && r.key===KEY_CHARS){ stamps[r.key]=''; return; }
+    let v=r && r.value; if(typeof v==='string'){ try{ v=jsonSafe(v); }catch(e){ return; } }
     if(!v || typeof v!=='object') return;
     // свою строку зеркалим на устройство: старт без сети покажет свои листы, даже если на этом устройстве
     // их ни разу не сохраняли (чужие не зеркалим — портреты всех игроков в квоту localStorage не влезут).
@@ -5120,18 +5156,27 @@ async function fetchCloudChars(keys){
     }
     // штамп — в том же виде, что отдаёт зонд value->>at (текст; у старых строк без штампа — пусто)
     if(r.key) stamps[r.key]=(r.value && typeof r.value==='object' && r.value.at!=null) ? String(r.value.at) : '';
-    const rowTag=(r.key && r.key!==KEY_CHARS) ? normTag(String(r.key).slice(12)) : null;   // 'comik:chars:'.length
+    const rowTag=normTag(String(r.key||'').slice(12));   // 'comik:chars:'.length
+    if(!rowTag) return;
     const rm=normGameMap(v);
     ALL_GAMES.forEach(g=>(rm[g]||[]).forEach(c=>{
       if(!c || typeof c!=='object' || !SAFE_ID.test(String(c.id||''))) return;
-      const o=c.owner ? normTag(c.owner) : '';
-      if(o){ if(rowTag===null || o===rowTag) owned.push([g,c]); }
-      else loose.push([g,c]);
+      const o=c.owner ? normTag(String(c.owner)) : '';
+      if(o && o!==rowTag) return;
+      c=o ? c : {...c, owner:rowTag};
+      // имя/игрок — строкой: число в имени роняло список игроков (.trim/.localeCompare)
+      ['name','player'].forEach(f=>{ if(c[f]!=null && typeof c[f]!=='string') c={...c, [f]:(typeof c[f]==='number'?String(c[f]):'')}; });
+      owned.push([g, c, rowTag]);
     }));
   });
-  owned.forEach(([g,c])=>{ merged[g]=mergeChars(merged[g], [c]); });
-  const ownedIds=new Set(owned.map(([,c])=>c.id));
-  loose.forEach(([g,c])=>{ if(!ownedIds.has(c.id)) merged[g]=mergeChars(merged[g], [c]); });
+  // один id — один владелец: свой лист выигрывает всегда; из чужих — созданный раньше (при равенстве — по тегу)
+  const idOwner=new Map(), me=tg||'';
+  owned.slice().sort((a,b)=>((a[2]===me)?0:1)-((b[2]===me)?0:1) || (+a[1].createdAt||0)-(+b[1].createdAt||0) || (a[2]<b[2]?-1:a[2]>b[2]?1:0))
+    .forEach(x=>{ const id=String(x[1].id); if(!idOwner.has(id)) idOwner.set(id, x[2]); });
+  owned.forEach(([g,c,t])=>{
+    if(idOwner.get(String(c.id))!==t) c={...c, id:String(c.id).slice(0,30)+'__'+t.slice(0,32), alias:1};
+    merged[g]=mergeChars(merged[g], [c]);
+  });
   // штампы едут вместе с картой, а запоминает их тот, кто слил карту в CHARS_ALL (charsSeen):
   // чтение, брошенное по тайм-ауту, не должно пометить непринятые листы как виденные
   Object.defineProperty(merged, 'stamps', {value:stamps});
@@ -5229,8 +5274,8 @@ async function cloudSetOnly(key,val,quiet){
 }
 
 async function sgetLocal(key, shared=SHARED){
-  if(hasLS){ try{ const v=localStorage.getItem(key); return v==null? null : JSON.parse(v); }catch(e){ return null; } }
-  if(hasStore){ try{ const r=await withTimeout(window.storage.get(key, shared)); return r&&r.value? JSON.parse(r.value):null; }catch(e){ return null; } }
+  if(hasLS){ try{ const v=localStorage.getItem(key); return v==null? null : jsonSafe(v); }catch(e){ return null; } }
+  if(hasStore){ try{ const r=await withTimeout(window.storage.get(key, shared)); return r&&r.value? jsonSafe(r.value):null; }catch(e){ return null; } }
   return key in mem ? mem[key] : null;
 }
 async function ssetLocal(key,val, shared=SHARED){
@@ -5427,7 +5472,22 @@ function sanitizeHTML(html){
 }
 const mergeById = (stored, local) => { const ids=new Set((stored||[]).map(x=>x&&x.id)); return (stored||[]).concat((local||[]).filter(x=>x&&!ids.has(x.id))); };
 /* персонажи сливаются по свежести: удаление хранится надгробием {deleted:true} и не воскресает из облака */
-const mergeChars = (a,b) => { const m=new Map(); (a||[]).concat(b||[]).forEach(c=>{ if(!c||!c.id) return; const p=m.get(c.id); if(!p || (c.updatedAt||0)>(p.updatedAt||0)) m.set(c.id,c); }); return [...m.values()]; };
+/* Слияние по id (листы, новости, архив). id уходит в разметку — в onclick="…('id')" и data-атрибуты, —
+   поэтому записи с id из чего-то, кроме букв, цифр, «_» и «-», не принимаем (кириллица в id архива есть).
+   Штамп из будущего (подделка «updatedAt: 9e15») больше не побеждает навсегда: считаем его не дальше суток вперёд */
+const MERGE_ID=/^[\p{L}\p{N}_-]{1,80}$/u;
+const mergeTs=c=>Math.min(+c.updatedAt||0, Date.now()+864e5);
+/* Листы персонажей: как mergeChars, но один id у РАЗНЫХ владельцев (подделка из чужой строки) не подменяет лист:
+   свой лист всегда остаётся своим, а уже виденный чужой — прежним. Иначе «лист» со штампом из будущего
+   заслонял настоящий, и клиент самой жертвы при сохранении выкидывал её лист из её строки */
+const mergeSheets = (a,b) => { const me=(typeof currentTag==='function' && currentTag()) || '', m=new Map();
+  (a||[]).concat(b||[]).forEach(c=>{ if(!c||typeof c!=='object'||!c.id||!MERGE_ID.test(String(c.id))) return;
+    const p=m.get(c.id); if(!p){ m.set(c.id,c); return; }
+    const po=normTag(p.owner||''), co=normTag(c.owner||'');
+    if(po && co && po!==co){ if(co===me && po!==me) m.set(c.id,c); return; }
+    if(mergeTs(c)>mergeTs(p)) m.set(c.id,c); });
+  return [...m.values()]; };
+const mergeChars = (a,b) => { const m=new Map(); (a||[]).concat(b||[]).forEach(c=>{ if(!c||typeof c!=='object'||!c.id||!MERGE_ID.test(String(c.id))) return; const p=m.get(c.id); if(!p || mergeTs(c)>mergeTs(p)) m.set(c.id,c); }); return [...m.values()]; };
 
 async function boot(){
   // Ядро и бестиарий не зависят от облака — поднимаем их ПЕРВЫМ делом, до сетевых запросов.
@@ -5485,7 +5545,7 @@ async function boot(){
     // миграция: карточки ядра, лежавшие раньше в пользовательских, выкидываем — они теперь в CORE
     const own = mergeChars(mergeById(arcMap[g], embMap[g]), ARCHIVE_ALL[g]).filter(c=>c && !coreIds.has(c.id));
     ARCHIVE_ALL[g] = own;
-    CHARS_ALL[g]   = mergeChars(chMap[g], CHARS_ALL[g]);
+    CHARS_ALL[g]   = mergeSheets(chMap[g], CHARS_ALL[g]);
   });
   if(BLOB_LOCAL[KEY_ARCHIVE]) archiveMergeIn(BLOB_LOCAL[KEY_ARCHIVE]);
   // Локальное зеркало своих листов. persistChars пишет их в 'comik:chars:<тег>',
@@ -5497,7 +5557,7 @@ async function boot(){
       const local=await sgetLocal('comik:chars:'+tg, true);
       if(local && typeof local==='object'){
         const lm=normGameMap(local);
-        ALL_GAMES.forEach(g=>{ CHARS_ALL[g]=mergeChars(CHARS_ALL[g], lm[g]); });
+        ALL_GAMES.forEach(g=>{ CHARS_ALL[g]=mergeSheets(CHARS_ALL[g], lm[g]); });
       }
     }
   }catch(e){}
@@ -5505,7 +5565,7 @@ async function boot(){
   if(supa){
     try{
       const perUser=await withTimeout(fetchCloudChars(), CLOUD_TMO);
-      if(perUser){ ALL_GAMES.forEach(g=>{ CHARS_ALL[g]=mergeChars(CHARS_ALL[g], perUser[g]); }); charsSeen(perUser); }
+      if(perUser){ ALL_GAMES.forEach(g=>{ CHARS_ALL[g]=mergeSheets(CHARS_ALL[g], perUser[g]); }); charsSeen(perUser); }
       else bootMiss=true;   // листы не дочитались — на доске у игрока не будет его персонажа, пока не дочитаем
     }catch(e){ bootMiss=true; }
   }
@@ -5523,7 +5583,7 @@ async function boot(){
   }
   if(BLOB_LOCAL[KEY_COREOVER]) coreOverMergeIn(BLOB_LOCAL[KEY_COREOVER]);
   bindGameData(true);
-  USERS = users || [];
+  USERS = usersNorm(users);
   SESSION = sess || null;
   SESSION_READY=true;
   // сессия известна — закрытый сеттинг (GW, ASSIMILATION), восстановленный из сохранённого выбора, проверяем строго
@@ -5550,7 +5610,7 @@ async function boot(){
       const err = gs && gs.error ? String(gs.error.message||gs.error) : '';
       if(authUser){
         SESSION = emailToLogin(authUser.email);
-        if(!USERS.some(u=>normTag(u.tag)===normTag(SESSION))){ USERS.push({ tag:normTag(SESSION), createdAt:Date.now() }); sset(KEY_USERS, USERS, true).catch(()=>{}); }
+        usersRegister(SESSION);
         ssetLocal(KEY_SESSION, SESSION, false);
       } else if(!err || /refresh token|invalid grant|not found|revoked/i.test(err)){
         SESSION = null; ssetLocal(KEY_SESSION, null, false);
@@ -5672,7 +5732,9 @@ function scheduleBestiary(){
   wait();
   setTimeout(parseBestiary, 6000);   // страховка, если заставка почему-то зависла
 }
-function renderAll(){ renderCats(); applyView(); renderAcct(); renderPlayers(); renderNews(); updateOnboard();
+// каждый раздел — отдельно: кривая запись в общей строке (её может записать любой игрок) роняла бы
+// не один раздел, а весь старт — вход, ленту, регистрацию воркера
+function renderAll(){ [renderCats, applyView, renderAcct, renderPlayers, renderNews, updateOnboard].forEach(f=>{ try{ f(); }catch(e){ try{ console.error('[КОМИК] renderAll', f.name, e); }catch(_){} } });
   try{ renderAmbient(); }catch(e){}
   const tv=document.getElementById('view-combat'); if(tv && tv.classList.contains('active')) renderToolsPage(); }
 window.addEventListener('resize', ()=>{ clearTimeout(window.__ambT); window.__ambT=setTimeout(()=>{ try{ renderAmbient(); }catch(e){} }, 350); });
@@ -6499,7 +6561,13 @@ const CHRONO_SECTIONS=[
 ];
 async function chronoGamesLoad(){
   let loc=null; if(BLOB_PENDING.has(KEY_CHRONO_GAMES)){ try{ loc=JSON.parse(localStorage.getItem(KEY_CHRONO_GAMES)||'null'); }catch(e){} }
-  try{ const v=await sget(KEY_CHRONO_GAMES,true); if(v && typeof v==='object') CHRONO_GAMES=Object.assign({legacy:[],neverland:[],terra:[],assimilation:[],skazki:[],gw:[]}, v); }catch(e){}
+  try{ const v=await sget(KEY_CHRONO_GAMES,true);
+    if(v && typeof v==='object' && !Array.isArray(v)){
+      // списки — через mergeChars: он отсекает записи с опасным id (id уходит в onclick)
+      const base={legacy:[],neverland:[],terra:[],assimilation:[],skazki:[],gw:[]};
+      Object.keys(v).forEach(k=>{ if(SAFE_GAME.test(k)) base[k]=Array.isArray(v[k]) ? mergeChars([], v[k]) : []; });
+      CHRONO_GAMES=base;
+    } }catch(e){}
   if(loc) chronoGamesMergeIn(loc);
 }
 /* архив игр хроники правят три разработчика с разных устройств — пишем слиянием по updatedAt
@@ -6705,7 +6773,7 @@ function openCardEditor(id){
     <div class="field" id="ce-f-title"><label>Название <span class="req">*</span></label><input id="ce-title" maxlength="80" value="${e?esc(e.title):''}"><div class="err">Укажите название</div></div>
     <div class="field"><label>Изображение</label>
       <div class="ce-imgrow">
-        <span class="ce-thumb" id="ceThumb">${EDIT_IMG?`<img src="${EDIT_IMG}">`:''}</span>
+        <span class="ce-thumb" id="ceThumb">${EDIT_IMG?`<img src="${esc(safeUrl(EDIT_IMG))}">`:''}</span>
         <button class="btn ghost" onclick="document.getElementById('ceFile').click()">Выбрать</button>
         <button class="btn ghost" onclick="ceImgClear()">Убрать</button>
       </div>
@@ -6808,7 +6876,7 @@ function ceAddRow(k,v){
 function ceImgPick(inp){
   const f=inp.files&&inp.files[0]; if(!f) return;
   compressImage(f, 1000, 0.8).then(src=>{
-    EDIT_IMG=src; const t=document.getElementById('ceThumb'); if(t) t.innerHTML=`<img src="${EDIT_IMG}">`;
+    EDIT_IMG=src; const t=document.getElementById('ceThumb'); if(t) t.innerHTML=`<img src="${esc(safeUrl(EDIT_IMG))}">`;
   }).catch(()=>toast('⚠ Не удалось обработать фото'));
   inp.value='';
 }
@@ -6893,7 +6961,7 @@ async function cloudRepull(reason){
     }
     let charsChanged=false;
     if(perUser){ const fp=g=>(CHARS_ALL[g]||[]).map(c=>c&&(c.id+':'+(c.updatedAt||0))).join(','); const before=ALL_GAMES.map(fp).join('|');
-      ALL_GAMES.forEach(g=>{ CHARS_ALL[g]=mergeChars(CHARS_ALL[g], perUser[g]); }); charsSeen(perUser); changed=true; charsChanged=ALL_GAMES.map(fp).join('|')!==before; }
+      ALL_GAMES.forEach(g=>{ CHARS_ALL[g]=mergeSheets(CHARS_ALL[g], perUser[g]); }); charsSeen(perUser); changed=true; charsChanged=ALL_GAMES.map(fp).join('|')!==before; }
     if(Array.isArray(nws)){ NEWS=mergeChars(NEWS, nws).filter(n=>n && !(n.deleted && (Date.now()-(n.updatedAt||0))>90*864e5)); changed=true; }
     if(changed){
       bindGameData();
@@ -7038,7 +7106,8 @@ function toggleSearchBar(e){ if(e) e.stopPropagation();
   f.classList.toggle('open',open); if(b) b.classList.toggle('active',open);
   if(open){ const i=document.getElementById('searchM'); i.value=''; runSearch(''); setTimeout(()=>i.focus(),60); }
 }
-function stripHtml(h){ const t=document.createElement('div'); t.innerHTML=h||''; return t.textContent||''; }
+// template, а не div: содержимое шаблона инертно — картинки не грузятся и их onerror не срабатывает
+function stripHtml(h){ const t=document.createElement('template'); t.innerHTML=h||''; return t.content.textContent||''; }
 function runSearch(q){
   q=(q||'').trim().toLowerCase();
   SF_RES=[];
@@ -7158,7 +7227,7 @@ function openNewsEditor(id){
     <div class="field" id="nw-f-title"><label>Заголовок <span class="req">*</span></label><input id="nw-title" maxlength="120" value="${n?esc(n.title):''}"><div class="err">Укажите заголовок</div></div>
     <div class="field"><label>Фото</label>
       <div class="ce-imgrow">
-        <span class="ce-thumb" id="nwThumb">${NEWS_IMG?`<img src="${NEWS_IMG}">`:''}</span>
+        <span class="ce-thumb" id="nwThumb">${NEWS_IMG?`<img src="${esc(safeUrl(NEWS_IMG))}">`:''}</span>
         <button class="btn ghost" onclick="document.getElementById('nwFile').click()">Выбрать</button>
         <button class="btn ghost" onclick="nwImgClear()">Убрать</button>
       </div>
@@ -7178,7 +7247,7 @@ function openNewsEditor(id){
 function nwImgPick(inp){
   const f=inp.files&&inp.files[0]; if(!f) return;
   compressImage(f, 1280, 0.8).then(src=>{
-    NEWS_IMG=src; const t=document.getElementById('nwThumb'); if(t) t.innerHTML=`<img src="${NEWS_IMG}">`;
+    NEWS_IMG=src; const t=document.getElementById('nwThumb'); if(t) t.innerHTML=`<img src="${esc(safeUrl(NEWS_IMG))}">`;
   }).catch(()=>toast('⚠ Не удалось обработать фото'));
   inp.value='';
 }
@@ -7240,18 +7309,29 @@ function gameClean(r){
     return t;
   }
   if(!SAFE_GAME.test(String(r.game||''))) return null;
-  const s=Object.assign({}, r), now=Date.now();
+  // копия разворотом, а не Object.assign: присваивание через ключ «__proto__» подменило бы прототип копии
+  const s={...r}, now=Date.now();
+  // текстовые поля — строкой (число в дате роняло fmtGameDate, а с ним и всю ленту у всех)
+  ['title','price','loc','time','date','owner'].forEach(f=>{ if(s[f]!=null) s[f]=(typeof s[f]==='string'||typeof s[f]==='number') ? String(s[f]).slice(0,120) : ''; });
+  if(s.seats!=null) s.seats=Math.max(1, Math.min(999, parseInt(s.seats,10)||1));
+  ['createdAt','updatedAt'].forEach(f=>{ if(s[f]!=null) s[f]=+s[f]||0; });
   const gone={};
   if(s.gone && typeof s.gone==='object' && !Array.isArray(s.gone)) Object.keys(s.gone).forEach(t=>{ const v=+s.gone[t]; if(v>0 && now-v<GAME_TOMB_TTL) gone[normTag(t)]=v; });
   s.gone=gone;
   s.players=(Array.isArray(s.players)?s.players:[]).filter(p=>p && typeof p==='object' && typeof p.tag==='string' && p.tag.trim()).map(p=>{
-    const q=Object.assign({}, p);
+    const q={...p};
     if(q.charId!=null && q.charId!=='' && !SAFE_ID.test(String(q.charId))) q.charId='';
     if(q.bg!=null && !SAFE_COLOR.test(String(q.bg))) delete q.bg;
     if(q.ink!=null && !SAFE_COLOR.test(String(q.ink))) delete q.ink;
+    ['name','charName'].forEach(f=>{ if(q[f]!=null) q[f]=(typeof q[f]==='string'||typeof q[f]==='number') ? String(q[f]).slice(0,80) : ''; });
+    ['at','upd'].forEach(f=>{ if(q[f]!=null) q[f]=+q[f]||0; });
     return q;
   });
-  if(s.chronoRef!=null && !(typeof s.chronoRef==='object' && SAFE_GAME.test(String(s.chronoRef.camp||'')) && SAFE_ID.test(String(s.chronoRef.id||'')))) delete s.chronoRef;
+  if(s.chronoRef!=null){
+    const c=s.chronoRef;
+    if(c && typeof c==='object' && SAFE_GAME.test(String(c.camp||'')) && SAFE_ID.test(String(c.id||''))) s.chronoRef={camp:String(c.camp), id:String(c.id)};
+    else delete s.chronoRef;
+  }
   return s;
 }
 /* массив из облака → живые сессии + надгробия (всё уже очищено) */
@@ -7440,7 +7520,7 @@ function gameDateOf(s){
 }
 function fmtGameDate(iso, opts){
   if(!iso) return '';
-  const [y,m,d]=iso.split('-').map(Number);
+  const [y,m,d]=String(iso).split('-').map(Number);
   return new Date(y,m-1,d).toLocaleDateString('ru-RU', opts||{weekday:'short',day:'numeric',month:'long'});
 }
 /* сортировка: сначала ближайшие по дате, без даты — в конец; при равенстве — по созданию */
@@ -7570,10 +7650,12 @@ function openGameSignup(){
     ${body}`;
   document.getElementById('scrim').classList.add('open');
 }
+// цвета участника идут в style="…" — проверяем ещё раз на месте вывода, а не только при чтении
+function gsColors(p){ return { bg:SAFE_COLOR.test(String(p&&p.bg||''))?p.bg:'var(--red)', ink:SAFE_COLOR.test(String(p&&p.ink||''))?p.ink:'#fff' }; }
 function gsAvaHtml(p, i, sid){
   const ch=p.charId?findCharAny(p.charId):null;
   const photo=ch&&ch.ava;
-  const bg=p.bg||'var(--red)', ink=p.ink||'#fff';
+  const {bg, ink}=gsColors(p);
   const initial=esc((p.name||p.tag||'?').charAt(0).toUpperCase());
   return `<button class="gs-ava" onclick="gsPlayerInfo('${sid}',${i})" title="${esc(p.name||'участник')}"${photo?'':` style="background:${bg};color:${ink}"`}>${photo?`<img src="${esc(safeUrl(photo))}" alt="">`:initial}</button>`;
 }
@@ -7681,7 +7763,7 @@ function gsPlayerInfo(sid, idx){
   const s=GAMES.find(x=>x.id===sid); if(!s) return;
   const p=(s.players||[])[idx]; if(!p) return;
   const ch=p.charId?findCharAny(p.charId):null;
-  const photo=ch&&ch.ava; const bg=p.bg||'var(--red)', ink=p.ink||'#fff';
+  const photo=ch&&ch.ava; const {bg, ink}=gsColors(p);
   const initial=esc((p.name||p.tag||'?').charAt(0).toUpperCase());
   const gm=canManageGame(s);
   document.getElementById('modal').innerHTML=`<button class="x" onclick="closeModal()" aria-label="Закрыть">✕</button>
@@ -8007,7 +8089,7 @@ function openAccessModal(hint, tab){
     accountPane = `<div class="field" id="au-f-tag"><label>Логин <span class="req">*</span></label>
         <input id="au-tag" maxlength="32" placeholder="login" autocapitalize="off" autocomplete="username" spellcheck="false"><div class="err">Логин: 4–32 символа — латиница, цифры или _</div></div>
       <div class="field" id="au-f-pass"><label>Пароль <span class="req">*</span></label>
-        <input id="au-pass" type="password" maxlength="100" autocomplete="current-password" onkeydown="if(event.key==='Enter')authSubmit()"><div class="err">Минимум 4 символа</div></div>
+        <input id="au-pass" type="password" maxlength="100" autocomplete="current-password" onkeydown="if(event.key==='Enter')authSubmit()"><div class="err">Минимум 8 символов</div></div>
       <div class="field" id="au-f-pass2" hidden><label>Повторите пароль <span class="req">*</span></label>
         <input id="au-pass2" type="password" maxlength="100" autocomplete="new-password" onkeydown="if(event.key==='Enter')authSubmit()"><div class="err">Пароли не совпадают</div></div>
       <label class="au-agree" id="au-f-agree" hidden><input type="checkbox" id="au-agree"><span>Я ознакомлен(а) и согласен(на) с <button type="button" class="lnk" onclick="openPolicy(true)">политикой и условиями</button> и <button type="button" class="lnk" onclick="openTerms(true)">условиями платных игр</button>.</span></label>
@@ -8329,7 +8411,10 @@ const AUTH_EMAIL_DOMAIN='komikdnd.ru';  // реальный домен прое�
 function loginToEmail(login){ return normTag(login)+'@'+AUTH_EMAIL_DOMAIN; }
 function emailToLogin(email){ return String(email||'').split('@')[0].toLowerCase(); }
 function authTimeout(p, ms=13000){ return Promise.race([ p, new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')), ms)) ]); }
-function afterAuthChange(){ renderAcct(); renderPlayers(); renderCats(); applyView(); updateDevUI(); renderSettings(); bmCloudSync(); updateOnboard(); }   // «С чего начать» — только гостям: после входа прячем сразу, а не после перезагрузки
+function afterAuthChange(){ renderAcct(); renderPlayers(); renderCats(); applyView(); updateDevUI(); renderSettings(); bmCloudSync(); updateOnboard();
+  // кто «свой» — поменялось: при одинаковом id у разных владельцев выбор зависел от того, кто смотрит (fetchCloudChars),
+  // поэтому строки листов перечитываем целиком ближайшим тиком
+  try{ ALL_GAMES.forEach(g=>{ CHARS_ALL[g]=(CHARS_ALL[g]||[]).filter(c=>!(c && c.alias)); }); CHARS_SEEN_AT={}; tickSoon(1500); }catch(e){} }   // «С чего начать» — только гостям: после входа прячем сразу, а не после перезагрузки
 function currentTag(){ return SESSION ? normTag(SESSION) : null; }
 function isOwner(c){ return !!(SESSION && c && c.owner && normTag(c.owner)===currentTag()); }
 /* Лист «под кодом» (старый, без владельца) правит только тот, кто ввёл код в этой вкладке (tryEditPlayer).
@@ -8378,7 +8463,7 @@ function openAuth(mode){
     <div class="field" id="au-f-tag"><label>Логин <span class="req">*</span></label>
       <input id="au-tag" maxlength="32" placeholder="login" autocapitalize="off" autocomplete="username" spellcheck="false"><div class="err">Логин: 4–32 символа — латиница, цифры или _</div></div>
     <div class="field" id="au-f-pass"><label>Пароль <span class="req">*</span></label>
-      <input id="au-pass" type="password" maxlength="100" autocomplete="${reg?'new-password':'current-password'}" onkeydown="if(event.key==='Enter')${reg?'doRegister()':'doLogin()'}"><div class="err">Минимум 4 символа</div></div>
+      <input id="au-pass" type="password" maxlength="100" autocomplete="${reg?'new-password':'current-password'}" onkeydown="if(event.key==='Enter')${reg?'doRegister()':'doLogin()'}"><div class="err">Минимум 8 символов</div></div>
     ${reg?`<div class="field" id="au-f-pass2"><label>Повторите пароль <span class="req">*</span></label>
       <input id="au-pass2" type="password" maxlength="100" autocomplete="new-password" onkeydown="if(event.key==='Enter')doRegister()"><div class="err">Пароли не совпадают</div></div>
     <label class="au-agree" id="au-f-agree"><input type="checkbox" id="au-agree"><span>Я ознакомлен(а) и согласен(на) с <button type="button" class="lnk" onclick="openPolicy(true)">политикой и условиями</button> и <button type="button" class="lnk" onclick="openTerms(true)">условиями платных игр</button>.</span></label>`:''}
@@ -8394,7 +8479,8 @@ async function doRegister(){
   const tag=normTag(pval('au-tag')), pass=(pf('au-pass')?.value||''), pass2=(pf('au-pass2')?.value||'');
   let ok=true;
   const badTag=!validTag(tag); pf('au-f-tag').classList.toggle('invalid', badTag); if(badTag) ok=false;
-  const shortP=pass.length<4; pf('au-f-pass').classList.toggle('invalid', shortP); if(shortP) ok=false;
+  // 8 — как и на сервере (GOTRUE_PASSWORD_MIN_LENGTH в push.sh): логины команды публичны, короткий пароль подбирается
+  const shortP=pass.length<8; pf('au-f-pass').classList.toggle('invalid', shortP); if(shortP) ok=false;
   const mism=pass!==pass2; if(pf('au-f-pass2')) pf('au-f-pass2').classList.toggle('invalid', mism); if(mism) ok=false;
   // согласие с условиями обязательно для регистрации
   const agreeBox=pf('au-agree'); const agreeRow=document.getElementById('au-f-agree');
@@ -8417,7 +8503,7 @@ async function doRegister(){
     if(si.error){ closeModal(); toast('Аккаунт создан. Выключите «Confirm email» в Supabase и войдите ('+si.error.message+')'); return; }
   }
   SESSION=tag; await sset(KEY_SESSION, SESSION, false);
-  if(!USERS.some(u=>normTag(u.tag)===tag)){ USERS.push({ tag, createdAt:Date.now() }); sset(KEY_USERS, USERS, true).catch(()=>{}); } // реестр логинов без паролей
+  usersRegister(tag);   // реестр логинов без паролей
   closeModal(); afterAuthChange(); toast('Аккаунт создан — вы вошли');
 }
 async function doLogin(){
@@ -8433,7 +8519,7 @@ async function doLogin(){
   }
   inlineDropForAuth().catch(()=>{});   // лист, открытый до входа, к новому аккаунту не относится
   SESSION=tag; await sset(KEY_SESSION, SESSION, false);
-  if(!USERS.some(u=>normTag(u.tag)===tag)){ USERS.push({ tag, createdAt:Date.now() }); sset(KEY_USERS, USERS, true).catch(()=>{}); }
+  usersRegister(tag);
   closeModal(); afterAuthChange(); toast('Вы вошли как '+dispTag(tag));
 }
 /* Смена аккаунта сворачивает открытый лист. Раньше он оставался в «Игроках» (и в памяти вкладки): на общем
@@ -8481,7 +8567,7 @@ async function persistCharsNow(retry){
         const cloud=await withTimeout(fetchCloudChars(keys), CLOUD_TMO);
         if(cloud){
           ALL_GAMES.forEach(g=>{
-            CHARS_ALL[g]=mergeChars(CHARS_ALL[g], cloud[g]);
+            CHARS_ALL[g]=mergeSheets(CHARS_ALL[g], cloud[g]);
             // надгробия старше 90 дней вычищаем — облако к этому времени везде синхронизировано
             CHARS_ALL[g]=CHARS_ALL[g].filter(c=>!(c && c.deleted && (Date.now()-(c.updatedAt||0))>90*864e5));
           });
@@ -8495,7 +8581,7 @@ async function persistCharsNow(retry){
         // Свои — и те, у кого владельца нет вовсе: это старые листы под кодом
         // доступа. Править их код разрешает (canEdit), а сохранять было некуда:
         // фильтр по тегу их вырезал, и правки жили только до перезагрузки.
-        mine[g]=(CHARS_ALL[g]||[]).filter(c=>{ if(!c) return false;
+        mine[g]=(CHARS_ALL[g]||[]).filter(c=>{ if(!c || c.alias) return false;   // alias — показ чужого листа с тем же id, не наш
           const o=normTag(c.owner||''); return !o || o===tag; });
       });
       mine.at=Date.now();   // штамп записи: по нему фоновый тик у других решает, перечитывать ли строку (fetchCloudCharsChanged)
@@ -8560,7 +8646,7 @@ async function cloudTickOnce(){
     if(ch && typeof ch==='object'){
       const fp=a=>(a||[]).map(c=>c&&(c.id+':'+(c.updatedAt||0))).join(',');   // отпечаток id:updatedAt (как в cloudRepull) вместо JSON.stringify всего массива
       ALL_GAMES.forEach(g=>{
-        const merged=mergeChars(CHARS_ALL[g], ch[g]);
+        const merged=mergeSheets(CHARS_ALL[g], ch[g]);
         if(fp(merged)!==fp(CHARS_ALL[g])){ CHARS_ALL[g]=merged; chChanged=true; }
       });
       charsSeen(ch);
@@ -11430,7 +11516,7 @@ function applyGameHero(){
   const o=HERO_EDITS[CUR_PROJECT]||{};
   const t=document.getElementById('heroTitle'), p=document.getElementById('heroText');
   if(t) t.textContent = o.title || g.title;
-  if(p) p.innerHTML = o.text || g.text;
+  if(p) p.innerHTML = sanitizeHTML(o.text || g.text);   // текст из облака (comik:hero:v1) — через санитайзер, как хроника
   const mh=document.querySelector('#view-news .masthead');
   if(mh){
     const hi=HERO_IMGS[CUR_PROJECT];
@@ -12466,7 +12552,7 @@ function restoreBackup(inp){
       const d=JSON.parse(r.result);
       if(d.format!=='comik-backup') { toast('Это не файл резервной копии КОМИК'); return; }
       ALL_GAMES.forEach(g=>{
-        if(d.chars && d.chars[g]) CHARS_ALL[g]=mergeChars(CHARS_ALL[g], d.chars[g]);
+        if(d.chars && d.chars[g]) CHARS_ALL[g]=mergeSheets(CHARS_ALL[g], d.chars[g]);
         if(d.archive && d.archive[g]) ARCHIVE_ALL[g]=mergeById(ARCHIVE_ALL[g], d.archive[g]);
       });
       if(Array.isArray(d.games)) gamesMergeRemote(d.games);   // тем же сливом, что облако: очистка, надгробия, записи по свежести
@@ -12823,7 +12909,7 @@ async function kvCasUpdate(key, mutate, tries){
   }
   throw lastErr||new Error('cas conflict');
 }
-function deepAssign(dst, patch){ for(const k in patch){ const v=patch[k];
+function deepAssign(dst, patch){ for(const k of Object.keys(patch||{})){ if(k==='__proto__'||k==='constructor'||k==='prototype') continue; const v=patch[k];
   if(v && typeof v==='object' && !Array.isArray(v) && dst[k] && typeof dst[k]==='object' && !Array.isArray(dst[k])) deepAssign(dst[k], v);
   else if(v===null) delete dst[k]; else dst[k]=v; } return dst; }
 /* патч одной карточки доски (по boardKey + trkCardKey); ds:null → снять спасброски.
@@ -12832,14 +12918,17 @@ function deepAssign(dst, patch){ for(const k in patch){ const v=patch[k];
    проверяется и локально, и на значении из облака перед CAS-записью */
 /* доска могла переехать на ключ «сеттинг::тег», пока правка ждала в очереди — идём по указателю.
    Возвращаем КЛЮЧ, на котором цепочка закончилась: по нему пишут и те, кто создаёт строку заново */
+// указатель пишет любой игрок (строка доски общая) — идём только по ключу вида «сеттинг::тег» и только по своим полям
+// объекта: указатель «__proto__» уводил запись ГМа в Object.prototype всей страницы
+const TRK_BOARD_KEY=/^[a-z0-9_-]{1,24}::[a-z0-9_]{1,40}$/;
 function trkFollowKey(v, boardKey){
   let k=boardKey, hop=0;
-  while(hop++<4){ const s=v&&v[k];
-    if(!(s && typeof s==='object' && !Array.isArray(s) && s.movedTo)) break;
+  while(hop++<4){ const s=v && Object.prototype.hasOwnProperty.call(v,k) ? v[k] : null;
+    if(!(s && typeof s==='object' && !Array.isArray(s) && typeof s.movedTo==='string' && TRK_BOARD_KEY.test(s.movedTo))) break;
     k=s.movedTo; }
   return k;
 }
-function trkFollow(v, boardKey){ return v && v[trkFollowKey(v, boardKey)]; }
+function trkFollow(v, boardKey){ const k=trkFollowKey(v, boardKey); return v && Object.prototype.hasOwnProperty.call(v,k) ? v[k] : undefined; }
 function trkCloudCardPatch(boardKey, cardKey, patch, when){
   const p=JSON.parse(JSON.stringify(patch||{}));
   trkWrite(v=>{ const s=trkFollow(v, boardKey); if(!s||!Array.isArray(s.list)) return;
@@ -12859,7 +12948,7 @@ function trkCondFlip(boardKey, cardKey, name, buff, on){
 /* глубокое слияние полей одной доски (позиция фишки, размер сетки, фон, журнал) */
 function trkCloudBoardMerge(boardKey, fields, key){
   const f=JSON.parse(JSON.stringify(fields||{}));
-  trkWrite(v=>{ const k=trkFollowKey(v, boardKey); let s=v[k];
+  trkWrite(v=>{ const k=trkFollowKey(v, boardKey); let s=Object.prototype.hasOwnProperty.call(v,k) ? v[k] : null;
     if(!s||typeof s!=='object'||Array.isArray(s)) s=v[k]={};
     deepAssign(s, f); s.at=Date.now(); }, key||null);
 }
@@ -13012,7 +13101,7 @@ async function trkPartyCatchup(force){
     let ready=fresh.filter(known);
     if(ready.length<fresh.length && supa){
       try{ const per=await withTimeout(fetchCloudChars(), CLOUD_TMO);
-        if(per){ ALL_GAMES.forEach(g=>{ CHARS_ALL[g]=mergeChars(CHARS_ALL[g], per[g]); }); charsSeen(per); bindGameData(); }
+        if(per){ ALL_GAMES.forEach(g=>{ CHARS_ALL[g]=mergeSheets(CHARS_ALL[g], per[g]); }); charsSeen(per); bindGameData(); }
       }catch(e){}
       ready=fresh.filter(known);
     }
@@ -14311,7 +14400,9 @@ function trkStageBind(){
   document.addEventListener('keydown', e=>{ if(e.key==='Escape' && TRK_V2_INS && document.getElementById('bv2Insp')) bv2Inspect(''); });
 })();
 /* карточка участника доски: фото фоном, затемнённый низ, имя + 3 стата (иниц/ХП/КД). ХП правится вводом */
-function cssUrl(u){ return String(u||'').replace(/["\\]/g,'').replace(/\)/g,'%29').replace(/\(/g,'%28').replace(/'/g,'%27'); }
+// результат всегда встаёт в атрибут style="…url('…')": «&» экранируем, иначе «&#39;» из чужой ссылки
+// браузер раскодировал бы в кавычку уже после этой чистки — и дописал бы в style что угодно
+function cssUrl(u){ return String(u||'').replace(/["\\]/g,'').replace(/\)/g,'%29').replace(/\(/g,'%28').replace(/'/g,'%27').replace(/&/g,'&amp;').replace(/</g,'%3C').replace(/>/g,'%3E'); }
 const SKULL_SVG='<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 2C7.6 2 4 5.6 4 10c0 2.3 1 4.3 2.6 5.7V18c0 1.1.9 2 2 2h.4v-1.8h1.2V20h3.6v-1.8h1.2V20h.4c1.1 0 2-.9 2-2v-2.3C19 14.3 20 12.3 20 10c0-4.4-3.6-8-8-8zM8.7 12.2A1.9 1.9 0 118.7 8.4a1.9 1.9 0 010 3.8zm6.6 0a1.9 1.9 0 110-3.8 1.9 1.9 0 010 3.8z"/></svg>';
 // карточка «противника» (монстр/NPC ГМа): её ХП и КД скрыты от игроков
 function isFoeCard(x){ if(!x) return false; if(x.foe===true) return true; if(x.foe===false) return false; return !x.charId; }
@@ -14849,7 +14940,7 @@ function trkRTSubscribe(){
           if(ch!==trkRT) return;                       // событие от уже заменённого канала
           // слишком большая строка (фон карты) → Realtime присылает событие без значения и с errors: дочитываем сами
           if((payload && Array.isArray(payload.errors) && payload.errors.length) || !payload || !payload.new || payload.new.value==null){ trkLiveCatchup(true); return; }
-          let v=payload.new.value; if(typeof v==='string') v=JSON.parse(v);
+          let v=payload.new.value; v=typeof v==='string' ? jsonSafe(v) : deproto(v);
           if(trkAdopt(v,'rt')) trkLiveApply();
         }catch(e){}
       })
