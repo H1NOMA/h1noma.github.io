@@ -62,11 +62,22 @@ function unzipStore(buf) {
 
   console.log('· гость: фото грузятся, когда попали на экран, второй заход — с устройства');
   {
+    // карточка, которую правили в облаке после выгрузки файлов сайта: её фото — только строкой облака
+    const rr = await rows(), lg = rr['comik:archive:v1'].legacy;
+    const edited = lg.find(x => x && /^kvimg:/.test(x.img || '') && !x.deleted), same = lg.find(x => x && /^kvimg:/.test(x.img || '') && !x.deleted && x !== edited);
+    edited.updatedAt = (edited.updatedAt || 0) + 1;
+    await mock('/__mock/rows', 'POST', Object.entries(rr).map(([key, value]) => ({ key, value })));
     const { ctx, page, errs } = await openPage(b, { viewport: PHONE, project: 'legacy' });
+    // та же карточка, что и в файлах сайта (id и время правки совпали) — фото файлом, облако не трогаем
     await mock('/__mock/log', 'DELETE');
-    await page.evaluate(() => { setProject('legacy'); go('world'); });
-    await page.waitForTimeout(500);
-    const card = await page.evaluate(() => { const c = ARCHIVE.find(x => x && /^kvimg:/.test(x.img || '')); if (!c) return null; openModal(c.id); return c.id; });
+    await page.evaluate(id => { setProject('legacy'); go('world'); openModal(id); }, same.id);
+    await page.waitForFunction(() => { const i = document.querySelector('#modal .dos-img img'); return i && (i.getAttribute('src') || '').length > 5; }, null, { timeout: 15000 }).catch(() => {});
+    const viaFile = await page.evaluate(() => { const i = document.querySelector('#modal .dos-img img'); return i ? (i.getAttribute('src') || '') : ''; });
+    const rowsAsked = (await mock('/__mock/log')).filter(x => /comik:img:/.test(x.key || '')).length;
+    check(/^img\/content\//.test(viaFile) && rowsAsked === 0, `фото, совпадающее с файлом сайта, — файлом (${viaFile.slice(0, 30)}), запросов в облако: ${rowsAsked}`);
+    await page.evaluate(() => closeModal());
+    await mock('/__mock/log', 'DELETE');
+    const card = await page.evaluate(id => { openModal(id); return id; }, edited.id);
     check(!!card, 'в LEGACY есть карточка с фото по ссылке');
     await page.waitForFunction(() => { const i = document.querySelector('#modal .dos-img img'); return i && /^data:image\//.test(i.getAttribute('src') || ''); }, null, { timeout: 15000 }).catch(() => {});
     const shown = await page.evaluate(() => { const i = document.querySelector('#modal .dos-img img'); return i ? (i.getAttribute('src') || '').slice(0, 15) : 'нет'; });

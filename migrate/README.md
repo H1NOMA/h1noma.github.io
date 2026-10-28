@@ -9,6 +9,8 @@
 | `push.sh check` | Только проверка защиты базы и входа, ничего не меняет (правила kv, включён ли RLS на `kv`/`devs`, запрет переименования строк, команда, настройки входа). | `bash <(curl -fsS https://komikdnd.ru/migrate/push.sh) check` |
 | `setup.sh` | Полная установка облака на чистый сервер (Docker, Supabase, те же миграции, Caddy); данные — из свежей копии в ветке `backups`, аккаунты — из `/root/auth-*.sql.gz`, ключи — из `/root/komik-env.backup`. Повторный запуск безопасен. | `bash <(curl -fsS https://komikdnd.ru/migrate/setup.sh)` |
 | `restore.sh` | Вернуть данные `kv` (всю таблицу или один ключ) из ежедневной копии; `accounts` — копия аккаунтов и состава команды в `/root`. | `bash <(curl -fsS https://komikdnd.ru/migrate/restore.sh)` — список дат |
+| `site.sh` | Сайт `komikdnd.ru` — с нашего сервера, а не с GitHub Pages (без VPN быстрее, файлы сжаты brotli): выкладка, обновление с GitHub раз в минуту, блок Caddy; подсказывает смену DNS и ждёт её. `check` — проверка, `off` — убрать. | `bash <(curl -fsS https://komikdnd.ru/migrate/site.sh)` |
+| `site-sync.sh` | То, что `site.sh` ставит в `/usr/local/bin/komik-site-sync`: забирает свежий `main`, сжимает, подменяет сайт одной операцией; раз в сутки чистит копии старше недели. | таймер `komik-site.timer` |
 | `harden.sh` | По желанию, один раз: fail2ban для SSH, автообновления безопасности, список открытых портов, как перейти на вход по ключу. | `bash <(curl -fsS https://komikdnd.ru/migrate/harden.sh)` |
 | `accounts.sh` | Перенос аккаунтов со старого облака supabase.co (история переезда; для нового сервера — `RESTORE.md`). | — |
 | `2026-09-21-rls.sql` | **Права записи в `kv` по ролям** (эта страница). | `push.sh` применяет сам |

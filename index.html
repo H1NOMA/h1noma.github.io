@@ -3795,7 +3795,7 @@ try{localStorage.removeItem('comik:ui:spgw');}catch(e){}</script>
   <div class="sp-fx2"></div>
   <div class="sp-vig"></div>
   <div class="sp-stage">
-    <img class="splash-logo" id="splashLogo" alt="КОМИК">
+    <img class="splash-logo" id="splashLogo" alt="КОМИК" crossorigin="anonymous">
     <div class="sp-slices" id="spSlices"></div>
     <div class="sp-pour"><i></i></div>
     <div class="sp-glint"><i></i></div>
@@ -4026,7 +4026,7 @@ if(/Android/i.test(navigator.userAgent||'')) d.classList.add('lite');}catch(e){}
 })();
 </script>
 <div id="logo-src" hidden aria-hidden="true" style="display:none"><a class="brand" href="#" onclick="rebootFX();return false;" aria-label="КОМИК — перезапуск системы">
-      <img class="komik" src="img/logo-komik.png" alt="КОМИК">
+      <img class="komik" src="img/logo-komik.png" alt="КОМИК" crossorigin="anonymous">
     </a></div>
 <div id="plogo-templates" hidden aria-hidden="true">
 <div class="plogo p-legacy" role="button" tabindex="0">
@@ -5333,10 +5333,22 @@ let IMG_T=null, IMG_PULLING=false, IMG_NOPERM=false, IMG_DB=null, IMG_IO=null, I
 const IMG_SEEN=new WeakSet();
 function imgRef(v){ const m=IMG_REF.exec(typeof v==='string'?v:''); return m?m[1]:''; }
 /* адрес для src/url(): ссылку kvimg — из уже скачанного (иначе пусто и сразу в очередь), остальное — как safeUrl */
-function imgSrc(v){ const h=imgRef(v); if(!h) return safeUrl(v); const u=IMG_URL.get(h); if(u) return u; imgWant(h); return ''; }
+function imgSrc(v){ const h=imgRef(v); if(!h) return safeUrl(v); const u=IMG_URL.get(h)||IMG_ALIAS.get(h); if(u) return u; imgWant(h); return ''; }
+/* Та же картинка лежит и файлом сайта: data/archive.json и data/news.json — выгрузка тех же карточек, где фото —
+   img/content/*. Карточка облака и карточка файла с одним id и одним временем правки — одна и та же, значит и фото
+   одно: показываем файл (он в кэше воркера и весит на треть меньше base64), а строку облака не качаем. Только в
+   памяти: в данных остаётся ссылка kvimg. Раньше первый экран качал фото новости дважды — файлом, а после ответа
+   облака ещё и строкой */
+const IMG_ALIAS=new Map();
+function imgAliasFrom(cloudList, fileList){
+  if(!Array.isArray(cloudList) || !Array.isArray(fileList)) return;
+  const byId=new Map(fileList.filter(e=>e && e.id).map(e=>[e.id, e]));
+  cloudList.forEach(c=>{ const h=imgRef(c && c.img); if(!h || IMG_ALIAS.has(h)) return; const e=byId.get(c.id);
+    if(e && typeof e.img==='string' && /^img\/content\/[\w.-]+$/.test(e.img) && (+e.updatedAt||0)===(+c.updatedAt||0)) IMG_ALIAS.set(h, e.img); });
+}
 /* <img> для разметки: нескачанная картинка остаётся без src и грузится, когда подъедет к экрану */
 function imgTag(v, attrs){
-  const h=imgRef(v), u=h?(IMG_URL.get(h)||''):safeUrl(v);
+  const h=imgRef(v), u=h?(IMG_URL.get(h)||IMG_ALIAS.get(h)||''):safeUrl(v);
   if(h && !u) imgScanSoon();
   return '<img'+(u?' src="'+esc(u)+'"':'')+(h?' data-kvimg="'+h+'"':'')+' '+(attrs==null?'alt=""':attrs)+'>';
 }
@@ -5346,7 +5358,7 @@ function imgScan(){
   if(!IMG_IO && 'IntersectionObserver' in window)
     IMG_IO=new IntersectionObserver(es=>es.forEach(e=>{ if(!e.isIntersecting) return; IMG_IO.unobserve(e.target); const h=e.target.getAttribute('data-kvimg'); if(h) imgWant(h); }), {rootMargin:'600px'});
   document.querySelectorAll('img[data-kvimg]:not([src])').forEach(el=>{
-    const h=el.getAttribute('data-kvimg'), u=IMG_URL.get(h);
+    const h=el.getAttribute('data-kvimg'), u=IMG_URL.get(h)||IMG_ALIAS.get(h);
     if(u){ el.src=u; return; }
     if(IMG_SEEN.has(el)) return; IMG_SEEN.add(el);
     if(IMG_IO) IMG_IO.observe(el); else imgWant(h);
@@ -5384,7 +5396,7 @@ function imgPut(h, u, store){
     if(v && v.classList.contains('active') && document.getElementById('trkBox') && typeof trkRedraw==='function') trkRedraw(true); }catch(e){} }, 150);
 }
 function imgWant(h){
-  if(!h || IMG_URL.has(h) || IMG_WANT.has(h)) return;
+  if(!h || IMG_URL.has(h) || IMG_ALIAS.has(h) || IMG_WANT.has(h)) return;
   const miss=IMG_MISS.get(h); if(miss && Date.now()-miss<60000) return;   // только что не нашли — облако не долбим
   IMG_WANT.add(h); if(!IMG_T) IMG_T=setTimeout(imgPull, 40);
 }
@@ -5720,6 +5732,7 @@ async function boot(){
     if(want!==CUR_PROJECT) setProject(want, true);
   }catch(e){ if(CUR_PROJECT!=='classic') setProject('classic', true); }
   let embN=null; try{ embN=await D.news; }catch(e){}
+  imgAliasFrom(nws, embN);
   // облако (со свежестью) в приоритете над файлом; надгробия глушат «воскрешение», старые чистим
   NEWS = mergeChars(nws||[], embN||[]).filter(n=>n && !(n.deleted && (Date.now()-(n.updatedAt||0))>90*864e5));
   if(BLOB_LOCAL[KEY_NEWS]) newsMergeIn(BLOB_LOCAL[KEY_NEWS]);
@@ -5727,6 +5740,7 @@ async function boot(){
   const coreIds=new Set(CORE.map(c=>c.id));
   let embA=null; try{ embA=await D.archive; }catch(e){}
   const arcMap=normGameMap(arc), embMap=normGameMap(embA), chMap=normGameMap(chars);
+  ALL_GAMES.forEach(g=>imgAliasFrom(arcMap[g], embMap[g]));
   ALL_GAMES.forEach(g=>{
     // миграция: карточки ядра, лежавшие раньше в пользовательских, выкидываем — они теперь в CORE
     const own = mergeChars(mergeById(arcMap[g], embMap[g]), ARCHIVE_ALL[g]).filter(c=>c && !coreIds.has(c.id));

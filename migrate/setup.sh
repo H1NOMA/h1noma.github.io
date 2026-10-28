@@ -376,4 +376,5 @@ elif [ -n "$ENV_NEW" ]; then
   echo "старый ключ — длинная строка, начинается с eyJ). Чтобы в следующий раз обойтись без этого — migrate/RESTORE.md."
 fi
 echo "Сохрани копии ключей и аккаунтов у себя на компьютере — migrate/RESTORE.md, раздел 1."
+echo "Сайт — с этого же сервера (быстро и без VPN): bash <(curl -fsS https://komikdnd.ru/migrate/site.sh)"
 echo "Проверить защиту базы и входа: bash <(curl -fsS https://komikdnd.ru/migrate/push.sh) check"

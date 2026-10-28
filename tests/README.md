@@ -27,3 +27,10 @@ node tests/offline.js    # второй заход без сети: воркер
 ```bash
 PGHOST=/путь/к/сокету PGPORT=55432 PGUSER=postgres bash tests/sql/run.sh
 ```
+
+Выкладка сайта на сервер (`migrate/site-sync.sh`) проверяется в песочнице — те же пути через переменные:
+
+```bash
+KOMIK_SITE_BASE=/tmp/s/lib KOMIK_SITE_LIVE=/tmp/s/www/komik KOMIK_SITE_SELF=/tmp/s/bin/komik-site-sync \
+KOMIK_SITE_NOPRUNE=1 bash migrate/site-sync.sh     # забирает main с GitHub, сжимает, подменяет ссылку
+```

@@ -8,7 +8,8 @@
 #    bash <(curl -fsS https://komikdnd.ru/migrate/restore.sh) /root/kv-before-restore-….json.gz [ключ] — отменить возврат
 #                                                           (без ключа — ВСЯ таблица, с ключом — только он)
 #    bash <(curl -fsS https://komikdnd.ru/migrate/restore.sh) accounts                  — копия аккаунтов и команды в /root
-#  Копии делает GitHub раз в сутки (~06:17 МСК) в ветку backups, хранятся около месяца.
+#  Копии делает GitHub раз в сутки (~06:17 МСК) в ветку backups, хранятся неделю (старше — удаляются).
+#  Копии на самом сервере (kv-before-restore-*, auth-*) тоже живут неделю; последняя копия аккаунтов — всегда.
 #  Строки из копии записываются поверх текущих; строк, которых в копии нет, скрипт не удаляет.
 #  Листы персонажей (comik:chars:<тег>) пишутся со свежей отметкой времени: иначе устройства игроков, где лист
 #  удалён или правился позже копии, по свежести снова перебили бы возвращённый лист.
@@ -26,6 +27,15 @@ ME="bash <(curl -fsS https://komikdnd.ru/migrate/restore.sh)"
 [ -f "$SB_DIR/.env" ] || { warn "нет $SB_DIR/.env — облако не установлено (сначала setup.sh)"; exit 1; }
 docker exec supabase-db pg_isready -q -h 127.0.0.1 -U postgres 2>/dev/null || { warn "база не отвечает: cd $SB_DIR && docker compose up -d"; exit 1; }
 WORK=$(mktemp -d); trap 'rm -rf "$WORK"' EXIT
+# копии на сервере храним неделю, как и ежедневные на GitHub: старше 7 дней — удаляем при каждом запуске.
+# Из копий аккаунтов последняя остаётся всегда — её берёт setup.sh при переезде
+prune_old(){ local f newest n=0
+  while IFS= read -r f; do rm -f "$f"; n=$((n + 1)); done < <(find /root -maxdepth 1 -name 'kv-before-restore-*.json.gz' -mtime +6)
+  newest=$(find /root -maxdepth 1 -name 'auth-*.sql.gz' -printf '%T@ %p\n' | sort -nr | head -n 1 | cut -d' ' -f2-)
+  while IFS= read -r f; do [ "$f" = "$newest" ] && continue; rm -f "$f"; n=$((n + 1)); done < <(find /root -maxdepth 1 -name 'auth-*.sql.gz' -mtime +6)
+  [ "$n" = 0 ] || echo "  удалено копий на сервере старше недели: $n"
+}
+prune_old
 A1="${1:-}"; A2="${2:-}"
 server_ip(){ local ip; ip=$(curl -s4 --max-time 5 ifconfig.me 2>/dev/null || true)
   [[ "$ip" =~ ^[0-9.]+$ ]] || ip=$(hostname -I 2>/dev/null | awk '{print $1}'); echo "${ip:-<IP-сервера>}"; }
