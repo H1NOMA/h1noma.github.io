@@ -4,7 +4,7 @@
 --
 --  Запуск:  docker exec -i supabase-db psql -v ON_ERROR_STOP=1 -U postgres -d postgres < migrate/2026-09-27-hardening.sql
 --       (push.sh применяет её сам на шаге 5/5 — последней, после 09-21, 09-25 и 09-26).
---  Идемпотентно. Верна и без предыдущих миграций, но push.sh и setup.sh каждый раз гонят все четыре —
+--  Идемпотентно. Верна и без предыдущих миграций, но push.sh и setup.sh каждый раз гонят все миграции —
 --  ОДНОЙ транзакцией (свои begin;/commit; у файлов снимаются, обёртка — одна на всех): 09-21/09-25/09-26
 --  пересоздают свои (более слабые) версии функций и политик, эта — возвращает строгие. Снаружи промежуточного
 --  состояния никто не видит, а ошибка в любом файле откатывает всё — база остаётся как была.
@@ -225,7 +225,8 @@ begin
   select string_agg(policyname, ', ' order by policyname) into odd from pg_policies
    where schemaname = 'public' and tablename = 'kv'
      and policyname not in ('kv_read', 'kv_write_dev', 'kv_write_player_ins', 'kv_write_player_upd',
-                            'kv_projects_owner_ins', 'kv_projects_owner_upd', 'kv_projects_owner_del');
+                            'kv_projects_owner_ins', 'kv_projects_owner_upd', 'kv_projects_owner_del',
+                            'kv_img_hash_ins', 'kv_img_hash_upd', 'kv_img_player_ins', 'kv_img_player_upd');   -- 10-28
   if odd is not null then raise warning 'Лишние правила на kv (разрешительное правило открывает запись всем — проверь): %', odd; end if;
 end
 $$;

@@ -4896,7 +4896,6 @@ const SOURCES={
   ERLW: {en:'Eberron: Rising from the Last War', ru:'«Эберрон: Возрождение после Последней войны»', cat:'сеттинг'},
   GGR:  {en:"Guildmasters' Guide to Ravnica", ru:'«Путеводитель гильдмастера по Равнике»', cat:'сеттинг'},
   MOT:  {en:'Mythic Odysseys of Theros', ru:'«Мифические одиссеи Тероса»', cat:'сеттинг'},
-  EGW:  {en:"Explorer's Guide to Wildemount", ru:'«Путеводитель исследователя по Дикогорью»', cat:'сеттинг'},
   AI:   {en:'Acquisitions Incorporated', ru:'«Приобретения Инкорпорейтед»', cat:'сеттинг'},
   SCC:  {en:'Strixhaven: A Curriculum of Chaos', ru:'«Стриксхейвен: Учебная программа хаоса»', cat:'сеттинг'},
   AAG:  {en:"Spelljammer: Astral Adventurer's Guide", ru:'«Спеллджаммер: Путеводитель астрального искателя»', cat:'сеттинг'},
@@ -5018,9 +5017,30 @@ function supaMake(){
   // No-op замок исключает и это зависание, и любую сериализацию/дедлок: signIn стартует мгновенно.
   const noLock = (name, acquireTimeout, fn) => fn();
   supa = window.supabase.createClient(SUPA_URL, SUPA_KEY, {
-    auth: { persistSession:true, autoRefreshToken:true, detectSessionInUrl:false, lock: noLock }
+    auth: { persistSession:true, autoRefreshToken:true, detectSessionInUrl:false, lock: noLock },
+    global: { fetch: cloudFetch }
   });
   return true;
+}
+/* Сервер облака временами не отвечает на новое соединение: 28.10 примерно каждое пятое рукопожатие
+   висело 10 с и рвалось (остальные — за секунду). Чтение (GET) повторяем: оно ничего не меняет.
+   Ответ без заголовков дольше 10 с считаем зависшим и пробуем заново; тело большого ответа это не
+   ограничивает (таймер снимается, как только пришли заголовки). Записи не повторяем — их судьбу
+   решают вызывающие (CAS доски, очередь листов, «дошлём, когда связь вернётся»). */
+function cloudFetch(input, init){
+  init=init||{};
+  const m=String(init.method||'GET').toUpperCase();
+  if(m!=='GET' && m!=='HEAD') return fetch(input, init);
+  const outer=init.signal;
+  const once=()=>{
+    const ac=new AbortController();
+    if(outer){ if(outer.aborted) ac.abort(); else outer.addEventListener('abort', ()=>ac.abort(), {once:true}); }
+    const t=setTimeout(()=>ac.abort(), 10000);
+    return fetch(input, Object.assign({}, init, {signal:ac.signal})).finally(()=>clearTimeout(t));
+  };
+  let n=0;
+  const go=()=>once().catch(e=>{ if(++n>2 || (outer && outer.aborted)) throw e; return new Promise(r=>setTimeout(r, 400*n)).then(go); });
+  return go();
 }
 /* Библиотека облака (supabase.js, ~180 КБ) грузится отдельным файлом. Раньше на неё давалось
    5 секунд, и на медленной мобильной сети приложение навсегда уходило в «работаем локально»:
@@ -5207,7 +5227,9 @@ async function fetchCloudCharsChanged(){
   if(!r) return null;
   if(r.error || !Array.isArray(r.data)) return fetchCloudChars();
   const keys=r.data.filter(x=>x && x.key && CHARS_SEEN_AT[x.key]!==(x.at==null?'':String(x.at))).map(x=>x.key);
-  return keys.length ? fetchCloudChars(keys) : null;
+  // ничего не менялось — пустая карта (зонд ответил), а не null (null — «облако не ответило»)
+  if(!keys.length){ const none=emptyGames(); Object.defineProperty(none, 'stamps', {value:{}}); return none; }
+  return fetchCloudChars(keys);
 }
 
 // облачные данные бывают тяжёлыми (архив/листы с картинками) — на телефоне 4 c мало и чтение
@@ -5294,6 +5316,153 @@ async function ssetLocal(key,val, shared=SHARED){
   if(hasLS){ try{ localStorage.setItem(key, JSON.stringify(val)); return true; }catch(e){ return false; } }
   if(hasStore){ try{ const r=await withTimeout(window.storage.set(key, JSON.stringify(val), shared)); return r!==undefined; }catch(e){ return false; } }
   mem[key]=val; return true;
+}
+
+/* ═══ Фото в облаке — отдельными строками comik:img:<хэш> ═══
+   Раньше фото карточек архива, новостей и портреты листов лежали base64 прямо в общих строках:
+   архив весил 5,9 МБ (98 % — картинки), и каждый посетитель качал его целиком на старте и при каждом
+   возврате на вкладку. На мобильной сети чтение не укладывалось в 15 с — свежие карточки не
+   показывались, а правки ГМа не уходили (запись ждёт удачного чтения). Теперь в карточке лежит ссылка
+   «kvimg:<хэш>», а картинка — в своей строке comik:img:<хэш>; хэш — SHA-256 от data:-адреса, сервер его
+   проверяет (миграция 10-28), поэтому подменить картинку под чужим хэшем нельзя. Качается картинка,
+   когда попала на экран, и одна и та же — один раз на устройство: копия лежит в IndexedDB. */
+const IMG_PREFIX='comik:img:', IMG_REF=/^kvimg:([0-9a-f]{32})$/, IMG_DATA=/^data:image\/(jpeg|png|webp|gif);base64,/;
+const IMG_MAX=1400000;   // сервер принимает строку до 1,5 МБ; больше — фото остаётся внутри, как раньше
+const IMG_URL=new Map(), IMG_WANT=new Set(), IMG_MISS=new Map(), IMG_UP=new Set();
+let IMG_T=null, IMG_PULLING=false, IMG_NOPERM=false, IMG_DB=null, IMG_IO=null, IMG_SCAN_T=null, IMG_AFTER_T=null;
+const IMG_SEEN=new WeakSet();
+function imgRef(v){ const m=IMG_REF.exec(typeof v==='string'?v:''); return m?m[1]:''; }
+/* адрес для src/url(): ссылку kvimg — из уже скачанного (иначе пусто и сразу в очередь), остальное — как safeUrl */
+function imgSrc(v){ const h=imgRef(v); if(!h) return safeUrl(v); const u=IMG_URL.get(h); if(u) return u; imgWant(h); return ''; }
+/* <img> для разметки: нескачанная картинка остаётся без src и грузится, когда подъедет к экрану */
+function imgTag(v, attrs){
+  const h=imgRef(v), u=h?(IMG_URL.get(h)||''):safeUrl(v);
+  if(h && !u) imgScanSoon();
+  return '<img'+(u?' src="'+esc(u)+'"':'')+(h?' data-kvimg="'+h+'"':'')+' '+(attrs==null?'alt=""':attrs)+'>';
+}
+function imgScanSoon(){ if(!IMG_SCAN_T) IMG_SCAN_T=setTimeout(imgScan, 0); }
+function imgScan(){
+  IMG_SCAN_T=null;
+  if(!IMG_IO && 'IntersectionObserver' in window)
+    IMG_IO=new IntersectionObserver(es=>es.forEach(e=>{ if(!e.isIntersecting) return; IMG_IO.unobserve(e.target); const h=e.target.getAttribute('data-kvimg'); if(h) imgWant(h); }), {rootMargin:'600px'});
+  document.querySelectorAll('img[data-kvimg]:not([src])').forEach(el=>{
+    const h=el.getAttribute('data-kvimg'), u=IMG_URL.get(h);
+    if(u){ el.src=u; return; }
+    if(IMG_SEEN.has(el)) return; IMG_SEEN.add(el);
+    if(IMG_IO) IMG_IO.observe(el); else imgWant(h);
+  });
+}
+async function imgHashOf(s){
+  try{ const b=await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
+    return [...new Uint8Array(b)].slice(0,16).map(x=>x.toString(16).padStart(2,'0')).join(''); }catch(e){ return ''; }
+}
+function imgDb(){
+  if(!IMG_DB) IMG_DB=new Promise(res=>{ try{ const rq=indexedDB.open('komik-img', 1);
+    rq.onupgradeneeded=()=>{ try{ rq.result.createObjectStore('img'); }catch(e){} };
+    rq.onsuccess=()=>res(rq.result); rq.onerror=()=>res(null); rq.onblocked=()=>res(null);
+  }catch(e){ res(null); } });
+  return IMG_DB;
+}
+async function imgDbGet(hs){
+  const out=new Map(); if(!hs.length) return out;
+  const db=await withTimeout(imgDb(), 3000); if(!db) return out;
+  await new Promise(res=>{ try{ const tx=db.transaction('img','readonly'), st=tx.objectStore('img');
+    hs.forEach(h=>{ const r=st.get(h); r.onsuccess=()=>{ if(typeof r.result==='string') out.set(h, r.result); }; });
+    tx.oncomplete=res; tx.onerror=res; tx.onabort=res;
+  }catch(e){ res(); } });
+  return out;
+}
+function imgDbPut(h,u){ imgDb().then(db=>{ if(db) try{ db.transaction('img','readwrite').objectStore('img').put(u, h); }catch(e){} }).catch(()=>{}); }
+/* картинка дошла: в память, на устройство, во все уже нарисованные <img>; доску (там фон через url()) — перерисовать */
+function imgPut(h, u, store){
+  if(!IMG_URL.has(h)) IMG_URL.set(h, u);
+  IMG_MISS.delete(h);
+  if(store) imgDbPut(h, u);
+  document.querySelectorAll('img[data-kvimg="'+h+'"]').forEach(el=>{ if(el.getAttribute('src')!==u) el.src=u; });
+  clearTimeout(IMG_AFTER_T);
+  IMG_AFTER_T=setTimeout(()=>{ try{ const v=document.getElementById('view-combat');
+    if(v && v.classList.contains('active') && document.getElementById('trkBox') && typeof trkRedraw==='function') trkRedraw(true); }catch(e){} }, 150);
+}
+function imgWant(h){
+  if(!h || IMG_URL.has(h) || IMG_WANT.has(h)) return;
+  const miss=IMG_MISS.get(h); if(miss && Date.now()-miss<60000) return;   // только что не нашли — облако не долбим
+  IMG_WANT.add(h); if(!IMG_T) IMG_T=setTimeout(imgPull, 40);
+}
+async function imgPull(){
+  IMG_T=null;
+  if(IMG_PULLING){ IMG_T=setTimeout(imgPull, 300); return; }
+  const want=[...IMG_WANT]; IMG_WANT.clear(); if(!want.length) return;
+  IMG_PULLING=true;
+  try{
+    const have=await imgDbGet(want);
+    have.forEach((u,h)=>imgPut(h, u, false));
+    const miss=want.filter(h=>!have.has(h));
+    if(miss.length && !supa){ miss.forEach(imgRetry); return; }
+    for(let i=0;i<miss.length;i+=4){   // по четыре: строка картинки — 100–500 КБ
+      const part=miss.slice(i,i+4), got=new Set();
+      let rows; try{ rows=await withTimeout(cloudGetKeys(part.map(h=>IMG_PREFIX+h)), 30000); }catch(e){ rows=undefined; }
+      if(Array.isArray(rows)) for(const r of rows){
+        const h=String((r&&r.key)||'').slice(IMG_PREFIX.length), v=r&&r.value;
+        if(!part.includes(h) || typeof v!=='string' || !IMG_DATA.test(v)) continue;
+        const hv=await imgHashOf(v); if(hv && hv!==h) continue;
+        imgPut(h, v, true); got.add(h);
+      }
+      // строки нет — минуту не просим; нет связи — повторим сами с растущей паузой
+      part.forEach(h=>{ if(got.has(h)) return; if(Array.isArray(rows)) IMG_MISS.set(h, Date.now()); else imgRetry(h); });
+    }
+  }catch(e){}
+  finally{ IMG_PULLING=false; }
+}
+const IMG_TRIES=new Map();
+function imgRetry(h){
+  const n=(IMG_TRIES.get(h)||0)+1; IMG_TRIES.set(h, n);
+  if(n<=5) setTimeout(()=>imgWant(h), 4000*n);
+}
+/* выгрузка: фото, лежащие внутри объектов (поле f), — в свои строки, в поле — ссылка. Строку пишет
+   команда, а после миграции 10-28 — и игрок (свои портреты). Не вышло (нет связи или прав) — фото
+   остаётся внутри, как раньше, и ничего не теряется. updatedAt не трогаем: содержимое то же */
+async function imgOffload(items){
+  if(!supa || IMG_NOPERM || !items.length) return 0;
+  const todo=[];
+  for(const it of items){ const v=it.o && it.o[it.f];
+    if(typeof v==='string' && v.length<=IMG_MAX && IMG_DATA.test(v)){ const h=await imgHashOf(v); if(h) todo.push({o:it.o, f:it.f, h, v}); } }
+  if(!todo.length) return 0;
+  const need=[...new Set(todo.map(t=>t.h))].filter(h=>!IMG_UP.has(h));
+  if(need.length){
+    let have=null;
+    try{ const r=await withTimeout(supa.from('kv').select('key').in('key', need.map(h=>IMG_PREFIX+h)), 10000);
+      if(r && !r.error && Array.isArray(r.data)) have=r.data; }catch(e){}
+    if(!have) return 0;
+    have.forEach(r=>IMG_UP.add(String(r.key).slice(IMG_PREFIX.length)));
+    for(const h of need){
+      if(IMG_UP.has(h)) continue;
+      if(await cloudSetOnly(IMG_PREFIX+h, todo.find(t=>t.h===h).v, true)) IMG_UP.add(h);
+      else { if(SSET_LAST_ERR==='noperm') IMG_NOPERM=true; break; }
+    }
+  }
+  let n=0;
+  todo.forEach(t=>{ if(!IMG_UP.has(t.h)) return; if(!IMG_URL.has(t.h)) imgPut(t.h, t.v, true); if(t.o[t.f]===t.v){ t.o[t.f]='kvimg:'+t.h; n++; } });
+  return n;
+}
+/* все картинки по ссылкам — для копий и выгрузок (резервная копия, zip для репозитория): из памяти, с устройства, из облака */
+async function imgResolveAll(hs){
+  hs=[...new Set(hs.filter(Boolean))];
+  const out=new Map(); hs.forEach(h=>{ const u=IMG_URL.get(h); if(u) out.set(h, u); });
+  let rest=hs.filter(h=>!out.has(h));
+  (await imgDbGet(rest)).forEach((u,h)=>out.set(h, u));
+  rest=rest.filter(h=>!out.has(h));
+  for(let i=0;i<rest.length && supa;i+=4){
+    let rows; try{ rows=await withTimeout(cloudGetKeys(rest.slice(i,i+4).map(h=>IMG_PREFIX+h)), 30000); }catch(e){}
+    (Array.isArray(rows)?rows:[]).forEach(r=>{ const h=String(r.key).slice(IMG_PREFIX.length); if(typeof r.value==='string' && IMG_DATA.test(r.value)){ out.set(h, r.value); imgPut(h, r.value, true); } });
+  }
+  return out;
+}
+/* ссылки kvimg внутри объекта (рекурсивно, по полям img/ava) */
+function imgRefsIn(o, acc){
+  acc=acc||[];
+  if(Array.isArray(o)) o.forEach(x=>imgRefsIn(x, acc));
+  else if(o && typeof o==='object') Object.keys(o).forEach(k=>{ const v=o[k]; if((k==='img'||k==='ava') && imgRef(v)) acc.push(imgRef(v)); else if(v && typeof v==='object') imgRefsIn(v, acc); });
+  return acc;
 }
 
 /* ====================== Состояние ====================== */
@@ -5528,7 +5697,8 @@ async function boot(){
   else if(pvis && typeof pvis==='object') projCfgApply(pvis, {force:true, boot:true});
   // диагностика синхронизации: видно в консоли браузера (F12 → Console). Если облако не читается —
   // supa:false ИЛИ значения null при живом supa → проблема со связью/доступом, а не с кодом.
-  try{ console.info('[КОМИК] облако', {supa:!!supa, архив:arc!=null, листы:chars!=null, новости:nws!=null, аккаунты:users!=null}); }catch(_){}
+  // (листы здесь не в счёт: их строки comik:chars:<тег> читаются ниже, отдельно)
+  try{ console.info('[КОМИК] облако', {supa:!!supa, архив:arc!=null, новости:nws!=null, аккаунты:users!=null}); }catch(_){}
   let bootMiss = !!supa && (arc==null || nws==null || users==null);   // что-то не дочиталось (тайм-аут) — дочитаем позже (см. ниже, после листов)
   await loadChronoEmbedded();
   if(chr) CHRONO_DATA = Object.assign(CHRONO_DATA, chr);
@@ -5714,6 +5884,43 @@ async function boot(){
   // чтения не дошли — ещё раз через 6 с (при удачном старте это было лишним полным чтением)
   cloudRepullBind();
   if(bootMiss) setTimeout(()=>cloudRepull('boot-safety'), 6000);
+  imgMigrateSoon();
+}
+async function imgMigrateRow(key){
+  let rows; try{ rows=await withTimeout(cloudGetKeys([key]), 30000); }catch(e){}
+  const v=Array.isArray(rows) && rows[0] && rows[0].value;
+  if(!v || typeof v!=='object' || Array.isArray(v)) return;
+  const items=[];
+  Object.keys(v).forEach(g=>{ if(Array.isArray(v[g])) v[g].forEach(c=>{ if(c && typeof c==='object' && typeof c.ava==='string' && IMG_DATA.test(c.ava)) items.push({o:c, f:'ava'}); }); });
+  if(!items.length || !(await imgOffload(items))) return;
+  let q=supa.from('kv').update({value:v}).eq('key', key);
+  q = v.at!=null ? q.eq('value->>at', String(v.at)) : q.is('value->>at', null);
+  try{ await withTimeout(q.select('key'), 20000); }catch(e){}
+}
+/* Старые фото (base64 внутри строк) — в отдельные строки comik:img:<хэш>, один раз за запуск, когда всё
+   дочитано: команда переносит фото архива, новостей и портреты из чужих строк листов, каждый вошедший — свои.
+   Строку перезаписываем, только если хоть одно фото действительно уехало (нет прав или связи — не трогаем) */
+let IMG_MIG_T=null;
+function imgMigrateSoon(ms){
+  clearTimeout(IMG_MIG_T);
+  IMG_MIG_T=setTimeout(async ()=>{
+    if(!supa || document.hidden){ imgMigrateSoon(); return; }
+    const inl=(o,f)=>o && typeof o[f]==='string' && IMG_DATA.test(o[f]);
+    try{
+      const tag=currentTag(), items=[];
+      if(isDev()){
+        if(await imgOffload(archImgItems().filter(it=>inl(it.o,'img')))) await persistArchive(true);
+        if(await imgOffload(newsImgItems().filter(it=>inl(it.o,'img')))) await persistNews(true);
+        // портреты в строках листов других игроков: команда пишет любую строку, но только условной записью
+        // (если строку за это время не меняли — штамп at тот же), иначе — в другой раз
+        const keys=new Set();
+        ALL_GAMES.forEach(g=>(CHARS_ALL[g]||[]).forEach(c=>{ const o=normTag((c&&c.owner)||''); if(c && !c.alias && o && o!==tag && validTag(o) && inl(c,'ava')) keys.add('comik:chars:'+o); }));
+        for(const k of keys) await imgMigrateRow(k);
+      }
+      if(tag) ALL_GAMES.forEach(g=>(CHARS_ALL[g]||[]).forEach(c=>{ if(c && !c.alias && normTag(c.owner||'')===tag && inl(c,'ava')) items.push({o:c, f:'ava'}); }));
+      if(items.length && await imgOffload(items)) await persistChars(true);
+    }catch(e){}
+  }, ms==null ? 25000 : ms);
 }
 /* Бестиарий (~7 МБ) парсится после первого рендера — сайт становится интерактивным раньше.
    Вызывается в начале boot(), до облачных запросов, поэтому монстры появляются даже если облако недоступно. */
@@ -6004,7 +6211,7 @@ function renderCardList(){
     const tags=(e.tags||[]).slice(0,2).map(t=>`<span class="tag">#${esc(t)}</span>`).join('');
     const bk=srcBookOf(e);
     return `<article class="card${e.img?' has-img':''}" tabindex="0" onclick="openModal('${e.id}')" onkeydown="if(event.key==='Enter')openModal('${e.id}')">
-      ${e.img?`<span class="cimg"><img src="${esc(safeUrl(e.img))}" alt="" loading="lazy" decoding="async"></span>`:''}
+      ${e.img?`<span class="cimg">${imgTag(e.img,'alt="" loading="lazy" decoding="async"')}</span>`:''}
       <div class="top">${cardIcon(e,20)}<span class="clabel">${esc((s||c).label)}</span>${isBookmarked(e.id)?'<span class="bm-mini" title="В закладках">⚑</span>':''}</div>
       <h3>${esc(e.title)}</h3>
       <div class="snip">${esc(e.body)}</div>
@@ -6256,7 +6463,7 @@ function openModal(id, overlay){
             ${e.kicker?`<div class="dos-kick">${esc(e.kicker)}</div>`:''}
             <h2>${esc(e.title)}</h2>
           </div>
-          ${e.img?`<span class="dos-img"><img src="${esc(safeUrl(e.img))}" alt=""></span>`:''}
+          ${e.img?`<span class="dos-img">${imgTag(e.img)}</span>`:''}
         </div>
         ${epi}
         ${rows?`<div class="dos-rows">${rows}</div>`:''}
@@ -6789,7 +6996,7 @@ function openCardEditor(id){
     <div class="field" id="ce-f-title"><label>Название <span class="req">*</span></label><input id="ce-title" maxlength="80" value="${e?esc(e.title):''}"><div class="err">Укажите название</div></div>
     <div class="field"><label>Изображение</label>
       <div class="ce-imgrow">
-        <span class="ce-thumb" id="ceThumb">${EDIT_IMG?`<img src="${esc(safeUrl(EDIT_IMG))}">`:''}</span>
+        <span class="ce-thumb" id="ceThumb">${EDIT_IMG?imgTag(EDIT_IMG,''):''}</span>
         <button class="btn ghost" onclick="document.getElementById('ceFile').click()">Выбрать</button>
         <button class="btn ghost" onclick="ceImgClear()">Убрать</button>
       </div>
@@ -6892,7 +7099,7 @@ function ceAddRow(k,v){
 function ceImgPick(inp){
   const f=inp.files&&inp.files[0]; if(!f) return;
   compressImage(f, 1000, 0.8).then(src=>{
-    EDIT_IMG=src; const t=document.getElementById('ceThumb'); if(t) t.innerHTML=`<img src="${esc(safeUrl(EDIT_IMG))}">`;
+    EDIT_IMG=src; const t=document.getElementById('ceThumb'); if(t) t.innerHTML=imgTag(EDIT_IMG,'');
   }).catch(()=>toast('⚠ Не удалось обработать фото'));
   inp.value='';
 }
@@ -6906,27 +7113,35 @@ const BLOB_PENDING=new Set();
 try{ (JSON.parse(localStorage.getItem('comik:blob:pending')||'[]')||[]).forEach(k=>BLOB_PENDING.add(k)); }catch(e){}
 function blobPendingSave(){ try{ BLOB_PENDING.size ? localStorage.setItem('comik:blob:pending', JSON.stringify([...BLOB_PENDING])) : localStorage.removeItem('comik:blob:pending'); }catch(e){} }
 let BLOB_TOLD=0;
-async function blobPersist(key, merge, value, quiet){
+/* Правка ложится на устройство и в «дослать» СРАЗУ, до чтения облака: на медленной сети это чтение долгое, и
+   закрытая за это время вкладка раньше теряла правку (на устройство она попадала только по тайм-ауту чтения).
+   Чтению — 45 с, а не 15: брошенное по тайм-ауту оно всё равно докачивалось в фоне, а тик запускал следующее */
+const BLOB_READ_TMO=45000, BLOB_BUSY=new Set();
+async function blobPersist(key, merge, value, quiet, prep){
   if(!supa) return sset(key, value(), true);
-  let remote;
-  try{ remote=await withTimeout(cloudGet(key), CLOUD_TMO); }catch(e){ remote=undefined; }
-  if(remote===undefined){
+  BLOB_BUSY.add(key);
+  try{
     await ssetLocal(key, value(), true);
     BLOB_PENDING.add(key); blobPendingSave();
-    if(!quiet && Date.now()-BLOB_TOLD>8000){ BLOB_TOLD=Date.now(); toast('⚠ Облако не ответило — сохранено на этом устройстве, отправим, когда связь вернётся'); }
-    return false;
-  }
-  if(remote!==null){ try{ merge(remote); }catch(e){} }
-  const ok=await sset(key, value(), true, quiet);
-  if(ok) BLOB_PENDING.delete(key); else if(SSET_LAST_ERR!=='noperm') BLOB_PENDING.add(key);
-  blobPendingSave();
-  return ok;
+    let remote;
+    try{ remote=await withTimeout(cloudGet(key), BLOB_READ_TMO); }catch(e){ remote=undefined; }
+    if(remote===undefined){
+      if(!quiet && Date.now()-BLOB_TOLD>8000){ BLOB_TOLD=Date.now(); toast('⚠ Облако не ответило — сохранено на этом устройстве, отправим, когда связь вернётся'); }
+      return false;
+    }
+    if(remote!==null){ try{ merge(remote); }catch(e){} }
+    if(prep){ try{ await prep(); }catch(e){} }   // фото — в свои строки (после слияния: и пришедшие из облака)
+    const ok=await sset(key, value(), true, quiet);
+    if(ok || SSET_LAST_ERR==='noperm') BLOB_PENDING.delete(key);   // нет прав — досылать нечего
+    blobPendingSave();
+    return ok;
+  }finally{ BLOB_BUSY.delete(key); }
 }
-/* дослать отложенные блобы (тик, возврат сети) */
+/* дослать отложенные блобы (тик, возврат сети); ключ, который как раз пишется, не трогаем */
 async function blobFlush(){
   if(!supa || !BLOB_PENDING.size) return;
   const fn={[KEY_ARCHIVE]:persistArchive, [KEY_NEWS]:persistNews, [KEY_CHRONO]:persistChrono, [KEY_COREOVER]:persistCoreOver, [KEY_CHRONO_GAMES]:persistChronoGames};
-  for(const k of [...BLOB_PENDING]){ if(fn[k]){ try{ await fn[k](true); }catch(e){} } else { BLOB_PENDING.delete(k); blobPendingSave(); } }
+  for(const k of [...BLOB_PENDING]){ if(BLOB_BUSY.has(k)) continue; if(fn[k]){ try{ await fn[k](true); }catch(e){} } else { BLOB_PENDING.delete(k); blobPendingSave(); } }
 }
 /* Своя неотправленная правка лежит в локальном зеркале ключа, а стартовое чтение облака это зеркало
    перезаписывает — поэтому для отложенных ключей зеркало читаем ДО облака, а после слияния
@@ -6947,15 +7162,18 @@ function archiveMergeIn(remote){
       .filter(c=>c && !coreIds.has(c.id) && !(c.deleted && (Date.now()-(c.updatedAt||0))>90*864e5));
   });
 }
+const archImgItems=()=>{ const out=[]; ALL_GAMES.forEach(g=>(ARCHIVE_ALL[g]||[]).forEach(c=>{ if(c && c.img) out.push({o:c, f:'img'}); })); return out; };
 async function persistArchive(quiet){
-  return blobPersist(KEY_ARCHIVE, archiveMergeIn, ()=>ARCHIVE_ALL, quiet);
+  return blobPersist(KEY_ARCHIVE, archiveMergeIn, ()=>ARCHIVE_ALL, quiet, ()=>imgOffload(archImgItems()));
 }
 /* ── Дозагрузка облачных данных после старта ──
    На десктопе первое чтение при загрузке иногда «отваливается» по таймауту (медленная/дёрганая
    первая связь с Supabase) → пользователь остаётся на локальном кэше и «не видит облако».
    Раньше повторной подкачки не было — данные обновлялись только полной перезагрузкой страницы.
    Теперь дотягиваем архив/листы/новости заново: при возврате на вкладку, при появлении сети и
-   один раз вскоре после старта. Слияние — по свежести (updatedAt) с надгробиями, локальное не теряем. */
+   один раз вскоре после старта. Слияние — по свежести (updatedAt) с надгробиями, локальное не теряем.
+   Листы — тем же зондом по штампам, что и фоновый тик: раньше каждый возврат на вкладку качал листы
+   ВСЕХ игроков с портретами (мегабайты на телефоне), хотя обычно не менялся ни один. */
 let CLOUD_REPULL_AT=0, CLOUD_REPULLING=false;
 async function cloudRepull(reason){
   if(!supa || CLOUD_REPULLING) return;
@@ -6965,7 +7183,7 @@ async function cloudRepull(reason){
     const [arc, nws, perUser] = await Promise.all([
       withTimeout(cloudGet(KEY_ARCHIVE), CLOUD_TMO),
       withTimeout(cloudGet(KEY_NEWS), CLOUD_TMO),
-      withTimeout(fetchCloudChars(), CLOUD_TMO)
+      withTimeout(fetchCloudCharsChanged(), CLOUD_TMO)
     ]);
     let changed=false;
     if(arc && typeof arc==='object'){
@@ -7025,8 +7243,9 @@ async function persistCoreOver(quiet){
 function newsMergeIn(remote){
   if(Array.isArray(remote)) NEWS = mergeChars(NEWS, remote).filter(n=>n && !(n.deleted && (Date.now()-(n.updatedAt||0))>90*864e5));
 }
+const newsImgItems=()=>NEWS.filter(n=>n && n.img).map(n=>({o:n, f:'img'}));
 async function persistNews(quiet){
-  return blobPersist(KEY_NEWS, newsMergeIn, ()=>NEWS, quiet);
+  return blobPersist(KEY_NEWS, newsMergeIn, ()=>NEWS, quiet, ()=>imgOffload(newsImgItems()));
 }
 /* Хронология — по-ключевое слияние: чужие правки подхватываем, свои (этой сессии) храним */
 const CHRONO_EDITED=new Set();
@@ -7211,7 +7430,7 @@ function renderNews(){
   if(!feed.length){ w.innerHTML=''; return; }   // без подсказки: пустая лента ничего не показывает
   w.innerHTML=feed.map(n=>`
     <article class="news-card" onclick="openNews('${n.id}')">
-      ${n.img?`<div class="nimg"><img src="${esc(safeUrl(n.img))}" alt=""></div>`:''}
+      ${n.img?`<div class="nimg">${imgTag(n.img)}</div>`:''}
       <div class="nbody">
         <h3>${esc(n.title)}</h3>
         ${n.body?`<p>${esc(n.body.length>150?n.body.slice(0,150)+'…':n.body)}</p>`:''}
@@ -7224,7 +7443,7 @@ function openNews(id){
   const m=document.getElementById('modal');
   m.innerHTML=`<button class="x" onclick="closeModal()">✕</button>
     <div class="news-full">
-      ${n.img?`<div class="nimg-full"><img src="${esc(safeUrl(n.img))}" alt=""></div>`:''}
+      ${n.img?`<div class="nimg-full">${imgTag(n.img)}</div>`:''}
       <div class="kicker" style="margin-bottom:6px">${fmtDate(n.date)}</div>
       <h2 style="font-family:var(--f-disp);color:var(--txt);line-height:1.25;margin-bottom:12px">${esc(n.title)}</h2>
       <div class="body" style="white-space:pre-wrap">${esc(n.body||'')}</div>
@@ -7243,7 +7462,7 @@ function openNewsEditor(id){
     <div class="field" id="nw-f-title"><label>Заголовок <span class="req">*</span></label><input id="nw-title" maxlength="120" value="${n?esc(n.title):''}"><div class="err">Укажите заголовок</div></div>
     <div class="field"><label>Фото</label>
       <div class="ce-imgrow">
-        <span class="ce-thumb" id="nwThumb">${NEWS_IMG?`<img src="${esc(safeUrl(NEWS_IMG))}">`:''}</span>
+        <span class="ce-thumb" id="nwThumb">${NEWS_IMG?imgTag(NEWS_IMG,''):''}</span>
         <button class="btn ghost" onclick="document.getElementById('nwFile').click()">Выбрать</button>
         <button class="btn ghost" onclick="nwImgClear()">Убрать</button>
       </div>
@@ -7263,7 +7482,7 @@ function openNewsEditor(id){
 function nwImgPick(inp){
   const f=inp.files&&inp.files[0]; if(!f) return;
   compressImage(f, 1280, 0.8).then(src=>{
-    NEWS_IMG=src; const t=document.getElementById('nwThumb'); if(t) t.innerHTML=`<img src="${esc(safeUrl(NEWS_IMG))}">`;
+    NEWS_IMG=src; const t=document.getElementById('nwThumb'); if(t) t.innerHTML=imgTag(NEWS_IMG,'');
   }).catch(()=>toast('⚠ Не удалось обработать фото'));
   inp.value='';
 }
@@ -7673,7 +7892,7 @@ function gsAvaHtml(p, i, sid){
   const photo=ch&&ch.ava;
   const {bg, ink}=gsColors(p);
   const initial=esc((p.name||p.tag||'?').charAt(0).toUpperCase());
-  return `<button class="gs-ava" onclick="gsPlayerInfo('${sid}',${i})" title="${esc(p.name||'участник')}"${photo?'':` style="background:${bg};color:${ink}"`}>${photo?`<img src="${esc(safeUrl(photo))}" alt="">`:initial}</button>`;
+  return `<button class="gs-ava" onclick="gsPlayerInfo('${sid}',${i})" title="${esc(p.name||'участник')}"${photo?'':` style="background:${bg};color:${ink}"`}>${photo?imgTag(photo):initial}</button>`;
 }
 function gsCardHtml(s, past){
   const left=seatsLeft(s), mine=myEntry(s), live=!!trkLiveBoardOfGame(s.id);
@@ -7784,7 +8003,7 @@ function gsPlayerInfo(sid, idx){
   const gm=canManageGame(s);
   document.getElementById('modal').innerHTML=`<button class="x" onclick="closeModal()" aria-label="Закрыть">✕</button>
     <div class="top">${rune('character',24)}<span class="clabel">Участник · ${esc(s.title||'сессия')}</span></div>
-    <div class="prof-av-big" style="background:${photo?'#12131a':bg};color:${ink};overflow:hidden;padding:0">${photo?`<img src="${esc(safeUrl(photo))}" alt="" style="width:100%;height:100%;object-fit:cover">`:initial}</div>
+    <div class="prof-av-big" style="background:${photo?'#12131a':bg};color:${ink};overflow:hidden;padding:0">${photo?imgTag(photo,'alt="" style="width:100%;height:100%;object-fit:cover"'):initial}</div>
     <h2 style="text-align:center;margin-bottom:10px">${esc(p.name||'Участник')}</h2>
     <div class="field"><label>Персонаж</label><input value="${esc(p.charName||'— без персонажа —')}" disabled></div>
     <div class="pacts">
@@ -8323,19 +8542,48 @@ async function exportSite(){
     // бестиарий живёт отдельным файлом core-bestiary.json и в выгрузку не входит —
     // правки Мастера по карточкам ядра хранятся отдельно, в CORE_OVER
     const coreMain=CORE.filter(c=>c.sub!=='bestiary' && !c.game);   // GW-затычки живут в коде, в выгрузку не идут
+    // фото архива и новостей (ссылки kvimg и base64) — отдельными файлами img/content/*, как они лежат
+    // в репозитории: внутри JSON их качал бы каждый посетитель на каждом старте
+    const arc=JSON.parse(JSON.stringify(ARCHIVE_ALL)), nws=JSON.parse(JSON.stringify(NEWS));
+    const items=[]; Object.keys(arc).forEach(g=>(Array.isArray(arc[g])?arc[g]:[]).forEach(c=>{ if(c && c.img) items.push(c); }));
+    nws.forEach(n=>{ if(n && n.img) items.push(n); });
+    const pics=await imgResolveAll(items.map(o=>imgRef(o.img)));
+    const files=[], named=new Map();
+    for(const o of items){
+      const h=imgRef(o.img), du=h ? (pics.get(h)||'') : (IMG_DATA.test(o.img) ? o.img : '');
+      if(!du) continue;   // уже файл img/content/… (или фото не скачалось — останется ссылкой на облако)
+      if(!named.has(du)){ const bytes=dataUrlBytes(du), name=await contentFileName(o.title, du, bytes); files.push({name, data:bytes}); named.set(du, name); }
+      o.img=named.get(du);
+    }
     const blob=zipStore([
       {name:'data/core.json',    data:J(coreMain)},
-      {name:'data/archive.json', data:J(ARCHIVE_ALL)},
-      {name:'data/news.json',    data:J(NEWS)},
+      {name:'data/archive.json', data:J(arc)},
+      {name:'data/news.json',    data:J(nws)},
       {name:'data/hero.json',    data:J(HERO_EDITS)},
       {name:'data/chrono.json',  data:J(CHRONO_DATA)},
+      ...files,
     ]);
     const a=document.createElement('a');
     a.href=URL.createObjectURL(blob); a.download='komik-data.zip';
     document.body.appendChild(a); a.click(); a.remove();
     clearDirty();
-    toast('Архив готов — распакуй в корень репозитория (папка data) и загрузи на GitHub');
+    toast('Архив готов — распакуй в корень репозитория (папки data и img/content) и загрузи на GitHub');
   }catch(e){ toast('⚠ Экспорт не удался'); }
+}
+function dataUrlBytes(du){
+  const raw=atob(du.slice(du.indexOf(',')+1)), u8=new Uint8Array(raw.length);
+  for(let i=0;i<raw.length;i++) u8[i]=raw.charCodeAt(i);
+  return u8;
+}
+/* имя файла фото в репозитории: транслит заголовка + 8 знаков SHA-1 содержимого (как у уже лежащих img/content/*) */
+const TRANSLIT={а:'a',б:'b',в:'v',г:'g',д:'d',е:'e',ё:'e',ж:'zh',з:'z',и:'i',й:'y',к:'k',л:'l',м:'m',н:'n',о:'o',п:'p',р:'r',с:'s',т:'t',у:'u',ф:'f',х:'h',ц:'c',ч:'ch',ш:'sh',щ:'shch',ъ:'',ы:'y',ь:'',э:'e',ю:'yu',я:'ya'};
+async function contentFileName(title, du, bytes){
+  const slug=[...String(title||'').toLowerCase()].map(ch=>TRANSLIT[ch]!=null?TRANSLIT[ch]:ch).join('')
+    .replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,40).replace(/-+$/,'') || 'img';
+  let h='';
+  try{ h=[...new Uint8Array(await crypto.subtle.digest('SHA-1', bytes))].slice(0,4).map(x=>x.toString(16).padStart(2,'0')).join(''); }catch(e){ h=String(Date.now()).slice(-8); }
+  const ext=({jpeg:'jpg',png:'png',webp:'webp',gif:'gif'})[(IMG_DATA.exec(du)||[])[1]]||'jpg';
+  return 'img/content/'+slug+'-'+h+'.'+ext;
 }
 
 /* ====================== Аккаунты (локальные, на устройстве) ====================== */
@@ -8602,6 +8850,8 @@ async function persistCharsNow(retry){
         mine[g]=(CHARS_ALL[g]||[]).filter(c=>{ if(!c || c.alias) return false;   // alias — показ чужого листа с тем же id, не наш
           const o=normTag(c.owner||''); return !o || o===tag; });
       });
+      // портреты — в свои строки comik:img:<хэш> (лист худеет, а у других он перечитывается без картинок)
+      try{ const items=[]; ALL_GAMES.forEach(g=>(mine[g]||[]).forEach(c=>{ if(c && c.ava) items.push({o:c, f:'ava'}); })); await imgOffload(items); }catch(e){}
       mine.at=Date.now();   // штамп записи: по нему фоновый тик у других решает, перечитывать ли строку (fetchCloudCharsChanged)
       const ok=await sset('comik:chars:'+tag, mine, true, !!retry);   // фоновая досылка — без тостов внутри sset
       CHARS_DIRTY=!ok;                                   // не дошло — дошлём при возврате сети / очередным фоновым тиком
@@ -8717,7 +8967,7 @@ function renderPlayers(){
       `<span class="pt-lock" title="${c.owner?('владелец '+esc(dispTag(c.owner))):'под кодом'}">🔒</span>`;
     const ph = (c.name||'?').trim().charAt(0).toUpperCase()||'?';
     return `<div class="ptile${isOwner(c)?' mine':''}" onclick="openInlineSheet('${esc(c.id)}', this)" title="${esc(c.name)}">
-      <div class="pt-ava">${c.ava?`<img src="${esc(safeUrl(c.ava))}" alt="">`:`<span class="pt-ph">${esc(ph)}</span>`}${lock}</div>
+      <div class="pt-ava">${c.ava?imgTag(c.ava):`<span class="pt-ph">${esc(ph)}</span>`}${lock}</div>
       <div class="pt-name">${esc(c.name)}</div>
       ${sub?`<div class="pt-sub">${sub}</div>`:''}
     </div>`;
@@ -9865,7 +10115,7 @@ function sheetAvaBlock(cur){
   AVA_TMP=cur||'';
   return `<div class="field"><label>Аватар</label>
     <div class="ava-row">
-      <span class="ava" id="avaPrev">${cur?`<img src="${esc(safeUrl(cur))}" alt="">`:'<span class="ava-ph">?</span>'}</span>
+      <span class="ava" id="avaPrev">${cur?imgTag(cur):'<span class="ava-ph">?</span>'}</span>
       <button type="button" class="btn ghost sm" onclick="document.getElementById('avaFile').click()">Фото</button>
       <button type="button" class="btn ghost sm" onclick="avaClear()">Убрать</button>
       <input type="file" id="avaFile" accept="image/*" hidden onchange="avaPick(this)">
@@ -10921,7 +11171,7 @@ function openPlayer(id){
   const raceCls=[originStr, [roleLabel(c), c.subcls?('('+c.subcls+')'):''].filter(Boolean).join(' ')].filter(Boolean).map(esc).join(' · ');
   const csTags=[c.bg?`<span class="cs-tag">${esc(c.bg)}</span>`:'', c.align?`<span class="cs-tag">${esc(c.align)}</span>`:''].filter(Boolean).join('');
   const headHtml=`<div class="cs-head">
-    <span class="cs-ava">${c.ava?`<img src="${esc(safeUrl(c.ava))}" alt="">`:'<span class="cs-ava-ph">?</span>'}</span>
+    <span class="cs-ava">${c.ava?imgTag(c.ava):'<span class="cs-ava-ph">?</span>'}</span>
     <div class="cs-idn"><h2 class="cs-name">${esc(c.name)}</h2>${raceCls?`<div class="cs-rc">${raceCls}</div>`:''}${csTags?`<div class="cs-tags">${csTags}</div>`:''}</div>
   </div>`;
   const lvlN=parseInt(c.level,10)||0;
@@ -12420,14 +12670,16 @@ function charToStandard(c, G){
   Object.keys(std).forEach(k=>{ const v=std[k]; if(v===''||v==null||(Array.isArray(v)&&!v.length)) delete std[k]; });
   return std;
 }
-function exportChar(id){
+async function exportChar(id){
   const c=findCharAny(id); if(!c){ toast('Персонаж не найден'); return; }
   const G=charGame(c);
   const clean=Object.assign({}, c); delete clean.codeHash;   // код доступа не выгружаем
+  // портрет по ссылке kvimg — саму картинку в файл: лист должен открываться где угодно, без нашего облака
+  const h=imgRef(clean.ava); if(h){ try{ clean.ava=(await imgResolveAll([h])).get(h)||''; }catch(e){ clean.ava=''; } }
   // верхний уровень — переносимые стандартные поля (для внешних сайтов); character — точная копия для КОМИК
   const data=Object.assign(
     { format:'comik-character', version:2, game:G, exportedAt:new Date().toISOString() },
-    charToStandard(c, G),
+    charToStandard(clean, G),
     { character:clean }
   );
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
@@ -12578,15 +12830,34 @@ function importCharFile(inp){
 }
 
 /* --- резервные копии --- */
-function downloadBackup(){
+async function downloadBackup(){
   const data={format:'comik-backup', version:1, at:new Date().toISOString(),
     chars:CHARS_ALL, games:GAMES, news:NEWS, archive:ARCHIVE_ALL, chrono:CHRONO_DATA, hero:HERO_EDITS, users:USERS, bmarks:BMARKS};
+  // фото по ссылкам kvimg (сами картинки лежат в облаке отдельными строками) — в копию: она должна
+  // подниматься и без облака
+  try{ const refs=imgRefsIn([CHARS_ALL, NEWS, ARCHIVE_ALL]);
+    if(refs.length){ const m=await imgResolveAll(refs); if(m.size) data.images=Object.fromEntries(m); } }catch(e){}
   const blob=new Blob([JSON.stringify(data)],{type:'application/json'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
   a.download='comik-backup-'+new Date().toISOString().slice(0,10)+'.json';
   a.click(); setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
   toast('Резервная копия скачана');
+}
+/* фото из копии: только настоящие картинки под своим хэшем — в кэш, а в объектах копии ссылку меняем обратно
+   на саму картинку (запись выгрузит её в облако заново, если там строки уже нет) */
+async function restoreImages(d){
+  const imgs=(d && d.images && typeof d.images==='object' && !Array.isArray(d.images)) ? d.images : null; if(!imgs) return;
+  const ok=new Map();
+  for(const h of Object.keys(imgs)){ const v=imgs[h];
+    if(!IMG_REF.test('kvimg:'+h) || typeof v!=='string' || !IMG_DATA.test(v)) continue;
+    const hv=await imgHashOf(v); if(hv && hv!==h) continue;
+    ok.set(h, v); imgPut(h, v, true);
+  }
+  const walk=o=>{ if(Array.isArray(o)) o.forEach(walk);
+    else if(o && typeof o==='object') Object.keys(o).forEach(k=>{ const v=o[k];
+      if((k==='img'||k==='ava') && ok.has(imgRef(v))) o[k]=ok.get(imgRef(v)); else if(v && typeof v==='object') walk(v); }); };
+  walk([d.chars, d.archive, d.news]);
 }
 function restoreBackup(inp){
   const f=inp.files && inp.files[0]; if(!f) return; inp.value='';
@@ -12595,6 +12866,7 @@ function restoreBackup(inp){
     try{
       const d=JSON.parse(r.result);
       if(d.format!=='comik-backup') { toast('Это не файл резервной копии КОМИК'); return; }
+      await restoreImages(d);
       ALL_GAMES.forEach(g=>{
         if(d.chars && d.chars[g]) CHARS_ALL[g]=mergeSheets(CHARS_ALL[g], d.chars[g]);
         if(d.archive && d.archive[g]) ARCHIVE_ALL[g]=mergeById(ARCHIVE_ALL[g], d.archive[g]);
@@ -12608,7 +12880,7 @@ function restoreBackup(inp){
       if(Array.isArray(d.bmarks)){ const has=new Set(BMARKS.map(b=>b&&(b.id+'|'+b.scope))); d.bmarks.forEach(b=>{ if(b && b.id && !has.has(b.id+'|'+b.scope)){ BMARKS.push(b); has.add(b.id+'|'+b.scope); } }); }
       bindGameData(); renderPlayers(); renderNews();
       // архив, хронологию и приветствия тоже сохраняем: слитые только в память, они пропадали при первой же синхронизации
-      await Promise.all([persistChars(), persistGames(), sset(KEY_NEWS, NEWS, true), sset(KEY_USERS, USERS, true),
+      await Promise.all([persistChars(), persistGames(), persistNews(), sset(KEY_USERS, USERS, true),
         persistArchive(), persistChrono(), sset(KEY_HERO, HERO_EDITS, true), sset(KEY_BM, BMARKS, false),
         (SESSION && supa) ? sset('comik:bm:'+currentTag(), BMARKS, true) : null]);
       toast('Копия восстановлена и слита с текущими данными');
@@ -12674,12 +12946,15 @@ function trkCardKey(x){ if(!x) return 'u:'; if(x.charId) return 'c:'+x.charId; i
    собирает у себя: из своего листа персонажа (по charId) или из бестиария по имени. */
 function trkAva(x, proj){
   if(!x) return '';
-  if(x.ava) return x.ava;
+  // ссылка kvimg — из уже скачанного: картинка дойдёт — imgPut перерисует доску
+  if(x.ava) return imgSrc(x.ava);
   const cid=x.charId||x.avaId;   // avaId — копия NPC-листа: своего листа у неё нет, фото берём у источника
-  if(cid){ const c=(CHARS_ALL[proj||CUR_PROJECT]||[]).find(k=>k && k.id===cid); if(c && c.ava) return c.ava; }
+  if(cid){ const c=(CHARS_ALL[proj||CUR_PROJECT]||[]).find(k=>k && k.id===cid); if(c && c.ava) return imgSrc(c.ava); }
   return beastImgByName(x.name);
 }
-function stripAva(x){ const o=Object.assign({}, x); delete o.ava; return o; }   // для отправки в облако
+// для отправки в облако: data:-адрес выкидываем (раздувал строку доски), а короткую ссылку kvimg:<хэш> или файл
+// сайта оставляем — иначе существо из архива, вернувшись с общего стола, теряло картинку (у игроков — всегда)
+function stripAva(x){ const o=Object.assign({}, x); if(!(imgRef(o.ava) || /^img\/[\w\/.-]+$/.test(o.ava||''))) delete o.ava; return o; }
 function trkMergedList(freshMap, list){
   const prev=TRK_SHARED[gmBoardKey()]||{};
   const m=freshMap||{}; if(!freshMap){ (Array.isArray(prev.list)?prev.list:[]).forEach(p=>{ if(p) m[trkCardKey(p)]=p; }); }

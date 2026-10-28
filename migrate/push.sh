@@ -64,12 +64,13 @@ verify(){
     bad "не смог прочитать правила таблицы kv — база не отвечает? (docker compose ps)"; OK=0
   else
     echo "  правила kv:${POL% }"
-    for p in kv_read kv_write_dev kv_write_player_ins kv_write_player_upd kv_projects_owner_ins kv_projects_owner_upd kv_projects_owner_del; do
+    for p in kv_read kv_write_dev kv_write_player_ins kv_write_player_upd kv_projects_owner_ins kv_projects_owner_upd kv_projects_owner_del \
+             kv_img_hash_ins kv_img_hash_upd kv_img_player_ins kv_img_player_upd; do
       if [[ "$POL" != *" $p "* ]]; then bad "нет правила $p"; OK=0; fi
     done
     if [[ "$POL" == *" kv_write "* ]]; then bad "ОСТАЛОСЬ старое правило kv_write: ЛЮБОЙ вошедший может переписать и стереть ЛЮБУЮ строку сайта!"; OK=0; fi
     if [[ "$POL" == *" kv_write_player "* ]]; then bad "осталось старое kv_write_player: игроки могут удалять общие строки и писать без ограничения размера"; OK=0; fi
-    EXTRA=""; X=" kv_read kv_write kv_write_player kv_write_dev kv_write_player_ins kv_write_player_upd kv_projects_owner_ins kv_projects_owner_upd kv_projects_owner_del "
+    EXTRA=""; X=" kv_read kv_write kv_write_player kv_write_dev kv_write_player_ins kv_write_player_upd kv_projects_owner_ins kv_projects_owner_upd kv_projects_owner_del kv_img_hash_ins kv_img_hash_upd kv_img_player_ins kv_img_player_upd "
     for p in $POL; do [[ "$X" == *" $p "* ]] || EXTRA="$EXTRA $p"; done
     if [ -n "$EXTRA" ]; then bad "лишние правила на kv:$EXTRA — они могут открыть запись всем, покажи программисту"; OK=0; fi
     # правила действуют, только пока RLS включён: «Disable RLS» в Studio открывает запись всем (права таблиц
@@ -245,12 +246,13 @@ say "5/5 · Защита аккаунтов и правил сайта"
 # Все миграции базы, строго по порядку, при каждом запуске (каждая идемпотентна):
 #   09-21 — права записи по ролям (снимает kv_write «любой пишет всё» и RPC в обход правил);
 #   09-25 — тег только с адреса @komikdnd.ru;  09-26 — comik:projects:v1 пишет только hinoma;
-#   09-27 — права команды у аккаунтов, игроки без удаления, переименования и с потолком размера, адрес не меняется.
-# 09-21..09-26 пересоздают свои (более мягкие) версии, 09-27 возвращает строгие — поэтому она последняя,
-# а применяем только если скачались ВСЕ четыре: иначе повторный запуск ослабил бы уже укреплённую базу.
+#   09-27 — права команды у аккаунтов, игроки без удаления, переименования и с потолком размера, адрес не меняется;
+#   10-28 — фото отдельными строками comik:img:<хэш> (сервер проверяет хэш, игрок пишет свои портреты).
+# 09-21..09-26 пересоздают свои (более мягкие) версии, 09-27 возвращает строгие — поэтому она после них,
+# а применяем только если скачались ВСЕ пять: иначе повторный запуск ослабил бы уже укреплённую базу.
 # И применяем ОДНОЙ транзакцией (mig_sql): снаружи мягкого промежуточного состояния никто не видит,
 # а сбой или Ctrl+C в любом месте откатывает всё — база остаётся как была.
-MIGS="2026-09-21-rls.sql 2026-09-25-email-domain.sql 2026-09-26-projects-owner.sql 2026-09-27-hardening.sql"
+MIGS="2026-09-21-rls.sql 2026-09-25-email-domain.sql 2026-09-26-projects-owner.sql 2026-09-27-hardening.sql 2026-10-28-images.sql"
 # скачанный файл годится, если он наш и целый: ровно одна строка «begin;» и одна «commit;» — последней
 # (обрезанный файл её не содержит; по этим строкам mig_sql и склеивает файлы в одну транзакцию)
 mig_ok(){ sed -i 's/\r$//' "$1" && grep -q 'комик\|КОМИК' "$1" && [ "$(grep -cx 'begin;' "$1")" = 1 ] \
@@ -284,7 +286,7 @@ done
 if [ -n "$MIG_ALL" ]; then
   # shellcheck disable=SC2086   # MIGS — список имён через пробел
   if apply_migs $MIGS; then
-    echo "  все четыре миграции применены ✓ (одной транзакцией: ${MIGS// / → })"
+    echo "  все пять миграций применены ✓ (одной транзакцией: ${MIGS// / → })"
   else
     warn "миграции НЕ применены — база осталась как была (транзакция откатилась). Пришли вывод выше программисту"
   fi
