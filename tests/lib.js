@@ -37,6 +37,8 @@ async function waitBoot(page) {
 
 async function login(page, tag, pass = 'password123') {
   await page.evaluate(() => openAuth('login'));
+  // openAuth через 60 мс ставит фокус в логин: если это случится посреди ввода пароля, пароль уедет в логин
+  await page.waitForFunction(() => document.activeElement && document.activeElement.id === 'au-tag', null, { timeout: 5000 });
   await page.fill('#au-tag', tag);
   await page.fill('#au-pass', pass);
   await page.evaluate(() => doLogin());

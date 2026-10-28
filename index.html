@@ -1857,8 +1857,6 @@
       var(--surface);
     border-color:rgba(150,125,85,.38)}
   [data-project="terra"] .card::after{content:"";position:absolute;top:0;right:0;width:20px;height:20px;background:radial-gradient(circle at 100% 0%, rgba(12,8,3,.85), rgba(60,38,14,.4) 55%, transparent 72%)}
-  [data-project="terra"] .news-card:nth-child(odd){transform:rotate(-.5deg)}
-  [data-project="terra"] .news-card:nth-child(even){transform:rotate(.5deg)}
   [data-project="terra"] .news-card:active{transform:scale(.985)}
   /* виньетка вместо граббера: его размер 38×5, сдвиг и неоновое свечение (.modal::before) сбрасываем,
      иначе от виньетки оставалась тёмная чёрточка в углу */
@@ -2389,6 +2387,27 @@
   .dice-fab:active{transform:scale(.9)}
   .dice-fab.show{display:flex}
   @media(min-width:880px){.dice-fab{display:none !important}}
+  /* ── формулы бросков (ГМ, «Доска ходов»): кнопка над кубом ── */
+  #fxBtn{display:none;right:12px;bottom:calc(12px + 58px + 12px + env(safe-area-inset-bottom))}
+  html.view-combat #fxBtn:not([hidden]){display:flex}
+  .mirror-ui #fxBtn{left:12px;right:auto}
+  @media(min-width:880px){
+    #fxBtn{right:var(--edge);bottom:calc(var(--edge) + var(--fabLift,0px) + 52px + 12px)}
+    html.pdock-on #fxBtn{bottom:calc(var(--edge) + var(--fabLift,0px) + var(--pdock-h) + 52px + 12px)}
+    .mirror-ui #fxBtn{left:calc(var(--rail-w,0px) + var(--fr));right:auto}
+  }
+  .fx-search{margin:0 0 10px}
+  .fx-search input{width:100%;padding:12px 14px;border-radius:var(--r-sm);background:var(--bg2);border:var(--hair) solid var(--line);color:var(--txt);
+    font-family:var(--f-body);font-size:16px;line-height:1.35;-webkit-appearance:none;appearance:none;transition:border-color .15s,box-shadow .15s}
+  .fx-search input:focus{outline:none;border-color:var(--red);box-shadow:0 0 0 3px rgba(var(--accent-rgb),.18)}
+  .fx-grp{margin:16px 0 6px;font-family:var(--f-mono);font-size:.64rem;letter-spacing:.14em;text-transform:uppercase;color:var(--red-ink)}
+  .fx-grp:first-of-type{margin-top:4px}
+  .fx-row{display:grid;grid-template-columns:minmax(0,38%) minmax(0,1fr);gap:4px 14px;padding:9px 0;border-bottom:1px dashed var(--line)}
+  .fx-n{font-weight:600;color:var(--txt);font-size:.9rem;line-height:1.35}
+  .fx-f{font-family:var(--f-mono);font-size:.8rem;line-height:1.5;color:var(--txt)}
+  .fx-d{grid-column:2;font-size:.8rem;line-height:1.45;color:var(--dim)}
+  .fx-empty{padding:28px 0;text-align:center;color:var(--muted);font-family:var(--f-mono);font-size:.8rem}
+  @media(max-width:520px){.fx-row{grid-template-columns:1fr}.fx-d{grid-column:1}}
   .p-skazki{background:linear-gradient(180deg,#151f36 0%,#12231a 42%,#08110a 100%);border:1px solid rgba(165,224,127,.35)}
   .p-skazki .pname{font-family:'Ruslan Display',Georgia,serif;font-weight:400;text-transform:none;letter-spacing:.05em;font-size:1.5rem;
     background-image:linear-gradient(180deg,#f4ffe0,#b8e58c 40%,#e7c164 82%,#a8752e);filter:drop-shadow(0 0 14px rgba(203,205,110,.5))}
@@ -2429,6 +2448,10 @@
   @keyframes rbSlice{0%{transform:translateY(0)}50%{transform:translateY(-24px) scaleY(1.7)}100%{transform:translateY(16px)}}
   .chrono-list{display:flex;flex-direction:column;gap:12px;max-width:680px}
   .chrono-list .plogo{min-height:112px}
+  /* на широком экране баннер растягивался до ~780 px при той же высоте, и арт обрезался совсем иначе, чем
+     на телефоне (лицо LEGACY срезано, у GALACTIC WAR — одно небо). Две колонки: каждый баннер — ширины
+     телефона, кадр арта тот же */
+  @media(min-width:640px){#view-chrono .chrono-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}}
   .chrono-branches{display:none;gap:10px;margin:-2px 0 4px}
   .chrono-branches.open{display:flex;animation:fade .18s}
   .chrono-branches .btn{flex:1;padding:13px 8px;font-size:.8rem}
@@ -3773,6 +3796,21 @@ html.is-web .app-cta:not([hidden]){display:flex}
 .iap-go{width:100%;padding:13px;border-radius:14px;border:0;cursor:pointer;font:inherit;font-weight:700;
   font-size:.95rem;background:var(--red);color:#12130f}
 .iap-go:active{opacity:.85}
+
+/* ═══ Cookie: плашка при первом заходе ═══ */
+.cookie-bar{position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:68;max-width:520px;margin:0 auto;
+  display:flex;align-items:center;gap:6px 10px;flex-wrap:wrap;padding:12px 12px 12px 15px;border-radius:var(--r-md);
+  background:var(--glass2);backdrop-filter:blur(24px) saturate(160%);-webkit-backdrop-filter:blur(24px) saturate(160%);
+  border:var(--hair) solid var(--line2);box-shadow:0 10px 30px rgba(0,0,0,.4);color:var(--txt);font-size:.86rem;line-height:1.4;
+  animation:cookieIn .32s var(--spring,cubic-bezier(.32,.72,0,1))}
+.cookie-bar span{flex:1 1 170px;min-width:0}
+.cookie-bar button{font:inherit;cursor:pointer;border-radius:12px;padding:8px 14px}
+.cookie-bar .cookie-lnk{background:none;border:0;color:var(--muted);text-decoration:underline;text-underline-offset:3px;padding:8px 4px}
+.cookie-bar .cookie-ok{border:0;background:var(--red);color:#12130f;font-weight:700}
+.cookie-bar.out{opacity:0;transform:translateY(12px);transition:opacity .24s,transform .24s}
+@keyframes cookieIn{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+@media(min-width:880px){.cookie-bar{left:auto;right:24px;bottom:24px;margin:0;max-width:430px}}
+@media print{.cookie-bar{display:none}}
 </style>
 </head>
 <body>
@@ -4344,6 +4382,9 @@ if(/Android/i.test(navigator.userAgent||'')) d.classList.add('lite');}catch(e){}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/><circle cx="12" cy="15.5" r="1.5" fill="currentColor" stroke="none"/></svg>
 </button>
 
+<button class="fab-side fx-fab" id="fxBtn" onclick="openFormulas()" aria-label="Формулы бросков" title="Формулы бросков" hidden>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M10 3.5L8 20.5M16.5 3.5l-2 17M4.5 9h16M3.5 15h16"/></svg>
+</button>
 <button class="dice-fab" id="diceBtn" onclick="toggleDice(event)" aria-label="Бросить куб">
   <svg class="fab-dice" viewBox="0 0 24 24"><path d="M12 2l8.7 5v10L12 22l-8.7-5V7L12 2z"/><path d="M12 2v4.6M3.3 7l8.7-.4 8.7.4M12 6.6L5.6 16.4h12.8L12 6.6M3.3 17l2.3-.6M20.7 17l-2.3-.6M12 22l-6.4-5.6M12 22l6.4-5.6"/></svg>
 </button>
@@ -6736,12 +6777,16 @@ function openPolicy(overlay){
       <p>Организация игр может оплачиваться. Договорённости об услуге и оплате происходят <b>вне сайта</b>. Оплата, если она есть, проходит напрямую выбранным способом; <b>платёжные реквизиты на сайте не вводятся и нами не хранятся</b>. Условия конкретной услуги согласуются с мастером до начала.</p>
       <h3>Пользовательский контент</h3>
       <p>Тексты, которые вы вводите, видны другим участникам. Не публикуйте личную информацию.</p>
+      <p>За содержание листов персонажей и других материалов, которые размещают игроки, отвечает разместивший их игрок. Администрация проекта не несёт ответственности за такие материалы, в том числе за экстремистские и антивоенные высказывания в листах игроков.</p>
+      <p><b>Администрация вправе удалить лист персонажа и аккаунт игрока, если игрок нарушает правила сайта.</b></p>
+      <h3>Cookie и хранилище браузера</h3>
+      <p>Сайт использует cookie и аналогичные технологии — локальное хранилище браузера, IndexedDB и кэш приложения. В них хранятся данные входа, ваши настройки, копии данных для работы без сети и уже загруженные изображения. Рекламных и аналитических cookie нет, третьим лицам эти данные не передаются. Отключить их можно в настройках браузера, но тогда вход и работа без сети будут недоступны.</p>
       <h3>Технические данные</h3>
-      <p>Рекламных трекеров нет. Для входа в браузере хранится токен сессии. Хостинг и облачный сервис могут фиксировать служебные логи в целях безопасности и работоспособности.</p>
+      <p>Рекламных трекеров нет. Хостинг и облачный сервис могут фиксировать служебные логи в целях безопасности и работоспособности.</p>
       <h3>Хранение и удаление</h3>
       <p>Данные хранятся в облачной базе проекта. Вы можете попросить удалить свой аккаунт и персонажей — напишите администратору в Telegram: <b>@HINOMA</b>.</p>
       <h3>Изменения</h3>
-      <p>Условия могут дополняться; актуальная версия — на этой странице.</p>
+      <p>Условия могут дополняться; актуальная версия — на этой странице. Редакция от 28 октября 2026 г.</p>
       <p class="muted" style="margin-top:14px">Продолжая пользоваться сайтом и создавая аккаунт, вы соглашаетесь с этими условиями.</p>
     </div>`;
   document.getElementById(overlay?'scrim2':'scrim').classList.add('open');
@@ -8310,6 +8355,7 @@ function updateDevUI(){
 }
 /* кнопка музыки видна только ГМ и только в разделе «Доска ходов» */
 function updateMusicBtn(){
+  if(typeof fxSync==='function') fxSync();   // формулы бросков — тоже кнопка «Доски ходов»
   const mb=document.getElementById('musicToggle'); if(!mb) return;
   const av=document.querySelector('.view.active'); const cur=av?av.id.replace('view-',''):'';
   mb.hidden = !(isDev() && cur==='combat');
@@ -8317,7 +8363,7 @@ function updateMusicBtn(){
 function adminSideFX(){
   const ab=document.getElementById('admBtn'); if(ab) ab.classList.toggle('on', ADMIN);
   applyView(); renderNews(); applyGameHero(); updateDirtyBadge(); renderPlayers();
-  updateDevUI();
+  updateDevUI(); fxSync();
 }
 function devToggleAdmin(){
   if(!isDev()) return;
@@ -12322,6 +12368,118 @@ const DICE_SHAPES={
   100:'<path d="M10.74 3.42 Q12.00 2.00 13.26 3.42 L19.74 10.78 Q21.00 12.20 19.71 13.60 L13.29 20.60 Q12.00 22.00 10.71 20.60 L4.29 13.60 Q3.00 12.20 4.26 10.78 Z"/>'
 };
 const CALC={4:0,6:0,8:0,10:0,12:0,20:0,100:0};
+/* ═══ Формулы бросков — шпаргалка Мастера на «Доске ходов» ═══
+   Строка: [название, формула, пояснение, скрытые теги]. Теги не показываются — по ним (и по всему видимому
+   тексту) ищет строка поиска: синонимы, сокращения, английские термины. Термины — как на ttg.club (D&D 5e). */
+const FX_DATA=[
+  ['Проверки и спасброски',[
+    ['Модификатор характеристики','(значение − 10) ÷ 2, вниз','8–9 → −1 · 10–11 → +0 · 12–13 → +1 · 14–15 → +2 · 16–17 → +3 · 18–19 → +4 · 20 → +5','мод модификатор ability modifier значение характеристики'],
+    ['Бонус мастерства','2 + (уровень − 1) ÷ 4, вниз','Уровни 1–4 +2 · 5–8 +3 · 9–12 +4 · 13–16 +5 · 17–20 +6. Существа по ПО: 0–4 +2 · 5–8 +3 · 9–12 +4 · 13–16 +5 · 17–20 +6 · 21–24 +7 · 25–28 +8 · 29–30 +9','бм proficiency bonus мастерство пб уровень опасности'],
+    ['Проверка характеристики','к20 + мод. характеристики (+ БМ при владении навыком)','Компетентность — удвоенный БМ. «Мастер на все руки» — +½ БМ (вниз) к проверкам без владения','check skill навык проверка навыка компетентность expertise jack of all trades бард'],
+    ['Спасбросок','к20 + мод. характеристики (+ БМ при владении)','Натуральные 1 и 20 у спасбросков и проверок ничего особого не значат','saving throw save спас'],
+    ['Пассивная проверка','10 + все модификаторы проверки','Преимущество +5, помеха −5. Пассивная Внимательность замечает скрытых существ и ловушки','passive perception пассивка внимательность восприятие проницательность анализ'],
+    ['Преимущество и помеха','2к20 — больший / меньший','Несколько источников не складываются; есть и то, и другое — обычный бросок','advantage disadvantage преим помеха 2d20'],
+    ['Групповая проверка','успех, если преуспела хотя бы половина','','group check группа отряд'],
+    ['Состязание','проверка против проверки','Ничья — всё остаётся как было','contest противостояние встречная проверка'],
+    ['Типичные Сл','5 · 10 · 15 · 20 · 25 · 30','Очень лёгкая · лёгкая · средняя · сложная · очень сложная · почти невозможная','сложность dc сл сложности задачи'],
+  ]],
+  ['Бой',[
+    ['Инициатива','к20 + мод. Ловкости','Ничья: ГМ решает за монстров, игроки — между собой','initiative порядок ходов'],
+    ['Атака оружием ближнего боя','к20 + мод. Силы + БМ (при владении)','Фехтовальное — Сила или Ловкость, на выбор','attack melee рукопашная атака бросок атаки finesse'],
+    ['Атака дальнобойным оружием','к20 + мод. Ловкости + БМ','Метательное — той же характеристикой, что и в ближнем бою. Цель в пределах 5 фт. от врага — помеха','ranged дальний бой лук арбалет метательное'],
+    ['Урон оружием','кость оружия + мод. той же характеристики','Вторая атака лёгким оружием (бой двумя оружиями) — без положительного модификатора','damage урон dmg two weapon fighting двуручный'],
+    ['Попадание','итог ≥ КД цели','Натуральная 20 — всегда попадание, натуральная 1 — всегда промах','hit попал ac кд промах'],
+    ['Критическое попадание','кости урона ×2, модификаторы ×1','Касается всех костей атаки: скрытая атака, божественная кара и т. п.','crit крит critical hit двадцатка natural 20'],
+    ['Удар без оружия','1 + мод. Силы, дробящий','К атаке — БМ (владеют все)','unarmed безоружный кулак удар'],
+    ['Укрытие','половинное +2 · три четверти +5','К КД и спасброскам Ловкости. Полное укрытие — нельзя выбрать целью','cover укрытие стена'],
+    ['Захват','Сила (Атлетика) против Силы (Атлетика) или Ловкости (Акробатика) цели','Вместо одной атаки; цель не больше вас на размер','grapple захват хватка схватить'],
+    ['Толчок','то же состязание','Сбить с ног или оттолкнуть на 5 фт.','shove толкнуть сбить с ног опрокинуть'],
+    ['Концентрация','спасбросок Телосложения, Сл = 10 или ½ урона (большее)','Каждый источник урона — отдельный спасбросок','concentration конц концентрация заклинание'],
+    ['Атаки толпы','к20, нужное для попадания → сколько атакующих на одно попадание','1–5 → 1 · 6–12 → 2 · 13–14 → 3 · 15–16 → 4 · 17–18 → 5 · 19 → 10 · 20 → 20','mob attacks толпа орда много монстров dmg'],
+  ]],
+  ['Класс доспеха',[
+    ['Без доспеха','10 + мод. Ловкости','','ac кд без брони'],
+    ['Лёгкий / средний / тяжёлый','КД доспеха + Лов · + Лов (макс. +2) · без Лов','Щит +2. Тяжёлый без нужной Силы — скорость −10 фт.','armor доспех броня латы кольчуга щит'],
+    ['Защита без доспехов','варвар 10 + Лов + Тел · монах 10 + Лов + Мдр','Варвар — можно со щитом','unarmored defense варвар монах'],
+    ['Доспехи мага','13 + мод. Ловкости','','mage armor доспех мага'],
+  ]],
+  ['Хиты, отдых и смерть',[
+    ['Хиты на 1 уровне','максимум кости хитов + мод. Телосложения','','hp хиты здоровье hit points первый уровень'],
+    ['Хиты за уровень','кость хитов (или среднее) + мод. Телосложения','Среднее: к6 → 4 · к8 → 5 · к10 → 6 · к12 → 7','level up повышение уровня кость хитов hit dice'],
+    ['Короткий отдых','потраченные кости хитов: кость + мод. Тел. каждая','Не меньше часа','short rest кор отдых'],
+    ['Продолжительный отдых','все хиты; ½ костей хитов (мин. 1)','8 часов, не чаще раза в 24 часа','long rest длинный отдых сон'],
+    ['Спасбросок от смерти','к20 без модификаторов: 10+ успех','1 — два провала, 20 — встаёт с 1 хитом. 3 успеха — стабилен, 3 провала — смерть','death save смерть умирающий 0 хитов'],
+    ['Урон при 0 хитов','провал спасброска от смерти','Критический — два провала. Остаток урона ≥ максимума хитов — мгновенная смерть','instant death мгновенная смерть'],
+    ['Стабилизация','Мудрость (Медицина), Сл 10','Стабильный через 1к4 часа получает 1 хит','stabilize медицина помощь уход за умирающим'],
+    ['Временные хиты','не складываются — берётся большее','Сначала тратятся они','temp hp врем хиты'],
+    ['Хиты монстра','число костей × среднее кости + число костей × мод. Тел.','Кость по размеру: Крошечный к4 · Маленький к6 · Средний к8 · Большой к10 · Огромный к12 · Громадный к20','monster hp хиты существа размер'],
+    ['Средний бросок кости','(грани + 1) ÷ 2','к4 2,5 · к6 3,5 · к8 4,5 · к10 5,5 · к12 6,5 · к20 10,5','average среднее матожидание'],
+  ]],
+  ['Магия',[
+    ['Сл спасброска от заклинания','8 + БМ + мод. базовой характеристики','Та же формула — у большинства умений существ и классов','spell save dc сложность заклинания'],
+    ['Атака заклинанием','к20 + БМ + мод. базовой характеристики','','spell attack атака заклинанием'],
+    ['Рассеивание / Контрзаклинание','проверка базовой характеристики, Сл 10 + уровень заклинания','Если ячейка ниже уровня заклинания цели','dispel counterspell рассеивание контр'],
+    ['Подготовленные заклинания','мод. характеристики + уровень класса (мин. 1)','Паладин, изобретатель — + ½ уровня (вниз)','prepared подготовка жрец друид волшебник паладин'],
+    ['Мультикласс: уровень заклинателя','полные + ½ паладин и следопыт + ⅓ мистический рыцарь и ловкач-маг','Половины и трети — вниз; изобретатель — ½ вверх. Магия договора колдуна — отдельно','multiclass ячейки мультикласс уровень заклинателя'],
+    ['Ритуал','+10 минут к времени накладывания','Ячейка не тратится; нужен признак «ритуал»','ritual ритуал'],
+    ['Усиление заговоров','на 5, 11 и 17 уровнях персонажа','','cantrip заговор скейл'],
+  ]],
+  ['Окружение и путешествия',[
+    ['Падение','1к6 дробящего за каждые 10 фт.','Максимум 20к6; приземляется ничком, если не избежал урона','fall falling падение высота'],
+    ['Прыжок в длину','значение Силы, фт. (с разбега 10 фт.)','С места — половина','long jump прыжок длина'],
+    ['Прыжок в высоту','3 + мод. Силы, фт. (с разбега 10 фт.)','С места — половина','high jump прыжок высота'],
+    ['Задержка дыхания','1 + мод. Тел. минут (мин. 30 секунд)','Потом удушье: мод. Тел. раундов (мин. 1), затем 0 хитов','breath удушье задыхается под водой'],
+    ['Грузоподъёмность','значение Силы × 15 фунтов','Толкать, тянуть, поднимать — × 30 (скорость 5 фт.). Размер: Крошечный ×½, Большой ×2, Огромный ×4, Громадный ×8','carry вес нагрузка груз'],
+    ['Темп путешествия','быстрый 30 миль/день · обычный 24 · медленный 18','Быстрый — −5 к пассивной Внимательности; медленный — можно скрытно','travel pace путешествие скорость миля'],
+    ['Форсированный марш','спасбросок Тел., Сл 10 + 1 за каждый час сверх 8','Провал — 1 степень истощения','forced march марш'],
+    ['Истощение','6 степеней','1 помеха на проверки · 2 скорость ×½ · 3 помеха на атаки и спасброски · 4 максимум хитов ×½ · 5 скорость 0 · 6 смерть. Продолжительный отдых снимает 1','exhaustion усталость истощение'],
+    ['Голод и жажда','без еды 3 + мод. Тел. дней (мин. 1)','Вода: 1 галлон в день (в жару — 2). Половина нормы — спасбросок Тел. Сл 15 от истощения, меньше половины — истощение без спасброска','food water еда вода голод жажда'],
+    ['Холод и жара','спасбросок Тел. каждый час','Мороз — Сл 10. Жара без воды — Сл 5 + 1 за каждый час. Провал — 1 степень истощения','cold heat мороз жара погода'],
+    ['Время','1 раунд = 6 секунд','10 раундов = 1 минута','round turn раунд время'],
+  ]],
+  ['Мастеру: ловушки, урон, встречи',[
+    ['Импровизированный урон','1к10 · 2к10 · 4к10 · 10к10 · 18к10 · 24к10','Угли, упавший шкаф · молния, костёр · обвал, чан кислоты · сдвигающиеся стены, лава вброд · погружение в лаву · вихрь на Плане Огня','improvised damage импровизация урон таблица dmg'],
+    ['Ловушка: Сл и атака','помеха 10–11 / +3–5 · опасная 12–15 / +6–8 · смертельная 16–20 / +9–12','Сл спасброска / бонус атаки по тяжести','trap ловушка сложность атака'],
+    ['Ловушка: урон по уровню','1–4: 1к10 / 2к10 / 4к10 · 5–10: 2к10 / 4к10 / 10к10','11–16: 4к10 / 10к10 / 18к10 · 17–20: 10к10 / 18к10 / 24к10 (помеха / опасная / смертельная)','trap damage урон ловушки'],
+    ['Сложность сражения','опыт монстров × множитель числа','1 ×1 · 2 ×1,5 · 3–6 ×2 · 7–10 ×2,5 · 11–14 ×3 · 15+ ×4. Сравнить с суммой порогов отряда','encounter xp опыт встреча баланс cr'],
+    ['Пороги опыта (на персонажа)','лёгкая / средняя / сложная / смертельная','1: 25/50/75/100 · 2: 50/100/150/200 · 3: 75/150/225/400 · 4: 125/250/375/500 · 5: 250/500/750/1100 · 6: 300/600/900/1400 · 7: 350/750/1100/1700 · 8: 450/900/1400/2100 · 9: 550/1100/1600/2400 · 10: 600/1200/1900/2800','xp thresholds пороги опыта уровень отряда'],
+    ['Пороги опыта, 11–20','лёгкая / средняя / сложная / смертельная','11: 800/1600/2400/3600 · 12: 1000/2000/3000/4500 · 13: 1100/2200/3400/5100 · 14: 1250/2500/3800/5700 · 15: 1400/2800/4300/6400 · 16: 1600/3200/4800/7200 · 17: 2000/3900/5900/8800 · 18: 2100/4200/6300/9500 · 19: 2400/4900/7300/10900 · 20: 2800/5700/8500/12700','xp thresholds пороги опыта'],
+    ['КД объекта','ткань 11 · стекло 13 · дерево, кость 15 · камень 17 · железо 19 · мифрил 21 · адамантин 23','','object ac предмет дверь сундук материал'],
+    ['Хиты объекта','хрупкий / прочный','Крошечный 2 (1к4) / 5 (2к4) · Маленький 3 (1к6) / 10 (3к6) · Средний 4 (1к8) / 18 (4к8) · Большой 5 (1к10) / 27 (5к10)','object hp хиты предмета сломать'],
+  ]],
+  ['Деньги',[
+    ['Курс монет','1 пм = 10 зм = 20 эм = 100 см = 1000 мм','','coins деньги монеты золото серебро медь платина электрум'],
+    ['Продажа снаряжения','половина цены','Самоцветы, произведения искусства, торговые товары — полная цена','sell продажа торговля'],
+  ]],
+];
+const fxNorm=s=>String(s||'').toLowerCase().replace(/ё/g,'е');
+function fxRows(q){
+  const words=fxNorm(q).split(/[\s,.;:]+/).filter(Boolean);
+  let html='', n=0;
+  FX_DATA.forEach(([grp, rows])=>{
+    const hit=rows.filter(r=>{ const hay=fxNorm(grp+' '+r.join(' ')); return words.every(w=>hay.includes(w)); });
+    if(!hit.length) return;
+    n+=hit.length;
+    html+=`<div class="fx-grp">${esc(grp)}</div>`+hit.map(([nm,f,d])=>`<div class="fx-row"><div class="fx-n">${esc(nm)}</div><div class="fx-f">${esc(f)}</div>${d?`<div class="fx-d">${esc(d)}</div>`:''}</div>`).join('');
+  });
+  return n ? html : '<div class="fx-empty">Ничего не найдено</div>';
+}
+function openFormulas(){
+  document.getElementById('modal').innerHTML=`
+    <button class="x" onclick="closeModal()" aria-label="Закрыть">✕</button>
+    <h2>Формулы бросков</h2>
+    <div class="fx-search"><input id="fxQ" type="search" placeholder="Поиск" autocomplete="off" spellcheck="false" oninput="fxFilter()"></div>
+    <div id="fxList">${fxRows('')}</div>`;
+  document.getElementById('scrim').classList.add('open');
+  if(!(window.matchMedia && matchMedia('(pointer:coarse)').matches)) setTimeout(()=>{ const i=document.getElementById('fxQ'); if(i) i.focus(); }, 60);
+}
+function fxFilter(){ const i=document.getElementById('fxQ'), l=document.getElementById('fxList'); if(i && l) l.innerHTML=fxRows(i.value); }
+/* кнопка — только Мастеру и только на «Доске ходов» */
+function fxSync(){
+  const b=document.getElementById('fxBtn'); if(!b) return;
+  const av=document.querySelector('.view.active');
+  b.hidden=!(typeof ADMIN!=='undefined' && ADMIN && av && av.id==='view-combat');
+}
 function toggleDice(e){ if(e) e.stopPropagation();
   const m=document.getElementById('diceMenu'), b=document.getElementById('diceBtn');
   const open=!m.classList.contains('open');
@@ -16416,6 +16574,24 @@ function preboot(){
 })();
 preboot();
 boot();
+
+/* ═══ Cookie: одна плашка при первом заходе, после заставки; согласие помним на устройстве ═══ */
+(function(){
+  const K='comik:cookies:ok';
+  try{ if(localStorage.getItem(K)) return; }catch(e){ return; }   // хранилища нет — согласие некуда записать, не дёргаем
+  function show(){
+    if(document.getElementById('cookieBar')) return;
+    const d=document.createElement('div'); d.id='cookieBar'; d.className='cookie-bar';
+    d.setAttribute('role','region'); d.setAttribute('aria-label','Cookie');
+    d.innerHTML='<span>Сайт использует cookie и хранилище браузера.</span>'+
+      '<button type="button" class="cookie-lnk">Подробнее</button><button type="button" class="cookie-ok">Принять</button>';
+    d.querySelector('.cookie-lnk').onclick=()=>openPolicy();
+    d.querySelector('.cookie-ok').onclick=()=>{ try{ localStorage.setItem(K, String(Date.now())); }catch(e){}
+      d.classList.add('out'); setTimeout(()=>d.remove(), 260); };
+    document.body.appendChild(d);
+  }
+  (function wait(){ if(document.getElementById('splash')) setTimeout(wait, 400); else setTimeout(show, 700); })();
+})();
 
 </script>
 
