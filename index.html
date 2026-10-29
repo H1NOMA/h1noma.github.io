@@ -7747,9 +7747,12 @@ function canonJson(v){
 // «то же самое» — с теми же правилами, что и запись (gamesPayload): надгробия старше GAME_TOMB_TTL не пишутся, живая копия
 // удалённой сессии — тоже. Иначе одно такое надгробие в облаке (сервер с 29.10 не даёт игроку его убрать) заставляло
 // переписывать строку по кругу и показывать «облако не ответило»
+// Порядок записавшихся не в счёт: сервер ставит пишущего последним, сайт — по времени записи
 const gamesCanon=arr=>{ const {live,gone,played}=gamesSplit(arr), cut=Date.now()-GAME_TOMB_TTL, g={};
   Object.keys(gone).forEach(id=>{ if(gone[id]>cut) g[id]=gone[id]; });
-  return canonJson({l:live.filter(x=>!gone[x.id]).sort((a,b)=>a.id<b.id?-1:1), g, p:played.filter(x=>g[x.id]).map(x=>x.id).sort()}); };
+  const byTag=(a,b)=>{ const x=normTag((a&&a.tag)||''), y=normTag((b&&b.tag)||''); return x<y?-1:x>y?1:0; };
+  return canonJson({l:live.filter(x=>!gone[x.id]).sort((a,b)=>a.id<b.id?-1:1).map(x=>({...x, players:(x.players||[]).slice().sort(byTag)})),
+    g, p:played.filter(x=>g[x.id]).map(x=>x.id).sort()}); };
 /* принять надгробия: помнить удаление, убрать сессию из списка, дописать историю своим персонажам */
 function gamesTakeGone(gone, played){
   Object.keys(gone||{}).forEach(id=>{ if((gone[id]||0)>(GAMES_GONE[id]||0)) GAMES_GONE[id]=gone[id]; });
@@ -7822,7 +7825,7 @@ async function persistGamesOnce(quiet){
   try{
     localOk = (await ssetLocal(KEY_GAMES, gamesPayload(), true))!==false;   // квота кончилась — сказать честно, см. SSET_NOWHERE
     if(!supa){ ok=true; }
-    else for(let i=0, lastRc=null;i<5 && !ok;i++){
+    else for(let i=0, lastRc=null, lastVc=null;i<5 && !ok;i++){
       let remote;
       try{ remote=await withTimeout(cloudGet(KEY_GAMES), 8000); }catch(e){ remote=undefined; }
       if(remote===undefined){ why='net'; break; }
@@ -7830,14 +7833,16 @@ async function persistGamesOnce(quiet){
       // игрок (не команда) с 29.10 меняет в облаке только своё — остальное сервер берёт из прежней строки. Записали,
       // а облако не сдвинулось ни на байт: такое сервер не примет никогда (место занято, время из будущего) — принимаем
       // облако, а не переписываем строку по кругу
+      // (принимаем, только если с прошлой записи на устройстве ничего не меняли: отмену, нажатую в эту секунду, не теряем)
       const rc=remote ? gamesCanon(remote) : null;
-      if(lastRc!==null && rc===lastRc && remote && !isDev()){ gamesAdopt(remote); ok=true; break; }
+      if(lastRc!==null && rc===lastRc && remote && !isDev() && gamesCanon(gamesPayload())===lastVc){ gamesAdopt(remote); ok=true; break; }
       lastRc=rc;
       gamesMergeRemote(remote||[]);
-      const val=gamesPayload();
-      if(remote && rc===gamesCanon(val)){ ok=true; break; }   // облако уже такое, как надо
+      const val=gamesPayload(), vc=gamesCanon(val);   // отпечаток — до записи: отмена/запись меняют те же объекты
+      if(remote && rc===vc){ ok=true; break; }   // облако уже такое, как надо
       const w=await sset(KEY_GAMES, val, true, true);
       if(!w){ why=SSET_LAST_ERR||'net'; break; }
+      lastVc=vc;
       // перечитаем на следующем круге: если кто-то писал одновременно, сольём и его правку
       await new Promise(r=>setTimeout(r, 150+Math.random()*350));
     }

@@ -117,6 +117,14 @@ const { launch, openPage, login, mock, rows, check, done } = require('./lib');
     st = await page.evaluate(() => ({ dirty: GAMES_DIRTY }));
     const cl = ((await rows())['comik:games:v1'] || []).find(x => x.id === 'gs5').players.find(p => p.tag === 'testplayer');
     check(!st.dirty && (await writes()) <= 2 && cl.upd < Date.now() + day, `часы спешат: ${await writes()} записи, в облаке время не из будущего, не «грязный»`);
+    await mock('/__mock/log', 'DELETE');
+    // и отменяет запись с тех же «спешащих» часов
+    await page.evaluate(day => { const s = GAMES.find(x => x.id === 'gs5'); s.players = s.players.filter(p => p.tag !== 'testplayer');
+      s.gone = Object.assign({}, s.gone, { testplayer: Date.now() + 3 * day }); return persistGames(); }, day);
+    await page.waitForTimeout(1500);
+    st = await page.evaluate(() => ({ dirty: GAMES_DIRTY }));
+    const g5 = ((await rows())['comik:games:v1'] || []).find(x => x.id === 'gs5');
+    check(!st.dirty && (await writes()) <= 2 && !g5.players.some(p => p.tag === 'testplayer'), `часы спешат, отмена: ${await writes()} записи, снят, не «грязный»`);
     check(errs.length === 0, 'ошибок в консоли нет' + (errs.length ? '\n    ' + errs.slice(0, 5).join('\n    ') : ''));
     await ctx.close();
   }

@@ -127,8 +127,15 @@ begin
     gone_o := coalesce(public.komik_num(case when jsonb_typeof(s->'gone') = 'object' then s->'gone'->me end), 0);
     gone_n := public.komik_num(case when jsonb_typeof(ns->'gone') = 'object' then ns->'gone'->me end);
     fresh_was := greatest(coalesce(public.komik_num(was->'upd'), 0), coalesce(public.komik_num(was->'at'), 0));
-    -- отметка снятия «из будущего» (часы устройства спешат) — считаем её «сейчас», если запись старше
-    if gone_n is not null and gone_n > now_ms + day then gone_n := case when fresh_was < now_ms then now_ms end; end if;
+    -- отметка снятия «из будущего» (часы устройства спешат): если та же запись несёт свою запись новее отметки (записался
+    -- снова после отмены) — отметку не берём; иначе ставим её сразу после прежней записи. Никогда не «сейчас»: повторная
+    -- запись сайта не должна менять строку, иначе он переписывает её по кругу (и бьёт свою запись с другого устройства)
+    if gone_n is not null and gone_n > now_ms + day then
+      gone_n := case
+        when mine is not null and greatest(coalesce(public.komik_num(mine->'upd'), 0), coalesce(public.komik_num(mine->'at'), 0)) > gone_n then null
+        when was is not null and fresh_was < now_ms then greatest(gone_o, fresh_was + 1)
+      end;
+    end if;
     if mine is not null then
       mine := komik_priv.komik_san_entry(mine, me);
       -- время правки «из будущего» — прежнее время своей записи (или «сейчас» у новой): не меняется от записи к записи,
