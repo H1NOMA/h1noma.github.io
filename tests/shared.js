@@ -94,6 +94,33 @@ const { launch, openPage, login, mock, rows, check, done } = require('./lib');
     await ctx.close();
   }
 
+  console.log('· расписание: сервер выправил свою запись (старый формат, часы спешат) — сайт не переписывает по кругу');
+  {
+    const day = 864e5, t = Date.now();
+    const r = await rows();
+    r['comik:games:v1'] = (r['comik:games:v1'] || []).filter(x => !['gs4', 'gs5'].includes(x.id)).concat([
+      { id: 'gs4', game: 'classic', title: 'Старая запись', seats: 5, createdAt: t - 9 * day, updatedAt: t - 9 * day,
+        players: [{ tag: 'testplayer', name: 'Тест', at: t - 8 * day, upd: t - 8 * day }] },   // без charId — как писали раньше
+      { id: 'gs5', game: 'classic', title: 'Новая', seats: 5, createdAt: t - day, updatedAt: t - day, players: [] }]);
+    await mock('/__mock/rows', 'POST', Object.entries(r).map(([key, value]) => ({ key, value })));
+    const { page, ctx, errs } = await page2('testplayer');
+    const writes = async () => (await mock('/__mock/log')).filter(x => x.key === 'comik:games:v1' && x.method !== 'GET').length;
+    await mock('/__mock/log', 'DELETE');
+    await page.evaluate(() => { openSignupForm('gs5'); }); await page.evaluate(() => doSignup('gs5'));
+    await page.waitForTimeout(1500);
+    let st = await page.evaluate(() => ({ dirty: GAMES_DIRTY, cid: JSON.stringify(((GAMES.find(s => s.id === 'gs4') || {}).players || [])[0] || {}) }));
+    check(!st.dirty && (await writes()) <= 2, `запись на новую игру при старой записи без charId: ${await writes()} записи, не «грязный»`);
+    await mock('/__mock/log', 'DELETE');
+    // часы устройства спешат на трое суток: сервер обрежет время записи
+    await page.evaluate(day => { const s = GAMES.find(x => x.id === 'gs5'); const me = s.players.find(p => p.tag === 'testplayer'); me.upd = Date.now() + 3 * day; me.name = 'Тест 2'; return persistGames(); }, day);
+    await page.waitForTimeout(1500);
+    st = await page.evaluate(() => ({ dirty: GAMES_DIRTY }));
+    const cl = ((await rows())['comik:games:v1'] || []).find(x => x.id === 'gs5').players.find(p => p.tag === 'testplayer');
+    check(!st.dirty && (await writes()) <= 2 && cl.upd < Date.now() + day, `часы спешат: ${await writes()} записи, в облаке время не из будущего, не «грязный»`);
+    check(errs.length === 0, 'ошибок в консоли нет' + (errs.length ? '\n    ' + errs.slice(0, 5).join('\n    ') : ''));
+    await ctx.close();
+  }
+
   await mock('/__mock/rows', 'POST', seed);
   await b.close();
   done();

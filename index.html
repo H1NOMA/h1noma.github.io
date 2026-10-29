@@ -7718,7 +7718,10 @@ function gameMergeInto(mine, r, cloudPl){
   const gone=Object.assign({}, mine.gone||{});
   Object.keys(r.gone||{}).forEach(t=>{ if((r.gone[t]||0)>(gone[t]||0)) gone[t]=r.gone[t]; });
   const seen=new Map();
-  (mine.players||[]).concat(r.players||[]).forEach(p=>{
+  // при равной свежести побеждает копия из облака: сервер с 29.10 сам выправляет запись игрока (место в очереди — прежнее,
+  // пустой charId), и своя копия, отличаясь только этим, вечно не совпадала бы с облаком
+  const fromCloud=!!cloudPl && cloudPl===r.players;
+  (fromCloud ? (r.players||[]).concat(mine.players||[]) : (mine.players||[]).concat(r.players||[])).forEach(p=>{
     if(!p || !p.tag) return;
     const k=normTag(p.tag), cur=seen.get(k);
     if(!cur || gameFresh(p)>gameFresh(cur)) seen.set(k, p);
@@ -7833,14 +7836,20 @@ async function persistGamesOnce(quiet){
   try{
     localOk = (await ssetLocal(KEY_GAMES, gamesPayload(), true))!==false;   // квота кончилась — сказать честно, см. SSET_NOWHERE
     if(!supa){ ok=true; }
-    else for(let i=0;i<5 && !ok;i++){
+    else for(let i=0, lastRc=null;i<5 && !ok;i++){
       let remote;
       try{ remote=await withTimeout(cloudGet(KEY_GAMES), 8000); }catch(e){ remote=undefined; }
       if(remote===undefined){ why='net'; break; }
       if(remote!==null && !Array.isArray(remote)){ why='format'; break; }
+      // игрок (не команда) с 29.10 меняет в облаке только своё — остальное сервер берёт из прежней строки. Записали,
+      // а облако не сдвинулось ни на байт: такое сервер не примет никогда (место занято, время из будущего) — принимаем
+      // облако, а не переписываем строку по кругу
+      const rc=remote ? gamesCanon(remote) : null;
+      if(lastRc!==null && rc===lastRc && remote && !isDev()){ gamesAdopt(remote); ok=true; break; }
+      lastRc=rc;
       gamesMergeRemote(remote||[]);
       const val=gamesPayload();
-      if(remote && gamesCanon(remote)===gamesCanon(val)){ ok=true; break; }   // облако уже такое, как надо
+      if(remote && rc===gamesCanon(val)){ ok=true; break; }   // облако уже такое, как надо
       const w=await sset(KEY_GAMES, val, true, true);
       if(!w){ why=SSET_LAST_ERR||'net'; break; }
       // перечитаем на следующем круге: если кто-то писал одновременно, сольём и его правку

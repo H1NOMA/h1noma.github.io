@@ -477,16 +477,20 @@ if [ -n "$BK_OK" ]; then
   install -m 755 -o root -g root "$BK_TMP" /usr/local/bin/komik-backup
   /usr/local/bin/komik-backup init
   # переход на шифрование: прежние открытые копии из ветки backups — на сервер, зашифрованными (сама ветка с первого
-  # же запуска GitHub держит только .gpg). Так точки возврата за прошлую неделю не пропадают
-  if [ -n "$PASS_NEW" ]; then
-    OLD_BK=$(mktemp -d)
-    if git clone -q --depth 1 --branch backups https://github.com/H1NOMA/h1noma.github.io.git "$OLD_BK/r" 2>/dev/null; then
+  # же запуска GitHub держит только .gpg). Так точки возврата за прошлую неделю не пропадают. Пока не перенесли все —
+  # пробуем при каждом запуске push.sh (повтор безопасен: уже перенесённые даты пропускаются)
+  BK_IMPORTED=/root/.komik-backup-imported
+  if [ ! -e "$BK_IMPORTED" ]; then
+    OLD_BK=$(mktemp -d); IMP_OK=1
+    if GIT_TERMINAL_PROMPT=0 timeout 300 git clone -q --depth 1 --branch backups https://github.com/H1NOMA/h1noma.github.io.git "$OLD_BK/r" 2>/dev/null; then
       for f in "$OLD_BK"/r/backups/kv-*.json.gz; do
         [ -f "$f" ] || continue
         D=$(basename "$f" .json.gz); D=${D#kv-}
-        if ! { gzip -t "$f" 2>/dev/null && /usr/local/bin/komik-backup import "$f" "$D"; }; then warn "$(basename "$f") не перенесена"; fi
+        if ! { gzip -t "$f" 2>/dev/null && /usr/local/bin/komik-backup import "$f" "$D"; }; then warn "$(basename "$f") не перенесена"; IMP_OK=""; fi
       done
-    else warn "ветка backups не скачалась — прежние копии остаются только там"; fi
+    else IMP_OK=""; fi
+    if [ -n "$IMP_OK" ]; then date -u +%FT%TZ > "$BK_IMPORTED"
+    else warn "прежние копии из ветки backups перенесены не все — запусти push.sh ещё раз сегодня, до 06:17 МСК (потом GitHub уберёт их из ветки)"; fi
     rm -rf "$OLD_BK"
   fi
   cat > /etc/systemd/system/komik-backup.service <<'EOF'

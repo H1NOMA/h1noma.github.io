@@ -131,7 +131,9 @@ begin
     if gone_n is not null and gone_n > now_ms + day then gone_n := case when fresh_was < now_ms then now_ms end; end if;
     if mine is not null then
       mine := komik_priv.komik_san_entry(mine, me);
-      if coalesce(public.komik_num(mine->'upd'), 0) > now_ms + day then mine := mine || jsonb_build_object('upd', now_ms); end if;
+      -- время правки «из будущего» — прежнее время своей записи (или «сейчас» у новой): не меняется от записи к записи,
+      -- иначе каждая повторная запись сайта меняла бы строку и он не мог бы понять, что облако её уже не примет
+      if coalesce(public.komik_num(mine->'upd'), 0) > now_ms + day then mine := mine || jsonb_build_object('upd', coalesce(public.komik_num(was->'upd'), now_ms)); end if;
       if was is not null then mine := mine || jsonb_build_object('at', coalesce(was->'at', mine->'at'));   -- место в очереди своё, не переставить
       elsif coalesce(public.komik_num(mine->'at'), 0) > now_ms + day then mine := mine || jsonb_build_object('at', now_ms);
       end if;
