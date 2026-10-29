@@ -13,15 +13,17 @@
     и общие (с потолком размера), команда (DEVS) — всё; строки comik:img:<хэш> — только с верным хэшем;
   · миграция 10-29 (по умолчанию включена, /__mock/fail {"v3": false} — сервер без неё): чтение белым списком
     (чужие листы — только витрина /rest/v1/kv_chars_pub), личные пуш-подписки push:sub:<тег>,
-    rpc komik_api_version → 3. Санитайзер общих строк (игрок меняет только своё) стенд не повторяет —
-    он проверен в tests/sql/run.sh;
+    rpc komik_api_version → 3. Санитайзер общих строк (игрок меняет только своё) стенд сам не повторяет;
+  · --pg БАЗА — вместо имитации прав REST идёт в настоящий Postgres с миграциями (tests/sql/stand.sh): те же
+    правила RLS, триггеры, витрина, санитайзер — запросы сайта переводятся в SQL и выполняются через psql от
+    имени anon/authenticated с токеном, как это делает PostgREST;
   · /auth/v1 — вход по паролю, регистрация (автоподтверждение), обновление токена, выход, user;
   · /functions/v1/notify-game — отдаёт публичный ключ, рассылку только считает;
   · /__mock/rows (GET — все строки, POST — заменить), /__mock/log (GET — журнал, DELETE — очистить),
     /__mock/fail (POST {"rate":0.2,"slow":300}) — обрывы и задержка для проверки устойчивости.
 Сид — массив строк [{key, value}] (формат ежедневного бэкапа kv) или {rows:[…]}.
 """
-import argparse, base64, hashlib, json, os, random, re, sys, threading, time
+import argparse, base64, hashlib, json, os, random, re, subprocess, sys, threading, time, uuid
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 from urllib.parse import urlsplit, parse_qsl, unquote
 
@@ -37,6 +39,84 @@ PUBLIC_READ = {'comik:archive:v1', 'comik:news:v1', 'comik:chrono:v1', 'comik:he
 PUB_FIELDS = ['id', 'owner', 'alias', 'name', 'player', 'ava', 'role', 'subcls', 'origin', 'subrace', 'level', 'hp', 'ac', 'init',
               'speed', 'deleted', 'createdAt', 'updatedAt']
 VAPID = 'B' + 'A' * 86
+PG = None            # имя базы в режиме --pg
+
+
+def user_id(email):
+    return str(uuid.UUID(hashlib.md5(email.encode()).hexdigest()))
+
+
+# ── режим --pg: настоящий Postgres вместо имитации ──
+def lit(v):
+    """строковый литерал SQL в долларовых кавычках"""
+    s, tag = str(v), 'q'
+    while '$' + tag + '$' in s:
+        tag += 'q'
+    return '$' + tag + '$' + s + '$' + tag + '$'
+
+
+def pg_run(sql, claims=None):
+    """(вывод, None) или (None, (sqlstate, сообщение)). claims — токен: None = владелец базы (postgres)"""
+    head = 'begin;\n'
+    if claims is not None:
+        head += 'set local role %s;\nset local request.jwt.claims to %s;\n' % (
+            'authenticated' if claims.get('role') == 'authenticated' else 'anon', lit(json.dumps(claims)))
+    r = subprocess.run(['psql', '-X', '-q', '-t', '-A', '-v', 'ON_ERROR_STOP=1', '-v', 'VERBOSITY=verbose', '-d', PG],
+                       input='\\set VERBOSITY verbose\n' + head + sql + ';\ncommit;\n', capture_output=True, text=True)
+    if r.returncode != 0:
+        m = re.search(r'ERROR:\s+([0-9A-Z]{5}):\s*(.*)', r.stderr)
+        return None, (m.group(1), m.group(2)) if m else ('XX000', r.stderr.strip()[:300])
+    return r.stdout.strip(), None
+
+
+def pg_col(expr):
+    if expr in ('key', 'value'):
+        return expr
+    m = re.fullmatch(r'value->>(\w+)', expr)
+    if m:
+        return "value->>'%s'" % m.group(1)
+    raise ValueError('колонка ' + expr)
+
+
+def pg_where(filters):
+    conds = []
+    for col, op in filters:
+        c = pg_col(col)
+        kind, _, arg = op.partition('.')
+        if kind == 'eq':
+            conds.append('%s = %s' % (c, lit(arg)))
+        elif kind == 'in':
+            conds.append('%s in (%s)' % (c, ', '.join(lit(x) for x in parse_in(arg)) or 'null'))
+        elif kind == 'like':
+            conds.append('%s like %s' % (c, lit(arg.replace('*', '%'))))
+        elif kind == 'is' and arg == 'null':
+            conds.append('%s is null' % c)
+        else:
+            raise ValueError('фильтр ' + op)
+    return ' and '.join(conds) or 'true'
+
+
+def pg_proj(select):
+    if not select or select == '*':
+        return "json_build_object('key', key, 'value', value)"
+    parts = []
+    for part in select.split(','):
+        part = part.strip()
+        alias, _, expr = part.partition(':')
+        if not expr:
+            expr, alias = alias, alias.split('->>')[-1]
+        parts.append('%s, %s' % (lit(alias), pg_col(expr)))
+    return 'json_build_object(%s)' % ', '.join(parts)
+
+
+def pg_rows():
+    out, err = pg_run("select coalesce(json_agg(json_build_object('key', key, 'value', value)), '[]') from public.kv")
+    return json.loads(out) if out else []
+
+
+def pg_load(rows):
+    return pg_run('truncate public.kv; insert into public.kv (key, value) select r->>\'key\', r->\'value\' from json_array_elements(%s::json) r'
+                  % lit(json.dumps(rows, ensure_ascii=False)))
 
 
 def jwt(payload):
@@ -217,6 +297,64 @@ class H(SimpleHTTPRequestHandler):
         except Exception:
             return None
 
+    def claims(self):
+        p = jwt_payload((self.headers.get('Authorization') or '').replace('Bearer ', ''))
+        return p if p.get('role') == 'authenticated' else {'role': 'anon'}
+
+    def pg_err(self, err, key=''):
+        code, msg = err
+        st = {'42501': 403 if self.tag() is not None else 401, '23505': 409, '42P01': 404, '42883': 404}.get(code, 400)
+        self.note(key, 0, st)
+        return self.send_json(st, {'code': code, 'message': msg})
+
+    def pg_rest(self, u):
+        """REST в режиме --pg: GET/POST/PATCH к kv и витрине — тем же SQL, что строит PostgREST"""
+        table = u.path.rsplit('/', 1)[-1]
+        if table not in ('kv', 'kv_chars_pub'):
+            return self.send_json(404, {'message': 'only kv in mock'})
+        select, filters = self.query(u)
+        keyf = next((op for col, op in filters if col == 'key'), '')
+        try:
+            where, proj = pg_where(filters), pg_proj(select)
+        except ValueError as e:
+            return self.send_json(400, {'message': str(e)})
+        prefer = self.headers.get('Prefer') or ''
+        if self.command == 'GET':
+            sql = "select coalesce(json_agg(%s), '[]') from public.%s where %s" % (proj, table, where)
+        elif self.command == 'POST':
+            b = self.body()
+            rows = b if isinstance(b, list) else [b]
+            if not rows or not all(isinstance(r, dict) and 'key' in r for r in rows):
+                return self.send_json(400, {'message': 'bad row'})
+            keyf = rows[0]['key']
+            vals = ', '.join('(%s, %s::jsonb)' % (lit(r['key']), lit(json.dumps(r.get('value'), ensure_ascii=False))) for r in rows)
+            ups = ' on conflict (key) do update set key = excluded.key, value = excluded.value' if 'merge-duplicates' in prefer else ''
+            sql = "with x as (insert into public.%s (key, value) values %s%s returning key, value) select coalesce(json_agg(%s), '[]') from x" % (table, vals, ups, proj)
+        else:
+            b = self.body() or {}
+            sets = []
+            if 'value' in b:
+                sets.append('value = %s::jsonb' % lit(json.dumps(b['value'], ensure_ascii=False)))
+            if 'key' in b:
+                sets.append('key = %s' % lit(b['key']))
+            sql = "with x as (update public.%s set %s where %s returning key, value) select coalesce(json_agg(%s), '[]') from x" % (table, ', '.join(sets) or 'key = key', where, proj)
+        out, err = pg_run(sql, self.claims())
+        if err:
+            return self.pg_err(err, keyf)
+        res = json.loads(out or '[]')
+        if self.command == 'GET' and 'vnd.pgrst.object' in (self.headers.get('Accept') or ''):
+            if len(res) != 1:
+                n = self.send_json(406, {'code': 'PGRST116', 'message': 'JSON object requested, multiple (or no) rows returned', 'details': 'The result contains %d rows' % len(res)})
+                return self.note(keyf, n, 406)
+            n = self.send_json(200, res[0])
+            return self.note(keyf, n, 200)
+        code = 200 if self.command != 'POST' else 201
+        if self.command != 'GET' and 'return=representation' not in prefer:
+            n = self.send_json(201 if self.command == 'POST' else 204, None)
+        else:
+            n = self.send_json(code, res)
+        self.note(keyf, n, code)
+
     def tag(self):
         tok = (self.headers.get('Authorization') or '').replace('Bearer ', '')
         p = jwt_payload(tok)
@@ -257,6 +395,8 @@ class H(SimpleHTTPRequestHandler):
         if u.path.startswith('/realtime/'):
             return self.send_json(404, {'error': 'no realtime in mock'})
         if u.path == '/__mock/rows':
+            if PG:
+                return self.send_json(200, pg_rows())
             with LOCK:
                 rows = [{'key': k, 'value': v} for k, v in ROWS.items()]
             return self.send_json(200, rows)
@@ -273,6 +413,9 @@ class H(SimpleHTTPRequestHandler):
         if u.path == '/__mock/rows':
             b = self.body()
             rows = b.get('rows') if isinstance(b, dict) else b
+            if PG:
+                _, err = pg_load(rows or [])
+                return self.send_json(500 if err else 200, {'ok': not err, 'rows': len(rows or []), 'error': err})
             with LOCK:
                 ROWS.clear(); ROWS.update({r['key']: r['value'] for r in rows or []})
             return self.send_json(200, {'ok': True, 'rows': len(ROWS)})
@@ -280,13 +423,16 @@ class H(SimpleHTTPRequestHandler):
             b = self.body() or {}
             FAIL['rate'] = float(b.get('rate') or 0); FAIL['slow'] = int(b.get('slow') or 0)
             FAIL['player_img'] = b.get('player_img', True) is not False
-            FAIL['v3'] = b.get('v3', True) is not False
-            return self.send_json(200, FAIL)
+            FAIL['v3'] = b.get('v3', True) is not False or bool(PG)   # настоящая база — всегда с 10-29
+            return self.send_json(200, dict(FAIL, pg=PG))
         if u.path == '/rest/v1/rpc/komik_api_version':
             self.body()
             if self.chaos(): return
             if not FAIL['v3']:
                 return self.send_json(404, {'code': 'PGRST202', 'message': 'Could not find the function public.komik_api_version without parameters in the schema cache'})
+            if PG:
+                out, err = pg_run('select public.komik_api_version()', self.claims())
+                return self.send_json(200, int(out)) if not err else self.pg_err(err)
             return self.send_json(200, 3)
         if u.path.startswith('/rest/v1/'):
             if self.chaos(): return
@@ -337,6 +483,8 @@ class H(SimpleHTTPRequestHandler):
         return select, filters
 
     def rest_get(self, u):
+        if PG:
+            return self.pg_rest(u)
         pub = u.path.endswith('/kv_chars_pub')
         if pub and not FAIL['v3']:
             return self.send_json(404, {'code': 'PGRST205', 'message': "Could not find the table 'public.kv_chars_pub' in the schema cache"})
@@ -358,6 +506,8 @@ class H(SimpleHTTPRequestHandler):
         self.note(keyf, n, 200)
 
     def rest_post(self, u):
+        if PG:
+            return self.pg_rest(u)
         if not u.path.endswith('/kv'):
             return self.send_json(404, {'message': 'only kv in mock'})
         b = self.body()
@@ -389,6 +539,8 @@ class H(SimpleHTTPRequestHandler):
         return self.send_json(201, None)
 
     def rest_patch(self, u):
+        if PG:
+            return self.pg_rest(u)
         if not u.path.endswith('/kv'):
             return self.send_json(404, {'message': 'only kv in mock'})
         select, filters = self.query(u)
@@ -465,7 +617,9 @@ class H(SimpleHTTPRequestHandler):
                 return self.send_json(422, {'code': 422, 'error_code': 'weak_password', 'msg': 'Password should be at least 8 characters.'})
             if email in USERS:
                 return self.send_json(422, {'code': 422, 'error_code': 'user_already_exists', 'msg': 'User already registered'})
-            USERS[email] = {'id': hashlib.md5(email.encode()).hexdigest(), 'email': email, 'password': b.get('password')}
+            USERS[email] = {'id': user_id(email), 'email': email, 'password': b.get('password')}
+            if PG:
+                pg_run('insert into auth.users (id, email) values (%s, %s) on conflict do nothing' % (lit(USERS[email]['id']), lit(email)))
             return self.send_json(200, self.session(USERS[email]))
         return self.send_json(404, {'msg': 'not in mock: ' + path})
 
@@ -476,7 +630,10 @@ def main():
     ap.add_argument('--seed', help='строки kv: [{key,value}] (можно .json.gz из ветки backups)')
     ap.add_argument('--fail', type=float, default=0.0)
     ap.add_argument('--slow', type=int, default=0)
+    ap.add_argument('--pg', help='база Postgres с миграциями (tests/sql/stand.sh) — права и триггеры настоящие')
     a = ap.parse_args()
+    global PG
+    PG = a.pg
     if a.seed:
         import gzip
         op = gzip.open if a.seed.endswith('.gz') else open
@@ -484,12 +641,21 @@ def main():
             d = json.load(f)
         rows = d.get('rows') if isinstance(d, dict) else d
         ROWS.update({r['key']: r['value'] for r in rows})
+        if PG:
+            _, err = pg_load(rows)
+            if err:
+                sys.exit('сид не лёг в базу: %s' % (err,))
     FAIL['rate'], FAIL['slow'] = a.fail, a.slow
     for t in ['hinoma', 'herr_teo', 'arlissss', 'testplayer', 'player_two']:
         e = t + '@komikdnd.ru'
-        USERS[e] = {'id': hashlib.md5(e.encode()).hexdigest(), 'email': e, 'password': 'password123'}
+        USERS[e] = {'id': user_id(e), 'email': e, 'password': 'password123'}
+    if PG:   # аккаунты — из базы (к ним привязана команда в devs), недостающие тестовые — заводим
+        for r in json.loads(pg_run("select coalesce(json_agg(json_build_object('id', id, 'email', email)), '[]') from auth.users")[0] or '[]'):
+            USERS[r['email'].lower()] = {'id': r['id'], 'email': r['email'].lower(), 'password': 'password123'}
+        for e, u in USERS.items():
+            pg_run('insert into auth.users (id, email) values (%s, %s) on conflict do nothing' % (lit(u['id']), lit(e)))
     srv = ThreadingHTTPServer(('127.0.0.1', a.port), H)
-    print('КОМИК-стенд: http://127.0.0.1:%d  строк kv: %d' % (a.port, len(ROWS)), flush=True)
+    print('КОМИК-стенд: http://127.0.0.1:%d  строк kv: %d%s' % (a.port, len(pg_rows()) if PG else len(ROWS), '  (Postgres: %s)' % PG if PG else ''), flush=True)
     srv.serve_forever()
 
 

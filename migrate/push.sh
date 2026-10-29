@@ -191,6 +191,16 @@ verify(){
     X=$(q "select qual ~ 'komik_is_team' from pg_policies where schemaname = 'public' and tablename = 'kv' and policyname = 'kv_read'")
     if [ "$X" = t ]; then echo "  чтение: чужие листы и пуш-подписки — только команде ✓"
     else bad "чтение kv открыто всем (старое правило kv_read): чужие листы персонажей и пуш-подписки видны без входа"; OK=0; fi
+    # 09-21…09-27 пересоздают свои, более слабые devs_read и kv_player_cap — строгие возвращает только 10-29, идущая последней
+    X=$(q "select qual ~ 'auth\.uid\(\)' and qual !~ '^\(?true\)?$' from pg_policies where schemaname = 'public' and tablename = 'devs' and policyname = 'devs_read'")
+    if [ "$X" != t ]; then bad "правило devs_read старое: любой вошедший видит id аккаунтов команды — запусти push.sh (без check)"; OK=0; fi
+    X=$(q "select prosrc ~ 'push:sub:' from pg_proc where oid = to_regprocedure('public.kv_player_cap(text)')")
+    if [ "$X" != t ]; then bad "kv_player_cap старая: игроки не могут сохранить пуш-подписку — запусти push.sh (без check)"; OK=0; fi
+    # витрина листов работает от владельца: запись через неё обошла бы правила kv (удалить чужие листы с ключом гостя)
+    X=$(q "select 'ok:' || coalesce(string_agg(r || ' ' || p, ', ' order by r, p), '')
+             from unnest(array['anon', 'authenticated']) r, unnest(array['INSERT', 'UPDATE', 'DELETE', 'TRUNCATE']) p
+            where to_regclass('public.kv_chars_pub') is not null and has_table_privilege(r, 'public.kv_chars_pub', p)")
+    if [ "$X" != 'ok:' ]; then bad "через витрину листов kv_chars_pub можно писать (${X#ok:}) — запусти push.sh (без check)"; OK=0; fi
     X=$(q "select prosrc ~ '4,32' from pg_proc where oid = to_regprocedure('public.my_tag()')")
     if [ "$X" != t ]; then bad "функция my_tag() старая: логины вроде «v1» получают права игрока"; OK=0; fi
     X=$(q "select count(*) from pg_trigger t join pg_proc f on f.oid = t.tgfoid where t.tgrelid = to_regclass('auth.users') and t.tgname = 'komik_email_guard' and t.tgenabled <> 'D' and f.prosrc ~ 'сменить нельзя'")
@@ -420,6 +430,17 @@ for MIG_NAME in $MIGS; do
   [ -n "$MIG_OK" ] || { warn "не смог скачать $MIG_NAME"; MIG_ALL=""; }
 done
 if [ -n "$MIG_ALL" ]; then
+  # снимок таблицы перед миграциями (только root, неделю): если после них что-то не так, прежнее состояние
+  # возвращается одной командой. Миграции меняют данные редко, но 10-29, например, раскладывает push:subs
+  KV_SNAP="/root/kv-before-push-$(date +%Y%m%d-%H%M%S).json.gz"
+  if ( umask 077; docker exec supabase-db psql -U postgres -d postgres -v ON_ERROR_STOP=1 -At -c \
+         "select coalesce(json_agg(json_build_object('key', key, 'value', value) order by key), '[]'::json) from public.kv" | gzip -9 > "$KV_SNAP" ) \
+     && [ "$(gzip -dc "$KV_SNAP" | head -c 1)" = '[' ]; then
+    echo "  снимок базы до миграций: $KV_SNAP"
+    echo "  (вернуть: bash <(curl -fsS https://komikdnd.ru/migrate/restore.sh) $KV_SNAP)"
+  else
+    rm -f "$KV_SNAP"; warn "снимок базы до миграций не снялся — продолжаю (ежедневные копии есть)"
+  fi
   # shellcheck disable=SC2086   # MIGS — список имён через пробел
   if apply_migs $MIGS; then
     echo "  все миграции применены ✓ (одной транзакцией: ${MIGS// / → })"
@@ -455,6 +476,19 @@ done
 if [ -n "$BK_OK" ]; then
   install -m 755 -o root -g root "$BK_TMP" /usr/local/bin/komik-backup
   /usr/local/bin/komik-backup init
+  # переход на шифрование: прежние открытые копии из ветки backups — на сервер, зашифрованными (сама ветка с первого
+  # же запуска GitHub держит только .gpg). Так точки возврата за прошлую неделю не пропадают
+  if [ -n "$PASS_NEW" ]; then
+    OLD_BK=$(mktemp -d)
+    if git clone -q --depth 1 --branch backups https://github.com/H1NOMA/h1noma.github.io.git "$OLD_BK/r" 2>/dev/null; then
+      for f in "$OLD_BK"/r/backups/kv-*.json.gz; do
+        [ -f "$f" ] || continue
+        D=$(basename "$f" .json.gz); D=${D#kv-}
+        if ! { gzip -t "$f" 2>/dev/null && /usr/local/bin/komik-backup import "$f" "$D"; }; then warn "$(basename "$f") не перенесена"; fi
+      done
+    else warn "ветка backups не скачалась — прежние копии остаются только там"; fi
+    rm -rf "$OLD_BK"
+  fi
   cat > /etc/systemd/system/komik-backup.service <<'EOF'
 [Unit]
 Description=КОМИК: зашифрованная копия таблицы kv (migrate/backup.sh)

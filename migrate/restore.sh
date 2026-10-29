@@ -118,7 +118,8 @@ if [ -n "$A1" ] && [ -f "$A1" ]; then
 else
   say "Ежедневные копии (этот сервер и GitHub, ветка backups)"
   # свои зашифрованные копии сервера за неделю — без интернета; на GitHub — те же (и старые открытые, если остались)
-  LOCAL=$(find "$BK_WWW" -maxdepth 1 -name 'kv-*.json.gz.gpg' -printf '%f\n' 2>/dev/null | sed -n 's/^kv-\([0-9-]*\)\.json\.gz\.gpg$/\1/p' | sort)
+  # папки может ещё не быть (новый push.sh не запускали) — тогда только GitHub; find с её ошибкой не роняет скрипт
+  LOCAL=$( { find "$BK_WWW" -maxdepth 1 -name 'kv-*.json.gz.gpg' -printf '%f\n' 2>/dev/null || true; } | sed -n 's/^kv-\([0-9-]*\)\.json\.gz\.gpg$/\1/p' | sort)
   REMOTE=""
   # частичный клон: сначала только список файлов, нужная копия скачается одна
   if git clone -q --depth 1 --filter=blob:none --no-checkout --branch backups "$REPO" "$WORK/bk" 2>/dev/null; then

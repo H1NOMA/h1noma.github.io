@@ -187,6 +187,7 @@ check(){
   if [ -n "$U" ] && [ "$U" != root ]; then ok "обновление идёт от пользователя $U, не от root"
   else bad "обновление сайта идёт от root — запусти $ME (переведёт на пользователя $SITE_USER)"; S=1; fi
   if systemctl is-failed -q komik-site.service; then bad "последнее обновление упало: journalctl -u komik-site -n 20"; S=1; fi
+  if [ "$(readlink "$WEBROOT" 2>/dev/null || true)" != "$LIVE" ]; then bad "$WEBROOT не ведёт на $LIVE — сайт перестанет обновляться: запусти $ME"; S=1; fi
   LIVE_SHA=$(basename "$(readlink -f "$WEBROOT" 2>/dev/null || echo нет)")
   GH=$(timeout 30 git ls-remote "https://github.com/H1NOMA/h1noma.github.io.git" refs/heads/main 2>/dev/null | cut -f1 || true)
   if [ -n "$GH" ] && [ "$LIVE_SHA" = "$GH" ]; then ok "на сервере свежая версия сайта (${GH:0:7})"
@@ -249,6 +250,17 @@ if curl -fsS --max-time 60 -o "$T" "https://raw.githubusercontent.com/H1NOMA/h1n
 fi
 rm -f "$T"
 [ -n "$SYNC_OK" ] || { bad "не смог скачать migrate/site-sync.sh — ничего не менял; проверь интернет и запусти ещё раз"; exit 1; }
+# прежняя схема: /var/www/komik — ссылка прямо на папку выкладки (её переключал синк от root). Переводим её на
+# постоянную $LIVE сейчас, пока мы root и до смены хозяина: если дальше что-то прервётся (сеть, Ctrl+C), синк
+# от $SITE_USER всё равно будет двигать то, что отдаёт Caddy, — а не обновлять $LIVE мимо сайта
+if [ -L "$WEBROOT" ]; then
+  WR_CUR=$(readlink "$WEBROOT")
+  if [[ "$WR_CUR" == "$BASE/releases/"* ]] && [ -f "$WR_CUR/index.html" ]; then
+    [ -L "$LIVE" ] || { ln -sfn "$WR_CUR" "$LIVE.tmp"; mv -Tf "$LIVE.tmp" "$LIVE"; }
+    ln -sfn "$LIVE" "$WEBROOT.tmp"; mv -Tf "$WEBROOT.tmp" "$WEBROOT"
+    ok "$WEBROOT → $LIVE (постоянная ссылка)"
+  fi
+fi
 # выкладки прежней схемы (их делал root) — новому хозяину; -h: ссылки меняем сами, а не то, куда они ведут
 chown -R -h "$SITE_USER:$SITE_USER" "$BASE"
 chmod 755 "$BASE"
@@ -273,7 +285,7 @@ if run_force; then ok "выложено от пользователя $SITE_USER
 else
   warn "systemd этого сервера не принял полную защиту — пробую запасную (тот же пользователь, система только для чтения)"
   units base
-  run_force || { bad "выкладка от пользователя $SITE_USER не прошла — сайт остался прежним. Пришли вывод выше программисту"; exit 1; }
+  run_force || { bad "выкладка от пользователя $SITE_USER не прошла — сайт показывает прежнюю версию. Запусти site.sh ещё раз; не поможет — пришли вывод выше программисту"; exit 1; }
   ok "выложено от пользователя $SITE_USER (запасная защита)"
 fi
 [ -f "$LIVE/index.html" ] || { bad "сайт не выложился — пришли вывод выше"; exit 1; }

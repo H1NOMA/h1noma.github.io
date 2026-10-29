@@ -14,10 +14,12 @@
 --      и переносит в него только то, что игрок вправе менять:
 --        · расписание — свою запись в сессии (имя, персонаж, цвет) и свою отметку снятия gone[тег];
 --          новых сессий, чужих записей, полей сессии игрок не меняет; записаться сверх мест нельзя;
---        · доска — у карточек СВОИХ персонажей (id из своей строки comik:chars:<тег>) ХП, временные ХП,
---          инициативу, спасброски от смерти, состояния, концентрацию; позицию своей фишки на карте; журнал
---          доски (его читает только ГМ); отметку «постучался» joinAt. Досок, чужих карточек, состава,
---          раунда, фона игрок не трогает;
+--        · доска — у карточек СВОИХ персонажей ХП, временные ХП, инициативу, спасброски от смерти, состояния,
+--          концентрацию; позицию своей фишки; дописать свои записи в журнал доски (читает только ГМ) — всё это
+--          только за столом, где сидит его персонаж; отметку «постучался» joinAt — и на доске игры, на которую
+--          записан. Чья карточка — по тегу ownTag, который ставит на неё ГМ при публикации (строку доски игрок
+--          не меняет), у карточек без тега — по id листа, который есть только в его строке. Версию строки rev
+--          ведёт сервер (прежняя + 1). Досок, чужих карточек, состава, раунда, фона игрок не трогает;
 --        · реестр логинов — только дописать себя.
 --      Клиенту ничего переделывать не нужно: он и так пишет «прочитать → слить → записать», лишнее просто
 --      не доезжает. Подделка, стирание, вандализм — не доезжают тоже.
@@ -29,6 +31,7 @@
 --      досок, реестр логинов, правки справочника. Свои листы/закладки/подписки — владелец. Всё — команда.
 --      Чужие листы остальным — через «витрину» kv_chars_pub: имя, игрок, портрет (ссылка kvimg:), класс,
 --      уровень, ХП, КД, инициатива — то, что нужно доске ходов и анонсам; биография, инвентарь, заметки — нет.
+--      Витрина — только для чтения (права Supabase по умолчанию дали бы через неё писать в kv в обход правил).
 --   4) id аккаунтов команды (devs.uid) видел любой вошедший — теперь каждый видит только свою строку.
 --   5) Журнал kv_history: кто (аккаунт и тег) и когда менял строку; прежнее значение — для всего, кроме
 --      доски ходов (её переписывает каждый тап по ХП) и фото; у больших строк (> 64 КБ: листы, архив, фоны) —
@@ -78,40 +81,55 @@ $$;
 create or replace function public.komik_san_games(o jsonb, n jsonb, me text) returns jsonb
 language plpgsql stable set search_path = '' as $$
 declare
-  res jsonb := '[]'; s jsonb; ns jsonb; mine jsonb; was jsonb; others jsonb;
+  res jsonb := '[]'; s jsonb; ns jsonb; mine jsonb; was jsonb; others jsonb; nm jsonb; ntomb jsonb; otomb jsonb;
   seats integer; gone_o numeric; gone_n numeric; fresh_was numeric; fresh_mine numeric;
   now_ms numeric := floor(extract(epoch from now()) * 1000);
+  day numeric := 86400000;
 begin
   if jsonb_typeof(o) is distinct from 'array' then o := '[]'; end if;
   if jsonb_typeof(n) is distinct from 'array' then n := '[]'; end if;
+  -- новая версия: id → живая сессия (первая), id надгробий; старая — id надгробий. Один проход, без поиска в цикле
+  select coalesce(jsonb_object_agg(id, x), '{}') into nm
+    from (select distinct on (x->>'id') x->>'id' as id, x from jsonb_array_elements(n) with ordinality t(x, i)
+           where jsonb_typeof(x) = 'object' and coalesce(x->>'id', '') <> '' and x->'deleted' is distinct from 'true'::jsonb
+           order by x->>'id', i) z;
+  select coalesce(jsonb_object_agg(x->>'id', true), '{}') into ntomb from jsonb_array_elements(n) x
+   where jsonb_typeof(x) = 'object' and x->'deleted' = 'true'::jsonb and coalesce(x->>'id', '') <> '';
+  select coalesce(jsonb_object_agg(x->>'id', true), '{}') into otomb from jsonb_array_elements(o) x
+   where jsonb_typeof(x) = 'object' and x->'deleted' = 'true'::jsonb and coalesce(x->>'id', '') <> '';
   for s in select x from jsonb_array_elements(o) x loop
-    -- надгробия и битые записи — как были
-    if jsonb_typeof(s) <> 'object' or s->'deleted' = 'true'::jsonb or coalesce(s->>'id','') = '' then
+    if jsonb_typeof(s) <> 'object' or coalesce(s->>'id', '') = '' then res := res || jsonb_build_array(s); continue; end if;
+    if s->'deleted' = 'true'::jsonb then
+      -- надгробие старше 90 дней (GAME_TOMB_TTL) сайт уже не пишет — уходит, если и новая версия его не несёт:
+      -- иначе сайт игрока вечно видел бы «облако не такое, как у меня» и переписывал строку по кругу
+      if coalesce(public.komik_num(s->'updatedAt'), 0) <= now_ms - 90 * day and not ntomb ? (s->>'id') then continue; end if;
       res := res || jsonb_build_array(s); continue;
     end if;
-    select x into ns from jsonb_array_elements(n) x
-      where jsonb_typeof(x) = 'object' and x->>'id' = s->>'id' and x->'deleted' is distinct from 'true'::jsonb limit 1;
+    if otomb ? (s->>'id') then continue; end if;      -- живая копия удалённой сессии: сайт её не показывает и не пишет
+    ns := nm -> (s->>'id');
     if ns is null then res := res || jsonb_build_array(s); continue; end if;   -- клиент этой сессии ещё не видел
     others := coalesce((select jsonb_agg(p) from jsonb_array_elements(case when jsonb_typeof(s->'players') = 'array' then s->'players' else '[]' end) p
-                        where lower(coalesce(p->>'tag','')) <> me), '[]');
-    select p into was from jsonb_array_elements(case when jsonb_typeof(s->'players') = 'array' then s->'players' else '[]' end) p
-      where lower(coalesce(p->>'tag','')) = me limit 1;
-    select p into mine from jsonb_array_elements(case when jsonb_typeof(ns->'players') = 'array' then ns->'players' else '[]' end) p
-      where jsonb_typeof(p) = 'object' and lower(coalesce(p->>'tag','')) = me limit 1;
-    gone_o := coalesce(public.komik_num(s->'gone'->me), 0);
+                        where lower(coalesce(p->>'tag', '')) <> me), '[]');
+    was := (select p from jsonb_array_elements(case when jsonb_typeof(s->'players') = 'array' then s->'players' else '[]' end) p
+             where lower(coalesce(p->>'tag', '')) = me limit 1);
+    mine := (select p from jsonb_array_elements(case when jsonb_typeof(ns->'players') = 'array' then ns->'players' else '[]' end) p
+              where jsonb_typeof(p) = 'object' and lower(coalesce(p->>'tag', '')) = me limit 1);
+    gone_o := coalesce(public.komik_num(case when jsonb_typeof(s->'gone') = 'object' then s->'gone'->me end), 0);
     gone_n := public.komik_num(case when jsonb_typeof(ns->'gone') = 'object' then ns->'gone'->me end);
-    if gone_n is not null and gone_n > now_ms + 86400000 then gone_n := null; end if;   -- отметка «из будущего» — не принимаем
-    fresh_was := greatest(coalesce(public.komik_num(was->'upd'),0), coalesce(public.komik_num(was->'at'),0));
+    fresh_was := greatest(coalesce(public.komik_num(was->'upd'), 0), coalesce(public.komik_num(was->'at'), 0));
+    -- отметка снятия «из будущего» (часы устройства спешат) — считаем её «сейчас», если запись старше
+    if gone_n is not null and gone_n > now_ms + day then gone_n := case when fresh_was < now_ms then now_ms end; end if;
     if mine is not null then
       mine := public.komik_san_entry(mine, me);
+      if coalesce(public.komik_num(mine->'upd'), 0) > now_ms + day then mine := mine || jsonb_build_object('upd', now_ms); end if;
       if was is not null then mine := mine || jsonb_build_object('at', coalesce(was->'at', mine->'at'));   -- место в очереди своё, не переставить
-      elsif coalesce(public.komik_num(mine->'at'), 0) > now_ms + 86400000 then mine := mine || jsonb_build_object('at', now_ms);
+      elsif coalesce(public.komik_num(mine->'at'), 0) > now_ms + day then mine := mine || jsonb_build_object('at', now_ms);
       end if;
-      fresh_mine := greatest(coalesce(public.komik_num(mine->'upd'),0), coalesce(public.komik_num(mine->'at'),0));
-      if fresh_mine <= greatest(gone_o, coalesce(gone_n,0)) then mine := null; end if;   -- запись не новее снятия — устаревшая копия
+      fresh_mine := greatest(coalesce(public.komik_num(mine->'upd'), 0), coalesce(public.komik_num(mine->'at'), 0));
+      if fresh_mine <= greatest(gone_o, coalesce(gone_n, 0)) then mine := null; end if;   -- запись не новее снятия — устаревшая копия
     end if;
     if mine is not null and was is null then                                          -- новая запись — только на свободное место
-      seats := nullif(regexp_replace(coalesce(s->>'seats',''), '\D', '', 'g'), '')::integer;
+      seats := nullif(left(regexp_replace(coalesce(s->>'seats', ''), '\D', '', 'g'), 4), '')::integer;
       if seats is not null and seats > 0 and jsonb_array_length(others) >= seats then mine := null; end if;
     end if;
     if mine is null and was is not null and coalesce(gone_n, 0) <= fresh_was then
@@ -138,7 +156,10 @@ language sql stable set search_path = '' as $$
   from (select case when jsonb_typeof(o) = 'array' then o else '[]'::jsonb end as oo) z
 $$;
 
--- 3. Доска ходов. id своих персонажей — из своей строки листов (без копий-alias и удалённых); тег — из токена
+-- 3. Доска ходов. Чья карточка — решает тег ownTag на ней: его ставит ГМ при публикации доски (по владельцу листа),
+--    а строку доски игрок не меняет. У карточек без тега (доска, опубликованная сайтом до 29.10) — id листа из своей
+--    строки, которого нет ни в чьей другой строке листов: свою строку игрок пишет сам, и чужой id, вписанный туда,
+--    так не пройдёт (а владелец листа при этом свою карточку тоже не правит — до первой публикации доски ГМом).
 create or replace function public.komik_my_chars() returns text[]
 language sql stable security definer set search_path = '' as $$
   select coalesce(array_agg(distinct s->>'id'), '{}')
@@ -149,8 +170,18 @@ language sql stable security definer set search_path = '' as $$
      and jsonb_typeof(s) = 'object' and coalesce(s->>'id','') <> '' and coalesce(s->>'alias','') = ''
      and (s->>'owner' is null or lower(s->>'owner') = public.my_tag()) and s->'deleted' is distinct from 'true'::jsonb
 $$;
+create or replace function public.komik_ids_alone(ids text[]) returns text[]
+language sql stable security definer set search_path = '' as $$
+  select coalesce(array_agg(i), '{}') from unnest(ids) i
+   where public.my_tag() <> '' and not exists (
+     select 1 from public.kv k
+      where k.key like 'comik:chars:%' and k.key <> 'comik:chars:' || public.my_tag() and jsonb_typeof(k.value) = 'object'
+        and jsonb_path_exists(k.value, '$.*[*] ? (@.id == $id)', jsonb_build_object('id', i)))
+$$;
 revoke all on function public.komik_my_chars() from public, anon;
 grant execute on function public.komik_my_chars() to authenticated, service_role;
+revoke all on function public.komik_ids_alone(text[]) from public, anon;
+grant execute on function public.komik_ids_alone(text[]) to authenticated, service_role;
 
 -- карточка своего персонажа: «живые» поля — из новой версии (нет поля — снято, как ds:null у клиента), остальное — старое
 create or replace function public.komik_san_card(oc jsonb, nc jsonb) returns jsonb
@@ -191,55 +222,110 @@ begin
 end
 $$;
 
+-- журнал доски: прежние записи остаются, новые — дописываются (только известные поля); хвост — 24 последних по времени,
+-- повторы (время + текст) — один раз, как в архиве ГМа (trkLogArc)
+create or replace function public.komik_log_merge(ol jsonb, nl jsonb) returns jsonb
+language sql immutable set search_path = '' as $$
+  select coalesce(jsonb_agg(e order by a nulls first), '[]') from (
+    select e, a from (
+      select distinct on (a, t) e, a, t from (
+        select x as e, public.komik_num(x->'at') as a, x->>'t' as t
+          from jsonb_array_elements(case when jsonb_typeof(ol) = 'array' then ol else '[]'::jsonb end) x
+         where jsonb_typeof(x) = 'object'
+        union all
+        select jsonb_strip_nulls(jsonb_build_object('at', public.komik_num(x->'at'), 'k', left(x->>'k', 16), 't', left(x->>'t', 160))),
+               public.komik_num(x->'at'), left(x->>'t', 160)
+          from jsonb_array_elements(case when jsonb_typeof(nl) = 'array' then nl else '[]'::jsonb end) x
+         where jsonb_typeof(x) = 'object' and public.komik_num(x->'at') is not null and jsonb_typeof(x->'t') = 'string') u
+      order by a, t) d
+    order by a desc nulls last limit 24) z
+$$;
+
 create or replace function public.komik_san_tracker(o jsonb, n jsonb, me text) returns jsonb
 language plpgsql stable set search_path = '' as $$
 declare
-  res jsonb; k text; ob jsonb; nb jsonb; b jsonb; mp jsonb; pk text; pv jsonb;
-  mine text[] := public.komik_my_chars();
+  res jsonb; k text; ob jsonb; nb jsonb; b jsonb; mp jsonb; pk text; pv jsonb; nl jsonb;
+  myids text[]; mine text[]; unst text[];
+  now_ms numeric := floor(extract(epoch from now()) * 1000);
 begin
   res := case when jsonb_typeof(o) = 'object' then o else '{}'::jsonb end;
   if jsonb_typeof(n) is distinct from 'object' then return res; end if;
-  -- версия строки и штамп — от клиента: на них держится compare-and-swap (kvCasUpdate)
-  if public.komik_num(n->'rev') is not null then res := res || jsonb_build_object('rev', public.komik_num(n->'rev')); end if;
-  if public.komik_num(n->'at')  is not null then res := res || jsonb_build_object('at',  public.komik_num(n->'at'));  end if;
+  -- версию строки ведёт сервер: ровно прежняя + 1. Сайт (kvCasUpdate) пишет то же самое, а кривая версия от игрока
+  -- (0, 6.5, 1e23) сломала бы условную запись всем, и ГМу тоже
+  res := res || jsonb_build_object('rev', case when coalesce(res->>'rev', '') ~ '^\d{1,15}$' then (res->>'rev')::bigint + 1 else 1 end);
+  if public.komik_num(n->'at') is not null then res := res || jsonb_build_object('at', least(public.komik_num(n->'at'), now_ms + 86400000)); end if;
   for k, ob in select * from jsonb_each(res) loop
-    continue when jsonb_typeof(ob) <> 'object';
+    continue when jsonb_typeof(ob) <> 'object' or jsonb_typeof(ob->'list') <> 'array' or jsonb_array_length(ob->'list') > 300;
     nb := n->k;
-    continue when nb is null or jsonb_typeof(nb) <> 'object';
+    continue when nb is null or jsonb_typeof(nb) <> 'object' or nb = ob;
+    -- свои карточки этой доски
+    select coalesce(array_agg(c->>'charId') filter (where lower(c->>'ownTag') = me), '{}'),
+           coalesce(array_agg(c->>'charId') filter (where coalesce(c->>'ownTag', '') = ''), '{}')
+      into mine, unst
+      from jsonb_array_elements(ob->'list') c
+     where jsonb_typeof(c) = 'object' and coalesce(c->>'charId', '') <> '' and c->'foe' is distinct from 'true'::jsonb;
+    if cardinality(unst) > 0 then
+      if myids is null then myids := public.komik_my_chars(); end if;
+      unst := array(select unnest(unst) intersect select unnest(myids));
+      if cardinality(unst) > 0 then mine := mine || public.komik_ids_alone(unst); end if;
+    end if;
     b := ob;
-    if jsonb_typeof(ob->'list') = 'array' and jsonb_typeof(nb->'list') = 'array' and cardinality(mine) > 0 then
-      b := jsonb_set(b, '{list}', coalesce((
-        select jsonb_agg(case when jsonb_typeof(c) = 'object' and c->>'charId' = any(mine)
-                              then public.komik_san_card(c, (select x from jsonb_array_elements(nb->'list') x
-                                                              where jsonb_typeof(x) = 'object' and x->>'charId' = c->>'charId' limit 1))
-                              else c end order by i)
-          from jsonb_array_elements(ob->'list') with ordinality t(c, i)), '[]'));
+    -- «постучался»: записался на игру этой доски, а карточки ещё нет — ГМ досадит (trkPartyCatchup)
+    if public.komik_num(nb->'joinAt') is not null and (cardinality(mine) > 0 or exists (
+         select 1 from public.kv g, jsonb_array_elements(case when jsonb_typeof(g.value) = 'array' then g.value else '[]'::jsonb end) s,
+                       jsonb_array_elements(case when jsonb_typeof(s->'players') = 'array' then s->'players' else '[]'::jsonb end) p
+          where g.key = 'comik:games:v1' and coalesce(ob->>'party', '') <> '' and s->>'id' = ob->>'party'
+            and jsonb_typeof(p) = 'object' and lower(coalesce(p->>'tag', '')) = me)) then
+      b := b || jsonb_build_object('joinAt', least(public.komik_num(nb->'joinAt'), now_ms + 86400000));
     end if;
-    if jsonb_typeof(nb->'mapPos') = 'object' and cardinality(mine) > 0 then
-      mp := case when jsonb_typeof(ob->'mapPos') = 'object' then ob->'mapPos' else '{}'::jsonb end;
-      for pk, pv in select * from jsonb_each(nb->'mapPos') loop
-        if left(pk, 2) = 'c:' and substr(pk, 3) = any(mine) and jsonb_typeof(pv) = 'object'
-           and public.komik_num(pv->'x') is not null and public.komik_num(pv->'y') is not null then
-          mp := mp || jsonb_build_object(pk, jsonb_build_object('x', public.komik_num(pv->'x'), 'y', public.komik_num(pv->'y')));
-        end if;
-      end loop;
-      b := jsonb_set(b, '{mapPos}', mp);
+    if cardinality(mine) > 0 then
+      -- живые поля своих карточек
+      if jsonb_typeof(nb->'list') = 'array' and jsonb_array_length(nb->'list') <= 300 then
+        nl := coalesce((select jsonb_object_agg(id, x) from (
+                select distinct on (x->>'charId') x->>'charId' as id, x from jsonb_array_elements(nb->'list') with ordinality t(x, i)
+                 where jsonb_typeof(x) = 'object' and x->>'charId' = any(mine) order by x->>'charId', i) z), '{}');
+        b := jsonb_set(b, '{list}', (select jsonb_agg(case when jsonb_typeof(c) = 'object' and c->>'charId' = any(mine) and nl ? (c->>'charId')
+                                                           then public.komik_san_card(c, nl->(c->>'charId')) else c end order by i)
+                                       from jsonb_array_elements(ob->'list') with ordinality t(c, i)));
+      end if;
+      -- своя фишка на карте (ключ c:<id> — только своей карточки этой доски)
+      if jsonb_typeof(nb->'mapPos') = 'object' then
+        mp := case when jsonb_typeof(ob->'mapPos') = 'object' then ob->'mapPos' else '{}'::jsonb end;
+        foreach pk in array mine loop
+          pv := nb->'mapPos'->('c:' || pk);
+          if jsonb_typeof(pv) = 'object' and public.komik_num(pv->'x') is not null and public.komik_num(pv->'y') is not null then
+            mp := mp || jsonb_build_object('c:' || pk, jsonb_build_object('x', public.komik_num(pv->'x'), 'y', public.komik_num(pv->'y')));
+          end if;
+        end loop;
+        b := jsonb_set(b, '{mapPos}', mp);
+      end if;
+      -- журнал доски: игрок дописывает свои действия (урон, броски), читает только ГМ
+      if jsonb_typeof(nb->'log') = 'array' and jsonb_array_length(nb->'log') <= 40 then
+        b := jsonb_set(b, '{log}', public.komik_log_merge(ob->'log', nb->'log'));
+      end if;
+      if public.komik_num(nb->'at') is not null then b := b || jsonb_build_object('at', least(public.komik_num(nb->'at'), now_ms + 86400000)); end if;
     end if;
-    -- журнал доски: игроки дописывают в него свои действия, читает только ГМ (клиент держит хвост ≤ 24)
-    if jsonb_typeof(nb->'log') = 'array' and jsonb_array_length(nb->'log') <= 40 and pg_column_size(nb->'log') <= 65536 then
-      b := jsonb_set(b, '{log}', nb->'log');
-    end if;
-    if public.komik_num(nb->'joinAt') is not null then b := b || jsonb_build_object('joinAt', public.komik_num(nb->'joinAt')); end if;
-    if public.komik_num(nb->'at')     is not null then b := b || jsonb_build_object('at',     public.komik_num(nb->'at'));     end if;
     res := jsonb_set(res, array[k], b);
   end loop;
   return res;
 end
 $$;
 
--- 4. Триггер-страж: игрок (не команда) пишет общую строку — собираем значение из старого + его разрешённых правок.
---    Upsert сайта (insert … on conflict do update) сначала проходит BEFORE INSERT: если строка уже есть,
---    там не трогаем — разберёт BEFORE UPDATE со старым значением (иначе excluded уже был бы «урезан до пустого»).
+-- помощники стража вызываются только из него (от имени пишущего); через API гостю они ни к чему
+do $$
+declare f text;
+begin
+  foreach f in array array['public.komik_san_entry(jsonb,text)', 'public.komik_san_games(jsonb,jsonb,text)', 'public.komik_san_users(jsonb,jsonb,text)',
+                           'public.komik_san_card(jsonb,jsonb)', 'public.komik_san_tracker(jsonb,jsonb,text)', 'public.komik_log_merge(jsonb,jsonb)'] loop
+    execute format('revoke all on function %s from public, anon', f);
+    execute format('grant execute on function %s to authenticated, service_role', f);
+  end loop;
+end
+$$;
+
+-- 4. Триггер-страж: игрок (не команда) пишет общую строку — собираем значение из ТЕКУЩЕГО + его разрешённых правок.
+--    Upsert сайта (insert … on conflict do update) проходит и BEFORE INSERT, и BEFORE UPDATE: в обоих чистим
+--    относительно текущей строки (повторная чистка ничего не меняет), а строки ещё нет — относительно пустой.
 create or replace function public.komik_kv_guard() returns trigger
 language plpgsql set search_path = '' as $$
 declare me text; o jsonb;
@@ -249,12 +335,13 @@ begin
   if public.komik_is_team() then return new; end if;
   me := public.my_tag();
   if me = '' then return new; end if;                                            -- без тега RLS запись и так не пустит
-  if tg_op = 'INSERT' then
-    if exists (select 1 from public.kv where key = new.key) then return new; end if;
-    o := null;
-  else
-    o := old.value;
+  -- раздутое значение не разбираем вовсе (правило записи проверяет размер уже очищенного): иначе один запрос на
+  -- несколько мегабайт держал бы процессор базы секундами
+  if pg_column_size(new.value) > coalesce(public.kv_player_cap(new.key), 0)
+     or (jsonb_typeof(new.value) = 'array' and jsonb_array_length(new.value) > 2000) then
+    raise exception 'kv: слишком большое значение для %', new.key using errcode = '54000';
   end if;
+  if tg_op = 'INSERT' then o := (select value from public.kv where key = new.key); else o := old.value; end if;
   new.value := case new.key
     when 'comik:games:v1'          then public.komik_san_games(o, new.value, me)
     when 'comik:tracker:shared:v1' then public.komik_san_tracker(o, new.value, me)
@@ -358,8 +445,20 @@ create or replace view public.kv_chars_pub with (security_barrier) as
              from jsonb_each(k.value) g(gk, gv) where jsonb_typeof(g.gv) = 'array'), '{}'::jsonb) as value
     from public.kv k
    where k.key like 'comik:chars:%' and jsonb_typeof(k.value) = 'object';
-revoke all on public.kv_chars_pub from public;
+-- только чтение: вид из одной таблицы Postgres считает «обновляемым», а права Supabase по умолчанию (ALL для anon и
+-- authenticated на всё новое в public) пустили бы через него удаление и запись строк kv в обход правил — вид работает
+-- от владельца. Поэтому права — только select, а любая запись в вид — ошибка
+revoke all on public.kv_chars_pub from public, anon, authenticated;
 grant select on public.kv_chars_pub to anon, authenticated, service_role;
+create or replace function public.komik_read_only() returns trigger
+language plpgsql set search_path = '' as $$
+begin
+  raise exception 'kv_chars_pub — только для чтения' using errcode = '42501';
+end
+$$;
+drop trigger if exists kv_chars_pub_ro on public.kv_chars_pub;
+create trigger kv_chars_pub_ro instead of insert or update or delete on public.kv_chars_pub
+  for each row execute function public.komik_read_only();
 
 -- 8. Пуш-подписки: общая строка → личные. Новые подписки сайт пишет в push:sub:<тег>; рассылка читает обе.
 --    Один адрес (endpoint) — одна запись, самая свежая

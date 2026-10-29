@@ -94,7 +94,8 @@ const sub = ep => `({ endpoint: '${ep}', toJSON(){ return { endpoint: this.endpo
     await ctx.close();
   }
 
-  {
+  if ((await mock('/__mock/fail', 'POST', { v3: true })).pg) console.log('· облако без миграции 10-29 — пропущено: стенд на настоящей базе (она с 10-29)');
+  else {
     console.log('· облако без миграции 10-29');
     await mock('/__mock/fail', 'POST', { v3: false });
     await mock('/__mock/log', 'DELETE');

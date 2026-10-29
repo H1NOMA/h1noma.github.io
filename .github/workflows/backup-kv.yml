@@ -132,7 +132,7 @@ jobs:
           #    коммитом и перезаписывается (force push). Поэтому прежние зашифрованные копии обязаны скачаться
           #    ЦЕЛИКОМ. Старые незашифрованные (kv-*.json.gz) не переносим: с этого запуска их в ветке нет.
           KEEP=$(mktemp -d); mkdir -p "$KEEP/backups"
-          PREV_N=0; PREV_SHA=""
+          PREV_N=0; OPEN_N=0; PREV_SHA=""
           # --exit-code: 0 — ветка есть, 2 — ветки нет (первый запуск), другое — сбой связи с GitHub
           RC=0; git ls-remote --exit-code --heads origin backups >/dev/null || RC=$?
           if [ "$RC" = 0 ]; then
@@ -158,8 +158,15 @@ jobs:
           # 5) Защита от стёртой базы: строки сервер уже сверил сам; здесь — размер: вдвое меньше прошлой копии —
           #    не записываем (прежние копии целы, GitHub пришлёт письмо).
           LAST=$(find "$KEEP/backups" -maxdepth 1 -name 'kv-*.json.gz.gpg' ! -name "kv-$DATE.json.gz.gpg" -printf '%f\n' | sort | tail -n 1)
-          if [ -n "$LAST" ]; then
-            PREV_SIZE=$(stat -c %s "$KEEP/backups/$LAST")
+          PREV_SIZE=""
+          if [ -n "$LAST" ]; then PREV_SIZE=$(stat -c %s "$KEEP/backups/$LAST")
+          elif [ "$OPEN_N" -gt 0 ]; then
+            # переход на шифрование: прошлая копия — открытая. Это gzip того же JSON, а gpg пишет без сжатия, так что
+            # размеры сравнимы; без этой проверки первый же запуск после перехода принял бы и стёртую базу
+            LAST=$(git ls-tree --name-only FETCH_HEAD backups/ | sed -n 's|^backups/\(kv-.*\.json\.gz\)$|\1|p' | sort | tail -n 1)
+            PREV_SIZE=$(git cat-file -s "FETCH_HEAD:backups/$LAST")
+          fi
+          if [ -n "$PREV_SIZE" ]; then
             echo "Размер прошлой копии ($LAST): $PREV_SIZE, сегодня: $SIZE"
             if [ $((SIZE * 2)) -lt "$PREV_SIZE" ]; then
               if [ "$ALLOW_SHRINK" = true ]; then

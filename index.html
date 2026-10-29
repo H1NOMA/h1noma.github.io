@@ -5298,9 +5298,23 @@ async function fetchCloudChars(keys){
   // штампы едут вместе с картой, а запоминает их тот, кто слил карту в CHARS_ALL (charsSeen):
   // чтение, брошенное по тайм-ауту, не должно пометить непринятые листы как виденные
   Object.defineProperty(merged, 'stamps', {value:stamps});
+  Object.defineProperty(merged, 'ownRead', {value:(tg && kvKeys.has(own)) ? tg : ''});   // чья своя строка прочитана из kv — см. charsSeen
   return merged;
 }
-const charsSeen=m=>{ if(m && m.stamps) Object.assign(CHARS_SEEN_AT, m.stamps); };
+const charsSeen=m=>{ if(!m) return; if(m.stamps) Object.assign(CHARS_SEEN_AT, m.stamps);
+  // своя строка прочитана из kv — это и есть правда о своих листах: урезанные копии из витрины, которых в ней нет
+  // (лист удалили на другом устройстве), убираем — иначе запись своей строки ждала бы их полных версий вечно
+  const me=currentTag();
+  if(me && m.ownRead===me) ALL_GAMES.forEach(g=>{ const a=CHARS_ALL[g]; if(Array.isArray(a)) for(let i=a.length-1;i>=0;i--) if(a[i] && a[i]._pub && normTag(a[i].owner||'')===me) a.splice(i,1); }); };
+/* своя строка листов — сразу из kv, не дожидаясь тика: после входа в памяти могут быть урезанные копии своих листов
+   из витрины (сайт открыли гостем), а правка такой копии затёрла бы полный лист */
+let CHARS_OWN_PULL=null;
+function charsOwnRefresh(){
+  const tag=currentTag(); if(!supa || !tag) return Promise.resolve();
+  return CHARS_OWN_PULL || (CHARS_OWN_PULL=fetchCloudChars(['comik:chars:'+tag]).then(m=>{ if(!m) return;
+    ALL_GAMES.forEach(g=>{ CHARS_ALL[g]=mergeSheets(CHARS_ALL[g], m[g]); }); charsSeen(m); bindGameData(); renderPlayers();
+  }).catch(()=>{}).finally(()=>{ CHARS_OWN_PULL=null; }));
+}
 /* Фоновый тик раньше качал листы ВСЕХ игроков (с портретами) каждые 40 с на каждом клиенте.
    Теперь сначала дешёвый зонд — только ключи и штамп записи; полные строки читаем лишь для тех,
    у кого штамп сменился (или его ещё нет: старые строки без штампа читаем один раз, дальше считаем
@@ -5775,6 +5789,9 @@ const mergeSheets = (a,b) => { const me=(typeof currentTag==='function' && curre
     const p=m.get(c.id); if(!p){ m.set(c.id,c); return; }
     const po=normTag(p.owner||''), co=normTag(c.owner||'');
     if(po && co && po!==co){ if(co===me && po!==me) m.set(c.id,c); return; }
+    // свой лист: полная версия из своей строки всегда главнее урезанной копии из витрины, даже если копию
+    // успели «поправить» (штамп новее); и копия полную не заменяет никогда
+    if(me && co===me && !!p._pub!==!!c._pub){ if(p._pub) m.set(c.id,c); return; }
     if(mergeNewer(c,p)) m.set(c.id,c); });
   return [...m.values()]; };
 // c новее p; при равном штампе полный лист новее урезанной копии из витрины (_pub, см. fetchCloudChars)
@@ -5937,7 +5954,7 @@ async function boot(){
     ]);
     if(Array.isArray(bm)) BMARKS=bm;
     gamesAdopt(gm);
-    if(Array.isArray(gl)){ gamesMergeRemote(gl); setTimeout(()=>{ try{ persistGames(true); }catch(e){} }, 1500); }
+    if(Array.isArray(gl)){ gamesMergeRemote(gl, true); setTimeout(()=>{ try{ persistGames(true); }catch(e){} }, 1500); }
   }catch(e){}
   // миграция заявок: теги игроков «@login» → «login»
   let gamesMigrated=false;
@@ -7696,8 +7713,8 @@ function gamesSplit(arr){
   });
   return {live, gone, played};
 }
-/* слить облачную копию ячейки r в свою mine */
-function gameMergeInto(mine, r){
+/* слить облачную копию ячейки r в свою mine (cloud — r пришла из облака, а не из копии на устройстве) */
+function gameMergeInto(mine, r, cloud){
   const gone=Object.assign({}, mine.gone||{});
   Object.keys(r.gone||{}).forEach(t=>{ if((r.gone[t]||0)>(gone[t]||0)) gone[t]=r.gone[t]; });
   const seen=new Map();
@@ -7709,13 +7726,17 @@ function gameMergeInto(mine, r){
   const players=[...seen.values()].filter(p=>gameFresh(p)>(gone[normTag(p.tag)]||0)).sort((a,b)=>(a.at||0)-(b.at||0));
   // поля ячейки (время, место, места) — по правке ГМа; списки уже слиты
   if((r.updatedAt||0)>(mine.updatedAt||0)) Object.assign(mine, r);
-  // Двое заняли последнее место одновременно (каждый видел его свободным) — лишних снимаем по порядку
-  // записи, одинаково на любом клиенте. Только тех, кто записался ПОСЛЕ последней правки ячейки:
-  // если ГМ сам уменьшил число мест, уже записавшихся это не выкидывает
+  // Двое заняли последнее место одновременно (каждый видел его свободным) — лишних снимаем, одинаково на любом
+  // клиенте: сначала тех, кого в облаке нет (облако уже приняло другого: с 29.10 сервер сам не пускает запись
+  // сверх мест — кто первым дошёл, тот и записан), потом — по порядку записи. Только тех, кто записался ПОСЛЕ
+  // последней правки ячейки: если ГМ сам уменьшил число мест, уже записавшихся это не выкидывает
   const lim=parseInt(mine.seats,10)||0, since=+mine.updatedAt||0;
-  for(let i=players.length-1; lim && i>=lim; i--){
-    const p=players[i]; if((+p.at||0)<=since) continue;
-    const k=normTag(p.tag); gone[k]=Math.max(gone[k]||0, gameFresh(p)+1); players.splice(i,1);
+  if(lim && players.length>lim){
+    const inCloud=new Set(cloud ? (r.players||[]).filter(p=>p && p.tag).map(p=>normTag(p.tag)) : []);
+    const extra=players.filter(p=>(+p.at||0)>since)
+      .sort((a,b)=>(inCloud.has(normTag(a.tag))-inCloud.has(normTag(b.tag))) || ((+b.at||0)-(+a.at||0)))
+      .slice(0, players.length-lim);
+    extra.forEach(p=>{ const k=normTag(p.tag); gone[k]=Math.max(gone[k]||0, gameFresh(p)+1); players.splice(players.indexOf(p),1); });
   }
   mine.players=players; mine.gone=gone;
 }
@@ -7733,7 +7754,12 @@ function canonJson(v){
   if(v && typeof v==='object') return '{'+Object.keys(v).sort().filter(k=>v[k]!==undefined).map(k=>JSON.stringify(k)+':'+canonJson(v[k])).join(',')+'}';
   return JSON.stringify(v===undefined?null:v);
 }
-const gamesCanon=arr=>{ const {live,gone,played}=gamesSplit(arr); return canonJson({l:live.slice().sort((a,b)=>a.id<b.id?-1:1), g:gone, p:played.map(x=>x.id).sort()}); };
+// «то же самое» — с теми же правилами, что и запись (gamesPayload): надгробия старше GAME_TOMB_TTL не пишутся, живая копия
+// удалённой сессии — тоже. Иначе одно такое надгробие в облаке (сервер с 29.10 не даёт игроку его убрать) заставляло
+// переписывать строку по кругу и показывать «облако не ответило»
+const gamesCanon=arr=>{ const {live,gone,played}=gamesSplit(arr), cut=Date.now()-GAME_TOMB_TTL, g={};
+  Object.keys(gone).forEach(id=>{ if(gone[id]>cut) g[id]=gone[id]; });
+  return canonJson({l:live.filter(x=>!gone[x.id]).sort((a,b)=>a.id<b.id?-1:1), g, p:played.filter(x=>g[x.id]).map(x=>x.id).sort()}); };
 /* принять надгробия: помнить удаление, убрать сессию из списка, дописать историю своим персонажам */
 function gamesTakeGone(gone, played){
   Object.keys(gone||{}).forEach(id=>{ if((gone[id]||0)>(GAMES_GONE[id]||0)) GAMES_GONE[id]=gone[id]; });
@@ -7742,7 +7768,7 @@ function gamesTakeGone(gone, played){
   if(played && played.length) gamePlayedHistory(played);
 }
 /* Слияние облачной записи на игру с локальной — единственный путь (сохранение, тик, старт) */
-function gamesMergeRemote(remote){
+function gamesMergeRemote(remote, local){
   if(!Array.isArray(remote)) return false;
   const before=canonJson(GAMES)+'|'+Object.keys(GAMES_GONE).length;
   const {live, gone, played}=gamesSplit(remote);
@@ -7754,7 +7780,7 @@ function gamesMergeRemote(remote){
     const mine=byId.get(r.id);
     if(!mine){ GAMES.push(r); byId.set(r.id, r); return; }
     const had=!!me && (mine.players||[]).some(p=>normTag(p.tag)===me);
-    gameMergeInto(mine, r);
+    gameMergeInto(mine, r, !local);
     if(had && !(mine.players||[]).some(p=>normTag(p.tag)===me)) lost.push(mine);
   });
   // свою запись сняли не мы сами (ГМ, гонка за последнее место, отмена с другого устройства) — скажем
@@ -7777,7 +7803,7 @@ function gamePlayedHistory(tombs){
   tombs.forEach(t=>{ const pl=t.played; if(!pl || !pl.chars || !pl.chars.length) return;
     const hid='gp:'+t.id;
     ALL_GAMES.forEach(g=>(CHARS_ALL[g]||[]).forEach(c=>{
-      if(!c || c.deleted || pl.chars.indexOf(c.id)<0) return;
+      if(!c || c.deleted || c._pub || pl.chars.indexOf(c.id)<0) return;
       if(!(c.owner ? normTag(c.owner)===me : ADMIN)) return;          // чужие листы дописывают их владельцы
       c.history=Array.isArray(c.history)?c.history:[];
       if(c.history.some(h=>h && h.hid===hid)) return;
@@ -8797,13 +8823,14 @@ function afterAuthChange(){ renderAcct(); renderPlayers(); renderCats(); applyVi
   // поэтому строки листов перечитываем целиком ближайшим тиком
   // (чистим на месте: CHARS указывает на тот же массив, и новый лист, добавленный в CHARS, не должен потеряться)
   try{ ALL_GAMES.forEach(g=>{ const a=CHARS_ALL[g]; if(Array.isArray(a)) for(let i=a.length-1;i>=0;i--) if(a[i] && a[i].alias) a.splice(i,1); });
-    CHARS_SEEN_AT={}; tickSoon(1500); }catch(e){} }   // «С чего начать» — только гостям: после входа прячем сразу, а не после перезагрузки
+    CHARS_SEEN_AT={}; tickSoon(1500); charsOwnRefresh(); }catch(e){} }   // «С чего начать» — только гостям: после входа прячем сразу, а не после перезагрузки
 function currentTag(){ return SESSION ? normTag(SESSION) : null; }
 function isOwner(c){ return !!(SESSION && c && c.owner && normTag(c.owner)===currentTag()); }
 /* Лист «под кодом» (старый, без владельца) правит только тот, кто ввёл код в этой вкладке (tryEditPlayer).
    Раньше хватало самого факта кода: плитку видят все, и лист открывался в редактор без проверки */
 const CODE_OK=new Set();
-function canEdit(c){ return isOwner(c) || (!!c && !c.owner && !!c.codeHash && CODE_OK.has(c.id)); }
+// урезанная копия из витрины (_pub) не правится никогда: её поля пусты, и правка затёрла бы ими полный лист
+function canEdit(c){ return !!c && !c._pub && (isOwner(c) || (!c.owner && !!c.codeHash && CODE_OK.has(c.id))); }
 /* id листа уходит в onclick строкой ('…'). Облачный JSON с кавычкой в id вышел бы из строки, а esc() тут
    не спасает: &#39; раскодируется обратно в кавычку до разбора обработчика. Такие листы не рисуем вовсе */
 const charIdOk = id => typeof id==='string' && /^[A-Za-z0-9_-]{1,64}$/.test(id);
@@ -8969,7 +8996,7 @@ async function persistCharsNow(retry){
       });
       // свой лист известен только урезанной копией из витрины (открыли сайт гостем и вошли, а свою строку ещё
       // не дочитали): запись без него стёрла бы его из облака, с ним — урезала бы. Ждём полного чтения
-      if(ALL_GAMES.some(g=>mine[g].some(c=>c._pub))){ CHARS_DIRTY=true; return false; }
+      if(ALL_GAMES.some(g=>mine[g].some(c=>c._pub))){ CHARS_DIRTY=true; if(!retry) toast('Лист ещё загружается — правка не сохранена'); return false; }
       // портреты — в свои строки comik:img:<хэш> (лист худеет, а у других он перечитывается без картинок)
       try{ const items=[]; ALL_GAMES.forEach(g=>(mine[g]||[]).forEach(c=>{ if(c && c.ava) items.push({o:c, f:'ava'}); })); await imgOffload(items); }catch(e){}
       mine.at=Date.now();   // штамп записи: по нему фоновый тик у других решает, перечитывать ли строку (fetchCloudCharsChanged)
@@ -11283,6 +11310,7 @@ function openPlayer(id){
   if(!c && ADMIN){ for(const g of Object.keys(CHARS_ALL)){ c=(CHARS_ALL[g]||[]).find(x=>x.id===id); if(c) break; } }
   if(!c || c.deleted) return;
   if(c.owner && !isOwner(c) && !ADMIN){ toast('Лист персонажа виден только владельцу'); return; }   // ГМ видит все листы
+  if(c._pub && isOwner(c)){ toast('Лист загружается…'); charsOwnRefresh(); return; }   // свой лист пока известен только по витрине
   const G=charGame(c);
   const L=sheetL(G);
   const ownW=canEdit(c);
@@ -11653,6 +11681,7 @@ function collectPlayerEdits(src, name){
 function applyPlayerEdits(id, allowEmptyName){
   const i=CHARS.findIndex(x=>x.id===id); if(i<0) return false;
   if(!canEdit(CHARS[i])) return false;
+  if(id===INLINE_ID && INLINE_BASE && INLINE_BASE._pub) return false;   // форма нарисована по урезанной копии
   if(!pf('ep-name')) return false;                       // форма 'ep' не отрисована — нечего собирать
   const name=pval('ep-name'); if(!name && !allowEmptyName) return false;
   const c=CHARS[i], ed=collectPlayerEdits(c, name);
@@ -11689,7 +11718,7 @@ function inlineMarkClean(c){
   INLINE_SNAP=inlineSnapOf(collectPlayerEdits(INLINE_BASE, pval('ep-name')));
 }
 // форма отстаёт от листа: пришла версия новее той, с которой её рисовали (или уже писали поверх такой)
-function inlineStale(c){ return INLINE_STALE || (c.updatedAt||0)>(INLINE_BASE.updatedAt||0); }
+function inlineStale(c){ return INLINE_STALE || (!!INLINE_BASE._pub && !c._pub) || (c.updatedAt||0)>(INLINE_BASE.updatedAt||0); }
 // поля, которые человек тронул в форме после отрисовки/последней записи
 function inlineTouched(name){
   if(!INLINE_BASE || !INLINE_SNAP || !pf('ep-name')) return [];
@@ -13178,7 +13207,7 @@ function restoreBackup(inp){
         if(d.chars && d.chars[g]) CHARS_ALL[g]=mergeSheets(CHARS_ALL[g], d.chars[g]);
         if(d.archive && d.archive[g]) ARCHIVE_ALL[g]=mergeById(ARCHIVE_ALL[g], d.archive[g]);
       });
-      if(Array.isArray(d.games)) gamesMergeRemote(d.games);   // тем же сливом, что облако: очистка, надгробия, записи по свежести
+      if(Array.isArray(d.games)) gamesMergeRemote(d.games, true);   // тем же сливом, что облако: очистка, надгробия, записи по свежести
       if(Array.isArray(d.news)) NEWS=mergeById(NEWS, d.news);
       if(d.chrono) CHRONO_DATA=Object.assign({}, d.chrono, CHRONO_DATA);
       if(d.hero) HERO_EDITS=Object.assign({}, d.hero, HERO_EDITS);
@@ -13262,6 +13291,13 @@ function trkAva(x, proj){
 // для отправки в облако: data:-адрес выкидываем (раздувал строку доски), а короткую ссылку kvimg:<хэш> или файл
 // сайта оставляем — иначе существо из архива, вернувшись с общего стола, теряло картинку (у игроков — всегда)
 function stripAva(x){ const o=Object.assign({}, x); if(!(imgRef(o.ava) || /^img\/[\w\/.-]+$/.test(o.ava||''))) delete o.ava; return o; }
+/* чей персонаж на карточке — тег владельца листа. Сервер (10-29) пускает игрока править живые поля только карточек
+   со своим тегом, а ставит тег ГМ при публикации: строку доски игроки не меняют. Спорный id (копии alias) — без тега */
+function trkCardOwnTag(x){
+  if(!x || !x.charId) return '';
+  for(const g of ALL_GAMES){ const c=(CHARS_ALL[g]||[]).find(k=>k && k.id===x.charId && !k.alias); if(c) return normTag(c.owner||''); }
+  return '';
+}
 function trkMergedList(freshMap, list){
   const prev=TRK_SHARED[gmBoardKey()]||{};
   const m=freshMap||{}; if(!freshMap){ (Array.isArray(prev.list)?prev.list:[]).forEach(p=>{ if(p) m[trkCardKey(p)]=p; }); }
@@ -13269,9 +13305,12 @@ function trkMergedList(freshMap, list){
     // враги/NPC ГМа: их боевые значения ведёт ГМ — берём из локального списка.
     // игроки: ХП/инициатива/спасброски принадлежат игроку — берём из общего стола, чтобы
     // публикация ГМа не откатывала и не «воскрешала» умирающего игрока (спасброски независимы).
-    if(isFoeCard(x)) return stripAva(x);
+    if(isFoeCard(x)){ const f=stripAva(x); delete f.ownTag; return f; }
     const p=m[trkCardKey(x)];
-    return stripAva(p?{...x, hp:p.hp, thp:p.thp, init:p.init, ds:p.ds, conds:Array.isArray(p.conds)?p.conds:(x.conds||[]), conc:(p.conc!=null?!!p.conc:!!x.conc)}:x);
+    const r=stripAva(p?{...x, hp:p.hp, thp:p.thp, init:p.init, ds:p.ds, conds:Array.isArray(p.conds)?p.conds:(x.conds||[]), conc:(p.conc!=null?!!p.conc:!!x.conc)}:x);
+    const own=trkCardOwnTag(x) || (p && typeof p.ownTag==='string' ? p.ownTag : '');   // лист не дочитан — тег прежний
+    if(own) r.ownTag=own; else delete r.ownTag;
+    return r;
   });
 }
 /* ГМ подтягивает «живые» правки игроков (ХП/инициатива/спасброски) из общего стола

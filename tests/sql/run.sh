@@ -61,8 +61,9 @@ NOW="(extract(epoch from now()) * 1000)::bigint"
 UPS="on conflict (key) do update set value = excluded.value"
 q -c "insert into kv values ('comik:chars:testplayer', '{\"at\":1,\"classic\":[{\"id\":\"pc1\",\"owner\":\"testplayer\",\"name\":\"Тест\",\"bio\":\"тайна\",\"ava\":\"data:image/png;base64,AAAA\",\"hp\":10,\"level\":3}]}') $UPS" \
   -c "insert into kv values ('comik:chars:hinoma', '{\"at\":1,\"classic\":[{\"id\":\"npc1\",\"name\":\"Гоблин\",\"notes\":\"спойлер\",\"ava\":\"kvimg:0123456789abcdef0123456789abcdef\"}]}') $UPS" \
+  -c "insert into kv values ('comik:chars:player_two', '{\"at\":1,\"classic\":[{\"id\":\"vpc1\",\"owner\":\"player_two\",\"name\":\"Жертва\",\"level\":2,\"inv\":[\"меч\"]}]}') $UPS" \
   -c "insert into kv values ('comik:games:v1', '[{\"id\":\"g1\",\"title\":\"Игра\",\"seats\":\"2\",\"players\":[{\"tag\":\"herr_teo\",\"name\":\"Тео\",\"at\":100}]},{\"id\":\"g2\",\"seats\":\"1\",\"players\":[{\"tag\":\"herr_teo\",\"at\":100}]}]') $UPS" \
-  -c "insert into kv values ('comik:tracker:shared:v1', '{\"rev\":1,\"at\":1,\"classic::hinoma\":{\"list\":[{\"charId\":\"pc1\",\"name\":\"Тест\",\"hp\":10,\"ds\":{\"s\":1,\"f\":0}},{\"charId\":\"npc1\",\"name\":\"Гоблин\",\"hp\":7}],\"round\":1,\"mapPos\":{\"c:npc1\":{\"x\":1,\"y\":1}}}}') $UPS" \
+  -c "insert into kv values ('comik:tracker:shared:v1', '{\"rev\":1,\"at\":1,\"classic::hinoma\":{\"list\":[{\"charId\":\"pc1\",\"name\":\"Тест\",\"hp\":10,\"ds\":{\"s\":1,\"f\":0}},{\"charId\":\"npc1\",\"name\":\"Гоблин\",\"hp\":7},{\"charId\":\"vpc1\",\"name\":\"Жертва\",\"hp\":9,\"ownTag\":\"player_two\"}],\"round\":1,\"mapPos\":{\"c:npc1\":{\"x\":1,\"y\":1}}},\"legacy::hinoma\":{\"party\":\"g1\",\"list\":[{\"charId\":\"zz1\",\"name\":\"Чужой\",\"hp\":1,\"ownTag\":\"herr_teo\"}],\"log\":[{\"at\":5,\"t\":\"старое\"}]}}') $UPS" \
   -c "insert into kv values ('comik:users:v1', '[{\"tag\":\"hinoma\",\"createdAt\":1}]') $UPS" >/dev/null
 G="(select value v from kv where key = 'comik:games:v1') z"
 T="(select value v from kv where key = 'comik:tracker:shared:v1') z"
@@ -82,6 +83,16 @@ try ok testplayer "игрок: снять свою запись" "insert into kv
 eq "своя снята, отметка стоит" "$(val postgres "select jsonb_array_length(v->0->'players'), v->0->'gone' ? 'testplayer' from $G")" "1|t"
 try ok testplayer "игрок: старая копия записи (старее отметки)" "insert into kv select key, jsonb_set(value, '{0,players}', (value->0->'players') || '[{\"tag\":\"testplayer\",\"at\":2000,\"upd\":2000}]') from kv where key = 'comik:games:v1' $UPS"
 eq "не воскресла" "$(val postgres "select jsonb_array_length(v->0->'players') from $G")" "1"
+NOWV=$(val postgres "select $NOW")
+q -c "update kv set value = value || '[{\"id\":\"gold\",\"deleted\":true,\"updatedAt\":1},{\"id\":\"gdup\",\"deleted\":true,\"updatedAt\":$NOWV},{\"id\":\"gdup\",\"game\":\"classic\",\"players\":[]},{\"id\":\"g4\",\"game\":\"classic\",\"seats\":\"5\",\"players\":[]}]'::jsonb where key = 'comik:games:v1'" >/dev/null
+try ok testplayer "игрок: пишет то, что пишет сайт (без надгробий старше 90 дней и живых копий удалённых)" "insert into kv select key, (select jsonb_agg(x) from jsonb_array_elements(value) x where x->>'id' <> 'gold' and not (x->>'id' = 'gdup' and x->'deleted' is null)) from kv where key = 'comik:games:v1' $UPS"
+eq "облако стало таким же: старого надгробия и живой копии нет" "$(val postgres "select count(*) filter (where x->>'id' = 'gold'), count(*) filter (where x->>'id' = 'gdup') from $G, jsonb_array_elements(v) x")" "0|1"
+try ok testplayer "часы спешат: запись с at/upd из будущего" "insert into kv select key, (select jsonb_agg(case when x->>'id' = 'g4' then jsonb_set(x, '{players}', '[{\"tag\":\"testplayer\",\"at\":1e15,\"upd\":1e15}]') else x end) from jsonb_array_elements(value) x) from kv where key = 'comik:games:v1' $UPS"
+eq "записан, время — не дальше суток вперёд" "$(val postgres "select count(*), bool_and((p->>'at')::numeric < $NOW + 86400000 and (p->>'upd')::numeric < $NOW + 86400000) from $G, jsonb_array_elements(v) x, jsonb_array_elements(x->'players') p where x->>'id' = 'g4'")" "1|t"
+try ok testplayer "и снимает запись отметкой из будущего" "insert into kv select key, (select jsonb_agg(case when x->>'id' = 'g4' then jsonb_set(jsonb_set(x, '{players}', '[]'), '{gone}', '{\"testplayer\":1000000000000001}') else x end) from jsonb_array_elements(value) x) from kv where key = 'comik:games:v1' $UPS"
+eq "снята" "$(val postgres "select jsonb_array_length(x->'players') from $G, jsonb_array_elements(v) x where x->>'id' = 'g4'")" "0"
+try fail testplayer "игрок: расписание из 3000 пустышек (не разбирается вовсе)" "update kv set value = (select jsonb_agg(jsonb_build_object('id', 'x' || i)) from generate_series(1, 3000) i) where key = 'comik:games:v1'"
+try fail anon "аноним: помощники стража через API" "select public.komik_san_games('[]', '[]', 'x')"
 try ok herr_teo "команда: пишет расписание как есть" "update kv set value = jsonb_set(value, '{0,title}', '\"Новая\"') where key = 'comik:games:v1'"
 eq "правка команды прошла" "$(val postgres "select v->0->>'title' from $G")" "Новая"
 
@@ -95,6 +106,26 @@ eq "чужая карточка, раунд, чужая фишка — преж�
    "7|1|2|1|1|77|f"
 try ok testplayer "игрок: ХП строкой-мусором" "update kv set value = jsonb_set(jsonb_set(value, '{rev}', '3'), '{classic::hinoma,list,0,hp}', '\"много\"') where key = 'comik:tracker:shared:v1'"
 eq "мусор не прошёл" "$(val postgres "select v->>'rev', v#>>'{classic::hinoma,list,0,hp}' from $T")" "3|3"
+
+echo "· доска: чужие карточки не присвоить, версию ведёт сервер, журнал только дописывается"
+q -c "update kv set value = jsonb_set(value, '{classic}', (value->'classic') || '[{\"id\":\"npc1\"},{\"id\":\"vpc1\",\"owner\":\"testplayer\"}]') where key = 'comik:chars:testplayer'" >/dev/null
+try ok testplayer "игрок: вписал в свою строку id чужих листов, пишет им ХП и фишки (+ сотня фишек-пустышек)" "update kv set value = jsonb_set(jsonb_set(jsonb_set(jsonb_set(value, '{classic::hinoma,list,1,hp}', '0'), '{classic::hinoma,list,2,hp}', '0'), '{classic::hinoma,list,0,hp}', '4'), '{classic::hinoma,mapPos}', (select jsonb_object_agg('c:fake' || i, jsonb_build_object('x', i, 'y', i)) from generate_series(1, 100) i) || '{\"c:vpc1\":{\"x\":50,\"y\":50},\"c:npc1\":{\"x\":50,\"y\":50},\"c:pc1\":{\"x\":4,\"y\":4}}') where key = 'comik:tracker:shared:v1'"
+eq "своя прошла; гоблин ГМа и чужой персонаж — нет; из фишек — только своя" \
+   "$(val postgres "select v#>>'{classic::hinoma,list,0,hp}', v#>>'{classic::hinoma,list,1,hp}', v#>>'{classic::hinoma,list,2,hp}', (select count(*) from jsonb_object_keys(v#>'{classic::hinoma,mapPos}')), v#>>'{classic::hinoma,mapPos,c:pc1,x}', v#>>'{classic::hinoma,mapPos,c:npc1,x}' from $T")" \
+   "4|7|9|2|4|1"
+try ok player_two "владелец по тегу ГМа (ownTag): ХП своего персонажа" "update kv set value = jsonb_set(value, '{classic::hinoma,list,2,hp}', '5') where key = 'comik:tracker:shared:v1'"
+eq "прошло, хотя чужой вписал этот id в свою строку" "$(val postgres "select v#>>'{classic::hinoma,list,2,hp}' from $T")" "5"
+REV=$(val postgres "select v->>'rev' from $T")
+try ok testplayer "игрок: портит версию доски (0, 6.5, 1e23)" "update kv set value = jsonb_set(value, '{rev}', '0') where key = 'comik:tracker:shared:v1'; update kv set value = jsonb_set(value, '{rev}', '6.5') where key = 'comik:tracker:shared:v1'; update kv set value = jsonb_set(value, '{rev}', '1e23') where key = 'comik:tracker:shared:v1'"
+eq "версия — прежняя + 3: сервер считает сам" "$(val postgres "select v->>'rev' from $T")" "$((REV + 3))"
+try ok hinoma "ГМ: условная запись по версии (как kvCasUpdate) проходит" "with x as (update kv set value = jsonb_set(value, '{rev}', to_jsonb($((REV + 4)))) where key = 'comik:tracker:shared:v1' and value->>'rev' = '$((REV + 3))' returning 1) select 1/count(*) from x"
+try ok testplayer "игрок за столом: журнал [] и запись задним числом с лишним полем" "update kv set value = jsonb_set(value, '{classic::hinoma,log}', '[{\"at\":0,\"t\":\"раньше всех\",\"k\":\"dmg\",\"x\":\"лишнее\"}]') where key = 'comik:tracker:shared:v1'"
+eq "прежнее осталось, новое дописано без лишнего" "$(val postgres "select jsonb_array_length(v#>'{classic::hinoma,log}'), v#>>'{classic::hinoma,log,0,t}', v#>'{classic::hinoma,log,0}' ? 'x' from $T")" "2|раньше всех|f"
+try ok testplayer "игрок не за этим столом: журнал, стук, ХП чужой доски" "update kv set value = jsonb_set(jsonb_set(jsonb_set(value, '{legacy::hinoma,log}', '[]'), '{legacy::hinoma,joinAt}', '123'), '{legacy::hinoma,list,0,hp}', '0') where key = 'comik:tracker:shared:v1'"
+eq "ничего не прошло" "$(val postgres "select jsonb_array_length(v#>'{legacy::hinoma,log}'), coalesce(v#>>'{legacy::hinoma,joinAt}', '-'), v#>>'{legacy::hinoma,list,0,hp}' from $T")" "1|-|1"
+q -c "update kv set value = jsonb_set(value, '{0,players}', (value->0->'players') || '[{\"tag\":\"testplayer\",\"at\":9000,\"upd\":9000}]') where key = 'comik:games:v1'" >/dev/null
+try ok testplayer "записался на игру этой доски — «стучится»" "update kv set value = jsonb_set(value, '{legacy::hinoma,joinAt}', '124') where key = 'comik:tracker:shared:v1'"
+eq "стук прошёл" "$(val postgres "select v#>>'{legacy::hinoma,joinAt}' from $T")" "124"
 try ok herr_teo "команда: раунд" "update kv set value = jsonb_set(value, '{classic::hinoma,round}', '2') where key = 'comik:tracker:shared:v1'"
 eq "правка команды прошла" "$(val postgres "select v#>>'{classic::hinoma,round}' from $T")" "2"
 
@@ -118,10 +149,15 @@ eq "аноним: чужие листы — нет" "$(val anon "select count(*)
 eq "аноним: расписание, доска, реестр — да" "$(val anon "select count(*) from kv where key in ('comik:games:v1', 'comik:tracker:shared:v1', 'comik:users:v1')")" "3"
 eq "аноним: пуш-подписки — нет" "$(val anon "select count(*) from kv where key like 'push:%'")" "0"
 eq "игрок: свои листы и подписки — да, чужие — нет" "$(val testplayer "select string_agg(key, ',' order by key) from kv where key like 'comik:chars:%' or key like 'push:%'")" "comik:chars:testplayer,push:sub:testplayer"
-eq "команда: всё" "$(val herr_teo "select count(*) from kv where key like 'comik:chars:%' or key like 'push:%'")" "5"
+eq "команда: всё" "$(val herr_teo "select count(*) from kv where key like 'comik:chars:%' or key like 'push:%'")" "6"
 eq "витрина: имя и уровень есть; биографии, заметок, base64-портрета нет; kvimg-портрет есть" \
    "$(val anon "select string_agg(value#>>'{classic,0,name}' || ':' || coalesce(value#>>'{classic,0,level}','-') || ':' || (value#>'{classic,0}' ? 'bio' or value#>'{classic,0}' ? 'notes') || ':' || coalesce(value#>>'{classic,0,ava}','-'), ',' order by key) from kv_chars_pub")" \
-   "Гоблин:-:false:kvimg:0123456789abcdef0123456789abcdef,Тест:3:false:-"
+   "Гоблин:-:false:kvimg:0123456789abcdef0123456789abcdef,Жертва:2:false:-,Тест:3:false:-"
+try fail anon       "аноним: удалить листы через витрину" "with x as (delete from kv_chars_pub where key like 'comik:chars:%' returning 1) select 1/count(*) from x"
+try fail testplayer "игрок: удалить листы через витрину" "with x as (delete from kv_chars_pub where key like 'comik:chars:%' returning 1) select 1/count(*) from x"
+try fail anon       "аноним: запись через витрину" "insert into kv_chars_pub (key) values ('zz')"
+try fail testplayer "игрок: правка через витрину" "with x as (update kv_chars_pub set key = key where key like 'comik:chars:%' returning 1) select 1/count(*) from x"
+eq "листы на месте" "$(val postgres "select count(*) from kv where key like 'comik:chars:%'")" "3"
 eq "аноним: devs — ничего" "$(val anon "select count(*) from devs")" "0"
 eq "игрок: devs — ничего" "$(val testplayer "select count(*) from devs")" "0"
 eq "команда: devs — только своя строка" "$(val hinoma "select string_agg(tag, ',') from devs")" "hinoma"

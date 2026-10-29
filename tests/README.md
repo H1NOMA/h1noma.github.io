@@ -33,6 +33,19 @@ node tests/access.js     # права 10-29 со стороны сайта: чу
 PGHOST=/путь/к/сокету PGPORT=55432 PGUSER=postgres bash tests/sql/run.sh
 ```
 
+Тот же сайт против **настоящих** прав и триггеров: база со всеми миграциями и стенд в режиме `--pg` — запросы сайта
+переводятся в SQL и идут через `psql` от имени anon/authenticated с токеном, как у PostgREST (стенд сам сервер не
+имитирует: правила RLS, витрина, санитайзер общих строк — из миграций):
+
+```bash
+export PGHOST=/путь/к/сокету PGPORT=55432 PGUSER=postgres
+bash tests/sql/stand.sh                                               # база komik_stand
+python3 tests/mock_cloud.py --port 8766 --pg komik_stand --seed /tmp/kv.json.gz &
+KOMIK_BASE=http://127.0.0.1:8766 node tests/shared.js   # общие строки: ХП только своей карточки, ГМ ставит тег владельца,
+                                                        # двое на последнее место — сайты сходятся с облаком
+KOMIK_BASE=http://127.0.0.1:8766 node tests/access.js   # и любые другие проверки (smoke.js, flaky.js…)
+```
+
 Серверные скрипты проверяются в песочнице, без root и без настоящего сервера — пути через переменные,
 папки — `mktemp -d`:
 

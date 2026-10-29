@@ -5,6 +5,8 @@
 #  Руками (root):  komik-backup                — снять копию сейчас (или: systemctl start komik-backup)
 #                  komik-backup allow-shrink   — сохранить, даже если строк стало меньше половины (удалили нарочно)
 #                  komik-backup init           — создать парольную фразу, если её ещё нет (это делает push.sh)
+#                  komik-backup import ФАЙЛ.json.gz ГГГГ-ММ-ДД — зашифровать прежнюю открытую копию в копию этого дня
+#                                              (push.sh так переносит копии из ветки backups при переходе на шифрование)
 #  Как устроено:
 #   · снимок — прямо из Postgres (docker exec … psql): вся таблица, без потолка PostgREST в 1000 строк
 #     и без анонимного ключа; формат прежний — JSON-массив {key, value};
@@ -14,7 +16,7 @@
 #   · в /var/www/komik-backup — kv-ГГГГ-ММ-ДД.json.gz.gpg за 7 последних дней, latest.json.gz.gpg и latest.txt
 #     (дата, имя, sha256, размер). Caddy отдаёт их по https://cloud.komikdnd.ru/backup/<имя> (без списка файлов);
 #     GitHub (.github/workflows/backup-kv.yml) забирает latest в ветку backups. Открытого текста там больше нет.
-#   · заодно — уборка копий в /root старше недели (kv-before-restore-*, auth-* кроме самой свежей).
+#   · заодно — уборка копий в /root старше недели (kv-before-restore-*, kv-before-push-*, auth-* кроме самой свежей).
 #  Расшифровать вручную — migrate/RESTORE.md, раздел 10.
 #  Песочница (без root и без docker; tests/README.md):
 #    KOMIK_BK_DIR=… KOMIK_BK_PASS=… KOMIK_BK_DUMP_CMD='cat kv.json' KOMIK_BK_NOPRUNE=1 bash migrate/backup.sh
@@ -70,6 +72,19 @@ if not (isinstance(rows, list) and rows and all(isinstance(r, dict) and isinstan
     sys.exit(1)
 print(len(rows))' 2>/dev/null || true; }
 
+# ── перенос прежней открытой копии (import): только файл дня, latest не трогаем ──
+if [ "$MODE" = import ]; then
+  SRC="${2:-}"; D="${3:-}"
+  [[ "$D" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] && [ -f "$SRC" ] || { bad "import: нужен файл .json.gz и дата ГГГГ-ММ-ДД"; exit 1; }
+  [ ! -e "$OUT/kv-$D.json.gz.gpg" ] || { echo "  kv-$D.json.gz.gpg уже есть — пропускаю"; exit 0; }
+  N=$(rows_of "$SRC"); [ -n "$N" ] || { bad "import: $SRC — не копия таблицы kv"; exit 1; }
+  gpg_enc "$SRC" "$WORK/kv.gpg"
+  { gpg_dec "$WORK/kv.gpg" "$WORK/check.json.gz" && cmp -s "$SRC" "$WORK/check.json.gz"; } || { bad "import: пробная расшифровка не сошлась"; exit 1; }
+  install -m 644 "$WORK/kv.gpg" "$OUT/.kv-$D.tmp"; mv -f "$OUT/.kv-$D.tmp" "$OUT/kv-$D.json.gz.gpg"
+  echo "  kv-$D.json.gz.gpg: строк $N — перенесена и зашифрована"
+  exit 0
+fi
+
 # ── снимок ──
 if [ -n "${KOMIK_BK_DUMP_CMD:-}" ]; then
   # песочница: готовый JSON вместо базы
@@ -85,8 +100,11 @@ ROWS=$(rows_of "$WORK/kv.json.gz")
 
 # ── не меньше половины прошлой копии: иначе стёртая база за неделю вытеснила бы все настоящие копии ──
 PREV=""
-if [ -s "$OUT/latest.json.gz.gpg" ]; then
-  if gpg_dec "$OUT/latest.json.gz.gpg" "$WORK/prev.json.gz" 2>/dev/null; then PREV=$(rows_of "$WORK/prev.json.gz"); fi
+# прошлая — latest; при первом запуске её ещё нет, но могут быть перенесённые из ветки (import) — свежайшая из них
+PREVF="$OUT/latest.json.gz.gpg"
+[ -s "$PREVF" ] || PREVF="$OUT/$(find "$OUT" -maxdepth 1 -name 'kv-*.json.gz.gpg' -printf '%f\n' 2>/dev/null | sort | tail -n 1)"
+if [ -f "$PREVF" ] && [ -s "$PREVF" ]; then
+  if gpg_dec "$PREVF" "$WORK/prev.json.gz" 2>/dev/null; then PREV=$(rows_of "$WORK/prev.json.gz"); fi
   [ -n "$PREV" ] || warn "прошлую копию не удалось прочитать (другая парольная фраза?) — сравнение числа строк пропускаю"
 fi
 if [ -n "$PREV" ] && [ $((ROWS * 2)) -lt "$PREV" ]; then
@@ -121,7 +139,7 @@ echo "Копия $F: строк $ROWS${PREV:+ (в прошлой $PREV)}, $(du -
 
 # ── уборка в /root: копии старше недели (последняя копия аккаунтов остаётся всегда — её берёт setup.sh) ──
 if [ -z "${KOMIK_BK_NOPRUNE:-}" ]; then
-  find /root -maxdepth 1 -name 'kv-before-restore-*.json.gz' -mtime +6 -delete 2>/dev/null || true
+  find /root -maxdepth 1 \( -name 'kv-before-restore-*.json.gz' -o -name 'kv-before-push-*.json.gz' \) -mtime +6 -delete 2>/dev/null || true
   NEWEST=$(find /root -maxdepth 1 -name 'auth-*.sql.gz' -printf '%T@ %p\n' 2>/dev/null | sort -nr | head -n 1 | cut -d' ' -f2-)
   find /root -maxdepth 1 -name 'auth-*.sql.gz' -mtime +6 2>/dev/null | while IFS= read -r f; do [ "$f" = "$NEWEST" ] || rm -f "$f"; done
 fi

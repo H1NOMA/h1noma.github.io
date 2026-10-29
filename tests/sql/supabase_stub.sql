@@ -8,6 +8,11 @@ do $$ begin
   if not exists (select 1 from pg_roles where rolname = 'supabase_admin') then create role supabase_admin nologin; end if;
   if not exists (select 1 from pg_roles where rolname = 'supabase_auth_admin') then create role supabase_auth_admin nologin; end if;
 end $$;
+-- как в Supabase: всё новое в public (таблицы, виды, функции, последовательности) сразу получает права anon и
+-- authenticated — миграции обязаны отбирать лишнее сами (без этого здесь не видно дыр вроде записи через вид)
+alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
+alter default privileges in schema public grant all on functions to anon, authenticated, service_role;
+alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
 create schema auth;
 create table auth.users (id uuid primary key, email text, created_at timestamptz default now());
 create function auth.jwt() returns jsonb language sql stable as $$
@@ -22,4 +27,5 @@ create publication supabase_realtime;
 insert into auth.users (id, email) values
   ('00000000-0000-0000-0000-0000000000a1', 'hinoma@komikdnd.ru'),
   ('00000000-0000-0000-0000-0000000000a2', 'herr_teo@komikdnd.ru'),
-  ('00000000-0000-0000-0000-0000000000b1', 'testplayer@komikdnd.ru');
+  ('00000000-0000-0000-0000-0000000000b1', 'testplayer@komikdnd.ru'),
+  ('00000000-0000-0000-0000-0000000000b2', 'player_two@komikdnd.ru');

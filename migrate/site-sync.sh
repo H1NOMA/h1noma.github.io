@@ -105,7 +105,9 @@ echo "Сайт обновлён: ${SHA:0:7} ($(git -C "$GITD" log -1 --format="%
 # хранится текущая и предыдущая выкладка; сжатое, которым никто не пользуется, — в утиль
 find "$REL" -mindepth 1 -maxdepth 1 -type d \( -name '.part-*' -o -name '.old-*' \) -mmin +60 -exec rm -rf {} +
 mapfile -t OLD < <(find "$REL" -mindepth 1 -maxdepth 1 -type d ! -name '.*' -printf '%T@ %p\n' | sort -nr | tail -n +3 | cut -d' ' -f2-)
-for d in "${OLD[@]}"; do [ "$d" = "$REL/$SHA" ] || rm -rf "$d"; done
+# ту, что сейчас отдаёт Caddy, не трогаем никогда (переезд со старой схемы прервали — /var/www/komik ещё на ней)
+KEEP=$(readlink -f "$WEBROOT" 2>/dev/null || true)
+for d in "${OLD[@]}"; do [ "$d" = "$REL/$SHA" ] || [ "$d" = "$KEEP" ] || rm -rf "$d"; done
 find "$ZC" -type f -links 1 -delete
 
 # раз в сутки: мусор git
