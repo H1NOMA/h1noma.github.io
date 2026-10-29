@@ -52,6 +52,23 @@ const SHOTS = process.argv[2] || '';
     // клавиатура: Enter на кнопке строки
     await page.focus('#fxList tr.fx-has:has-text("Укрытие") .fx-tg'); await page.keyboard.press('Enter'); await page.waitForTimeout(150);
     check(await page.evaluate(() => [...document.querySelectorAll('#fxList tr.fx-has')].find(x => x.textContent.includes('Укрытие')).classList.contains('open')), `${n}: Enter раскрывает строку`);
+    const isOpen = name => page.evaluate(nm => [...document.querySelectorAll('#fxList tr.fx-has')].find(x => x.textContent.includes(nm)).classList.contains('open'), name);
+    // выделение где-то ещё на странице не мешает ▸ и клавиатуре
+    await page.evaluate(() => { const td = [...document.querySelectorAll('#fxList td.fx-f')].find(x => x.closest('tr').textContent.includes('Инициатива')); const r = document.createRange(); r.selectNodeContents(td); getSelection().removeAllRanges(); getSelection().addRange(r); });
+    await page.evaluate(() => [...document.querySelectorAll('#fxList tr.fx-has .fx-tg')].find(x => x.textContent.includes('Атаки толпы')).click());
+    check(await isOpen('Атаки толпы'), `${n}: при выделенном тексте в другой строке ▸ раскрывает`);
+    await page.focus('#fxList tr.fx-has:has-text("Укрытие") .fx-tg'); await page.keyboard.press('Enter'); await page.waitForTimeout(100);
+    check(!(await isOpen('Укрытие')), `${n}: при выделенном тексте Enter сворачивает`);
+    await page.evaluate(() => getSelection().removeAllRanges());
+    // двойной щелчок по формуле (выделить слово) строку не переключает
+    await page.dblclick('#fxList tr.fx-has:has-text("Атаки толпы") td.fx-f'); await page.waitForTimeout(150);
+    check(await isOpen('Атаки толпы'), `${n}: двойной щелчок по формуле не сворачивает строку`);
+    await page.evaluate(() => getSelection().removeAllRanges());
+    if (n === 'phone') {   // примечание стоит сразу под формулой, даже если название в три строки
+      const gap = await page.evaluate(() => { const tr = [...document.querySelectorAll('#fxList .fx-tbl>tbody>tr')].find(x => x.textContent.includes('Атака дальнобойным'));
+        return Math.round(tr.querySelector('.fx-d').getBoundingClientRect().top - tr.querySelector('.fx-f').getBoundingClientRect().bottom); });
+      check(gap < 6, `${n}: примечание под формулой без пустой полосы (${gap} px)`);
+    }
 
     // ничего не вылезает за экран; широкая таблица ячеек листается внутри своей рамки
     await page.click('#fxList details.fx-sec[data-g="Магия"] > summary'); await page.waitForTimeout(150);
@@ -83,6 +100,14 @@ const SHOTS = process.argv[2] || '';
     await page.click('#fxBtn'); await page.waitForTimeout(300);
     const again = await page.evaluate(() => [...document.querySelectorAll('#fxList details.fx-sec[open]')].map(d => d.dataset.g).sort().join(','));
     check(again === 'Бой,Магия', `${n}: при новом открытии раскрыто прежнее (${again})`);
+    await page.waitForTimeout(500);   // окно въехало, фокус в поиске — заголовок и поиск на экране, а не прокручены вверх
+    const top = await page.evaluate(() => Math.round(document.getElementById('fxQ').getBoundingClientRect().top));
+    check(top > 0 && top < 400, `${n}: окно открылось с начала (поиск на ${top} px)`);
+    // запрос только из знаков препинания — это не поиск: раскрытие группы запоминается
+    await page.fill('#fxQ', '. ,'); await page.waitForTimeout(120);
+    await page.click('#fxList details.fx-sec[data-g="Деньги"] > summary'); await page.waitForTimeout(150);
+    check(await page.evaluate(() => FX_OPEN.has('Деньги')), `${n}: при запросе «. ,» раскрытие группы запомнилось`);
+    await page.click('#fxList details.fx-sec[data-g="Деньги"] > summary'); await page.waitForTimeout(150);
     await page.evaluate(() => closeModal());
 
     await page.evaluate(() => go('news')); await page.waitForTimeout(300);
