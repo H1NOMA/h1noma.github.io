@@ -64,8 +64,18 @@ language sql immutable set search_path = '' as $$
   select case when jsonb_typeof(j) in ('string', 'number') then left(j #>> '{}', n) end
 $$;
 
+-- Помощники стража — в своей схеме: PostgREST отдаёт наружу только public, так что вызвать их через API (и нагрузить
+-- базу огромными аргументами) нельзя. Страж работает от имени пишущего — ему нужно право на схему и на вызов
+create schema if not exists komik_priv;
+revoke all on schema komik_priv from public;
+grant usage on schema komik_priv to authenticated, service_role;
+-- (черновые версии в public — если остались от проб)
+drop function if exists public.komik_san_entry(jsonb, text), public.komik_san_games(jsonb, jsonb, text),
+  public.komik_san_users(jsonb, jsonb, text), public.komik_my_chars(), public.komik_my_chars(text), public.komik_ids_alone(text[]),
+  public.komik_san_card(jsonb, jsonb), public.komik_log_merge(jsonb, jsonb), public.komik_san_tracker(jsonb, jsonb, text);
+
 -- 1. Расписание: запись игрока в сессии — только известные поля, безопасные значения (как gameClean на сайте)
-create or replace function public.komik_san_entry(p jsonb, me text) returns jsonb
+create or replace function komik_priv.komik_san_entry(p jsonb, me text) returns jsonb
 language sql immutable set search_path = '' as $$
   select jsonb_strip_nulls(jsonb_build_object(
     'tag',      case when lower(coalesce(p->>'tag','')) = me then p->>'tag' else me end,
@@ -78,7 +88,7 @@ language sql immutable set search_path = '' as $$
     'upd',      public.komik_num(p->'upd')))
 $$;
 
-create or replace function public.komik_san_games(o jsonb, n jsonb, me text) returns jsonb
+create or replace function komik_priv.komik_san_games(o jsonb, n jsonb, me text) returns jsonb
 language plpgsql stable set search_path = '' as $$
 declare
   res jsonb := '[]'; s jsonb; ns jsonb; mine jsonb; was jsonb; others jsonb; nm jsonb; ntomb jsonb; otomb jsonb;
@@ -120,7 +130,7 @@ begin
     -- отметка снятия «из будущего» (часы устройства спешат) — считаем её «сейчас», если запись старше
     if gone_n is not null and gone_n > now_ms + day then gone_n := case when fresh_was < now_ms then now_ms end; end if;
     if mine is not null then
-      mine := public.komik_san_entry(mine, me);
+      mine := komik_priv.komik_san_entry(mine, me);
       if coalesce(public.komik_num(mine->'upd'), 0) > now_ms + day then mine := mine || jsonb_build_object('upd', now_ms); end if;
       if was is not null then mine := mine || jsonb_build_object('at', coalesce(was->'at', mine->'at'));   -- место в очереди своё, не переставить
       elsif coalesce(public.komik_num(mine->'at'), 0) > now_ms + day then mine := mine || jsonb_build_object('at', now_ms);
@@ -146,7 +156,7 @@ end
 $$;
 
 -- 2. Реестр логинов: только дописать себя
-create or replace function public.komik_san_users(o jsonb, n jsonb, me text) returns jsonb
+create or replace function komik_priv.komik_san_users(o jsonb, n jsonb, me text) returns jsonb
 language sql stable set search_path = '' as $$
   select case
     when exists (select 1 from jsonb_array_elements(oo) u where lower(coalesce(u->>'tag','')) = me) then oo
@@ -160,7 +170,7 @@ $$;
 --    а строку доски игрок не меняет. У карточек без тега (доска, опубликованная сайтом до 29.10) — id листа из своей
 --    строки, которого нет ни в чьей другой строке листов: свою строку игрок пишет сам, и чужой id, вписанный туда,
 --    так не пройдёт (а владелец листа при этом свою карточку тоже не правит — до первой публикации доски ГМом).
-create or replace function public.komik_my_chars() returns text[]
+create or replace function komik_priv.komik_my_chars() returns text[]
 language sql stable security definer set search_path = '' as $$
   select coalesce(array_agg(distinct s->>'id'), '{}')
     from public.kv k,
@@ -170,21 +180,17 @@ language sql stable security definer set search_path = '' as $$
      and jsonb_typeof(s) = 'object' and coalesce(s->>'id','') <> '' and coalesce(s->>'alias','') = ''
      and (s->>'owner' is null or lower(s->>'owner') = public.my_tag()) and s->'deleted' is distinct from 'true'::jsonb
 $$;
-create or replace function public.komik_ids_alone(ids text[]) returns text[]
+create or replace function komik_priv.komik_ids_alone(ids text[]) returns text[]
 language sql stable security definer set search_path = '' as $$
-  select coalesce(array_agg(i), '{}') from unnest(ids) i
+  select coalesce(array_agg(i), '{}') from unnest(ids[1:100]) i   -- страж передаёт несколько id; больше — не разбираем
    where public.my_tag() <> '' and not exists (
      select 1 from public.kv k
       where k.key like 'comik:chars:%' and k.key <> 'comik:chars:' || public.my_tag() and jsonb_typeof(k.value) = 'object'
         and jsonb_path_exists(k.value, '$.*[*] ? (@.id == $id)', jsonb_build_object('id', i)))
 $$;
-revoke all on function public.komik_my_chars() from public, anon;
-grant execute on function public.komik_my_chars() to authenticated, service_role;
-revoke all on function public.komik_ids_alone(text[]) from public, anon;
-grant execute on function public.komik_ids_alone(text[]) to authenticated, service_role;
 
 -- карточка своего персонажа: «живые» поля — из новой версии (нет поля — снято, как ds:null у клиента), остальное — старое
-create or replace function public.komik_san_card(oc jsonb, nc jsonb) returns jsonb
+create or replace function komik_priv.komik_san_card(oc jsonb, nc jsonb) returns jsonb
 language plpgsql immutable set search_path = '' as $$
 declare r jsonb := oc; f text; x numeric;
 begin
@@ -224,7 +230,7 @@ $$;
 
 -- журнал доски: прежние записи остаются, новые — дописываются (только известные поля); хвост — 24 последних по времени,
 -- повторы (время + текст) — один раз, как в архиве ГМа (trkLogArc)
-create or replace function public.komik_log_merge(ol jsonb, nl jsonb) returns jsonb
+create or replace function komik_priv.komik_log_merge(ol jsonb, nl jsonb) returns jsonb
 language sql immutable set search_path = '' as $$
   select coalesce(jsonb_agg(e order by a nulls first), '[]') from (
     select e, a from (
@@ -241,7 +247,7 @@ language sql immutable set search_path = '' as $$
     order by a desc nulls last limit 24) z
 $$;
 
-create or replace function public.komik_san_tracker(o jsonb, n jsonb, me text) returns jsonb
+create or replace function komik_priv.komik_san_tracker(o jsonb, n jsonb, me text) returns jsonb
 language plpgsql stable set search_path = '' as $$
 declare
   res jsonb; k text; ob jsonb; nb jsonb; b jsonb; mp jsonb; pk text; pv jsonb; nl jsonb;
@@ -265,9 +271,9 @@ begin
       from jsonb_array_elements(ob->'list') c
      where jsonb_typeof(c) = 'object' and coalesce(c->>'charId', '') <> '' and c->'foe' is distinct from 'true'::jsonb;
     if cardinality(unst) > 0 then
-      if myids is null then myids := public.komik_my_chars(); end if;
+      if myids is null then myids := komik_priv.komik_my_chars(); end if;
       unst := array(select unnest(unst) intersect select unnest(myids));
-      if cardinality(unst) > 0 then mine := mine || public.komik_ids_alone(unst); end if;
+      if cardinality(unst) > 0 then mine := mine || komik_priv.komik_ids_alone(unst); end if;
     end if;
     b := ob;
     -- «постучался»: записался на игру этой доски, а карточки ещё нет — ГМ досадит (trkPartyCatchup)
@@ -285,7 +291,7 @@ begin
                 select distinct on (x->>'charId') x->>'charId' as id, x from jsonb_array_elements(nb->'list') with ordinality t(x, i)
                  where jsonb_typeof(x) = 'object' and x->>'charId' = any(mine) order by x->>'charId', i) z), '{}');
         b := jsonb_set(b, '{list}', (select jsonb_agg(case when jsonb_typeof(c) = 'object' and c->>'charId' = any(mine) and nl ? (c->>'charId')
-                                                           then public.komik_san_card(c, nl->(c->>'charId')) else c end order by i)
+                                                           then komik_priv.komik_san_card(c, nl->(c->>'charId')) else c end order by i)
                                        from jsonb_array_elements(ob->'list') with ordinality t(c, i)));
       end if;
       -- своя фишка на карте (ключ c:<id> — только своей карточки этой доски)
@@ -301,7 +307,7 @@ begin
       end if;
       -- журнал доски: игрок дописывает свои действия (урон, броски), читает только ГМ
       if jsonb_typeof(nb->'log') = 'array' and jsonb_array_length(nb->'log') <= 40 then
-        b := jsonb_set(b, '{log}', public.komik_log_merge(ob->'log', nb->'log'));
+        b := jsonb_set(b, '{log}', komik_priv.komik_log_merge(ob->'log', nb->'log'));
       end if;
       if public.komik_num(nb->'at') is not null then b := b || jsonb_build_object('at', least(public.komik_num(nb->'at'), now_ms + 86400000)); end if;
     end if;
@@ -311,12 +317,13 @@ begin
 end
 $$;
 
--- помощники стража вызываются только из него (от имени пишущего); через API гостю они ни к чему
+-- помощники стража вызываются только из него (от имени пишущего игрока)
 do $$
 declare f text;
 begin
-  foreach f in array array['public.komik_san_entry(jsonb,text)', 'public.komik_san_games(jsonb,jsonb,text)', 'public.komik_san_users(jsonb,jsonb,text)',
-                           'public.komik_san_card(jsonb,jsonb)', 'public.komik_san_tracker(jsonb,jsonb,text)', 'public.komik_log_merge(jsonb,jsonb)'] loop
+  foreach f in array array['komik_priv.komik_san_entry(jsonb,text)', 'komik_priv.komik_san_games(jsonb,jsonb,text)', 'komik_priv.komik_san_users(jsonb,jsonb,text)',
+                           'komik_priv.komik_my_chars()', 'komik_priv.komik_ids_alone(text[])', 'komik_priv.komik_san_card(jsonb,jsonb)',
+                           'komik_priv.komik_log_merge(jsonb,jsonb)', 'komik_priv.komik_san_tracker(jsonb,jsonb,text)'] loop
     execute format('revoke all on function %s from public, anon', f);
     execute format('grant execute on function %s to authenticated, service_role', f);
   end loop;
@@ -343,9 +350,9 @@ begin
   end if;
   if tg_op = 'INSERT' then o := (select value from public.kv where key = new.key); else o := old.value; end if;
   new.value := case new.key
-    when 'comik:games:v1'          then public.komik_san_games(o, new.value, me)
-    when 'comik:tracker:shared:v1' then public.komik_san_tracker(o, new.value, me)
-    when 'comik:users:v1'          then public.komik_san_users(o, new.value, me)
+    when 'comik:games:v1'          then komik_priv.komik_san_games(o, new.value, me)
+    when 'comik:tracker:shared:v1' then komik_priv.komik_san_tracker(o, new.value, me)
+    when 'comik:users:v1'          then komik_priv.komik_san_users(o, new.value, me)
   end;
   return new;
 end

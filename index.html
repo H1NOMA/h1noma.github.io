@@ -7713,8 +7713,8 @@ function gamesSplit(arr){
   });
   return {live, gone, played};
 }
-/* слить облачную копию ячейки r в свою mine (cloud — r пришла из облака, а не из копии на устройстве) */
-function gameMergeInto(mine, r, cloud){
+/* слить копию ячейки r в свою mine. cloudPl — кто записан в этой ячейке в облаке (если известно) */
+function gameMergeInto(mine, r, cloudPl){
   const gone=Object.assign({}, mine.gone||{});
   Object.keys(r.gone||{}).forEach(t=>{ if((r.gone[t]||0)>(gone[t]||0)) gone[t]=r.gone[t]; });
   const seen=new Map();
@@ -7730,10 +7730,11 @@ function gameMergeInto(mine, r, cloud){
   // клиенте: сначала тех, кого в облаке нет (облако уже приняло другого: с 29.10 сервер сам не пускает запись
   // сверх мест — кто первым дошёл, тот и записан), потом — по порядку записи. Только тех, кто записался ПОСЛЕ
   // последней правки ячейки: если ГМ сам уменьшил число мест, уже записавшихся это не выкидывает
+  // Запись, которой в облаке нет, сервер сверх мест не примет никогда — её снимаем, даже если она старше правки ячейки
   const lim=parseInt(mine.seats,10)||0, since=+mine.updatedAt||0;
   if(lim && players.length>lim){
-    const inCloud=new Set(cloud ? (r.players||[]).filter(p=>p && p.tag).map(p=>normTag(p.tag)) : []);
-    const extra=players.filter(p=>(+p.at||0)>since)
+    const inCloud=new Set((cloudPl||[]).filter(p=>p && p.tag).map(p=>normTag(p.tag)));
+    const extra=players.filter(p=>(cloudPl && !inCloud.has(normTag(p.tag))) || (+p.at||0)>since)
       .sort((a,b)=>(inCloud.has(normTag(a.tag))-inCloud.has(normTag(b.tag))) || ((+b.at||0)-(+a.at||0)))
       .slice(0, players.length-lim);
     extra.forEach(p=>{ const k=normTag(p.tag); gone[k]=Math.max(gone[k]||0, gameFresh(p)+1); players.splice(players.indexOf(p),1); });
@@ -7779,8 +7780,11 @@ function gamesMergeRemote(remote, local){
     if(GAMES_GONE[r.id]) return;
     const mine=byId.get(r.id);
     if(!mine){ GAMES.push(r); byId.set(r.id, r); return; }
-    const had=!!me && (mine.players||[]).some(p=>normTag(p.tag)===me);
-    gameMergeInto(mine, r, !local);
+    // local — r это копия с устройства (старт с неотправленной записью, возврат из резервной копии), а mine уже
+    // из облака: кто записан в облаке — это mine, а не r
+    const has=pl=>!!me && (pl||[]).some(p=>p && normTag(p.tag)===me);
+    const had=has(mine.players) || (local && has(r.players));
+    gameMergeInto(mine, r, local ? (mine.players||[]).slice() : r.players);
     if(had && !(mine.players||[]).some(p=>normTag(p.tag)===me)) lost.push(mine);
   });
   // свою запись сняли не мы сами (ГМ, гонка за последнее место, отмена с другого устройства) — скажем

@@ -92,7 +92,8 @@ eq "записан, время — не дальше суток вперёд" "$
 try ok testplayer "и снимает запись отметкой из будущего" "insert into kv select key, (select jsonb_agg(case when x->>'id' = 'g4' then jsonb_set(jsonb_set(x, '{players}', '[]'), '{gone}', '{\"testplayer\":1000000000000001}') else x end) from jsonb_array_elements(value) x) from kv where key = 'comik:games:v1' $UPS"
 eq "снята" "$(val postgres "select jsonb_array_length(x->'players') from $G, jsonb_array_elements(v) x where x->>'id' = 'g4'")" "0"
 try fail testplayer "игрок: расписание из 3000 пустышек (не разбирается вовсе)" "update kv set value = (select jsonb_agg(jsonb_build_object('id', 'x' || i)) from generate_series(1, 3000) i) where key = 'comik:games:v1'"
-try fail anon "аноним: помощники стража через API" "select public.komik_san_games('[]', '[]', 'x')"
+try fail anon "аноним: помощники стража (схема komik_priv)" "select komik_priv.komik_san_games('[]', '[]', 'x')"
+eq "в public помощников стража нет — PostgREST их наружу не отдаёт" "$(val postgres "select count(*) from pg_proc where pronamespace = 'public'::regnamespace and proname ~ '^komik_(san_|my_chars|ids_alone|log_merge)'")" "0"
 try ok herr_teo "команда: пишет расписание как есть" "update kv set value = jsonb_set(value, '{0,title}', '\"Новая\"') where key = 'comik:games:v1'"
 eq "правка команды прошла" "$(val postgres "select v->0->>'title' from $G")" "Новая"
 

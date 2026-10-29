@@ -69,6 +69,31 @@ const { launch, openPage, login, mock, rows, check, done } = require('./lib');
     }
   }
 
+  console.log('· расписание: записался без сети, открыл сайт — место уже занято');
+  {
+    const day = 864e5, t = Date.now();
+    const gs3 = { id: 'gs3', game: 'classic', title: 'Офлайн', seats: 1, createdAt: t - 5 * day, updatedAt: t - 2 * day };
+    const r = await rows();
+    r['comik:games:v1'] = (r['comik:games:v1'] || []).filter(x => x.id !== 'gs3').concat([{ ...gs3, players: [{ tag: 'player_two', name: 'Второй', at: t - day, upd: t - day }] }]);
+    await mock('/__mock/rows', 'POST', Object.entries(r).map(([key, value]) => ({ key, value })));
+    // запись testplayer на устройстве (до правки ячейки ГМом), в облако не ушла; сайт открыт заново уже со связью
+    const { page, ctx, errs } = await page2('testplayer');
+    await page.evaluate(([g, t, day]) => { const mine = JSON.parse(localStorage.getItem('comik:games:v1') || '[]').filter(x => x.id !== 'gs3');
+      mine.push({ ...g, players: [{ tag: 'testplayer', name: 'Тест', at: t - 3 * day, upd: t - 3 * day }] });
+      localStorage.setItem('comik:games:v1', JSON.stringify(mine)); localStorage.setItem('comik:games:dirty', '1'); }, [gs3, t, day]);
+    await mock('/__mock/log', 'DELETE');
+    await page.reload(); await page.waitForFunction(() => typeof SESSION_READY !== 'undefined' && SESSION_READY === true, null, { timeout: 30000 });
+    await page.waitForTimeout(5000);
+    const writes = (await mock('/__mock/log')).filter(x => x.key === 'comik:games:v1' && x.method !== 'GET').length;
+    const cloud = ((await rows())['comik:games:v1'] || []).find(x => x.id === 'gs3' && !x.deleted) || {};
+    const st = await page.evaluate(() => ({ dirty: GAMES_DIRTY, who: ((GAMES.find(s => s.id === 'gs3') || {}).players || []).map(p => p.tag).join(',') }));
+    check((cloud.players || []).map(p => p.tag).join(',') === 'player_two', `в облаке место за тем, кто успел (${(cloud.players || []).map(p => p.tag).join(',')})`);
+    check(!st.dirty && st.who === 'player_two', `сайт согласен с облаком (${st.who}), не «грязный»`);
+    check(writes <= 2, `записей расписания после старта: ${writes} (не по кругу)`);
+    check(errs.length === 0, 'ошибок в консоли нет' + (errs.length ? '\n    ' + errs.slice(0, 5).join('\n    ') : ''));
+    await ctx.close();
+  }
+
   await mock('/__mock/rows', 'POST', seed);
   await b.close();
   done();
