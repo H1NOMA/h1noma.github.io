@@ -1,17 +1,20 @@
-name: Бэкап базы (Supabase kv)
+name: Бэкап базы (зашифрованная копия kv)
 
-# Раз в сутки выгружает всю таблицу kv из Supabase и складывает
-# сжатый снапшот в отдельную ветку `backups` (main не трогается, сайт не пересобирается).
+# Раз в сутки забирает с сервера ЗАШИФРОВАННУЮ копию таблицы kv и складывает её в отдельную ветку `backups`
+# (main не трогается, сайт не пересобирается). Копию снимает и шифрует сам сервер (migrate/backup.sh, таймер
+# komik-backup.timer, ~02:40 UTC): прямо из базы, всю таблицу, gpg (AES-256) парольной фразой владельца.
+# Сюда приходит только файл gpg — ключей облака в этом workflow нет, и открытый текст в ветку не попадает:
+# если файл не скачался, устарел или не похож на зашифрованный — workflow падает (GitHub пришлёт письмо),
+# а прежние копии в ветке остаются как были.
 # Можно запустить вручную: вкладка Actions → этот workflow → Run workflow.
-# Если бэкап упал (GitHub пришлёт письмо), прежние копии целы: в ветку в этот раз ничего не записано.
 
 on:
   schedule:
-    - cron: '17 3 * * *'   # ежедневно ~03:17 UTC
+    - cron: '17 3 * * *'   # ежедневно ~03:17 UTC — после копии на сервере
   workflow_dispatch:
     inputs:
       allow_shrink:
-        description: 'Сохранить копию, даже если строк в базе стало вдвое меньше (только если их удалили нарочно)'
+        description: 'Сохранить копию, даже если она вдвое меньше прошлой (только если данные удалили нарочно)'
         type: boolean
         default: false
 
@@ -29,51 +32,122 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Дамп таблицы kv и коммит в ветку backups
+      - name: Забрать зашифрованную копию с сервера и записать в ветку backups
         env:
-          # Публичный anon-ключ (только чтение; запись закрыта RLS) — тот же, что в index.html
-          SUPA_URL: https://cloud.komikdnd.ru
-          SUPA_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzg5MDg1MzA1LCJleHAiOjIxMDQ0NDUzMDV9.7evXWwQ2bbrEVPTpfMEnrFv8ON5dFC_iU-v7MiVQPyc
+          BK_URL: https://cloud.komikdnd.ru/backup
           ALLOW_SHRINK: ${{ inputs.allow_shrink }}   # по расписанию — пусто (= нет)
         run: |
           set -euo pipefail
-          DATE=$(date -u +%Y-%m-%d)
-          SNAP="/tmp/kv-$DATE.json.gz"
-          KEEP_DAYS=7   # храним копии только за последнюю неделю: сегодняшняя + 6 предыдущих дней, старше — удаляем
-          CUTOFF=$(date -u -d "$DATE - $((KEEP_DAYS - 1)) days" +%Y-%m-%d)   # самая старая дата, которая остаётся
+          KEEP_DAYS=7        # храним копии только за последнюю неделю: день копии + 6 предыдущих, старше — удаляем
+          MAX_AGE_H=30       # сервер снимает копию раз в сутки; старше 30 часов — значит, перестал
+          MIN_SIZE=100       # меньше — даже не заголовок шифра (пустую таблицу отсекает сам сервер)
+          MAX_SIZE=$((500 * 1024 * 1024))
+          DL=$(mktemp -d)
 
-          echo "Выгружаю таблицу kv…"
-          curl -sS --fail --max-time 180 \
-            "$SUPA_URL/rest/v1/kv?select=*" \
-            -H "apikey: $SUPA_KEY" -H "Authorization: Bearer $SUPA_KEY" \
-            | gzip -9 > "$SNAP"
-          echo "Снапшот: $(du -h "$SNAP" | cut -f1)"
-          # пустой ответ или ошибка вместо таблицы (облако лежит, ключ сменился) — не коммитим:
-          # иначе ротация вытеснила бы настоящие копии пустыми
-          ROWS=$(gzip -dc "$SNAP" | python3 -c 'import json,sys; d=json.load(sys.stdin); assert isinstance(d,list) and len(d)>0, "пустой снапшот"; print(len(d))')
-          echo "Строк сегодня: $ROWS"
+          # 1) latest.txt (дата, имя, sha256) и сам файл. sha256 не сошёлся — сервер мог как раз подменять копию
+          #    между двумя запросами: пробуем ещё раз
+          GOT=""
+          for TRY in 1 2 3; do
+            if curl -fsS --max-time 60 --retry 2 -o "$DL/latest.txt" "$BK_URL/latest.txt" \
+               && curl -fsS --max-time 600 --retry 2 -o "$DL/latest.json.gz.gpg" "$BK_URL/latest.json.gz.gpg"; then
+              WANT=$(sed -n 's/^sha256=\([0-9a-f]\{64\}\)$/\1/p' "$DL/latest.txt")
+              HAVE=$(sha256sum "$DL/latest.json.gz.gpg" | cut -d' ' -f1)
+              if [ -n "$WANT" ] && [ "$WANT" = "$HAVE" ]; then GOT=1; break; fi
+              echo "::warning::sha256 копии не совпал с latest.txt (попытка $TRY)"
+            else
+              echo "::warning::Сервер не отдал копию (попытка $TRY)"
+            fi
+            sleep 20
+          done
+          if [ -z "$GOT" ]; then
+            echo "::error::Не удалось скачать копию с сервера ($BK_URL/latest.json.gz.gpg) или sha256 не совпал — ветку не трогаю. На сервере: systemctl status komik-backup; journalctl -u komik-backup -n 30"
+            exit 1
+          fi
 
-          # Ветка backups хранит ТОЛЬКО последнюю неделю. Раньше старые файлы удалялись из дерева, но каждый
-          # ежедневный коммит навсегда оставался в истории (~2,5 МБ в день в публичном репозитории).
-          # Теперь ветка каждый раз собирается заново одним коммитом: снапшоты за $KEEP_DAYS дней + README,
-          # и перезаписывается (force push) — всё, что старше недели, уходит из истории целиком.
-          # Поэтому прежние копии обязаны скачаться ЦЕЛИКОМ: раньше сбой скачивания молча глотался,
-          # и force push оставил бы в ветке одну сегодняшнюю копию вместо недели.
+          # 2) свежесть: дата и время снятия — из latest.txt
+          DATE=$(sed -n 's/^date=\([0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}\)$/\1/p' "$DL/latest.txt")
+          CREATED=$(sed -n 's/^created=\([0-9T:Z-]\{20\}\)$/\1/p' "$DL/latest.txt")
+          if [ -z "$DATE" ] || [ -z "$CREATED" ] || [ "$(date -u -d "$CREATED" +%F)" != "$DATE" ]; then
+            echo "::error::В latest.txt нет даты или она не сходится — ветку не трогаю"; exit 1
+          fi
+          AGE_H=$(( ($(date -u +%s) - $(date -u -d "$CREATED" +%s)) / 3600 ))
+          echo "Копия на сервере: $DATE (снята $CREATED, $AGE_H ч назад)"
+          if [ "$AGE_H" -gt "$MAX_AGE_H" ] || [ "$AGE_H" -lt -1 ]; then
+            echo "::error::Копии на сервере $AGE_H ч — сервер перестал их снимать. На сервере: systemctl status komik-backup.timer; journalctl -u komik-backup -n 30"
+            exit 1
+          fi
+
+          # 3) это действительно файл, зашифрованный паролем (OpenPGP symmetric), и ничего больше:
+          #    первый пакет — 3 (ключ из пароля; байт 0x8c или 0xc3), последний — 18/20 (шифр с проверкой целостности),
+          #    пакеты ровно до конца файла. Открытые данные (сжатые/литеральные пакеты, gzip, JSON) — отказ.
+          SIZE=$(stat -c %s "$DL/latest.json.gz.gpg")
+          if [ "$SIZE" -lt "$MIN_SIZE" ] || [ "$SIZE" -gt "$MAX_SIZE" ]; then
+            echo "::error::Размер копии $SIZE байт — не похоже на таблицу сайта, ветку не трогаю"; exit 1
+          fi
+          python3 -I - "$DL/latest.json.gz.gpg" <<'PY'
+          import sys
+          data = open(sys.argv[1], 'rb').read()
+          def fail(m):
+              print('::error::Копия не прошла проверку: ' + m + ' — ветку не трогаю'); sys.exit(1)
+          if not data or data[0] not in (0x8C, 0xC3):
+              fail('первый байт %s, а у зашифрованного паролем OpenPGP — 0x8c или 0xc3' % (hex(data[0]) if data else 'пусто'))
+          pos, tags = 0, []
+          while pos < len(data):
+              b = data[pos]; pos += 1
+              if not b & 0x80:
+                  fail('битый заголовок пакета на смещении %d' % (pos - 1))
+              if b & 0x40:                                   # новый формат заголовка
+                  tag = b & 0x3F
+                  while True:
+                      if pos >= len(data): fail('файл обрезан')
+                      l1 = data[pos]; pos += 1; part = False
+                      if l1 < 192: n = l1
+                      elif l1 < 224:
+                          if pos >= len(data): fail('файл обрезан')
+                          n = ((l1 - 192) << 8) + data[pos] + 192; pos += 1
+                      elif l1 == 255:
+                          if pos + 4 > len(data): fail('файл обрезан')
+                          n = int.from_bytes(data[pos:pos + 4], 'big'); pos += 4
+                      else:
+                          n = 1 << (l1 & 0x1F); part = True    # длина частями
+                      pos += n
+                      if pos > len(data): fail('файл обрезан')
+                      if not part: break
+              else:                                          # старый формат заголовка
+                  tag, lt = (b >> 2) & 0x0F, b & 3
+                  if lt == 3: n = len(data) - pos
+                  else:
+                      k = (1, 2, 4)[lt]
+                      if pos + k > len(data): fail('файл обрезан')
+                      n = int.from_bytes(data[pos:pos + k], 'big'); pos += k
+                  pos += n
+                  if pos > len(data): fail('файл обрезан')
+              tags.append(tag)
+          if len(tags) < 2 or tags[-1] not in (18, 20) or any(t != 3 for t in tags[:-1]):
+              fail('пакеты %s, а у зашифрованного паролем файла — 3, затем 18 или 20' % tags)
+          print('OpenPGP: пакеты %s, %d байт — зашифровано паролем ✓' % (tags, len(data)))
+          PY
+
+          # 4) Прежние копии из ветки. Ветка хранит ТОЛЬКО последнюю неделю: каждый раз собирается заново одним
+          #    коммитом и перезаписывается (force push). Поэтому прежние зашифрованные копии обязаны скачаться
+          #    ЦЕЛИКОМ. Старые незашифрованные (kv-*.json.gz) не переносим: с этого запуска их в ветке нет.
           KEEP=$(mktemp -d); mkdir -p "$KEEP/backups"
-          HAD_BRANCH=0; PREV_N=0; PREV_SHA=""
+          PREV_N=0; PREV_SHA=""
           # --exit-code: 0 — ветка есть, 2 — ветки нет (первый запуск), другое — сбой связи с GitHub
           RC=0; git ls-remote --exit-code --heads origin backups >/dev/null || RC=$?
           if [ "$RC" = 0 ]; then
-            HAD_BRANCH=1
             git fetch -q --depth=1 origin backups
             PREV_SHA=$(git rev-parse FETCH_HEAD)
             TREE=$(git ls-tree --name-only FETCH_HEAD backups/)
-            PREV_N=$(printf '%s\n' "$TREE" | awk '/^backups\/kv-.*\.json\.gz$/ { n++ } END { print n + 0 }')
+            PREV_N=$(printf '%s\n' "$TREE" | awk '/^backups\/kv-.*\.json\.gz\.gpg$/ { n++ } END { print n + 0 }')
+            OPEN_N=$(printf '%s\n' "$TREE" | awk '/^backups\/kv-.*\.json\.gz$/ { n++ } END { print n + 0 }')
             if [ "$PREV_N" -gt 0 ]; then git archive FETCH_HEAD backups | tar -x -C "$KEEP"; fi
-            GOT=$(find "$KEEP/backups" -maxdepth 1 -name 'kv-*.json.gz' | wc -l)
-            echo "Прежних копий в ветке: $PREV_N, скачано: $GOT"
-            if [ "$GOT" -ne "$PREV_N" ]; then
-              echo "::error::Скачались не все прежние копии ($GOT из $PREV_N) — ветку не трогаю"; exit 1
+            find "$KEEP/backups" -maxdepth 1 -type f ! -name 'kv-*.json.gz.gpg' -delete
+            GOT_N=$(find "$KEEP/backups" -maxdepth 1 -name 'kv-*.json.gz.gpg' | wc -l)
+            echo "Прежних зашифрованных копий в ветке: $PREV_N, скачано: $GOT_N"
+            [ "$OPEN_N" = 0 ] || echo "Старых незашифрованных копий в ветке: $OPEN_N — в новую ветку не попадут"
+            if [ "$GOT_N" -ne "$PREV_N" ]; then
+              echo "::error::Скачались не все прежние копии ($GOT_N из $PREV_N) — ветку не трогаю"; exit 1
             fi
           elif [ "$RC" = 2 ]; then
             echo "Ветки backups ещё нет — это первый бэкап"
@@ -81,40 +155,38 @@ jobs:
             echo "::error::GitHub не ответил на git ls-remote (код $RC) — ветку не трогаю"; exit 1
           fi
 
-          # Защита от вандализма и пустой таблицы: строк стало меньше половины от последней копии —
-          # не записываем (прежние копии целы, GitHub пришлёт письмо о сбое).
-          LAST=$(find "$KEEP/backups" -maxdepth 1 -name 'kv-*.json.gz' -printf '%f\n' | sort | tail -n 1)
+          # 5) Защита от стёртой базы: строки сервер уже сверил сам; здесь — размер: вдвое меньше прошлой копии —
+          #    не записываем (прежние копии целы, GitHub пришлёт письмо).
+          LAST=$(find "$KEEP/backups" -maxdepth 1 -name 'kv-*.json.gz.gpg' ! -name "kv-$DATE.json.gz.gpg" -printf '%f\n' | sort | tail -n 1)
           if [ -n "$LAST" ]; then
-            if PREV_ROWS=$(gzip -dc "$KEEP/backups/$LAST" | python3 -c 'import json,sys; print(len(json.load(sys.stdin)))'); then
-              echo "Строк в последней копии ($LAST): $PREV_ROWS, сегодня: $ROWS"
-              if [ $((ROWS * 2)) -lt "$PREV_ROWS" ]; then
-                if [ "$ALLOW_SHRINK" = true ]; then
-                  echo "::warning::Строк стало $ROWS вместо $PREV_ROWS — сохраняю, потому что при запуске отмечено «данные удалили нарочно»"
-                else
-                  echo "::error::Строк в базе стало $ROWS вместо $PREV_ROWS (меньше половины) — копию НЕ сохраняю, прежние копии целы. Проверьте сайт: не стёрты ли данные. Если строки удалили нарочно — Actions → этот workflow → Run workflow → отметить галочку и запустить."
-                  exit 1
-                fi
+            PREV_SIZE=$(stat -c %s "$KEEP/backups/$LAST")
+            echo "Размер прошлой копии ($LAST): $PREV_SIZE, сегодня: $SIZE"
+            if [ $((SIZE * 2)) -lt "$PREV_SIZE" ]; then
+              if [ "$ALLOW_SHRINK" = true ]; then
+                echo "::warning::Копия стала вдвое меньше — сохраняю, потому что при запуске отмечено «данные удалили нарочно»"
+              else
+                echo "::error::Копия $SIZE байт вместо $PREV_SIZE (меньше половины) — НЕ сохраняю, прежние копии целы. Проверьте сайт: не стёрты ли данные. Если удалили нарочно — Actions → этот workflow → Run workflow → отметить галочку и запустить."
+                exit 1
               fi
-            else
-              echo "::warning::Последнюю копию $LAST не удалось прочитать — сравнение числа строк пропущено"
             fi
           fi
 
-          cp "$SNAP" "$KEEP/backups/"
-          # Ротация — по дате: копии старше недели удаляются сразу. Удаление идёт только после удачного
-          # сегодняшнего снапшота (сбой выше — выход до этого места), так что свежая копия в ветке есть всегда.
-          # Имя kv-ГГГГ-ММ-ДД сравнивается как дата.
-          WANT=0
-          for F in $(find "$KEEP/backups" -maxdepth 1 -name 'kv-*.json.gz' -printf '%f\n' | sort); do
-            D=${F#kv-}; D=${D%.json.gz}
+          cp "$DL/latest.json.gz.gpg" "$KEEP/backups/kv-$DATE.json.gz.gpg"
+          # Ротация — по дате: копии старше недели удаляются сразу. Удаление идёт только после удачной проверки
+          # сегодняшней копии (сбой выше — выход до этого места), так что свежая копия в ветке есть всегда.
+          CUTOFF=$(date -u -d "$DATE - $((KEEP_DAYS - 1)) days" +%Y-%m-%d)   # самая старая дата, которая остаётся
+          WANT_N=0
+          for F in $(find "$KEEP/backups" -maxdepth 1 -name 'kv-*.json.gz.gpg' -printf '%f\n' | sort); do
+            D=${F#kv-}; D=${D%.json.gz.gpg}
             if [[ "$D" < "$CUTOFF" ]]; then echo "Удаляю старше недели: $F"; rm -f "$KEEP/backups/$F"
-            else WANT=$((WANT + 1)); fi
+            else WANT_N=$((WANT_N + 1)); fi
           done
-          N=$(find "$KEEP/backups" -maxdepth 1 -name 'kv-*.json.gz' | wc -l)
-          OLDEST=$(find "$KEEP/backups" -maxdepth 1 -name 'kv-*.json.gz' -printf '%f\n' | sort | head -n 1)
-          # последняя проверка перед перезаписью ветки: сегодняшняя копия на месте и пропало только то, что старше недели
-          if [ ! -s "$KEEP/backups/kv-$DATE.json.gz" ] || [ "$N" != "$WANT" ]; then
-            echo "::error::После ротации копий $N (ожидалось $WANT, сегодняшняя: $(ls "$KEEP/backups/kv-$DATE.json.gz" 2>/dev/null || echo нет)) — ветку не перезаписываю"; exit 1
+          N=$(find "$KEEP/backups" -maxdepth 1 -name 'kv-*.json.gz.gpg' | wc -l)
+          OLDEST=$(find "$KEEP/backups" -maxdepth 1 -name 'kv-*.json.gz.gpg' -printf '%f\n' | sort | head -n 1)
+          # последняя проверка перед перезаписью ветки: в ней только зашифрованные копии, сегодняшняя на месте
+          if [ ! -s "$KEEP/backups/kv-$DATE.json.gz.gpg" ] || [ "$N" != "$WANT_N" ] \
+             || [ -n "$(find "$KEEP" -type f ! -name 'kv-*.json.gz.gpg')" ]; then
+            echo "::error::После ротации копий $N (ожидалось $WANT_N) или в ветке оказалось что-то кроме *.gpg — ветку не перезаписываю"; exit 1
           fi
 
           git config user.name  "komik-backup-bot"
@@ -123,14 +195,23 @@ jobs:
           git rm -rf -q --cached . 2>/dev/null || true
           git clean -fdxq
           cp -r "$KEEP/backups" .
-          printf '# Резервные копии базы KOMIK\n\nАвтоснапшоты таблицы Supabase `kv` (gzip), по одному в день.\nХранятся только копии за последнюю неделю (%s дней): ветка каждый день пересобирается одним коммитом,\nкопии старше недели удаляются вместе с историей.\n\nСейчас копий: %s, самая старая — %s.\n' "$KEEP_DAYS" "$N" "$OLDEST" > README.md
+          # shellcheck disable=SC2016   # обратные кавычки — разметка Markdown, а не подстановка
+          printf '%s\n' \
+            '# Резервные копии базы KOMIK (зашифрованные)' '' \
+            'Снапшоты таблицы `kv`, по одному в день: `kv-ГГГГ-ММ-ДД.json.gz.gpg` — JSON (массив `{key, value}`),' \
+            'сжатый gzip и зашифрованный gpg (AES-256) парольной фразой владельца. Без неё файл не прочитать.' \
+            'Как расшифровать — `migrate/RESTORE.md` (раздел 10) в ветке main.' '' \
+            "Хранятся копии за последнюю неделю ($KEEP_DAYS дней): ветка каждый день пересобирается одним коммитом." \
+            'Старые коммиты GitHub может ещё какое-то время отдавать по прямой ссылке — поэтому здесь только' \
+            'зашифрованные файлы.' '' \
+            "Сейчас копий: $N, самая старая — $OLDEST." > README.md
           git add backups README.md
-          O=${OLDEST#kv-}; O=${O%.json.gz}
-          git commit -q -m "Бэкап kv $DATE (копий: $N, с $O)"
+          O=${OLDEST#kv-}; O=${O%.json.gz.gpg}
+          git commit -q -m "Бэкап kv $DATE, зашифрован (копий: $N, с $O)"
           # --force-with-lease: перезаписываем, только если ветка всё та же, что мы скачали
           # (пустое значение — ветки быть не должно). Иначе — ошибка, а не потеря чужих копий.
           git push -q --force-with-lease="refs/heads/backups:$PREV_SHA" origin HEAD:refs/heads/backups
-          echo "Готово: backups/kv-$DATE.json.gz, всего копий $N"
+          echo "Готово: backups/kv-$DATE.json.gz.gpg, всего копий $N"
 
       # GitHub сам выключает расписание в публичном репозитории после 60 дней без коммитов в нём.
       # Повторное «включение» через API на каждом запуске не даёт этому случиться (так работают

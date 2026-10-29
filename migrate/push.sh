@@ -1,15 +1,20 @@
 #!/usr/bin/env bash
 # ══════════════════════════════════════════════════════════════════
-#  КОМИК · пуши: починка VAPID-ключей на сервере + обновление notify-game,
-#          защита входа (GoTrue) и правил базы (все миграции migrate/*.sql)
+#  КОМИК · главная команда обслуживания облака:
+#    пуши — починка VAPID-ключей + обновление notify-game; защита входа (GoTrue) и правил базы
+#    (все миграции migrate/*.sql); шлюз Supabase только на 127.0.0.1; Caddy — наружу только API сайта
+#    (Studio — через SSH-туннель), HSTS, без стандартного «:80»; свои ключи S3 вместо ключей из примера;
+#    ежедневная зашифрованная копия базы на сервере (migrate/backup.sh, таймер komik-backup.timer).
 #  Запуск на сервере: bash <(curl -fsS https://komikdnd.ru/migrate/push.sh)
 #  Только проверить защиту, ничего не меняя: bash <(curl -fsS https://komikdnd.ru/migrate/push.sh) check
+#  Только показать, каким станет Caddyfile (без root, ничего не меняет): bash push.sh render
 #  Когда нужен: тест уведомлений отвечает 500 «Vapid public key should be
 #  65 bytes long» / «VAPID_PRIVATE повреждён» / «не задан»; после обновления сайта;
 #  после добавления человека в команду (привязка прав). Повторный запуск безопасен.
 #  Спросит одно: приватный VAPID-ключ (Enter — оставить текущий, «new» — новая пара).
 #  Публичный ключ вычисляется из приватного, а сайт берёт его у самой функции —
 #  поэтому даже при новой паре сайт править не нужно: устройства переподпишутся сами.
+#  В первый раз создаст и покажет парольную фразу копий базы — её надо сохранить в менеджер паролей.
 # ══════════════════════════════════════════════════════════════════
 set -euo pipefail
 say(){ printf '\n\033[1;32m══ %s\033[0m\n' "$*"; }
@@ -18,12 +23,103 @@ bad(){ printf '\033[1;31m✗ %s\033[0m\n' "$*"; }
 SB_DIR=/opt/supabase/docker
 OVR="$SB_DIR/docker-compose.override.yml"
 REF="${KOMIK_REF:-main}"   # ветка репозитория, откуда брать index.ts
+CLOUD_DOMAIN=cloud.komikdnd.ru
+CADDYFILE="${KOMIK_CADDYFILE:-/etc/caddy/Caddyfile}"
+BK_WWW=/var/www/komik-backup            # зашифрованные копии (migrate/backup.sh), Caddy отдаёт их по /backup/
+BK_PASS=/root/.komik-backup-pass
 # публичный ключ пары, под которую оформлены подписки игроков (VAPID_PUBLIC в index.html)
 SITE_PUB="BJjgF7Dfj-PGEBho4AK_eec8YivMgnT5Oux8KdfLOx3sDcqpEBJ22tYzdsQ0fhx3S5IlRr-y3zTqsnOszzEpFI4"
+
+# ── Caddy для облака: наружу только API сайта, HSTS; стандартный «:80» убираем ──
+# ТОТ ЖЕ блок пишет setup.sh: правишь здесь — правь и там (tests/README.md сверяет их render).
+# Путь сверяем «сырым» — таким, каким он уйдёт на шлюз: только /rest|auth|functions|realtime/v1/…, с учётом
+# регистра, без %-кодов, «.», «..» и «//». Иначе шлюз (Envoy) понял бы путь не так, как Caddy, и запрос вроде
+# /REST/v1/ или /x/..%2frest/v1/ ушёл бы мимо API — на Studio (корень /, полный доступ к базе)
+API_RE='^/(rest|auth|functions|realtime)/v1/([A-Za-z0-9_~-][A-Za-z0-9._~-]*(/[A-Za-z0-9_~-][A-Za-z0-9._~-]*)*/?)?([?].*)?$'
+cloud_block(){
+  cat <<EOF
+# komik-cloud:begin — облако КОМИК (migrate/push.sh, setup.sh). Руками не править: скрипт перезапишет
+$CLOUD_DOMAIN {
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+	# зашифрованные копии базы (migrate/backup.sh): только эти имена, списка файлов нет
+	@backup path_regexp ^/backup/(latest[.]json[.]gz[.]gpg|latest[.]txt|kv-[0-9-]+[.]json[.]gz[.]gpg)\$
+	handle @backup {
+		uri strip_prefix /backup
+		root * $BK_WWW
+		header Cache-Control "no-cache"
+		file_server
+	}
+	# наружу — только API, которым пользуется сайт: supabase-js (rest, auth, realtime) и пуши (functions).
+	# Studio (корень /), /pg/, /storage/, /graphql/ — нет: Studio только через SSH-туннель (migrate/RESTORE.md, раздел 9)
+	@api expression \`{http.request.uri}.matches("$API_RE")\`
+	handle @api {
+		reverse_proxy 127.0.0.1:8000
+	}
+	handle {
+		respond 404
+	}
+}
+# komik-cloud:end
+EOF
+}
+# новый Caddyfile: наш блок облака — свежий и на прежнем месте (нет его — в конец); стандартный «:80» (страница
+# «Caddy works!» по IP) и «cloud.komikdnd.ru { reverse_proxy localhost:8000 }» прежних версий setup.sh — вон.
+# Повторный запуск даёт тот же файл (Caddy не перечитывается зря)
+caddy_cloud_new(){
+  local f="$CADDYFILE"; [ -f "$f" ] || f=/dev/null
+  BLK="$(cloud_block)" DOM="$CLOUD_DOMAIN {" awk '
+    index($0, "# komik-cloud:begin") == 1 { if (!done) print ENVIRON["BLK"]; done = 1; skip = "mark"; next }
+    skip == "mark" { if (index($0, "# komik-cloud:end") == 1) skip = ""; next }
+    skip == "blk"  { if ($0 == "}") skip = ""; next }
+    $0 == ":80 {" || $0 == ENVIRON["DOM"] { skip = "blk"; next }
+    { print }
+    END { if (!done) print "\n" ENVIRON["BLK"] }' "$f" | cat -s
+}
+caddy_apply(){ # caddy_apply <новый Caddyfile>: проверить, подложить, перечитать; не прошло — вернуть прежний
+  local new=$1 bak=""
+  if [ -f "$CADDYFILE" ] && cmp -s "$new" "$CADDYFILE"; then echo "  настройки Caddy уже такие ✓"; return 0; fi
+  if ! caddy validate --adapter caddyfile --config "$new" >/dev/null 2>"$new.err"; then
+    bad "новый Caddyfile не прошёл проверку — ничего не меняю:"; tail -5 "$new.err"; return 1; fi
+  if [ -f "$CADDYFILE" ]; then bak="$CADDYFILE.before-cloud-$(date +%Y%m%d-%H%M%S)"; cp "$CADDYFILE" "$bak"; fi
+  cp "$new" "$CADDYFILE"
+  # reload — без обрыва соединений; Caddy не запущен — restart
+  if systemctl reload caddy 2>/dev/null || systemctl restart caddy; then echo "  Caddy перечитал настройки ✓${bak:+ (прежний файл: $bak)}"
+  else
+    if [ -n "$bak" ]; then cp "$bak" "$CADDYFILE"; systemctl restart caddy || true; fi
+    bad "Caddy не принял настройки — вернул прежние"; return 1
+  fi
+}
+# для проверки (tests/README.md): каким станет Caddyfile — без root, ничего не меняя
+if [ "${1:-}" = render ]; then caddy_cloud_new; exit 0; fi
 
 [ "$(id -u)" = 0 ] || { echo "Запусти от root: ssh root@<IP>"; exit 1; }
 [ -f "$SB_DIR/.env" ] || { warn "нет $SB_DIR/.env — облако не установлено (сначала setup.sh)"; exit 1; }
 cd "$SB_DIR"
+# шлюз Supabase (Envoy; в старых ревизиях — Kong). Его порт 8000 публикуем только на 127.0.0.1: Docker открывает
+# порты мимо ufw, и на 0.0.0.0 Studio был бы виден по http://IP:8000 в обход Caddy. Нужен он только Caddy
+GW_SVC=$(grep -oE '^  (api-gw|kong):' docker-compose.yml 2>/dev/null | head -n 1 | tr -d ' :' || true); GW_SVC=${GW_SVC:-api-gw}
+gw_ports(){ local id; id=$(docker compose ps -q "$GW_SVC" 2>/dev/null || true); [ -z "$id" ] || docker port "$id" 8000/tcp 2>/dev/null || true; }
+# ключи S3 для Storage: в публичном .env.example они одни на всех — заменяем случайными. Storage у нас
+# остановлен, но включи его кто-нибудь — с ключами из примера в файлы зашёл бы любой.
+# REALTIME_DB_ENC_KEY (тоже из примера) не трогаем: его смена ломает уже сохранённые настройки Realtime
+s3_keys(){ local k v def new changed=""
+  for k in S3_PROTOCOL_ACCESS_KEY_ID S3_PROTOCOL_ACCESS_KEY_SECRET; do
+    v=$(grep "^$k=" .env | cut -d= -f2- || true)
+    def=$(grep "^$k=" .env.example 2>/dev/null | cut -d= -f2- || true)
+    if [ -z "$v" ] || [ "$v" = "$def" ]; then
+      if [ "$k" = S3_PROTOCOL_ACCESS_KEY_ID ]; then new=$(openssl rand -hex 16); else new=$(openssl rand -hex 32); fi
+      if grep -q "^$k=" .env; then sed -i "s|^$k=.*|$k=$new|" .env; else echo "$k=$new" >> .env; fi
+      changed=1
+    fi
+  done
+  if [ -n "$changed" ]; then echo "  ключи S3 (Storage) были из публичного примера — заменены случайными ✓"
+  else echo "  ключи S3 (Storage) свои, не из примера ✓"; fi
+}
 
 # длина ключа после base64url-декодирования (65 — публичный, 32 — приватный)
 b64len(){ python3 -c "import base64,sys;s=sys.argv[1];print(len(base64.urlsafe_b64decode(s+'='*(-len(s)%4))))" "$1" 2>/dev/null || echo -1; }
@@ -117,12 +213,31 @@ verify(){
   else bad "вход (контейнер supabase-auth) без ограничения попыток / длины пароля — запусти push.sh (без check)"; OK=0; fi
   if grep -q '^DISABLE_SIGNUP=true' "$SB_DIR/.env" 2>/dev/null; then echo "  регистрация: закрыта (новых игроков заводишь в Studio, migrate/RESTORE.md)"
   else echo "  регистрация: открыта"; fi
+  # снаружи — только API: шлюз на 127.0.0.1, в Caddy — наш блок, корень домена (Studio) отвечает 404
+  X=$(gw_ports)
+  if [ -n "$X" ] && ! grep -qv '^127\.0\.0\.1:' <<< "$X"; then echo "  шлюз :8000 слушает только 127.0.0.1 ✓"
+  else bad "шлюз :8000 открыт наружу (${X:-контейнер не отвечает}) — Studio виден по http://IP:8000 мимо Caddy: запусти push.sh (без check)"; OK=0; fi
+  if grep -q '^# komik-cloud:begin' "$CADDYFILE" 2>/dev/null; then
+    X=$(curl -s --noproxy '*' -o /dev/null -w '%{http_code}' --max-time 10 --resolve "$CLOUD_DOMAIN:443:127.0.0.1" "https://$CLOUD_DOMAIN/" 2>/dev/null || true)
+    if [ "$X" = 404 ]; then echo "  наружу — только API сайта; Studio — через SSH-туннель ✓"
+    else bad "https://$CLOUD_DOMAIN/ ответил ${X:-ничего} вместо 404 — проверь Caddy: journalctl -u caddy -n 30"; OK=0; fi
+  else bad "Caddy отдаёт наружу весь шлюз — Studio (полный доступ к базе) открыт в интернет под одним паролем: запусти push.sh (без check)"; OK=0; fi
+  if grep -q '^:80 {' "$CADDYFILE" 2>/dev/null; then warn "в Caddyfile остался стандартный блок :80 (страница «Caddy works!» по IP) — запусти push.sh"; fi
+  for X in S3_PROTOCOL_ACCESS_KEY_ID S3_PROTOCOL_ACCESS_KEY_SECRET; do
+    if [ "$(grep "^$X=" "$SB_DIR/.env" | cut -d= -f2-)" = "$(grep "^$X=" "$SB_DIR/.env.example" 2>/dev/null | cut -d= -f2-)" ]; then
+      bad "$X — из публичного примера Supabase: запусти push.sh (без check)"; OK=0; fi
+  done
+  # копии: таймер работает, последняя — не старше 30 часов
+  X=$(sed -n 's/^created=//p' "$BK_WWW/latest.txt" 2>/dev/null || true)
+  if systemctl is-active -q komik-backup.timer && [ -n "$X" ] && [ $(( $(date -u +%s) - $(date -u -d "$X" +%s 2>/dev/null || echo 0) )) -lt 108000 ]; then
+    echo "  зашифрованная копия базы: последняя $X ✓"
+  else bad "ежедневной зашифрованной копии нет или она старая (${X:-нет}) — запусти push.sh; журнал: journalctl -u komik-backup -n 30"; OK=0; fi
   if [ $OK = 1 ]; then printf '\n\033[1;32mИтог: защита базы включена ✓\033[0m\n'
   else printf '\n\033[1;31mИтог: ⚠ защита базы включена НЕ полностью — запусти push.sh ещё раз; не помогло — пришли этот вывод программисту\033[0m\n'; return 1; fi
 }
 if [ "${1:-}" = check ]; then verify || exit 1; exit 0; fi
 
-say "1/5 · Что сейчас в docker-compose.override.yml"
+say "1/7 · Что сейчас в docker-compose.override.yml"
 VPUB=""; VPRIV=""
 if [ -f "$OVR" ]; then
   VPUB=$(clean "$(grep 'VAPID_PUBLIC:' "$OVR" | sed 's/.*VAPID_PUBLIC://' || true)")
@@ -139,7 +254,7 @@ if [ $PRIV_OK = 1 ]; then
   else warn "текущий приватный ключ НЕ от пары сайта — после починки устройства переподпишутся сами при открытии сайта"; fi
 fi
 
-say "2/5 · Приватный ключ"
+say "2/7 · Приватный ключ"
 echo "Enter — оставить текущий приватный ключ (если выше он «ок»)."
 echo "Вставить ключ — если сохранился приватный ключ пары сайта (43 символа, без кавычек):"
 echo "  тогда прежние подписки игроков заработают сразу, без переподписки."
@@ -171,17 +286,21 @@ fi
 [ "$(b64len "$VPUB")" = 65 ] || { warn "не удалось вычислить публичный ключ из приватного — это не ключ P-256? отмена"; exit 1; }
 [ "$(pubof "$VPRIV")" = "$VPUB" ] || { warn "проверка пары не сошлась: публичный ключ не от этого приватного — отмена"; exit 1; }
 
-say "3/5 · Записываю ключи и обновляю функцию"
+say "3/7 · Записываю ключи и обновляю функцию"
 # тот же формат, что пишет setup.sh — повторный запуск setup.sh его подхватит.
 # Файл пишется целиком: всё, что должно в нём жить (в том числе настройки входа ниже), — только здесь и в setup.sh.
 # auth: логины команды публичны, поэтому GoTrue ограничивает попытки входа по IP игрока (заголовок ставит Caddy,
 # подделать его снаружи нельзя) и не принимает новые пароли короче 8 символов (старые пароли продолжают работать).
+# Шлюз (порт 8000) и пулер Postgres — только на 127.0.0.1: снаружи к ним путь один — через Caddy (и только к API).
 {
   echo 'services:'
   echo '  supavisor:'
   echo '    ports: !override'
   echo '      - "127.0.0.1:5432:5432"'
   echo '      - "127.0.0.1:6543:6543"'
+  echo "  $GW_SVC:"
+  echo '    ports: !override'
+  echo '      - "127.0.0.1:8000:8000/tcp"'
   echo '  auth:'
   echo '    environment:'
   echo '      GOTRUE_RATE_LIMIT_HEADER: "X-Forwarded-For"'
@@ -195,6 +314,7 @@ say "3/5 · Записываю ключи и обновляю функцию"
 chmod 600 "$OVR"
 grep -q '^COMPOSE_FILE=docker-compose.yml:docker-compose.override.yml' .env \
   || sed -i 's|^COMPOSE_FILE=.*|COMPOSE_FILE=docker-compose.yml:docker-compose.override.yml|' .env
+s3_keys
 mkdir -p volumes/functions/notify-game
 # сначала с сайта (он же отдал этот скрипт), потом с GitHub: raw.githubusercontent.com из России открывается не всегда.
 # Качаем во временный файл и проверяем, что пришла наша функция, а не страница ошибки.
@@ -221,28 +341,38 @@ echo "  контейнер functions пересоздан ✓"
 # auth пересоздаётся, только если его настройки изменились (первый запуск) — иначе не трогаем; --no-deps: базу не задевать
 if docker compose up -d --no-deps auth >/dev/null 2>&1; then echo "  настройки входа (auth) применены ✓"
 else warn "контейнер auth не обновился — логи: docker compose logs --tail=50 auth"; fi
+# шлюз пересоздаётся, только если изменился порт (первый запуск после правки): API на несколько секунд замолкнет
+GW_BEFORE=$(gw_ports | paste -sd' ')
+if docker compose up -d --no-deps "$GW_SVC" >/dev/null 2>&1; then
+  GW_AFTER=$(gw_ports | paste -sd' ')
+  if [ -n "$GW_AFTER" ] && ! grep -qv '^127\.0\.0\.1:' <<< "$(gw_ports)"; then
+    echo "  шлюз :8000 — только на 127.0.0.1 ✓${GW_BEFORE:+ (было: $GW_BEFORE)}"
+  else warn "шлюз слушает: ${GW_AFTER:-ничего} — покажи программисту (docker compose ps $GW_SVC)"; fi
+else warn "шлюз ($GW_SVC) не пересоздался — логи: docker compose logs --tail=50 $GW_SVC"; fi
 
-say "4/5 · Проверка"
+say "4/7 · Проверка"
 ANON=$(grep '^ANON_KEY=' .env | cut -d= -f2-)
 sleep 4
 # без пользовательского токена функция обязана ответить 403 forbidden:
 # это значит, что модуль загрузился и ключи приняты. 500 — ключи всё ещё не те.
-CODE=$(curl -s -o /tmp/komik-push-check.txt -w '%{http_code}' -X POST \
+CHK=$(mktemp)
+CODE=$(curl -s -o "$CHK" -w '%{http_code}' -X POST \
   http://127.0.0.1:8000/functions/v1/notify-game \
   -H "apikey: $ANON" -H "Authorization: Bearer $ANON" -H "Content-Type: application/json" -d '{}' || echo 000)
 if [ "$CODE" = 403 ]; then
   echo "  функция отвечает 403 без токена — ключи приняты ✓"
 else
-  warn "функция ответила $CODE: $(head -c 300 /tmp/komik-push-check.txt)"
+  warn "функция ответила $CODE: $(head -c 300 "$CHK")"
   echo "  логи: docker compose logs --tail=50 functions"
 fi
+rm -f "$CHK"
 # ключ, который функция отдаёт сайту, обязан быть от этого приватного
 GOT=$(curl -s -H "apikey: $ANON" -H "Authorization: Bearer $ANON" http://127.0.0.1:8000/functions/v1/notify-game \
       | python3 -c "import json,sys;print(json.load(sys.stdin).get('publicKey',''))" 2>/dev/null || true)
 if [ "$GOT" = "$VPUB" ]; then echo "  функция отдаёт сайту верный публичный ключ ✓"
 else warn "функция отдаёт ключ «${GOT:-<ничего>}», ожидался $VPUB"; fi
 
-say "5/5 · Защита аккаунтов и правил сайта"
+say "5/7 · Защита аккаунтов и правил сайта"
 # Все миграции базы, строго по порядку, при каждом запуске (каждая идемпотентна):
 #   09-21 — права записи по ролям (снимает kv_write «любой пишет всё» и RPC в обход правил);
 #   09-25 — тег только с адреса @komikdnd.ru;  09-26 — comik:projects:v1 пишет только hinoma;
@@ -294,6 +424,77 @@ else
   warn "миграции базы в этот раз НЕ применялись (ни одна) — проверь интернет и запусти push.sh ещё раз"
 fi
 rm -rf "$MIG_DIR"
+
+say "6/7 · Caddy: наружу только API сайта, HSTS"
+# Studio (полный доступ к базе) больше не в интернете — только через SSH-туннель (migrate/RESTORE.md, раздел 9)
+install -d -m 755 "$BK_WWW"
+CF_NEW=$(mktemp)
+caddy_cloud_new > "$CF_NEW"
+caddy_apply "$CF_NEW" || warn "Caddy остался с прежними настройками — пришли вывод выше программисту"
+rm -f "$CF_NEW" "$CF_NEW.err"
+
+say "7/7 · Ежедневная зашифрованная копия базы"
+# Копию снимает сам сервер (komik-backup, раз в сутки): прямо из базы, всю таблицу, и шифрует её; GitHub забирает
+# только зашифрованный файл (https://cloud.komikdnd.ru/backup/latest.json.gz.gpg). Ставим скрипт только отсюда —
+# владелец запускает push.sh сам; сам себя komik-backup не обновляет.
+command -v gpg >/dev/null || apt-get install -yq gnupg >/dev/null
+PASS_NEW=""; [ -s "$BK_PASS" ] || PASS_NEW=1
+BK_TMP=$(mktemp); BK_OK=""
+BK_GH="https://raw.githubusercontent.com/H1NOMA/h1noma.github.io/$REF/migrate/backup.sh"
+BK_SITE="https://komikdnd.ru/migrate/backup.sh"
+if [ -n "${KOMIK_REF:-}" ]; then BK_SRC="$BK_GH $BK_SITE"; else BK_SRC="$BK_SITE $BK_GH"; fi
+for u in $BK_SRC; do
+  curl -sSf --max-time 30 -o "$BK_TMP" "$u" && bash -n "$BK_TMP" && grep -q 'komik-backup' "$BK_TMP" && { BK_OK=1; break; }
+done
+if [ -n "$BK_OK" ]; then
+  install -m 755 -o root -g root "$BK_TMP" /usr/local/bin/komik-backup
+  /usr/local/bin/komik-backup init
+  cat > /etc/systemd/system/komik-backup.service <<'EOF'
+[Unit]
+Description=КОМИК: зашифрованная копия таблицы kv (migrate/backup.sh)
+After=docker.service
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/komik-backup
+Nice=10
+IOSchedulingClass=idle
+TimeoutStartSec=30min
+PrivateTmp=yes
+NoNewPrivileges=yes
+ProtectSystem=full
+EOF
+  # 02:37 UTC (05:37 МСК) — за полчаса до того, как GitHub придёт за копией (backup-kv.yml, 03:17 UTC)
+  cat > /etc/systemd/system/komik-backup.timer <<'EOF'
+[Unit]
+Description=КОМИК: зашифрованная копия базы раз в сутки
+[Timer]
+OnCalendar=*-*-* 02:37:00 UTC
+RandomizedDelaySec=5min
+Persistent=true
+[Install]
+WantedBy=timers.target
+EOF
+  systemctl daemon-reload
+  systemctl enable --now komik-backup.timer >/dev/null 2>&1
+  T0=$(date '+%Y-%m-%d %H:%M:%S')
+  if systemctl start komik-backup.service; then
+    journalctl -u komik-backup --since "$T0" -o cat --no-pager 2>/dev/null | tail -n 2 | sed 's/^/  /'
+    X=$(curl -s --noproxy '*' -o /dev/null -w '%{http_code}' --max-time 10 --resolve "$CLOUD_DOMAIN:443:127.0.0.1" "https://$CLOUD_DOMAIN/backup/latest.json.gz.gpg" || true)
+    if [ "$X" = 200 ]; then echo "  https://$CLOUD_DOMAIN/backup/latest.json.gz.gpg отдаётся (зашифрованной) ✓"
+    else warn "Caddy не отдаёт копию (ответ ${X:-нет}) — GitHub не сможет её забрать; journalctl -u caddy -n 30"; fi
+  else
+    bad "копия не снялась:"; journalctl -u komik-backup --since "$T0" -o cat --no-pager 2>/dev/null | tail -n 15 | sed 's/^/  /'
+  fi
+else
+  warn "не смог скачать migrate/backup.sh — ежедневная копия НЕ настроена; проверь интернет и запусти push.sh ещё раз"
+fi
+rm -f "$BK_TMP"
+if [ -n "$PASS_NEW" ] && [ -s "$BK_PASS" ]; then
+  echo
+  warn "Парольная фраза копий показана выше (и: cat $BK_PASS). Без неё копии не расшифровать."
+  read -rp "  Сохрани её в менеджер паролей и нажми Enter… " _ </dev/tty || true
+fi
+
 if [ "$VPUB" != "$SITE_PUB" ]; then
   say "Пара ключей отличается от прежней"
   echo "Ничего делать не нужно: сайт берёт ключ у функции, и каждое устройство переподпишется"

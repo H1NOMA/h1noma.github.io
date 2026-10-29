@@ -7,8 +7,11 @@
 #    bash <(curl -fsS https://komikdnd.ru/migrate/restore.sh) 2026-09-25 comik:games:v1 — вернуть один ключ
 #    bash <(curl -fsS https://komikdnd.ru/migrate/restore.sh) /root/kv-before-restore-….json.gz [ключ] — отменить возврат
 #                                                           (без ключа — ВСЯ таблица, с ключом — только он)
+#    bash <(curl -fsS https://komikdnd.ru/migrate/restore.sh) /root/kv-2026-10-29.json.gz.gpg [ключ] — из своего файла
 #    bash <(curl -fsS https://komikdnd.ru/migrate/restore.sh) accounts                  — копия аккаунтов и команды в /root
-#  Копии делает GitHub раз в сутки (~06:17 МСК) в ветку backups, хранятся неделю (старше — удаляются).
+#  Копии снимает сам сервер раз в сутки (~05:40 МСК, komik-backup) — зашифрованными (kv-ДАТА.json.gz.gpg) — и держит
+#  неделю в /var/www/komik-backup; GitHub забирает их в ветку backups (тоже неделю). Фраза для расшифровки — из
+#  /root/.komik-backup-pass, а нет его (новый сервер) — спросит. Старые незашифрованные .json.gz понимает как раньше.
 #  Копии на самом сервере (kv-before-restore-*, auth-*) тоже живут неделю; последняя копия аккаунтов — всегда.
 #  Строки из копии записываются поверх текущих; строк, которых в копии нет, скрипт не удаляет.
 #  Листы персонажей (comik:chars:<тег>) пишутся со свежей отметкой времени: иначе устройства игроков, где лист
@@ -21,6 +24,8 @@ warn(){ printf '\033[1;33m⚠ %s\033[0m\n' "$*"; }
 bad(){ printf '\033[1;31m✗ %s\033[0m\n' "$*"; }
 SB_DIR=/opt/supabase/docker
 REPO="${KOMIK_BACKUPS_REPO:-https://github.com/H1NOMA/h1noma.github.io}"
+BK_WWW=/var/www/komik-backup          # зашифрованные копии этого сервера (migrate/backup.sh)
+BK_PASS=/root/.komik-backup-pass
 ME="bash <(curl -fsS https://komikdnd.ru/migrate/restore.sh)"
 
 [ "$(id -u)" = 0 ] || { echo "Запусти от root: ssh root@<IP>"; exit 1; }
@@ -37,6 +42,29 @@ prune_old(){ local f newest n=0
 }
 prune_old
 A1="${1:-}"; A2="${2:-}"
+# расшифровать копию (.gpg → .json.gz): фраза — из $BK_PASS, не подошла или файла нет — спросить (как setup.sh);
+# подошла, а файла не было — кладём её туда: новые копии пойдут той же фразой, что сохранена у владельца
+gpg_dec(){ GNUPGHOME="$1" gpg --batch --yes --quiet --pinentry-mode loopback --no-symkey-cache --passphrase-fd 0 -o "$3" -d "$2" 2>/dev/null; }
+bk_decrypt(){ # bk_decrypt <файл .gpg> <куда .json.gz>
+  local g p rc=1; g=$(mktemp -d)
+  if [ -s "$BK_PASS" ] && gpg_dec "$g" "$1" "$2" < "$BK_PASS"; then rc=0
+  else
+    [ ! -s "$BK_PASS" ] || warn "фраза из $BK_PASS к этой копии не подошла (копия от другой фразы?)"
+    for _ in 1 2 3; do
+      read -rsp "  Парольная фраза копий базы (из менеджера паролей; Enter — отмена): " p </dev/tty || p=""; echo
+      p=$(printf '%s' "$p" | tr -d '\r\n\t ')
+      [ -n "$p" ] || break
+      if printf '%s\n' "$p" | gpg_dec "$g" "$1" "$2"; then
+        rc=0
+        if [ ! -s "$BK_PASS" ]; then ( umask 077; printf '%s\n' "$p" > "$BK_PASS" ); echo "  фраза подошла — сохранена в $BK_PASS ✓"; fi
+        break
+      fi
+      warn "фраза не подошла"
+    done
+  fi
+  rm -rf "$g"; [ $rc = 0 ] || rm -f "$2"
+  return $rc
+}
 server_ip(){ local ip; ip=$(curl -s4 --max-time 5 ifconfig.me 2>/dev/null || true)
   [[ "$ip" =~ ^[0-9.]+$ ]] || ip=$(hostname -I 2>/dev/null | awk '{print $1}'); echo "${ip:-<IP-сервера>}"; }
 
@@ -81,17 +109,25 @@ SQL
   exit 0
 fi
 
-# ── откуда брать копию: дата из ветки backups или свой файл (.json.gz) ──
+# ── откуда брать копию: дата (копии этого сервера или ветка backups на GitHub) или свой файл (.json.gz / .gpg) ──
 SNAP="$WORK/snap.json.gz"
 if [ -n "$A1" ] && [ -f "$A1" ]; then
-  cp "$A1" "$SNAP"; LABEL="файла $A1"
+  if [[ "$A1" == *.gpg ]]; then bk_decrypt "$A1" "$SNAP" || { bad "не смог расшифровать $A1 — ничего не трогаю"; exit 1; }
+  else cp "$A1" "$SNAP"; fi
+  LABEL="файла $A1"
 else
-  say "Ежедневные копии (GitHub, ветка backups)"
-  # частичный клон: сначала только список файлов, нужная копия скачается одна (~2,5 МБ)
-  git clone -q --depth 1 --filter=blob:none --no-checkout --branch backups "$REPO" "$WORK/bk" 2>/dev/null \
-    || { bad "не смог получить список копий с GitHub (нет интернета?)"; exit 1; }
-  DATES=$(git -C "$WORK/bk" ls-tree --name-only HEAD backups/ | sed -n 's|^backups/kv-\([0-9-]*\)\.json\.gz$|\1|p' | sort)
-  [ -n "$DATES" ] || { bad "копий в ветке backups нет"; exit 1; }
+  say "Ежедневные копии (этот сервер и GitHub, ветка backups)"
+  # свои зашифрованные копии сервера за неделю — без интернета; на GitHub — те же (и старые открытые, если остались)
+  LOCAL=$(find "$BK_WWW" -maxdepth 1 -name 'kv-*.json.gz.gpg' -printf '%f\n' 2>/dev/null | sed -n 's/^kv-\([0-9-]*\)\.json\.gz\.gpg$/\1/p' | sort)
+  REMOTE=""
+  # частичный клон: сначала только список файлов, нужная копия скачается одна
+  if git clone -q --depth 1 --filter=blob:none --no-checkout --branch backups "$REPO" "$WORK/bk" 2>/dev/null; then
+    REMOTE=$(git -C "$WORK/bk" ls-tree --name-only HEAD backups/ | sed -n 's|^backups/kv-\([0-9-]*\)\.json\.gz\(\.gpg\)\{0,1\}$|\1|p' | sort -u)
+  else
+    warn "GitHub не ответил (нет интернета?) — только копии этого сервера"
+  fi
+  DATES=$(printf '%s\n%s\n' "$LOCAL" "$REMOTE" | grep -v '^$' | sort -u || true)
+  [ -n "$DATES" ] || { bad "копий нет ни на сервере ($BK_WWW), ни в ветке backups"; exit 1; }
   if [ -z "$A1" ]; then
     echo "$DATES" | paste -sd' ' | fold -s -w 78 | sed 's/^/  /'
     echo
@@ -102,7 +138,14 @@ else
     exit 0
   fi
   grep -qx -- "$A1" <<< "$DATES" || { bad "копии за «$A1» нет. Есть: $(echo "$DATES" | head -1) … $(echo "$DATES" | tail -1) (список: $ME)"; exit 1; }
-  git -C "$WORK/bk" show "HEAD:backups/kv-$A1.json.gz" > "$SNAP" || { bad "не смог скачать копию за $A1"; exit 1; }
+  # своя копия сервера — первой; потом зашифрованная с GitHub; потом старая открытая
+  if [ -f "$BK_WWW/kv-$A1.json.gz.gpg" ]; then
+    bk_decrypt "$BK_WWW/kv-$A1.json.gz.gpg" "$SNAP" || { bad "не смог расшифровать копию за $A1 — ничего не трогаю"; exit 1; }
+  elif git -C "$WORK/bk" show "HEAD:backups/kv-$A1.json.gz.gpg" > "$WORK/snap.gpg" 2>/dev/null; then
+    bk_decrypt "$WORK/snap.gpg" "$SNAP" || { bad "не смог расшифровать копию за $A1 — ничего не трогаю"; exit 1; }
+  else
+    git -C "$WORK/bk" show "HEAD:backups/kv-$A1.json.gz" > "$SNAP" || { bad "не смог скачать копию за $A1"; exit 1; }
+  fi
   LABEL="копии от $A1"
 fi
 
