@@ -27,5 +27,6 @@ create publication supabase_realtime;
 insert into auth.users (id, email) values
   ('00000000-0000-0000-0000-0000000000a1', 'hinoma@komikdnd.ru'),
   ('00000000-0000-0000-0000-0000000000a2', 'herr_teo@komikdnd.ru'),
+  ('00000000-0000-0000-0000-0000000000a3', 'arlissss@komikdnd.ru'),
   ('00000000-0000-0000-0000-0000000000b1', 'testplayer@komikdnd.ru'),
   ('00000000-0000-0000-0000-0000000000b2', 'player_two@komikdnd.ru');
