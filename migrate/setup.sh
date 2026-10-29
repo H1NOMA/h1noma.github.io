@@ -9,8 +9,12 @@
 #    komik-env.backup, komik-override.backup, auth-ДАТА.sql.gz — тогда ключи и пароли прежние.
 #  Запуск:  bash <(curl -fsS https://komikdnd.ru/migrate/setup.sh)
 #  Своя копия данных вместо свежей: KOMIK_KV_FILE=/root/kv-2026-09-20.json.gz bash <(curl …setup.sh)
+#  (копии с 29.10.2026 зашифрованы — kv-ДАТА.json.gz.gpg: спросит парольную фразу, migrate/RESTORE.md)
 #  Повторный запуск безопасен: готовые шаги пропускаются, в непустые (или не ответившие
 #  на подсчёт строк) kv и auth.users ничего НЕ заливается, и уже лежащая строка не перезаписывается.
+#  Снаружи — только API сайта (Studio — через SSH-туннель), шлюз Supabase — на 127.0.0.1.
+#  После установки — push.sh: пуши, ежедневная зашифрованная копия базы и итоговая проверка.
+#  Только показать, каким станет Caddyfile (без root, ничего не меняет): bash setup.sh render
 # ══════════════════════════════════════════════════════════════════════
 set -euo pipefail
 
@@ -20,9 +24,80 @@ REF="${KOMIK_REF:-main}"   # ветка репозитория, откуда б�
 SB_SHA="6c3e8a6a4e1668d71c53cdca2359893ebf106e6a"
 SB_DIR=/opt/supabase/docker
 INFO=/root/komik-cloud-info.txt
+CADDYFILE="${KOMIK_CADDYFILE:-/etc/caddy/Caddyfile}"
+BK_WWW=/var/www/komik-backup            # зашифрованные копии (migrate/backup.sh, ставит push.sh), Caddy отдаёт их по /backup/
+BK_PASS=/root/.komik-backup-pass
 
 say(){ printf '\n\033[1;32m══ %s\033[0m\n' "$*"; }
 warn(){ printf '\033[1;33m⚠ %s\033[0m\n' "$*"; }
+bad(){ printf '\033[1;31m✗ %s\033[0m\n' "$*"; }
+
+# ── Caddy для облака: наружу только API сайта, HSTS; стандартный «:80» убираем ──
+# ТОТ ЖЕ блок пишет push.sh: правишь здесь — правь и там (tests/README.md сверяет их render).
+# Путь сверяем «сырым» — таким, каким он уйдёт на шлюз: только /rest|auth|functions|realtime/v1/…, с учётом
+# регистра, без %-кодов, «.», «..» и «//». Иначе шлюз (Envoy) понял бы путь не так, как Caddy, и запрос вроде
+# /REST/v1/ или /x/..%2frest/v1/ ушёл бы мимо API — на Studio (корень /, полный доступ к базе)
+API_RE='^/(rest|auth|functions|realtime)/v1/([A-Za-z0-9_~-][A-Za-z0-9._~-]*(/[A-Za-z0-9_~-][A-Za-z0-9._~-]*)*/?)?([?].*)?$'
+cloud_block(){
+  cat <<EOF
+# komik-cloud:begin — облако КОМИК (migrate/push.sh, setup.sh). Руками не править: скрипт перезапишет
+$CLOUD_DOMAIN {
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+	# зашифрованные копии базы (migrate/backup.sh): только эти имена, списка файлов нет
+	@backup path_regexp ^/backup/(latest[.]json[.]gz[.]gpg|latest[.]txt|kv-[0-9-]+[.]json[.]gz[.]gpg)\$
+	handle @backup {
+		uri strip_prefix /backup
+		root * $BK_WWW
+		header Cache-Control "no-cache"
+		file_server
+	}
+	# наружу — только API, которым пользуется сайт: supabase-js (rest, auth, realtime) и пуши (functions).
+	# Studio (корень /), /pg/, /storage/, /graphql/ — нет: Studio только через SSH-туннель (migrate/RESTORE.md, раздел 9)
+	@api expression \`{http.request.uri}.matches("$API_RE")\`
+	handle @api {
+		reverse_proxy 127.0.0.1:8000
+	}
+	handle {
+		respond 404
+	}
+}
+# komik-cloud:end
+EOF
+}
+# новый Caddyfile: наш блок облака — свежий и на прежнем месте (нет его — в конец); стандартный «:80» (страница
+# «Caddy works!» по IP) и «cloud.komikdnd.ru { reverse_proxy localhost:8000 }» прежних версий setup.sh — вон.
+# Повторный запуск даёт тот же файл (Caddy не перечитывается зря)
+caddy_cloud_new(){
+  local f="$CADDYFILE"; [ -f "$f" ] || f=/dev/null
+  BLK="$(cloud_block)" DOM="$CLOUD_DOMAIN {" awk '
+    index($0, "# komik-cloud:begin") == 1 { if (!done) print ENVIRON["BLK"]; done = 1; skip = "mark"; next }
+    skip == "mark" { if (index($0, "# komik-cloud:end") == 1) skip = ""; next }
+    skip == "blk"  { if ($0 == "}") skip = ""; next }
+    $0 == ":80 {" || $0 == ENVIRON["DOM"] { skip = "blk"; next }
+    { print }
+    END { if (!done) print "\n" ENVIRON["BLK"] }' "$f" | cat -s
+}
+caddy_apply(){ # caddy_apply <новый Caddyfile>: проверить, подложить, перечитать; не прошло — вернуть прежний
+  local new=$1 bak=""
+  if [ -f "$CADDYFILE" ] && cmp -s "$new" "$CADDYFILE"; then echo "  настройки Caddy уже такие ✓"; return 0; fi
+  if ! caddy validate --adapter caddyfile --config "$new" >/dev/null 2>"$new.err"; then
+    bad "новый Caddyfile не прошёл проверку — ничего не меняю:"; tail -5 "$new.err"; return 1; fi
+  if [ -f "$CADDYFILE" ]; then bak="$CADDYFILE.before-cloud-$(date +%Y%m%d-%H%M%S)"; cp "$CADDYFILE" "$bak"; fi
+  cp "$new" "$CADDYFILE"
+  # reload — без обрыва соединений; Caddy не запущен — restart
+  if systemctl reload caddy 2>/dev/null || systemctl restart caddy; then echo "  Caddy перечитал настройки ✓${bak:+ (прежний файл: $bak)}"
+  else
+    if [ -n "$bak" ]; then cp "$bak" "$CADDYFILE"; systemctl restart caddy || true; fi
+    bad "Caddy не принял настройки — вернул прежние"; return 1
+  fi
+}
+# для проверки (tests/README.md): каким станет Caddyfile — без root, ничего не меняя
+if [ "${1:-}" = render ]; then caddy_cloud_new; exit 0; fi
 
 [ "$(id -u)" = 0 ] || { echo "Запусти от root: ssh root@<IP>"; exit 1; }
 
@@ -111,13 +186,33 @@ PY
 else
   echo ".env уже есть — секреты не трогаю"
 fi
+# ключи S3 для Storage: в публичном .env.example они одни на всех — заменяем случайными. Storage у нас
+# остановлен, но включи его кто-нибудь — с ключами из примера в файлы зашёл бы любой.
+# REALTIME_DB_ENC_KEY (тоже из примера) не трогаем: его смена ломает уже сохранённые настройки Realtime
+s3_keys(){ local k v def new changed=""
+  for k in S3_PROTOCOL_ACCESS_KEY_ID S3_PROTOCOL_ACCESS_KEY_SECRET; do
+    v=$(grep "^$k=" .env | cut -d= -f2- || true)
+    def=$(grep "^$k=" .env.example 2>/dev/null | cut -d= -f2- || true)
+    if [ -z "$v" ] || [ "$v" = "$def" ]; then
+      if [ "$k" = S3_PROTOCOL_ACCESS_KEY_ID ]; then new=$(openssl rand -hex 16); else new=$(openssl rand -hex 32); fi
+      if grep -q "^$k=" .env; then sed -i "s|^$k=.*|$k=$new|" .env; else echo "$k=$new" >> .env; fi
+      changed=1
+    fi
+  done
+  if [ -n "$changed" ]; then echo "  ключи S3 (Storage) были из публичного примера — заменены случайными ✓"
+  else echo "  ключи S3 (Storage) свои, не из примера ✓"; fi
+}
+s3_keys
 # перечитываем значения (важно при повторном запуске)
 PGPASS=$(grep '^POSTGRES_PASSWORD=' .env | cut -d= -f2-)
 ANON=$(grep '^ANON_KEY=' .env | cut -d= -f2-)
 SERVICE=$(grep '^SERVICE_ROLE_KEY=' .env | cut -d= -f2-)
 DASHPASS=$(grep '^DASHBOARD_PASSWORD=' .env | cut -d= -f2-)
+# шлюз Supabase (Envoy; в старых ревизиях — Kong)
+GW_SVC=$(grep -oE '^  (api-gw|kong):' docker-compose.yml 2>/dev/null | head -n 1 | tr -d ' :' || true); GW_SVC=${GW_SVC:-api-gw}
 
-# override: порты Postgres-пулера прячем на loopback; настройки входа (auth); сюда же — VAPID для пушей.
+# override: порты шлюза и Postgres-пулера прячем на loopback (Docker открывает порты мимо ufw: на 0.0.0.0
+# Studio был бы виден по http://IP:8000 в обход Caddy); настройки входа (auth); сюда же — VAPID для пушей.
 # Тот же формат, что пишет push.sh: файл пишется целиком — всё, что в нём должно жить, только здесь и там.
 VPUB=""; VPRIV=""
 if [ -f docker-compose.override.yml ]; then
@@ -146,6 +241,9 @@ fi
   echo '    ports: !override'
   echo '      - "127.0.0.1:5432:5432"'
   echo '      - "127.0.0.1:6543:6543"'
+  echo "  $GW_SVC:"
+  echo '    ports: !override'
+  echo '      - "127.0.0.1:8000:8000/tcp"'
   # вход: ограничение попыток по IP (заголовок ставит Caddy) и новые пароли от 8 символов
   echo '  auth:'
   echo '    environment:'
@@ -174,12 +272,16 @@ for _ in $(seq 1 90); do
 done
 [ -n "$DB_OK" ] || { warn "база не поднялась за 7 минут — смотри docker compose logs db"; exit 1; }
 echo "жду готовности API-шлюза…"
-# корень /rest/v1/ в этой ревизии Envoy пускает только сервисный ключ — им и проверяем
+# корень /rest/v1/ в этой ревизии Envoy пускает только сервисный ключ — им и проверяем.
+# Ключ — файлом заголовков (0600): в аргументах curl его видно всем в списке процессов (ps)
+GW_HDR=$(mktemp)
+printf 'apikey: %s\nAuthorization: Bearer %s\n' "$SERVICE" "$SERVICE" > "$GW_HDR"
 GW_OK=""
 for _ in $(seq 1 60); do
-  curl -sf -o /dev/null http://127.0.0.1:8000/rest/v1/ -H "apikey: $SERVICE" -H "Authorization: Bearer $SERVICE" && { GW_OK=1; break; }
+  curl -sf -o /dev/null http://127.0.0.1:8000/rest/v1/ -H @"$GW_HDR" && { GW_OK=1; break; }
   sleep 5
 done
+rm -f "$GW_HDR"
 [ -n "$GW_OK" ] || { warn "шлюз :8000 не отвечает — смотри docker compose logs api-gw rest"; exit 1; }
 echo "стек поднят ✓"
 
@@ -242,6 +344,30 @@ say "8/9 · Данные и аккаунты"
 #     лежать устаревшие или испорченные данные.
 #     Строки не посчитались (база перезапускается, нет памяти) — НЕ заливаем: вдруг таблица не пустая.
 #     И даже в пустую — «ignore-duplicates»: уже существующую строку заливка не перезапишет никогда.
+#     Копии с 29.10.2026 зашифрованы (kv-ДАТА.json.gz.gpg, migrate/backup.sh): фраза — из /root/.komik-backup-pass,
+#     а на новом сервере её нет — спрашиваем. Подошла — кладём туда же: новые копии пойдут той же фразой,
+#     что уже сохранена у владельца. Старые незашифрованные .json.gz понимаем по-прежнему.
+gpg_dec(){ GNUPGHOME="$1" gpg --batch --yes --quiet --pinentry-mode loopback --no-symkey-cache --passphrase-fd 0 -o "$3" -d "$2" 2>/dev/null; }
+bk_decrypt(){ # bk_decrypt <файл .gpg> <куда .json.gz>
+  local g p rc=1; g=$(mktemp -d)
+  if [ -s "$BK_PASS" ] && gpg_dec "$g" "$1" "$2" < "$BK_PASS"; then rc=0
+  else
+    [ ! -s "$BK_PASS" ] || warn "фраза из $BK_PASS к этой копии не подошла"
+    for _ in 1 2 3; do
+      read -rsp "  Парольная фраза копий базы (из менеджера паролей; Enter — пропустить): " p </dev/tty || p=""; echo
+      p=$(printf '%s' "$p" | tr -d '\r\n\t ')
+      [ -n "$p" ] || break
+      if printf '%s\n' "$p" | gpg_dec "$g" "$1" "$2"; then
+        rc=0
+        if [ ! -s "$BK_PASS" ]; then ( umask 077; printf '%s\n' "$p" > "$BK_PASS" ); echo "  фраза подошла — сохранена в $BK_PASS ✓"; fi
+        break
+      fi
+      warn "фраза не подошла"
+    done
+  fi
+  rm -rf "$g"; [ $rc = 0 ] || rm -f "$2"
+  return $rc
+}
 KVCNT=$(docker exec supabase-db psql -U postgres -d postgres -tAc "select count(*) from public.kv" 2>/dev/null) || KVCNT=""
 if [ "$KVCNT" != 0 ]; then
   if [ -n "$KVCNT" ]; then echo "  kv уже содержит $KVCNT ключей — восстановление пропускаю (данные не трогаю)"
@@ -252,11 +378,15 @@ else
     if [ -f "$KOMIK_KV_FILE" ]; then KV_SRC="$KOMIK_KV_FILE"; echo "  копия: $KOMIK_KV_FILE"; else warn "файла $KOMIK_KV_FILE нет"; fi
   elif git clone -q --depth 1 --filter=blob:none --no-checkout --branch backups \
          https://github.com/H1NOMA/h1noma.github.io "$BK_DIR/bk" 2>/dev/null; then
-    # частичный клон: список файлов, а скачивается одна — самая свежая — копия
-    LAST=$(git -C "$BK_DIR/bk" ls-tree --name-only HEAD backups/ | grep -E '^backups/kv-[0-9-]+\.json\.gz$' | sort | tail -1 || true)
-    if [ -n "$LAST" ] && git -C "$BK_DIR/bk" show "HEAD:$LAST" > "$BK_DIR/snap.json.gz" 2>/dev/null; then
-      KV_SRC="$BK_DIR/snap.json.gz"; echo "  свежая копия: $(basename "$LAST")"
+    # частичный клон: список файлов, а скачивается одна — самая свежая — копия (за один день .gpg — после .json.gz)
+    LAST=$(git -C "$BK_DIR/bk" ls-tree --name-only HEAD backups/ | grep -E '^backups/kv-[0-9-]+\.json\.gz(\.gpg)?$' | sort | tail -1 || true)
+    if [ -n "$LAST" ] && git -C "$BK_DIR/bk" show "HEAD:$LAST" > "$BK_DIR/$(basename "$LAST")" 2>/dev/null; then
+      KV_SRC="$BK_DIR/$(basename "$LAST")"; echo "  свежая копия: $(basename "$LAST")"
     fi
+  fi
+  if [ -n "$KV_SRC" ] && [[ "$KV_SRC" == *.gpg ]]; then
+    if bk_decrypt "$KV_SRC" "$BK_DIR/snap.json.gz"; then KV_SRC="$BK_DIR/snap.json.gz"
+    else warn "копия зашифрована, а фразы нет или она не подошла — данные не восстанавливаю"; KV_SRC=""; fi
   fi
   # в копии оставляем только key и value (в старых есть лишний столбец updated_at)
   if [ -n "$KV_SRC" ] && python3 - "$KV_SRC" "$BK_DIR/payload.json" <<'PY'
@@ -336,17 +466,14 @@ if curl -sSf -o "$SB_DIR/volumes/functions/notify-game/index.ts" \
 else warn "не смог скачать notify-game — пуши не заработают"; fi
 docker compose up -d functions >/dev/null 2>&1 || docker compose up -d
 
-if ! grep -q "$CLOUD_DOMAIN" /etc/caddy/Caddyfile 2>/dev/null; then
-  cat >> /etc/caddy/Caddyfile <<EOF2
-
-$CLOUD_DOMAIN {
-    reverse_proxy localhost:8000
-}
-EOF2
-fi
-# restart, не reload: поднимает сервис и если он не был запущен
+# наружу — только API сайта (Studio — через SSH-туннель), HSTS; стандартный «:80» («Caddy works!» по IP) убираем
+install -d -m 755 "$BK_WWW"
 systemctl enable caddy >/dev/null 2>&1 || true
-systemctl restart caddy || warn "Caddy не стартовал — пришли вывод: systemctl status caddy --no-pager | head -20"
+CF_NEW=$(mktemp)
+caddy_cloud_new > "$CF_NEW"
+caddy_apply "$CF_NEW" || warn "Caddy остался с прежними настройками — пришли вывод выше программисту"
+rm -f "$CF_NEW" "$CF_NEW.err"
+systemctl is-active -q caddy || systemctl restart caddy || warn "Caddy не стартовал — пришли вывод: systemctl status caddy --no-pager | head -20"
 
 # необязательная экономия памяти: файлохранилище сайту не нужно
 for s in storage imgproxy; do docker compose stop "$s" >/dev/null 2>&1 || true; done
@@ -356,8 +483,10 @@ IP=$(curl -s4 ifconfig.me || hostname -I | awk '{print $1}')
 cat > "$INFO" <<EOF2
 ══ КОМИК · параметры нового облака ══
 Адрес API:        https://$CLOUD_DOMAIN
-Studio (панель):  https://$CLOUD_DOMAIN  · логин: supabase · пароль: $DASHPASS
-ANON_KEY — публичный ключ сайта (он же вписан в index.html и .github/workflows/backup-kv.yml):
+Studio (панель):  только через SSH-туннель (migrate/RESTORE.md, раздел 9) — в PowerShell:
+                  ssh -N -L 8000:127.0.0.1:8000 root@$CLOUD_DOMAIN  → в браузере http://localhost:8000
+                  логин: supabase · пароль: $DASHPASS
+ANON_KEY — публичный ключ сайта (он же вписан в index.html):
 $ANON
 
 SERVICE_ROLE_KEY — СЕКРЕТ. Никому и никуда не отправлять:
@@ -367,14 +496,16 @@ chmod 600 "$INFO"
 say "ГОТОВО"
 echo "Все параметры сохранены в $INFO (посмотреть: cat $INFO)"
 echo
-echo "Проверь в браузере: https://$CLOUD_DOMAIN — должен ответить JSON (нужна DNS-запись cloud → $IP)."
+echo "Проверь в браузере: https://$CLOUD_DOMAIN/rest/v1/ — короткая ошибка про ключ API: облако на месте"
+echo "(нужна DNS-запись cloud → $IP). А https://$CLOUD_DOMAIN/ — пустая страница 404: панели в интернете нет, так и надо."
 if [ -n "$ENV_RESTORED" ]; then
   echo "Ключи прежние (из /root/komik-env.backup) — сайт править не нужно."
 elif [ -n "$ENV_NEW" ]; then
   echo "Ключи НОВЫЕ: старый анон-ключ на сайте больше не подходит. Замени его на ANON_KEY из $INFO"
-  echo "в двух файлах репозитория — index.html и .github/workflows/backup-kv.yml (на GitHub: файл → карандаш;"
+  echo "в index.html (на GitHub: файл → карандаш;"
   echo "старый ключ — длинная строка, начинается с eyJ). Чтобы в следующий раз обойтись без этого — migrate/RESTORE.md."
 fi
 echo "Сохрани копии ключей и аккаунтов у себя на компьютере — migrate/RESTORE.md, раздел 1."
+echo "Дальше — пуши, ежедневная зашифрованная копия базы и проверка: bash <(curl -fsS https://komikdnd.ru/migrate/push.sh)"
 echo "Сайт — с этого же сервера (быстро и без VPN): bash <(curl -fsS https://komikdnd.ru/migrate/site.sh)"
 echo "Проверить защиту базы и входа: bash <(curl -fsS https://komikdnd.ru/migrate/push.sh) check"

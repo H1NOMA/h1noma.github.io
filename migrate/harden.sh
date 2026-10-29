@@ -6,15 +6,107 @@
 #   · fail2ban — после 6 неверных паролей SSH за 10 минут адрес блокируется на час;
 #   · unattended-upgrades — обновления безопасности Ubuntu ставятся сами каждый день.
 #  Показывает, какие порты сервера открыты в интернет.
-#  НЕ отключает вход по паролю и НЕ меняет порт SSH (так легко закрыть дверь и перед собой) —
+#  Обычный запуск НЕ отключает вход по паролю и НЕ меняет порт SSH (так легко закрыть дверь и перед собой) —
 #  в конце печатает, как перейти на вход по ключу с Windows.
+#
+#  Вход только по ключу — отдельной командой, когда ключ уже добавлен и вход по нему проверен:
+#    bash <(curl -fsS https://komikdnd.ru/migrate/harden.sh) ssh-keys
+#  Пишет /etc/ssh/sshd_config.d/00-komik.conf: PasswordAuthentication no, KbdInteractiveAuthentication no,
+#  PermitRootLogin prohibit-password. Откажет, если в /root/.ssh/authorized_keys нет ни одного настоящего ключа;
+#  перед перезапуском проверяет sshd -t и что настройки действительно подействовали (sshd -T), иначе — откат.
 # ══════════════════════════════════════════════════════════════════
 set -euo pipefail
 say(){ printf '\n\033[1;32m══ %s\033[0m\n' "$*"; }
 warn(){ printf '\033[1;33m⚠ %s\033[0m\n' "$*"; }
+bad(){ printf '\033[1;31m✗ %s\033[0m\n' "$*"; }
+ok(){ printf '  %s ✓\n' "$*"; }
+# пути — переменными только для проверки в песочнице (tests/README.md); на сервере — как есть
+AK="${KOMIK_SSH_AUTHKEYS:-/root/.ssh/authorized_keys}"
+SSHD_CFG="${KOMIK_SSHD_CONFIG:-/etc/ssh/sshd_config}"
+DROPIN="${KOMIK_SSHD_DROPIN:-/etc/ssh/sshd_config.d/00-komik.conf}"
 
 [ "$(id -u)" = 0 ] || { echo "Запусти от root: ssh root@<IP>"; exit 1; }
 export DEBIAN_FRONTEND=noninteractive
+IP=$(hostname -I 2>/dev/null | awk '{print $1}'); IP=${IP:-<IP-сервера>}
+# как завести ключ на Windows и положить его на сервер — одна инструкция для обоих режимов
+key_howto(){
+  cat <<EOF
+На своём компьютере (Windows) открой PowerShell (НЕ на сервере):
+  1) ssh-keygen -t ed25519
+     (Enter на все вопросы; ключ появится в папке .ssh твоего пользователя)
+  2) type \$env:USERPROFILE\\.ssh\\id_ed25519.pub | ssh root@$IP "mkdir -p ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys"
+     (последний раз спросит пароль сервера)
+  3) в НОВОМ окне PowerShell: ssh root@$IP — должен пустить БЕЗ пароля.
+Только если шаг 3 сработал — на сервере: bash <(curl -fsS https://komikdnd.ru/migrate/harden.sh) ssh-keys
+Ключ живёт на этом компьютере: скопируй папку .ssh в надёжное место. Потерял ключ, а пароль выключен —
+вход только через консоль в панели хостинга (там же вернуть пароль: rm $DROPIN && systemctl reload ssh).
+EOF
+}
+
+# ── режим ssh-keys: вход по SSH только по ключу ──
+if [ "${1:-}" = ssh-keys ]; then
+  say "Вход по SSH только по ключу"
+  # перевод строки Windows (\r) в конце ключа попадает в файл при вставке из PowerShell — убираем
+  if [ -f "$AK" ] && grep -q $'\r' "$AK"; then sed -i 's/\r$//' "$AK"; fi
+  # «правильный» ключ — тот, у которого ssh-keygen смог посчитать отпечаток (тип, base64 и длина — настоящие)
+  KEYS=""; N=0
+  if [ -f "$AK" ]; then
+    while IFS= read -r line || [ -n "$line" ]; do
+      case "$line" in ''|'#'*) continue ;; esac
+      if fp=$(ssh-keygen -l -f /dev/stdin <<< "$line" 2>/dev/null); then N=$((N + 1)); KEYS="$KEYS    $fp"$'\n'; fi
+    done < "$AK"
+  fi
+  if [ "$N" = 0 ]; then
+    bad "в $AK нет ни одного ключа — выключать вход по паролю нельзя: сервер закрылся бы и от тебя"
+    echo
+    key_howto
+    exit 1
+  fi
+  # sshd строг к правам: папка и файл, доступные на запись другим, — и ключ молча не примут
+  chmod 700 "$(dirname "$AK")"; chmod 600 "$AK"
+  echo "Ключи, с которыми можно будет войти (из $AK): $N"
+  printf '%s' "$KEYS"
+  echo
+  echo "Дальше вход root по паролю будет выключен — пустит только с этими ключами."
+  echo "Вход по ключу ты уже проверил в НОВОМ окне PowerShell (ssh root@$IP — пустило без пароля)?"
+  read -rp "Напиши «да», чтобы выключить вход по паролю: " YES </dev/tty || YES=""
+  [ "$YES" = да ] || { echo "Отменено — ничего не менял."; exit 0; }
+  BAK=""; if [ -f "$DROPIN" ]; then BAK=$(mktemp); cp "$DROPIN" "$BAK"; fi
+  put_back(){ if [ -n "$BAK" ]; then cp "$BAK" "$DROPIN"; else rm -f "$DROPIN"; fi; }
+  mkdir -p "$(dirname "$DROPIN")"
+  # 00- — чтобы стоять раньше 50-cloud-init.conf и т.п.: у sshd действует ПЕРВОЕ значение параметра
+  cat > "$DROPIN" <<EOF
+# КОМИК (migrate/harden.sh ssh-keys): вход только по ключу. Вернуть вход по паролю (из консоли хостинга):
+#   rm $DROPIN && systemctl reload ssh
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+PermitRootLogin prohibit-password
+EOF
+  chmod 644 "$DROPIN"
+  ERR=$(mktemp)
+  if ! sshd -t -f "$SSHD_CFG" 2>"$ERR"; then
+    put_back; bad "sshd -t: настройки не прошли проверку — вернул как было:"; sed 's/^/  /' "$ERR"; exit 1
+  fi
+  # подействовало ли: строка Include должна быть в sshd_config раньше своих значений этих параметров
+  EFF=$(sshd -T -f "$SSHD_CFG" 2>"$ERR" | awk '$1 ~ /^(passwordauthentication|kbdinteractiveauthentication|challengeresponseauthentication|permitrootlogin)$/ {print $1 "=" $2}')
+  if ! grep -qx 'passwordauthentication=no' <<< "$EFF" || grep -Eq '^(kbdinteractive|challengeresponse)authentication=yes$' <<< "$EFF" \
+     || ! grep -Eqx 'permitrootlogin=(without-password|prohibit-password)' <<< "$EFF"; then
+    put_back
+    bad "настройки не подействовали (sshd -T: $(paste -sd' ' <<< "$EFF")) — вернул как было."
+    echo "  Скорее всего, в $SSHD_CFG нет строки «Include /etc/ssh/sshd_config.d/*.conf» в начале. Покажи вывод программисту."
+    exit 1
+  fi
+  rm -f "$ERR" "$BAK"
+  # reload: текущие соединения не рвутся. Сервис не запущен (вход через ssh.socket) — новые настройки возьмёт при старте
+  if systemctl try-reload-or-restart ssh.service 2>/dev/null || systemctl try-reload-or-restart sshd.service 2>/dev/null; then
+    ok "sshd перечитал настройки"
+  else warn "не смог перечитать sshd (systemctl reload ssh) — настройки вступят после перезапуска сервера"; fi
+  ok "вход по паролю выключен: $(paste -sd' ' <<< "$EFF")"
+  printf '\n\033[1;33m%s\033[0m\n' "НЕ ЗАКРЫВАЙ ЭТО ОКНО, пока не проверишь вход в НОВОМ окне PowerShell: ssh root@$IP"
+  echo "  Пустило без пароля — всё, можно закрывать."
+  echo "  Не пустило — прямо в ЭТОМ окне верни как было: rm $DROPIN && systemctl reload ssh"
+  exit 0
+fi
 
 say "1/3 · fail2ban (защита SSH от подбора пароля)"
 apt-get update -q >/dev/null || warn "apt-get update не прошёл (нет интернета?) — пробую поставить из того, что есть"
@@ -64,27 +156,12 @@ else
 fi
 
 say "Вход по SSH-ключу вместо пароля (сделай сам, когда будет время)"
-IP=$(hostname -I 2>/dev/null | awk '{print $1}'); IP=${IP:-<IP-сервера>}
 # пароль принимают два способа входа: PasswordAuthentication и keyboard-interactive (через PAM) —
 # на части образов хостингов второй включён, и тогда «PasswordAuthentication no» пароль не выключает
 PWSTATE=$(sshd -T 2>/dev/null | awk '
   $1=="passwordauthentication"{p=$2} $1=="kbdinteractiveauthentication"||$1=="challengeresponseauthentication"{if(k=="")k=$2}
   END{ if(p=="") print "не удалось узнать (sshd -T)";
        else print ((p=="yes"||k=="yes")?"включён":"выключен") " (PasswordAuthentication " p ", KbdInteractiveAuthentication " (k==""?"?":k) ")" }' || true)
-cat <<EOF
-Сейчас вход по паролю: $PWSTATE
-На своём компьютере (Windows) открой PowerShell:
-  1) ssh-keygen -t ed25519
-     (Enter на все вопросы; ключ появится в папке .ssh твоего пользователя)
-  2) type \$env:USERPROFILE\\.ssh\\id_ed25519.pub | ssh root@$IP "mkdir -p ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys"
-     (последний раз спросит пароль сервера)
-  3) ssh root@$IP — должен пустить БЕЗ пароля.
-Только если шаг 3 сработал, можно выключить вход по паролю (на сервере; обе строки — иначе пароль
-всё ещё примут через keyboard-interactive; sshd -t проверяет настройки до перезапуска):
-  printf 'PasswordAuthentication no\nKbdInteractiveAuthentication no\n' > /etc/ssh/sshd_config.d/00-komik.conf && sshd -t && systemctl restart ssh
-  и, НЕ закрывая это окно, проверь вход в новом окне PowerShell: ssh root@$IP
-  проверка на сервере: sshd -T | grep -E '^(passwordauthentication|kbdinteractiveauthentication) ' — обе строки «no»
-Ключ живёт на этом компьютере: скопируй папку .ssh в надёжное место. Потерял ключ и пароль выключен —
-вход только через консоль в панели хостинга (там же вернуть пароль: rm /etc/ssh/sshd_config.d/00-komik.conf && systemctl restart ssh).
-Если сам себя заблокировал паролями — подожди час или в консоли хостинга: fail2ban-client set sshd unbanip ТВОЙ_IP
-EOF
+echo "Сейчас вход по паролю: $PWSTATE"
+key_howto
+echo "Если сам себя заблокировал паролями — подожди час или в консоли хостинга: fail2ban-client set sshd unbanip ТВОЙ_IP"
