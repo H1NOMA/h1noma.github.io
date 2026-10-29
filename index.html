@@ -1757,7 +1757,11 @@
   .ce-sec-top{display:flex;gap:8px}
   .ce-sec-top .ce-sh{flex:1;min-width:0}
   .ce-sec textarea{width:100%;margin-top:8px;resize:vertical}
-  .ico-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(44px,1fr));gap:6px;max-height:210px;overflow-y:auto;padding:8px;border:var(--hair) solid var(--line2);border-radius:12px;background:var(--bg2)}
+  .ico-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(44px,1fr));gap:6px;max-height:300px;overflow-y:auto;position:relative;padding:8px;border:var(--hair) solid var(--line2);border-radius:12px;background:var(--bg2)}
+  .ico-q{width:100%;margin-bottom:8px}
+  .ico-h{grid-column:1/-1;font-family:var(--f-mono);font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:8px 2px 0}
+  .ico-h:first-of-type{padding-top:2px}
+  .ico-grid [hidden]{display:none}
   .ico-opt{aspect-ratio:1;display:flex;align-items:center;justify-content:center;border:1px solid var(--line2);border-radius:10px;background:var(--surface);color:var(--dim);cursor:pointer;transition:border-color .12s,color .12s}
   .ico-opt.ico-none{font-family:var(--f-mono);font-size:1.1rem}
   .ico-opt.on{border-color:var(--red);color:var(--red-ink);background:var(--surface2)}
@@ -4900,6 +4904,7 @@ const subById = (catId, subId) => (catById(catId).subs.find(s=>s.id===subId) || 
 
 // руны категорий (монохром, цвет через currentColor)
 const CARD_ICONS={"sword": "<path d=\"M14.5 3.5L20 3l-.5 5.5-9 9L7 14l7.5-10.5z\"/><path d=\"M6.5 14.5L3 18l3 3 3.5-3.5\"/>", "axe": "<path d=\"M6 3l6 6-3 3-6-6z\"/><path d=\"M9 6c4-3 9-2 11 1-3 3-8 3-11 0z\"/><path d=\"M11 12l-6 9\"/>", "bow": "<path d=\"M5 3c8 3 12 9 14 18\"/><path d=\"M5 3v18l14-9\"/>", "dagger": "<path d=\"M13 3l3 3-7 7-3-3 7-7z\"/><path d=\"M8 13l-4 4 3 3 4-4\"/>", "hammer": "<path d=\"M4 8h9v5H4z\"/><path d=\"M13 10.5h4l3-2.5v7l-3-2.5h-4\"/><path d=\"M8.5 13v8\"/>", "spear": "<path d=\"M12 2l2.5 6h-5L12 2z\"/><path d=\"M12 8v14\"/>", "staff": "<circle cx=\"12\" cy=\"4.5\" r=\"2.5\"/><path d=\"M12 7v15\"/>", "sling": "<circle cx=\"12\" cy=\"9\" r=\"3\"/><path d=\"M6 4c2 6 4 10 6 14 2-4 4-8 6-14\"/>", "shield": "<path d=\"M12 3l7 3v6c0 5-3 8-7 9-4-1-7-4-7-9V6l7-3z\"/>", "armor": "<path d=\"M12 3l6 2v6c0 5-2.5 8-6 10-3.5-2-6-5-6-10V5l6-2z\"/><path d=\"M12 5v16\"/>", "helmet": "<path d=\"M5 13a7 7 0 0114 0v6H5v-6z\"/><path d=\"M12 13v6M5 16h14\"/>", "potion": "<path d=\"M10 3h4v4l3.5 8a4 4 0 01-3.7 5.6H10.2A4 4 0 016.5 15L10 7V3z\"/><path d=\"M8 14h8\"/>", "ring": "<circle cx=\"12\" cy=\"14\" r=\"6\"/><path d=\"M9.5 8.5L12 3l2.5 5.5\"/>", "scroll": "<path d=\"M6 4h12v14a2 2 0 002-2V6\"/><path d=\"M6 4a2 2 0 00-2 2v12a2 2 0 002 2h12\"/><path d=\"M9 9h6M9 13h6\"/>", "wand": "<path d=\"M4 20L16 8\"/><path d=\"M17 3l1 2 2 1-2 1-1 2-1-2-2-1 2-1 1-2z\"/>", "amulet": "<path d=\"M8 3l4 5 4-5\"/><circle cx=\"12\" cy=\"14\" r=\"5\"/><path d=\"M12 11.5v5M9.5 14h5\"/>", "cloak": "<path d=\"M12 3l6 3v15H6V6l6-3z\"/><path d=\"M12 3v18\"/>", "boots": "<path d=\"M6 3h4v10l5 3v5H6V3z\"/><path d=\"M6 16h9\"/>", "gem": "<path d=\"M12 3l7 5-7 13-7-13 7-5z\"/><path d=\"M5 8h14M12 3v18\"/>", "coin": "<circle cx=\"12\" cy=\"12\" r=\"8\"/><path d=\"M9 12h6M12 9v6\"/>", "rope": "<path d=\"M7 3c4 3 4 6 0 9s-4 6 0 9\"/><path d=\"M17 3c-4 3-4 6 0 9s4 6 0 9\"/>", "torch": "<path d=\"M12 3c2 3 3 5 3 7a3 3 0 01-6 0c0-2 1-4 3-7z\"/><path d=\"M12 13v8\"/>", "pack": "<path d=\"M6 8h12v13H6z\"/><path d=\"M9 8V5a3 3 0 016 0v3\"/>", "tools": "<path d=\"M14 3l4 4-3 3-4-4 3-3z\"/><path d=\"M11 6L4 13v4h4l7-7\"/>", "book": "<path d=\"M4 4h7a2 2 0 012 2v14a2 2 0 00-2-2H4V4z\"/><path d=\"M20 4h-7a2 2 0 00-2 2v14a2 2 0 012-2h7V4z\"/>", "goblin": "<path d=\"M5 9l3-4 4 2 4-2 3 4-2 3v5H7v-5L5 9z\"/><circle cx=\"10\" cy=\"11\" r=\".9\"/><circle cx=\"14\" cy=\"11\" r=\".9\"/>", "skull": "<path d=\"M12 3a8 8 0 00-8 8v4l3 1v4h10v-4l3-1v-4a8 8 0 00-8-8z\"/><circle cx=\"9\" cy=\"12\" r=\"1.6\"/><circle cx=\"15\" cy=\"12\" r=\"1.6\"/>", "dragon": "<path d=\"M3 14l5-6 4 2 4-4 5 2-3 5 2 5-7-2-5 3-2-5z\"/><circle cx=\"17\" cy=\"8\" r=\".8\"/>", "beast": "<path d=\"M4 10l2-5 3 3h6l3-3 2 5-3 3v6H7v-6l-3-3z\"/><circle cx=\"10\" cy=\"12\" r=\".9\"/><circle cx=\"14\" cy=\"12\" r=\".9\"/>", "undead": "<path d=\"M12 3a7 7 0 00-7 7v5l2 2v4h10v-4l2-2v-5a7 7 0 00-7-7z\"/><path d=\"M9 11h2M13 11h2M9 16h6\"/>", "aberration": "<circle cx=\"12\" cy=\"9\" r=\"5\"/><circle cx=\"12\" cy=\"9\" r=\"1.6\"/><path d=\"M8 13c-1 4-3 6-4 7M12 14v7M16 13c1 4 3 6 4 7\"/>", "giant": "<circle cx=\"12\" cy=\"6\" r=\"3\"/><path d=\"M7 21v-7l-2-3 3-2h8l3 2-2 3v7\"/>", "ooze": "<path d=\"M4 16c0-5 3.5-9 8-9s8 4 8 9c0 2-2 3-4 2s-3 1-4 1-2-2-4-1-4-.2-4-2z\"/>", "ghost": "<path d=\"M6 20V11a6 6 0 0112 0v9l-2-2-2 2-2-2-2 2-2-2z\"/><circle cx=\"10\" cy=\"10\" r=\".9\"/><circle cx=\"14\" cy=\"10\" r=\".9\"/>", "combat": "<path d=\"M4 4l9 9M20 4l-9 9\"/><path d=\"M14 14l6 6M10 14l-6 6\"/>", "rest": "<path d=\"M20 14a8 8 0 01-10-10 8 8 0 1010 10z\"/>", "magic": "<path d=\"M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3z\"/>", "cond": "<circle cx=\"12\" cy=\"12\" r=\"8.5\"/><path d=\"M12 7.5v5.5\"/><circle cx=\"12\" cy=\"16.5\" r=\".9\" fill=\"currentColor\" stroke=\"none\"/>", "dice": "<path d=\"M12 2l8.7 5v10L12 22l-8.7-5V7L12 2z\"/><path d=\"M12 12l8.7-5M12 12v10M12 12L3.3 7\"/>", "eye": "<path d=\"M2 12s4-6 10-6 10 6 10 6-4 6-10 6S2 12 2 12z\"/><circle cx=\"12\" cy=\"12\" r=\"2.5\"/>", "run": "<circle cx=\"14\" cy=\"4.5\" r=\"2\"/><path d=\"M8 21l3-6-2-4 4-3 3 4 3 1\"/><path d=\"M9 11l-3 2\"/>", "race": "<circle cx=\"12\" cy=\"7\" r=\"3.5\"/><path d=\"M5 20a7 7 0 0114 0\"/>", "class": "<path d=\"M12 3l7 4v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V7l7-4z\"/><path d=\"M12 8v8M8.5 12h7\"/>", "bg": "<path d=\"M5 21V7l7-4 7 4v14\"/><path d=\"M9 21v-6h6v6\"/>", "feat": "<path d=\"M12 3l2.6 5.6 6.4.8-4.7 4.3 1.3 6.3L12 17l-5.6 3 1.3-6.3L3 9.4l6.4-.8L12 3z\"/>", "faction": "<path d=\"M6 21V4l6-2 6 2v17\"/><path d=\"M12 2v19M6 9h12M6 15h12\"/>", "deity": "<circle cx=\"12\" cy=\"12\" r=\"4\"/><path d=\"M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M16.9 16.9l2.1 2.1M19.1 4.9l-2.1 2.1M7 17l-2.1 2.1\"/>", "npc": "<circle cx=\"12\" cy=\"7.5\" r=\"3.5\"/><path d=\"M5 21a7 7 0 0114 0\"/><path d=\"M12 11v3\"/>", "tree": "<path d=\"M12 3l5 7h-3l3 5h-3l2 4H8l2-4H7l3-5H7l5-7z\"/><path d=\"M12 19v3\"/>", "mountain": "<path d=\"M3 19l6-11 4 6 2-3 6 8z\"/><path d=\"M9 8l2 3\"/>", "castle": "<path d=\"M4 21V9l2 1V7h2v3l2-1V7h2v3l2-1V7h2v3l2-1v12z\"/><path d=\"M10 21v-4h4v4\"/>", "crown": "<path d=\"M4 8l3 4 5-6 5 6 3-4v10H4z\"/><path d=\"M4 18h16\"/>", "key": "<circle cx=\"8\" cy=\"8\" r=\"4\"/><path d=\"M11 11l8 8M16 16l2-2M18 18l2-2\"/>", "chest": "<path d=\"M4 9h16v11H4z\"/><path d=\"M4 9l2-3h12l2 3M4 13h16M11 11h2v3h-2z\"/>", "flag": "<path d=\"M6 3v18M6 4h11l-2 3 2 3H6\"/>", "moon": "<path d=\"M15 3a8 8 0 100 18 6.5 6.5 0 010-18z\"/>", "star": "<path d=\"M12 3l2.6 6.3 6.8.5-5.2 4.4 1.7 6.6L12 17.7 6.1 21.3l1.7-6.6-5.2-4.4 6.8-.5L12 3z\"/>", "flame": "<path d=\"M12 3c3 4 5 6 5 9a5 5 0 01-10 0c0-1.5.7-2.8 2-4-.3 1.8.5 3 2 3 .8-3-.5-5 1-8z\"/>", "wave": "<path d=\"M3 8c2-2 4-2 6 0s4 2 6 0 4-2 6 0M3 13c2-2 4-2 6 0s4 2 6 0 4-2 6 0M3 18c2-2 4-2 6 0s4 2 6 0 4-2 6 0\"/>", "flower": "<circle cx=\"12\" cy=\"10\" r=\"2.3\"/><path d=\"M12 10c0-4 4-4 4 0M12 10c0 4 4 4 4 0M12 10c0-4-4-4-4 0M12 10c0 4-4 4-4 0M12 12v9\"/>", "gate": "<path d=\"M4 21V8a8 8 0 0116 0v13\"/><path d=\"M9 21v-8a3 3 0 016 0v8M4 12h16\"/>", "tower": "<path d=\"M8 21V7l-2-2 2-2h8l2 2-2 2v14\"/><path d=\"M8 11h8M8 15h8M11 21v-4h2v4\"/>", "map": "<path d=\"M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z\"/><path d=\"M9 4v14M15 6v14\"/>", "portal": "<ellipse cx=\"12\" cy=\"12\" rx=\"5\" ry=\"9\"/><ellipse cx=\"12\" cy=\"12\" rx=\"2\" ry=\"5\"/>", "leaf": "<path d=\"M5 19c0-8 6-14 14-14 0 8-6 14-14 14z\"/><path d=\"M5 19c4-4 7-7 10-9\"/>", "crystal": "<path d=\"M12 2l5 6-5 14-5-14 5-6z\"/><path d=\"M7 8h10M12 2v20\"/>"};
+const CARD_ICON_GROUPS=[['Значки', Object.keys(CARD_ICONS).sort().map(k=>[k,k])]];   // [группа, [[ключ, название], …]] — порядок в выборе значка
 function cardIcon(e, size){
   const inner = e && e.ico && CARD_ICONS[e.ico];
   if(!inner) return rune(e?e.cat:'', size);
@@ -7081,6 +7086,24 @@ function closeTagPicker(){ TAGS_KEEP=true; openCardEditor(EDIT_ID); }
 /* ---------- Редактор карточек (админ) ---------- */
 let EDIT_IMG='', EDIT_ID=null, TAGS_KEEP=false, EDIT_DRAFT=null, CE_STAT=null, CE_LOC=null, CE_ICO='';
 function ceSetIco(name){ CE_ICO=name||''; document.querySelectorAll('#ceIcoGrid .ico-opt').forEach(b=>b.classList.toggle('on', (b.dataset.ico||'')===CE_ICO)); }
+/* выбор значка: группы (CARD_ICON_GROUPS) с подписями по-русски, поиск по названию; «—» — значок раздела */
+function ceIcoGridHtml(){
+  const btn=(k,ru)=>`<button type="button" class="ico-opt${CE_ICO===k?' on':''}" data-ico="${k}" data-q="${esc((ru+' '+k.replace(/_/g,' ')).toLowerCase().replace(/ё/g,'е'))}" onclick="ceSetIco('${k}')" title="${esc(ru)}" aria-label="${esc(ru)}"><svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linejoin="round" stroke-linecap="round">${CARD_ICONS[k]}</svg></button>`;
+  return `<button type="button" class="ico-opt ico-none${!CE_ICO?' on':''}" onclick="ceSetIco('')" title="Авто по разделу" aria-label="Авто по разделу">—</button>`
+    + CARD_ICON_GROUPS.map(([t,items])=>`<div class="ico-h">${esc(t)}</div>`+items.filter(([k])=>CARD_ICONS[k]).map(([k,ru])=>btn(k,ru)).join('')).join('');
+}
+function ceIcoFilter(q){
+  const w=String(q||'').toLowerCase().replace(/ё/g,'е').trim().split(/\s+/).filter(Boolean);
+  const grid=document.getElementById('ceIcoGrid'); if(!grid) return;
+  let head=null, any=false;
+  const close=()=>{ if(head) head.hidden=!any; };
+  [...grid.children].forEach(el=>{
+    if(el.classList.contains('ico-h')){ close(); head=el; any=false; return; }
+    if(el.classList.contains('ico-none')){ el.hidden=w.length>0; return; }
+    const hit=w.every(x=>(el.dataset.q||'').includes(x)); el.hidden=!hit; if(hit) any=true;
+  });
+  close();
+}
 // параметры локации хранятся в досье этими ключами — редактируются отдельными полями, не «сырыми» строками
 const LOC_DOS=['Статус','Опасность','Форма правления'];
 function ceLocFrom(e){
@@ -7122,10 +7145,8 @@ function openCardEditor(id){
       <input type="file" id="ceFile" accept="image/*" hidden onchange="ceImgPick(this)">
     </div>
     <div class="field"><label>Значок (слева от названия)</label>
-      <div class="ico-grid" id="ceIcoGrid">
-        <button type="button" class="ico-opt ico-none${!CE_ICO?' on':''}" onclick="ceSetIco('')" title="Авто по разделу">—</button>
-        ${Object.keys(CARD_ICONS).sort().map(k=>`<button type="button" class="ico-opt${CE_ICO===k?' on':''}" data-ico="${k}" onclick="ceSetIco('${k}')" title="${k}"><svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linejoin="round" stroke-linecap="round">${CARD_ICONS[k]}</svg></button>`).join('')}
-      </div>
+      <input id="ceIcoQ" class="ico-q" type="search" placeholder="Найти значок" autocomplete="off" oninput="ceIcoFilter(this.value)">
+      <div class="ico-grid" id="ceIcoGrid">${ceIcoGridHtml()}</div>
     </div>
     <div class="field"><label>Описание</label><textarea id="ce-body" rows="5">${e?esc(e.body||''):''}</textarea></div>
     <div class="field"><label>Досье</label>
@@ -7173,6 +7194,8 @@ function openCardEditor(id){
   if(returning && EDIT_DRAFT) ceRestore(EDIT_DRAFT);   // вернули введённые поля после выбора тегов
   EDIT_DRAFT=null;
   ceToggleStat();                                       // статблок виден только у бестиария/божеств
+  const ig=document.getElementById('ceIcoGrid'), on=ig && ig.querySelector('.ico-opt.on:not(.ico-none)');
+  if(on) ig.scrollTop=Math.max(0, on.offsetTop-48);     // выбранный значок — на виду, а не где-то в середине списка
 }
 function ceToggleStat(){
   const sub=document.getElementById('ce-sub')?.value;
