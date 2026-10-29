@@ -124,8 +124,10 @@ function unzipStore(buf) {
     await mock('/__mock/fail', 'POST', { player_img: true });
     ({ ctx, page, errs } = await openPage(b, { viewport: PHONE }));
     await login(page, 'testplayer');
+    // гостем лист пришёл урезанной копией из витрины (без портрета) — перенос ждёт, пока вход перечитает его целиком
     await page.evaluate(() => imgMigrateSoon(10));
-    await page.waitForTimeout(4000);
+    await page.waitForFunction(() => /^kvimg:/.test(((CHARS_ALL.classic || []).find(c => c && c.id === 'tpsheet1') || {}).ava || ''), null, { timeout: 15000 }).catch(() => {});
+    await page.waitForTimeout(1000);
     r = await rows();
     const sh = (r['comik:chars:testplayer'].classic || [])[0] || {};
     check(/^kvimg:/.test(sh.ava || ''), 'новый сервер: портрет игрока уехал в строку фото, в листе ссылка');

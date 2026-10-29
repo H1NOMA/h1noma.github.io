@@ -11,6 +11,10 @@
     PATCH (CAS по value->>rev) — те запросы, что шлёт index.html;
   · права как на сервере (миграции 09-21…09-27 + 10-28): аноним только читает, игрок пишет свои строки
     и общие (с потолком размера), команда (DEVS) — всё; строки comik:img:<хэш> — только с верным хэшем;
+  · миграция 10-29 (по умолчанию включена, /__mock/fail {"v3": false} — сервер без неё): чтение белым списком
+    (чужие листы — только витрина /rest/v1/kv_chars_pub), личные пуш-подписки push:sub:<тег>,
+    rpc komik_api_version → 3. Санитайзер общих строк (игрок меняет только своё) стенд не повторяет —
+    он проверен в tests/sql/run.sh;
   · /auth/v1 — вход по паролю, регистрация (автоподтверждение), обновление токена, выход, user;
   · /functions/v1/notify-game — отдаёт публичный ключ, рассылку только считает;
   · /__mock/rows (GET — все строки, POST — заменить), /__mock/log (GET — журнал, DELETE — очистить),
@@ -27,7 +31,11 @@ LOCK = threading.RLock()   # note() зовётся и под замком (от�
 ROWS = {}            # key → value (jsonb)
 USERS = {}           # email → {id, email, password}
 LOG = []             # [{t, method, path, key, bytes, status}]
-FAIL = {'rate': 0.0, 'slow': 0, 'player_img': True}   # player_img: False — сервер без миграции 10-28
+FAIL = {'rate': 0.0, 'slow': 0, 'player_img': True, 'v3': True}   # player_img: False — сервер без миграции 10-28; v3: False — без 10-29
+PUBLIC_READ = {'comik:archive:v1', 'comik:news:v1', 'comik:chrono:v1', 'comik:hero:v1', 'comik:projects:v1', 'comik:games:v1',
+               'comik:tracker:shared:v1', 'comik:users:v1', 'comik:coreover:v1', 'comik:corehid:v1'}
+PUB_FIELDS = ['id', 'owner', 'alias', 'name', 'player', 'ava', 'role', 'subcls', 'origin', 'subrace', 'level', 'hp', 'ac', 'init',
+              'speed', 'deleted', 'createdAt', 'updatedAt']
 VAPID = 'B' + 'A' * 86
 
 
@@ -48,8 +56,12 @@ def player_cap(tag, key):
     """public.kv_player_cap: потолок размера строки для игрока (байты) или None — писать нельзя"""
     if not re.fullmatch(r'[a-z0-9_]{4,32}', tag or ''):
         return None
-    caps = {'comik:tracker:shared:v1': 8388608, 'comik:games:v1': 524288, 'comik:users:v1': 262144, 'push:subs': 524288,
+    caps = {'comik:tracker:shared:v1': 8388608, 'comik:games:v1': 524288, 'comik:users:v1': 262144,
             'comik:chars:' + tag: 10485760, 'comik:bm:' + tag: 262144}
+    if FAIL['v3']:
+        caps['push:sub:' + tag] = 65536
+    else:
+        caps['push:subs'] = 524288
     if key in caps:
         return caps[key]
     if key.startswith('comik:img:') and FAIL['player_img']:
@@ -64,6 +76,29 @@ def img_ok(key, value):
     if not isinstance(value, str) or not value.startswith('data:image/'):
         return False
     return key == 'comik:img:' + hashlib.sha256(value.encode('utf-8')).hexdigest()[:32]
+
+
+def can_read(tag, key):
+    """правило kv_read: до 10-29 — всё всем; после — белый список, своё владельцу, всё команде"""
+    if not FAIL['v3'] or tag in DEVS:
+        return True
+    if key in PUBLIC_READ or key.startswith('comik:img:') or key.startswith('comik:trk:bg:'):
+        return True
+    return bool(tag) and key in ('comik:chars:' + tag, 'comik:bm:' + tag, 'push:sub:' + tag)
+
+
+def char_pub(c):
+    """komik_char_pub: из листа — только поля витрины; портрет — только ссылкой"""
+    out = {f: c[f] for f in PUB_FIELDS if c.get(f) is not None}
+    if not re.fullmatch(r'kvimg:[0-9a-f]{32}|img/[A-Za-z0-9_./-]{1,200}', str(out.get('ava') or '')):
+        out.pop('ava', None)
+    return out
+
+
+def pub_rows():
+    return [{'key': k, 'value': dict({'at': v.get('at')}, **{g: [char_pub(c) for c in a if isinstance(c, dict)]
+                                                             for g, a in v.items() if isinstance(a, list)})}
+            for k, v in ROWS.items() if k.startswith('comik:chars:') and isinstance(v, dict)]
 
 
 def can_write(tag, key, value, insert):
@@ -245,7 +280,14 @@ class H(SimpleHTTPRequestHandler):
             b = self.body() or {}
             FAIL['rate'] = float(b.get('rate') or 0); FAIL['slow'] = int(b.get('slow') or 0)
             FAIL['player_img'] = b.get('player_img', True) is not False
+            FAIL['v3'] = b.get('v3', True) is not False
             return self.send_json(200, FAIL)
+        if u.path == '/rest/v1/rpc/komik_api_version':
+            self.body()
+            if self.chaos(): return
+            if not FAIL['v3']:
+                return self.send_json(404, {'code': 'PGRST202', 'message': 'Could not find the function public.komik_api_version without parameters in the schema cache'})
+            return self.send_json(200, 3)
         if u.path.startswith('/rest/v1/'):
             if self.chaos(): return
             return self.rest_post(u)
@@ -295,11 +337,15 @@ class H(SimpleHTTPRequestHandler):
         return select, filters
 
     def rest_get(self, u):
-        if not u.path.endswith('/kv'):
+        pub = u.path.endswith('/kv_chars_pub')
+        if pub and not FAIL['v3']:
+            return self.send_json(404, {'code': 'PGRST205', 'message': "Could not find the table 'public.kv_chars_pub' in the schema cache"})
+        if not u.path.endswith('/kv') and not pub:
             return self.send_json(404, {'message': 'only kv in mock'})
         select, filters = self.query(u)
+        tag = self.tag()
         with LOCK:
-            rows = [{'key': k, 'value': v} for k, v in ROWS.items()]
+            rows = pub_rows() if pub else [{'key': k, 'value': v} for k, v in ROWS.items() if can_read(tag, k)]
         out = [project(r, select) for r in rows if match(r, filters)]
         keyf = next((op for col, op in filters if col == 'key'), '')
         if 'vnd.pgrst.object' in (self.headers.get('Accept') or ''):
@@ -357,7 +403,7 @@ class H(SimpleHTTPRequestHandler):
                 nv = b.get('value', ROWS[k])
                 nk = b.get('key', k)
                 # RLS: USING отфильтровывает строку молча, WITH CHECK — ошибка
-                if tag is None:
+                if tag is None or not can_read(tag, k):
                     continue
                 if tag not in DEVS and player_cap(tag, k) is None and not (k == 'comik:projects:v1' and tag == 'hinoma'):
                     continue

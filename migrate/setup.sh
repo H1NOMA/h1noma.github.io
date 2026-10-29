@@ -194,11 +194,11 @@ do $$ begin
   alter publication supabase_realtime add table public.kv;
 exception when duplicate_object then null; end $$;
 SQL
-# Права записи — те же пять файлов, в том же порядке и так же ОДНОЙ транзакцией, что применяет push.sh
+# Права записи — те же файлы, в том же порядке и так же ОДНОЙ транзакцией, что применяет push.sh
 # при каждом запуске: конечное состояние у свежего и у давно работающего сервера одинаковое, а правится оно
 # в одном месте (migrate/*.sql). Не скачались/не применились — запись в kv закрыта всем (RLS без разрешающих
 # правил), сайт только читает; это чинит push.sh. Ставить дальше Caddy и функции это не мешает — поэтому не выходим.
-MIGS="2026-09-21-rls.sql 2026-09-25-email-domain.sql 2026-09-26-projects-owner.sql 2026-09-27-hardening.sql 2026-10-28-images.sql"
+MIGS="2026-09-21-rls.sql 2026-09-25-email-domain.sql 2026-09-26-projects-owner.sql 2026-09-27-hardening.sql 2026-10-28-images.sql 2026-10-29-security.sql"
 # скачанный файл годится, если он наш и целый: ровно одна строка «begin;» и одна «commit;» — последней
 mig_ok(){ sed -i 's/\r$//' "$1" && grep -q 'комик\|КОМИК' "$1" && [ "$(grep -cx 'begin;' "$1")" = 1 ] \
   && [ "$(grep -cx 'commit;' "$1")" = 1 ] && [ "$(grep -v '^[[:space:]]*$' "$1" | tail -1)" = 'commit;' ]; }
@@ -230,7 +230,7 @@ for MIG_NAME in $MIGS; do
 done
 if [ -n "$MIG_ALL" ]; then
   # shellcheck disable=SC2086   # MIGS — список имён через пробел
-  if apply_migs $MIGS; then echo "  все пять миграций применены ✓ (одной транзакцией)"
+  if apply_migs $MIGS; then echo "  все миграции применены ✓ (одной транзакцией)"
   else warn "миграции не применены (транзакция откатилась)"; MIG_ALL=""; fi
 fi
 if [ -n "$MIG_ALL" ]; then echo "схема и права применены ✓"

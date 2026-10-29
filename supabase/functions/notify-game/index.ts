@@ -36,7 +36,7 @@ const MAX_SUBS = 500;            // подписок за одну рассыл�
 const BATCH = 20;                // одновременных запросов к push-службам
 const MIN_GAP_MS = 10_000;       // между рассылками
 const SAFE_ID = /^[A-Za-z0-9_-]{1,64}$/;   // gid игры — тот же шаблон, что SAFE_ID в index.html
-// push:subs может переписать любой вошедший игрок, поэтому пуши уходят только на адреса
+// строки подписок пишут сами игроки, поэтому пуши уходят только на адреса
 // push-служб браузеров, а не на любой сервер из списка. Chrome и браузеры на его движке — FCM
 // (fcm.googleapis.com, изредка jmt17.google.com), Firefox — Mozilla, Safari/iPhone — Apple,
 // Edge — Windows (WNS). Если у какого-то браузера пуши перестали доходить, а в ответе рассылки
@@ -46,7 +46,7 @@ const PUSH_SUFFIXES = [".push.services.mozilla.com", ".notify.windows.com"];
 const B64U = /^[A-Za-z0-9_-]+=*$/;
 type Target = { endpoint: string; keys: { p256dh: string; auth: string } };
 
-// запись из push:subs → то, что уходит в web-push; null — битая запись или чужой адрес
+// запись из push:sub:<тег> / push:subs → то, что уходит в web-push; null — битая запись или чужой адрес
 function pushTarget(s: any): Target | null {
   if (!s || typeof s.endpoint !== "string" || s.endpoint.length > 2048 || !s.keys) return null;
   const { p256dh, auth } = s.keys;
@@ -216,8 +216,14 @@ Deno.serve(async (req) => {
   const gid = SAFE_ID.test(String(body.gid ?? "")) ? String(body.gid) : "";
   const payload = JSON.stringify({ title, body: msg, tag: "komik-game", gid });
 
-  const { data: row } = await supa.from("kv").select("value").eq("key", "push:subs").maybeSingle();
-  const all: any[] = Array.isArray(row?.value) ? row!.value : [];
+  // подписки — в личных строках push:sub:<тег> (миграция 10-29) и в старой общей push:subs (до неё)
+  const [{ data: legacy }, { data: own }] = await Promise.all([
+    supa.from("kv").select("key,value").eq("key", "push:subs").maybeSingle(),
+    supa.from("kv").select("key,value").like("key", "push:sub:%"),
+  ]);
+  const rows: { key: string; value: any[] }[] = [legacy, ...(own || [])].filter((r: any) => r && Array.isArray(r.value));
+  // один адрес мог остаться в двух строках (сменили аккаунт на устройстве) — берём самую свежую запись
+  const all: any[] = rows.flatMap((r) => r.value).sort((a: any, b: any) => (+b?.at || 0) - (+a?.at || 0));
   // только адреса push-служб, без повторов и не больше MAX_SUBS; остальное пропускаем (skipped)
   const subs: Target[] = [];
   const seen = new Set<string>();
@@ -247,9 +253,12 @@ Deno.serve(async (req) => {
 
   if (dead.size) {
     // перечитываем перед записью: пока шла рассылка, кто-то мог подписаться — его не теряем
-    const { data: fresh } = await supa.from("kv").select("value").eq("key", "push:subs").maybeSingle();
-    const cur: any[] = Array.isArray(fresh?.value) ? fresh!.value : all;
-    await supa.from("kv").update({ value: cur.filter((s) => s && !dead.has(s.endpoint)) }).eq("key", "push:subs");
+    for (const r of rows) {
+      if (!r.value.some((s: any) => s && dead.has(s.endpoint))) continue;
+      const { data: fresh } = await supa.from("kv").select("value").eq("key", r.key).maybeSingle();
+      const cur: any[] = Array.isArray(fresh?.value) ? fresh!.value : r.value;
+      await supa.from("kv").update({ value: cur.filter((s) => s && !dead.has(s.endpoint)) }).eq("key", r.key);
+    }
   }
 
   const out: Record<string, unknown> = {

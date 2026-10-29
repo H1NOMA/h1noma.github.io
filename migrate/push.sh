@@ -89,6 +89,12 @@ verify(){
     if [ "$RPC" != 0 ]; then bad "остались старые функции записи в обход правил (kv_deep_merge и др.)"; OK=0; fi
     X=$(q "select count(*) from pg_trigger t join pg_proc f on f.oid = t.tgfoid where t.tgrelid = to_regclass('public.kv') and t.tgname = 'kv_key_fixed' and t.tgenabled <> 'D' and f.prosrc ~ 'менять нельзя'")
     if [ "$X" != 1 ]; then bad "нет запрета переименовывать строки kv (триггер kv_key_fixed): игрок может «увести» расписание или доску в свою строку"; OK=0; fi
+    X=$(q "select count(*) from pg_trigger where tgrelid = to_regclass('public.kv') and tgname in ('komik_kv_guard', 'komik_kv_journal') and tgenabled <> 'D'")
+    if [ "$X" = 2 ]; then echo "  общие строки: игрок меняет только своё, журнал правок ведётся ✓"
+    else bad "нет стража общих строк или журнала (триггеры komik_kv_guard/komik_kv_journal): игрок может переписать расписание и доску целиком"; OK=0; fi
+    X=$(q "select qual ~ 'komik_is_team' from pg_policies where schemaname = 'public' and tablename = 'kv' and policyname = 'kv_read'")
+    if [ "$X" = t ]; then echo "  чтение: чужие листы и пуш-подписки — только команде ✓"
+    else bad "чтение kv открыто всем (старое правило kv_read): чужие листы персонажей и пуш-подписки видны без входа"; OK=0; fi
     X=$(q "select prosrc ~ '4,32' from pg_proc where oid = to_regprocedure('public.my_tag()')")
     if [ "$X" != t ]; then bad "функция my_tag() старая: логины вроде «v1» получают права игрока"; OK=0; fi
     X=$(q "select count(*) from pg_trigger t join pg_proc f on f.oid = t.tgfoid where t.tgrelid = to_regclass('auth.users') and t.tgname = 'komik_email_guard' and t.tgenabled <> 'D' and f.prosrc ~ 'сменить нельзя'")
@@ -249,10 +255,10 @@ say "5/5 · Защита аккаунтов и правил сайта"
 #   09-27 — права команды у аккаунтов, игроки без удаления, переименования и с потолком размера, адрес не меняется;
 #   10-28 — фото отдельными строками comik:img:<хэш> (сервер проверяет хэш, игрок пишет свои портреты).
 # 09-21..09-26 пересоздают свои (более мягкие) версии, 09-27 возвращает строгие — поэтому она после них,
-# а применяем только если скачались ВСЕ пять: иначе повторный запуск ослабил бы уже укреплённую базу.
+# а применяем только если скачались ВСЕ: иначе повторный запуск ослабил бы уже укреплённую базу.
 # И применяем ОДНОЙ транзакцией (mig_sql): снаружи мягкого промежуточного состояния никто не видит,
 # а сбой или Ctrl+C в любом месте откатывает всё — база остаётся как была.
-MIGS="2026-09-21-rls.sql 2026-09-25-email-domain.sql 2026-09-26-projects-owner.sql 2026-09-27-hardening.sql 2026-10-28-images.sql"
+MIGS="2026-09-21-rls.sql 2026-09-25-email-domain.sql 2026-09-26-projects-owner.sql 2026-09-27-hardening.sql 2026-10-28-images.sql 2026-10-29-security.sql"
 # скачанный файл годится, если он наш и целый: ровно одна строка «begin;» и одна «commit;» — последней
 # (обрезанный файл её не содержит; по этим строкам mig_sql и склеивает файлы в одну транзакцию)
 mig_ok(){ sed -i 's/\r$//' "$1" && grep -q 'комик\|КОМИК' "$1" && [ "$(grep -cx 'begin;' "$1")" = 1 ] \
@@ -286,7 +292,7 @@ done
 if [ -n "$MIG_ALL" ]; then
   # shellcheck disable=SC2086   # MIGS — список имён через пробел
   if apply_migs $MIGS; then
-    echo "  все пять миграций применены ✓ (одной транзакцией: ${MIGS// / → })"
+    echo "  все миграции применены ✓ (одной транзакцией: ${MIGS// / → })"
   else
     warn "миграции НЕ применены — база осталась как была (транзакция откатилась). Пришли вывод выше программисту"
   fi

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <!-- Безопасность: ограничиваем источники (защита от инъекций/утечек). script/style — только свои + инлайн
      (приложению нужны инлайновые обработчики); подключения — только к себе и Supabase; object/embed запрещены. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; media-src 'self' data: blob: https:; connect-src 'self' https://cloud.komikdnd.ru wss://cloud.komikdnd.ru; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src 'none'; manifest-src 'self'; worker-src 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; media-src 'self' data: blob:; connect-src 'self' https://cloud.komikdnd.ru wss://cloud.komikdnd.ru; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src 'none'; manifest-src 'self'; worker-src 'self'">
 <meta name="referrer" content="strict-origin-when-cross-origin">
 <!-- анти-кликджекинг: сайт не должен работать внутри чужого фрейма (GitHub Pages не даёт задать заголовок) -->
 <script>try{if(window.top!==window.self){try{window.top.location=window.self.location;}catch(_){document.documentElement.style.display='none';}}}catch(e){}</script>
@@ -5219,15 +5219,30 @@ async function usersRegister(tag){
 // собрать все листы персонажей из облака: легаси-блоб comik:chars:v1 + все пер-юзерные comik:chars:<тег>
 // (keys — только эти строки: остальные не менялись, см. fetchCloudCharsChanged)
 let CHARS_SEEN_AT={};   // ключ → штамп записи value.at (persistChars), чьи листы уже слиты в CHARS_ALL
+/* С 29.10.2026 чужие строки листов kv отдаёт только команде; игроку и гостю — «витрина» kv_chars_pub: те же
+   строки, но в листах только имя, игрок, портрет-ссылка, класс, уровень, ХП, КД (биографии, инвентаря, заметок нет).
+   Витрину спрашиваем, только если kv чужих строк не отдал; облако без витрины отвечает ошибкой — тогда kv и так
+   отдал все. Свою строку из витрины не берём никогда: урезанный свой лист уехал бы в облако поверх полного */
+async function charsPub(q){ try{ const r=await withTimeout(q, 8000); return (r && !r.error && Array.isArray(r.data)) ? deproto(r.data) : []; }catch(e){ return []; } }
+function charsWithPub(rows, pub, own){ const have=new Set(rows.map(r=>r && r.key)); return rows.concat(pub.filter(r=>r && r.key && r.key!==own && !have.has(r.key))); }
+async function charsOwnKey(){
+  // свой тег: стартовое чтение идёт раньше, чем boot() присвоит SESSION, — берём его из локальной сессии
+  let tg=currentTag();
+  if(!tg && !SESSION_READY){ try{ const s=await sgetLocal(KEY_SESSION, false); if(s) tg=normTag(s); }catch(e){} }
+  return 'comik:chars:'+(tg||'');
+}
 async function fetchCloudChars(keys){
   const merged=emptyGames(), stamps={};
   let rows;
   try{ rows=keys ? await cloudGetKeys(keys) : await cloudGetPrefix('comik:chars:'); }catch(e){ return null; }
   if(!Array.isArray(rows)) return null;
-  // свой тег: стартовое чтение идёт раньше, чем boot() присвоит SESSION, — берём его из локальной сессии
-  let tg=currentTag();
-  if(!tg && !SESSION_READY){ try{ const s=await sgetLocal(KEY_SESSION, false); if(s) tg=normTag(s); }catch(e){} }
-  const own='comik:chars:'+(tg||'');
+  const own=await charsOwnKey(), tg=own.slice(12), kvKeys=new Set(rows.map(r=>r && r.key));
+  if(keys){
+    const got=new Set(rows.map(r=>r && r.key)), miss=keys.filter(k=>k!==own && k!==KEY_CHARS && !got.has(k));
+    if(miss.length) rows=charsWithPub(rows, await charsPub(supa.from('kv_chars_pub').select('key,value').in('key', miss)), own);
+  } else if(!rows.some(r=>r && r.key!==own && r.key!==KEY_CHARS)){
+    rows=charsWithPub(rows, await charsPub(supa.from('kv_chars_pub').select('key,value').like('key','comik:chars:%')), own);
+  }
   /* Строку comik:chars:<тег> пишет только её владелец (RLS), а читают все. Раньше листы из ВСЕХ строк
      сливались по одному id: игрок клал в свою строку «лист» с чужим id и штампом из будущего —
      и чужой персонаж пропадал или подменялся у всех, а у самой жертвы подделка уезжала в её строку.
@@ -5262,6 +5277,7 @@ async function fetchCloudChars(keys){
       const o=c.owner ? normTag(String(c.owner)) : '';
       if(o && o!==rowTag) return;
       c=o ? c : {...c, owner:rowTag};
+      if(!kvKeys.has(r.key)) c={...c, _pub:1};   // урезанная копия из витрины: полный лист с тем же штампом её заменит, сохранять её нельзя
       // имя/игрок — строкой: число в имени роняло список игроков (.trim/.localeCompare)
       ['name','player'].forEach(f=>{ if(c[f]!=null && typeof c[f]!=='string') c={...c, [f]:(typeof c[f]==='number'?String(c[f]):'')}; });
       owned.push([g, c, rowTag, !o]);   // [3]: владелец не был записан в самом листе, а приписан по строке
@@ -5296,7 +5312,10 @@ async function fetchCloudCharsChanged(){
   // запрос, и брошенная по тайм-ауту она продолжала бы качаться в фоне. Ошибка зонда (не поддержан) — читаем всё, как раньше
   if(!r) return null;
   if(r.error || !Array.isArray(r.data)) return fetchCloudChars();
-  const keys=r.data.filter(x=>x && x.key && CHARS_SEEN_AT[x.key]!==(x.at==null?'':String(x.at))).map(x=>x.key);
+  let data=r.data;
+  const own=await charsOwnKey();
+  if(!data.some(x=>x && x.key!==own && x.key!==KEY_CHARS)) data=charsWithPub(data, await charsPub(supa.from('kv_chars_pub').select('key,at:value->>at').like('key','comik:chars:%')), own);
+  const keys=data.filter(x=>x && x.key && CHARS_SEEN_AT[x.key]!==(x.at==null?'':String(x.at))).map(x=>x.key);
   // ничего не менялось — пустая карта (зонд ответил), а не null (null — «облако не ответило»)
   if(!keys.length){ const none=emptyGames(); Object.defineProperty(none, 'stamps', {value:{}}); return none; }
   return fetchCloudChars(keys);
@@ -5403,7 +5422,10 @@ let IMG_T=null, IMG_PULLING=false, IMG_NOPERM=false, IMG_DB=null, IMG_IO=null, I
 const IMG_SEEN=new WeakSet();
 function imgRef(v){ const m=IMG_REF.exec(typeof v==='string'?v:''); return m?m[1]:''; }
 /* адрес для src/url(): ссылку kvimg — из уже скачанного (иначе пусто и сразу в очередь), остальное — как safeUrl */
-function imgSrc(v){ const h=imgRef(v); if(!h) return safeUrl(v); const u=IMG_URL.get(h)||IMG_ALIAS.get(h); if(u) return u; imgWant(h); return ''; }
+/* Картинки — только свои: data:/blob:, файлы сайта, ссылки kvimg. Чужой адрес (https://…) из данных облака
+   сдавал бы владельцу того сервера IP и время визита каждого, кто открыл страницу (CSP их тоже не пустит) */
+function imgOwn(v){ const s=safeUrl(v); return (/^(data|blob):/i.test(s) || !/^([a-z][\w+.-]*:|\/\/)/i.test(s)) ? s : ''; }
+function imgSrc(v){ const h=imgRef(v); if(!h) return imgOwn(v); const u=IMG_URL.get(h)||IMG_ALIAS.get(h); if(u) return u; imgWant(h); return ''; }
 /* Та же картинка лежит и файлом сайта: data/archive.json и data/news.json — выгрузка тех же карточек, где фото —
    img/content/*. Карточка облака и карточка файла с одним id и одним временем правки — одна и та же, значит и фото
    одно: показываем файл (он в кэше воркера и весит на треть меньше base64), а строку облака не качаем. Только в
@@ -5418,7 +5440,7 @@ function imgAliasFrom(cloudList, fileList){
 }
 /* <img> для разметки: нескачанная картинка остаётся без src и грузится, когда подъедет к экрану */
 function imgTag(v, attrs){
-  const h=imgRef(v), u=h?(IMG_URL.get(h)||IMG_ALIAS.get(h)||''):safeUrl(v);
+  const h=imgRef(v), u=h?(IMG_URL.get(h)||IMG_ALIAS.get(h)||''):imgOwn(v);
   if(h && !u) imgScanSoon();
   return '<img'+(u?' src="'+esc(u)+'"':'')+(h?' data-kvimg="'+h+'"':'')+' '+(attrs==null?'alt=""':attrs)+'>';
 }
@@ -5726,9 +5748,10 @@ function sanitizeHTML(html){
     [...el.attributes].forEach(a=>{
       const n=a.name.toLowerCase(), v=String(a.value||'');
       if(n.startsWith('on')) el.removeAttribute(a.name);                                   // обработчики событий
-      else if(n==='href'||n==='src'||n==='xlink:href'||n==='formaction'||n==='action'||n==='data'||n==='srcset'){
+      else if(n==='src'||n==='srcset'){ if(!imgOwn(v)) el.removeAttribute(a.name); }          // картинки — только свои
+      else if(n==='href'||n==='xlink:href'||n==='formaction'||n==='action'||n==='data'){
         if(!safeUrl(v)) el.removeAttribute(a.name);                                          // опасные схемы URL
-      } else if(n==='style' && /(expression|javascript:|vbscript:|url\s*\(\s*['"]?\s*(javascript|data:text))/i.test(v)) el.removeAttribute(a.name);
+      } else if(n==='style' && /(expression|javascript:|vbscript:|url\s*\(\s*['"]?\s*(javascript|data:text|https?:|\/\/))/i.test(v)) el.removeAttribute(a.name);
     });
   });
   return tpl.innerHTML;
@@ -5752,9 +5775,11 @@ const mergeSheets = (a,b) => { const me=(typeof currentTag==='function' && curre
     const p=m.get(c.id); if(!p){ m.set(c.id,c); return; }
     const po=normTag(p.owner||''), co=normTag(c.owner||'');
     if(po && co && po!==co){ if(co===me && po!==me) m.set(c.id,c); return; }
-    if(mergeTs(c)>mergeTs(p)) m.set(c.id,c); });
+    if(mergeNewer(c,p)) m.set(c.id,c); });
   return [...m.values()]; };
-const mergeChars = (a,b) => { const m=new Map(); (a||[]).concat(b||[]).forEach(c=>{ if(!c||typeof c!=='object'||!c.id||!MERGE_ID.test(String(c.id))) return; const p=m.get(c.id); if(!p || mergeTs(c)>mergeTs(p)) m.set(c.id,c); }); return [...m.values()]; };
+// c новее p; при равном штампе полный лист новее урезанной копии из витрины (_pub, см. fetchCloudChars)
+const mergeNewer=(c,p)=>{ const a=mergeTs(c), b=mergeTs(p); return a>b || (a===b && !!p._pub && !c._pub); };
+const mergeChars = (a,b) => { const m=new Map(); (a||[]).concat(b||[]).forEach(c=>{ if(!c||typeof c!=='object'||!c.id||!MERGE_ID.test(String(c.id))) return; const p=m.get(c.id); if(!p || mergeNewer(c,p)) m.set(c.id,c); }); return [...m.values()]; };
 
 async function boot(){
   // Ядро и бестиарий не зависят от облака — поднимаем их ПЕРВЫМ делом, до сетевых запросов.
@@ -5891,7 +5916,7 @@ async function boot(){
   refreshAdmin();   // сессия окончательно определена → сразу выставляем флаг режима ГМ (.is-gm)
   let charsMigrated=false;
   ALL_GAMES.forEach(g=>(CHARS_ALL[g]||[]).forEach(c=>{
-    if(!c) return; let ch=false;
+    if(!c || c._pub) return; let ch=false;
     if(c.owner && c.owner!==normTag(c.owner)){ c.owner=normTag(c.owner); ch=true; }
     if(typeof c.player==='string' && /^@/.test(c.player.trim())){ c.player=c.player.trim().replace(/^@+/,''); ch=true; }
     if(ch){ c.updatedAt=Date.now(); charsMigrated=true; }
@@ -5984,7 +6009,7 @@ async function imgMigrateRow(key){
 /* Старые фото (base64 внутри строк) — в отдельные строки comik:img:<хэш>, один раз за запуск, когда всё
    дочитано: команда переносит фото архива, новостей и портреты из чужих строк листов, каждый вошедший — свои.
    Строку перезаписываем, только если хоть одно фото действительно уехало (нет прав или связи — не трогаем) */
-let IMG_MIG_T=null;
+let IMG_MIG_T=null, IMG_MIG_WAIT=0;
 function imgMigrateSoon(ms){
   clearTimeout(IMG_MIG_T);
   IMG_MIG_T=setTimeout(async ()=>{
@@ -5992,6 +6017,9 @@ function imgMigrateSoon(ms){
     const inl=(o,f)=>o && typeof o[f]==='string' && IMG_DATA.test(o[f]);
     try{
       const tag=currentTag(), items=[];
+      // только что вошли, а листы в памяти — ещё урезанные копии из витрины (портрет в них не виден): ждём тика,
+      // который перечитает строки целиком, — но не дольше минуты
+      if(tag && IMG_MIG_WAIT<40 && ALL_GAMES.some(g=>(CHARS_ALL[g]||[]).some(c=>c && c._pub && (isDev() || normTag(c.owner||'')===tag)))){ IMG_MIG_WAIT++; imgMigrateSoon(1500); return; }
       if(isDev()){
         if(await imgOffload(archImgItems().filter(it=>inl(it.o,'img')))) await persistArchive(true);
         if(await imgOffload(newsImgItems().filter(it=>inl(it.o,'img')))) await persistNews(true);
@@ -6805,7 +6833,7 @@ function openPolicy(overlay){
       <h3>Платные услуги</h3>
       <p>Организация игр может оплачиваться. Договорённости об услуге и оплате происходят <b>вне сайта</b>. Оплата, если она есть, проходит напрямую выбранным способом; <b>платёжные реквизиты на сайте не вводятся и нами не хранятся</b>. Условия конкретной услуги согласуются с мастером до начала.</p>
       <h3>Пользовательский контент</h3>
-      <p>Тексты, которые вы вводите, видны другим участникам. Не публикуйте личную информацию.</p>
+      <p>Имя, класс, уровень и портрет персонажа, а также записи на игры видны другим участникам; остальной лист персонажа — только вам и мастерам. Не публикуйте личную информацию.</p>
       <p>За содержание листов персонажей и других материалов, которые размещают игроки, отвечает разместивший их игрок. Администрация проекта не несёт ответственности за такие материалы, в том числе за экстремистские и антивоенные высказывания в листах игроков.</p>
       <p><b>Администрация вправе удалить лист персонажа и аккаунт игрока, если игрок нарушает правила сайта.</b></p>
       <h3>Cookie и хранилище браузера</h3>
@@ -6815,7 +6843,7 @@ function openPolicy(overlay){
       <h3>Хранение и удаление</h3>
       <p>Данные хранятся в облачной базе проекта. Вы можете попросить удалить свой аккаунт и персонажей — напишите администратору в Telegram: <b>@HINOMA</b>.</p>
       <h3>Изменения</h3>
-      <p>Условия могут дополняться; актуальная версия — на этой странице. Редакция от 28 октября 2026 г.</p>
+      <p>Условия могут дополняться; актуальная версия — на этой странице. Редакция от 29 октября 2026 г.</p>
       <p class="muted" style="margin-top:14px">Продолжая пользоваться сайтом и создавая аккаунт, вы соглашаетесь с этими условиями.</p>
     </div>`;
   document.getElementById(overlay?'scrim2':'scrim').classList.add('open');
@@ -7282,7 +7310,7 @@ async function cloudRepull(reason){
       changed=true;
     }
     let charsChanged=false;
-    if(perUser){ const fp=g=>(CHARS_ALL[g]||[]).map(c=>c&&(c.id+':'+(c.updatedAt||0))).join(','); const before=ALL_GAMES.map(fp).join('|');
+    if(perUser){ const fp=g=>(CHARS_ALL[g]||[]).map(c=>c&&(c.id+':'+(c.updatedAt||0)+(c._pub?'p':''))).join(','); const before=ALL_GAMES.map(fp).join('|');
       ALL_GAMES.forEach(g=>{ CHARS_ALL[g]=mergeSheets(CHARS_ALL[g], perUser[g]); }); charsSeen(perUser); changed=true; charsChanged=ALL_GAMES.map(fp).join('|')!==before; }
     if(Array.isArray(nws)){ NEWS=mergeChars(NEWS, nws).filter(n=>n && !(n.deleted && (Date.now()-(n.updatedAt||0))>90*864e5)); changed=true; }
     if(changed){
@@ -8939,6 +8967,9 @@ async function persistCharsNow(retry){
         mine[g]=(CHARS_ALL[g]||[]).filter(c=>{ if(!c || c.alias) return false;   // alias — показ чужого листа с тем же id, не наш
           const o=normTag(c.owner||''); return !o || o===tag; });
       });
+      // свой лист известен только урезанной копией из витрины (открыли сайт гостем и вошли, а свою строку ещё
+      // не дочитали): запись без него стёрла бы его из облака, с ним — урезала бы. Ждём полного чтения
+      if(ALL_GAMES.some(g=>mine[g].some(c=>c._pub))){ CHARS_DIRTY=true; return false; }
       // портреты — в свои строки comik:img:<хэш> (лист худеет, а у других он перечитывается без картинок)
       try{ const items=[]; ALL_GAMES.forEach(g=>(mine[g]||[]).forEach(c=>{ if(c && c.ava) items.push({o:c, f:'ava'}); })); await imgOffload(items); }catch(e){}
       mine.at=Date.now();   // штамп записи: по нему фоновый тик у других решает, перечитывать ли строку (fetchCloudCharsChanged)
@@ -9001,7 +9032,7 @@ async function cloudTickOnce(){
     projCfgFromCloud(pv);
     let chChanged=false, gmChanged=false;
     if(ch && typeof ch==='object'){
-      const fp=a=>(a||[]).map(c=>c&&(c.id+':'+(c.updatedAt||0))).join(',');   // отпечаток id:updatedAt (как в cloudRepull) вместо JSON.stringify всего массива
+      const fp=a=>(a||[]).map(c=>c&&(c.id+':'+(c.updatedAt||0)+(c._pub?'p':''))).join(',');   // отпечаток id:updatedAt (как в cloudRepull) вместо JSON.stringify всего массива; p — копия из витрины
       ALL_GAMES.forEach(g=>{
         const merged=mergeSheets(CHARS_ALL[g], ch[g]);
         if(fp(merged)!==fp(CHARS_ALL[g])){ CHARS_ALL[g]=merged; chChanged=true; }
@@ -16015,7 +16046,7 @@ function toast(msg, opts){
 }
 
 /* ====================== Push-уведомления ======================
-   Подписка на устройстве → эндпоинт хранится в облаке (kv «push:subs»).
+   Подписка на устройстве → эндпоинт хранится в облаке (kv «push:sub:<тег>», до 29.10.2026 — общая «push:subs»).
    Рассылку делает серверная функция notify-game (Supabase Edge Function) с секретным
    VAPID-ключом. На iOS работает только если сайт добавлен на главный экран (PWA, iOS 16.4+). */
 const VAPID_PUBLIC='BJjgF7Dfj-PGEBho4AK_eec8YivMgnT5Oux8KdfLOx3sDcqpEBJ22tYzdsQ0fhx3S5IlRr-y3zTqsnOszzEpFI4';   // запасной: настоящий ключ отдаёт сервер
@@ -16090,35 +16121,54 @@ async function pushToggle(){
   if(st==='unsupported'){ toast('Уведомления недоступны на этом устройстве'); pushRenderBtn(); return; }
   if(st==='on') pushDisable(); else pushEnable();
 }
+/* Где лежат подписки. С 29.10.2026 (миграция 10-29, komik_api_version ≥ 3) — у каждого своя строка
+   push:sub:<тег>: её читает и пишет только владелец (и рассылка), чужие адреса никому не видны.
+   Облако без этой миграции — по-старому, общая push:subs. null — не узнали (нет связи/не вошли) */
+let PUSH_V3=null;
+async function pushKey(){
+  const tag=currentTag()||'';
+  if(PUSH_V3===null && supa){
+    try{ const r=await withTimeout(supa.rpc('komik_api_version'), 8000);
+      if(r && !r.error) PUSH_V3=(+r.data||0)>=3;
+      else if(r && r.error && (r.status===404 || /PGRST202|42883/.test(String(r.error.code||'')))) PUSH_V3=false;   // функции нет — старое облако
+    }catch(e){}
+  }
+  if(PUSH_V3===null) return null;
+  return PUSH_V3 ? (/^[a-z0-9_]{4,32}$/.test(tag) ? 'push:sub:'+tag : null) : 'push:subs';
+}
 /* push:subs — один массив на всех: «прочитать → поправить → записать» у двух устройств сразу
    (ГМ просит стол включить уведомления) оставлял в облаке только последнего. Поэтому после записи
-   перечитываем и, если нас затёрли, пишем снова — до 5 кругов с паузой вразнобой */
-async function pushReadSubs(){
-  try{ const cur=await withTimeout(cloudGet('push:subs'), CLOUD_TMO); if(Array.isArray(cur)) return cur; if(cur===null) return []; }catch(e){}   // null — строки ещё нет; undefined — облако не ответило
+   перечитываем и, если нас затёрли, пишем снова — до 5 кругов с паузой вразнобой (своя строка push:sub:<тег>
+   — то же самое между своими устройствами) */
+async function pushReadSubs(key){
+  if(!key) return null;
+  try{ const cur=await withTimeout(cloudGet(key), CLOUD_TMO); if(Array.isArray(cur)) return cur; if(cur===null) return []; }catch(e){}   // null — строки ещё нет; undefined — облако не ответило
   return null;
 }
 const pushNap=()=>new Promise(r=>setTimeout(r, 200+Math.random()*450));
 async function pushSaveSub(sub){
   const j=sub.toJSON(); j.tag=currentTag()||''; j.at=Date.now(); j.dev=pushDevId();
+  const key=await pushKey(); if(!key) return false;
   for(let i=0;i<5;i++){
-    let arr=await pushReadSubs();
+    let arr=await pushReadSubs(key);
     if(!arr) return false;   // список не прочитан — записью «только себя» затёрли бы чужие подписки
     const has=arr.find(x=>x && x.endpoint===j.endpoint);
     const orphans=!!j.dev && arr.some(x=>x && x.dev===j.dev && x.endpoint!==j.endpoint);
     if(i>0 && has && (has.tag||'')===j.tag && has.dev===j.dev && !orphans) return true;   // перечитали — мы в списке
     if(j.dev) arr=arr.filter(x=>!(x && x.dev===j.dev && x.endpoint!==j.endpoint));   // прежние адреса этого же устройства
     const k=arr.findIndex(x=>x && x.endpoint===j.endpoint); if(k>=0) arr[k]=j; else arr.push(j);
-    if(!(await sset('push:subs', arr, true, true).catch(()=>false))) return false;
+    if(!(await sset(key, arr, true, true).catch(()=>false))) return false;
     await pushNap();
   }
   return false;
 }
 async function pushRemoveSub(sub){
   const dev=pushDevId(), mine=x=>x && (x.endpoint===sub.endpoint || (dev && x.dev===dev));
+  const key=await pushKey(); if(!key) return;
   for(let i=0;i<4;i++){
-    const arr=await pushReadSubs();
+    const arr=await pushReadSubs(key);
     if(!arr || !arr.some(mine)) return;   // не прочитали или нас там уже нет — писать нечего
-    if(!(await sset('push:subs', arr.filter(x=>!mine(x)), true, true).catch(()=>false))) return;
+    if(!(await sset(key, arr.filter(x=>!mine(x)), true, true).catch(()=>false))) return;
     await pushNap();
   }
 }
@@ -16144,7 +16194,7 @@ async function pushHeal(force){
       try{ sub=await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:urlB64ToU8(key)}); }
       catch(e){ toast('Уведомления нужно переподключить', {action:{label:'Включить', fn:()=>pushEnable()}, ms:9000}); return; }
     }
-    const list=await pushReadSubs();
+    const list=await pushReadSubs(await pushKey());
     if(!list) return;                                          // облако не ответило — попробуем в другой раз
     const mine=list.find(x=>x && x.endpoint===sub.endpoint), dev=pushDevId();
     const orphans=list.some(x=>x && dev && x.dev===dev && x.endpoint!==sub.endpoint);
@@ -16240,7 +16290,9 @@ async function pushCall(body){
 /* тестовая рассылка + диагностика: показывает реальный ответ функции */
 async function pushTest(){
   let tokKind='anon'; try{ if(supa){ const s=await supa.auth.getSession(); if(s.data.session&&s.data.session.access_token) tokKind='user'; } }catch(e){}
-  let subN='?'; try{ const cur=await cloudGet('push:subs'); subN=Array.isArray(cur)?cur.length:0; }catch(e){ subN='ошибка чтения'; }
+  let subN='?'; try{ const k=await pushKey();
+    if(k && k!=='push:subs'){ const rows=await cloudGetPrefix('push:sub:'); subN=rows.reduce((n,r)=>n+(Array.isArray(r.value)?r.value.length:0), 0)+(isDev()?'':' (видны только свои)'); }
+    else { const cur=await cloudGet('push:subs'); subN=Array.isArray(cur)?cur.length:0; } }catch(e){ subN='ошибка чтения'; }
   let out, keyInfo='?';
   try{ const r=await withTimeout(fetch(SUPA_URL+'/functions/v1/notify-game', { headers:{ apikey:SUPA_KEY, Authorization:'Bearer '+SUPA_KEY } }), 6000);
     const j=r&&await r.json().catch(()=>null); keyInfo = r&&r.ok&&j&&j.publicKey ? (j.publicKey.slice(0,10)+'…'+(j.site?' (совпадает с сайтом)':' (новая пара — устройства переподпишутся сами)')) : ('нет — '+((j&&j.error)||('HTTP '+(r&&r.status)))); }

@@ -98,7 +98,7 @@ else
     echo "Вернуть один ключ (например, расписание):  $ME $(echo "$DATES" | tail -1) comik:games:v1"
     echo "Вернуть всю таблицу:                        $ME $(echo "$DATES" | tail -1)"
     echo "Ключи: comik:games:v1 — расписание, comik:tracker:shared:v1 — доска ходов, comik:chars:<тег> — листы игрока,"
-    echo "       comik:news:v1 — новости, comik:archive:v1 — архив, comik:hero:v1 — приветствие, push:subs — пуш-подписки."
+    echo "       comik:news:v1 — новости, comik:archive:v1 — архив, comik:hero:v1 — приветствие, push:sub:<тег> — пуш-подписки."
     exit 0
   fi
   grep -qx -- "$A1" <<< "$DATES" || { bad "копии за «$A1» нет. Есть: $(echo "$DATES" | head -1) … $(echo "$DATES" | tail -1) (список: $ME)"; exit 1; }
