@@ -27,7 +27,8 @@ const SHEETS = [
       ava: ava ? PICS[pic++ % PICS.length] : '', createdAt: now, updatedAt: now });
   });
   const mine = Object.entries(byOwner).map(([o, list]) => ({ key: 'comik:chars:' + o, value: { at: now, classic: list } }));
-  await mock('/__mock/rows', 'POST', seed.filter(r => !mine.some(m => m.key === r.key)).concat(mine));
+  // листы стенда (выгрузка облака) убираем — плиток должно быть ровно столько, сколько подложили
+  await mock('/__mock/rows', 'POST', seed.filter(r => !/^comik:chars:/.test(r.key)).concat(mine));
 
   const { page, ctx, errs } = await openPage(b, { viewport: { width: 1280, height: 900 }, project: 'classic', storage: { 'comik:cookies:ok': '1' } });
   // цикл ResizeObserver в консоль не пишется — ловим его событием
