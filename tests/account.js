@@ -72,14 +72,28 @@ async function register(page, tag, pass) {
     const { page, ctx, errs } = await openPage(b, { viewport: DESK });
     await login(page, 'testplayer');
     await hookToasts(page);
+    // открыт свой лист с несохранённой правкой: облако его уже не примет (запись уйдёт анонимом)
+    const cid = await page.evaluate(async () => { const now = Date.now(); const c = { id: 'lost' + now.toString(36), owner: 'testplayer', name: 'Потеря', level: 1, createdAt: now, updatedAt: now }; CHARS_ALL[CUR_PROJECT].push(c); bindGameData(); await persistChars(); go('players'); return c.id; });
+    await page.waitForTimeout(300);
+    await page.evaluate(id => openInlineSheet(id), cid);
+    await page.waitForSelector('#playerEditor #ep-name', { timeout: 5000 });
+    await page.fill('#playerEditor #ep-name', 'Потеря-правка');
+    await page.evaluate(() => { window.__t = []; });
     // токен истёк, а refresh-токен сервер уже отозвал: supabase-js сам удаляет сессию (SIGNED_OUT)
-    await page.route('**/auth/v1/token?grant_type=refresh_token', r => r.fulfill({ status: 400, contentType: 'application/json',
+    const refresh = '**/auth/v1/token?grant_type=refresh_token';
+    await page.route(refresh, r => r.fulfill({ status: 400, contentType: 'application/json',
       body: JSON.stringify({ code: 400, error_code: 'refresh_token_not_found', msg: 'Invalid Refresh Token: Refresh Token Not Found' }) }));
     await page.evaluate(() => { const k = Object.keys(localStorage).find(x => /^sb-.*-auth-token$/.test(x)); const s = JSON.parse(localStorage.getItem(k)); s.expires_at = Math.floor(Date.now() / 1000) - 60; localStorage.setItem(k, JSON.stringify(s)); });
     await page.evaluate(() => supa.auth.getSession().catch(() => {}));
     check(await page.waitForFunction(() => currentTag() === null, null, { timeout: 10000 }).then(() => true, () => false), 'сайт заметил потерю сессии и вышел');
-    check(await sawToast(page, /^Сессия завершена/) && !/Нет прав/.test(await toastsNow(page)), `тост «Сессия завершена — войдите снова» (${await toastsNow(page)})`);
-    check(await page.evaluate(() => document.getElementById('drAva').textContent === '?' && localStorage.getItem('comik:session:v1') === 'null'), 'аватар — «?», вход на устройстве забыт');
+    await page.waitForTimeout(600);
+    check(await sawToast(page, /^Сессия завершена/) && !/Нет прав/.test(await toastsNow(page)), `тост «Сессия завершена — войдите снова», без «Нет прав» от записи открытого листа (${await toastsNow(page)})`);
+    check(await page.evaluate(() => document.getElementById('drAva').textContent === '?' && localStorage.getItem('comik:session:v1') === 'null' && INLINE_ID === null), 'аватар — «?», вход на устройстве забыт, лист свёрнут');
+    await page.unroute(refresh);
+    await login(page, 'testplayer');
+    const saved = await page.waitForFunction(async id => { const r = await (await fetch('/__mock/rows')).json(); const v = (r.find(x => x.key === 'comik:chars:testplayer') || {}).value || {};
+      return Object.values(v).some(l => Array.isArray(l) && l.some(c => c && c.id === id && c.name === 'Потеря-правка')); }, cid, { timeout: 15000, polling: 500 }).then(() => true, () => false);
+    check(saved, 'правка листа, сделанная до потери сессии, дошла в облако после нового входа');
     check(realErrs(errs).length === 0, errLine(realErrs(errs)));
     await ctx.close();
   }
@@ -366,12 +380,14 @@ async function register(page, tag, pass) {
   {
     console.log('· удаление: ответ потерялся; тот же аккаунт на другом устройстве');
     const tag = 'lost_' + Date.now().toString(36), P = 'lostpass12';
-    const A = await openPage(b), B = await openPage(b, { viewport: DESK });
+    const A = await openPage(b), B = await openPage(b, { viewport: DESK }), C = await openPage(b);
     await hookToasts(A.page);
     await register(A.page, tag, P);
     await A.page.waitForFunction(t => currentTag() === t, tag, { timeout: 15000 });
     await login(B.page, tag, P);
     await hookToasts(B.page);
+    await login(C.page, tag, P);
+    await hookToasts(C.page);
     // сервер аккаунт удалил, а ответ до сайта не дошёл
     await A.page.route('**/rest/v1/rpc/komik_delete_me', async route => { await route.fetch(); await route.abort(); });
     await A.page.evaluate(() => openProfileCard());
@@ -389,9 +405,13 @@ async function register(page, tag, pass) {
       `другое устройство: запись отбита — вышел, «Аккаунт удалён» (${await toastsNow(B.page)})`);
     const left = await B.page.evaluate(t => Object.keys(localStorage).filter(k => k === 'comik:session:v1' ? localStorage.getItem(k) !== 'null' : (k.endsWith(':' + t) || /^sb-.*-auth-token$/.test(k))), tag);
     check(!/Нет прав/.test(await toastsNow(B.page)) && !left.length, 'без «Нет прав на запись», и там устройство вычищено' + (left.length ? ': ' + left.join(', ') : ''));
-    const e = realErrs(A.errs.concat(B.errs));
+    // третье устройство: первая запись — запись на игру (у неё свой тост об отказе)
+    await C.page.evaluate(t => { window.__t = []; const now = Date.now(); GAMES.push({ id: 'glost', game: CUR_PROJECT, title: 'Проверка', seats: 4, players: [{ tag: t, name: 'Ушедший', at: now, upd: now }], createdAt: now, updatedAt: now }); persistGamesOnce(); }, tag);
+    check(await C.page.waitForFunction(() => currentTag() === null, null, { timeout: 10000 }).then(() => true, () => false) && await sawToast(C.page, /^Аккаунт удалён$/) && !/Нет прав/.test(await toastsNow(C.page)),
+      `запись на игру отбита — вышел, «Аккаунт удалён» без «Нет прав» (${await toastsNow(C.page)})`);
+    const e = realErrs(A.errs.concat(B.errs, C.errs));
     check(e.length === 0, errLine(e));
-    await A.ctx.close(); await B.ctx.close();
+    await A.ctx.close(); await B.ctx.close(); await C.ctx.close();
   }
 
   await mock('/__mock/rows', 'POST', seed);

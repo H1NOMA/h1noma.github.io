@@ -5273,8 +5273,9 @@ async function cloudGet(key){
   return data ? deproto(data.value) : null;
 }
 async function cloudSet(key,val){
+  const tag=currentTag();   // чьим токеном ушла запись: отказ может прийти, когда на устройстве уже другой аккаунт
   const {error} = await supa.from('kv').upsert({key, value: val});
-  if(error){ accGoneSeen(error); throw error; }
+  if(error){ accGoneSeen(error, tag); throw error; }
   return true;
 }
 // выборка всех строк с ключом по префиксу (для пер-юзерных листов comik:chars:<тег>)
@@ -8009,7 +8010,7 @@ async function persistGamesOnce(quiet){
   else if(supa){
     gamesDirty(true);
     if(!quiet){
-      if(why==='noperm') toast('⚠ Нет прав на запись — запись на игру не сохранена в облаке');
+      if(why==='noperm'){ if(!ACC_GONE_SEEN) toast('⚠ Нет прав на запись — запись на игру не сохранена в облаке'); }   // аккаунт удалён — скажет accGoneSeen
       else toast(localOk ? '⚠ Облако не ответило — запись сохранена на устройстве, отправим, когда связь вернётся' : SSET_NOWHERE);
     }
   }
@@ -9120,9 +9121,9 @@ async function accDelete(){
 /* Запись отбита триггером komik_kv_gone: аккаунт удалён с другого устройства (или ответ на своё удаление не дошёл),
    а его токен ещё жив. Раньше сайт оставался «вошедшим» и на каждую правку говорил «Нет прав на запись» */
 let ACC_GONE_SEEN=false;
-function accGoneSeen(e){
+function accGoneSeen(e, sent){
   const tag=currentTag();
-  if(!cloudGone(e) || !tag || ACC_DEL || ACC_GONE_SEEN) return;   // своё удаление (ACC_DEL) доводит accDelete
+  if(!cloudGone(e) || !tag || tag!==sent || ACC_DEL || ACC_GONE_SEEN) return;   // своё удаление (ACC_DEL) доводит accDelete
   ACC_GONE_SEEN=true;
   setTimeout(async ()=>{
     try{ if(currentTag()===tag && !ACC_DEL){ await accGoneLocal(tag); closeOverlay(); closeModal(); toast('Аккаунт удалён'); } }
@@ -9323,7 +9324,9 @@ async function authLost(was, n){
   if(SESSION!==was || AUTH_LEAVING) return;
   let s=null; try{ const gs=await authTimeout(supa.auth.getSession(), 6000); s=gs && gs.data && gs.data.session; }catch(e){ return; }
   if(s || SESSION!==was || AUTH_LEAVING) return;   // за это время вошли снова
-  // открытый лист сворачиваем, как при выходе: облако его уже не примет, но правки лягут на устройство и дойдут после входа
+  // открытый лист сворачиваем, как при выходе: облако его уже не примет, но правки лягут на устройство и дойдут после входа.
+  // Его запись уйдёт уже анонимом — «Нет прав на запись» перед «Сессия завершена» только путал (sset молчит 8 с)
+  SSET_NOPERM_AT=Date.now();
   try{ await withTimeout(inlineDropForAuth(), 5000); }catch(e){}
   if(SESSION!==was) return;
   await authOutLocal();
