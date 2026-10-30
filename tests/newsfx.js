@@ -63,8 +63,6 @@ async function phone(b, width, shots) {
     prevOp = op; prevW = s.mhR[2];
     if (shots && y > touch - 20 && y < full + 20 && n < 9 && (y - Math.round(touch)) % 32 < 16) await page.screenshot({ path: `${shots}/newsfx-${width}-a${n++}.png` });
   }
-  check(mono, `${width}: прозрачность приветствия только убывает по мере прокрутки`);
-  check(shrink, `${width}: приветствие только сжимается`);
   check(seenMid, `${width}: есть промежуточные кадры (впитывается, а не исчезает разом)`);
   await scrollTo(page, Math.ceil(full) + 30);
   s = await state(page);
@@ -124,9 +122,15 @@ async function phone(b, width, shots) {
   await page.waitForTimeout(800);
   s = await state(page);
   check(!s.on && !s.away && !s.ftf, `${width}: карточка снова видна — пилюля вернулась в неё, inline-стилей перехода нет`);
-  await scrollTo(page, Math.round(touch + g.mhH * .4));
-  s = await state(page);
-  check(s.tf && +s.op > 0 && s.vis !== 'hidden', `${width}: на обратном ходе приветствие выходит из пилюли`);
+  // в покое промежуточных положений нет: из середины зоны лента доезжает к краю, блок — целиком в одном из состояний
+  for (const [f, want] of [[.5, 'in'], [.05, 'out']]) {
+    await scrollTo(page, Math.round(touch + g.mhH * .75 * f));
+    await page.waitForTimeout(1300);
+    s = await state(page);
+    const y = await page.evaluate(() => Math.round(scrollY)), rawNow = (y - touch) / (g.mhH * .75);
+    const ok = want === 'in' ? s.vis === 'hidden' && rawNow >= .99 : !s.tf && !s.op && rawNow <= .01;
+    check(ok, `${width}: остановка на ${f} хода → ${want === 'in' ? 'впитано, лента доехала вниз' : 'развёрнуто, лента вернулась вверх'} (y=${y}, ход ${rawNow.toFixed(2)}, ${s.vis || 'видно'})`);
+  }
   await scrollTo(page, 0);
   await page.waitForTimeout(900);                   // пружина возвращает блок и успокаивается
   s = await state(page);
@@ -258,9 +262,12 @@ async function peek(b, shots) {
   await scrollTo(page, 0); await page.waitForTimeout(900);
   const r0 = await page.evaluate(() => { const mh = document.querySelector('#view-news .masthead'); return mh.style.borderRadius ? -1 : parseFloat(getComputedStyle(mh).borderTopLeftRadius); });
   const g = await geo(page);
-  await scrollTo(page, Math.round(g.mhTop - g.pb + 6)); await page.waitForTimeout(900);
-  const rs = await page.evaluate(() => document.querySelector('#view-news .masthead').style.borderRadius);
-  check(r0 > 0 && Math.abs(r0 - cssR) > 3 && Math.abs(parseFloat(rs) - r0) < 2,
+  // первые кадры перехода: радиус ещё почти свой
+  const rs = await page.evaluate(y => new Promise(r => { scrollTo({ top: y, behavior: 'instant' });
+    requestAnimationFrame(() => requestAnimationFrame(() => { const st = document.querySelector('#view-news .masthead').style, m = /scale\(([\d.]+),\s*([\d.]+)\)/.exec(st.transform || '');
+      const ry = parseFloat((st.borderRadius.split('/')[1] || st.borderRadius)); r(m && ry ? (ry * +m[2]).toFixed(1) : ''); })); }), Math.round(g.mhTop - g.pb + g.mhH * .75 * .5));
+  // видимый радиус первого кадра (местный × масштаб) ближе к радиусу нового сеттинга, чем прежнего
+  check(r0 > 0 && Math.abs(r0 - cssR) > 3 && rs && Math.abs(+rs - r0) < Math.abs(+rs - cssR),
     `после смены сеттинга впитывание скругляется от его радиуса (${cssR}px → ${r0}px, в начале ${rs})`);
 
   // шторка жестом от края: раскрытое закрывается сразу, а не уезжает с полотном; тап в шторке срабатывает
