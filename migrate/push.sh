@@ -191,7 +191,7 @@ verify(){
     X=$(q "select qual ~ 'komik_is_team' from pg_policies where schemaname = 'public' and tablename = 'kv' and policyname = 'kv_read'")
     if [ "$X" = t ]; then echo "  чтение: чужие листы и пуш-подписки — только команде ✓"
     else bad "чтение kv открыто всем (старое правило kv_read): чужие листы персонажей и пуш-подписки видны без входа"; OK=0; fi
-    # 09-21…09-27 пересоздают свои, более слабые devs_read и kv_player_cap — строгие возвращает только 10-29, идущая последней
+    # 09-21…09-27 пересоздают свои, более слабые devs_read и kv_player_cap — строгие возвращает только 10-29, идущая после них
     X=$(q "select qual ~ 'auth\.uid\(\)' and qual !~ '^\(?true\)?$' from pg_policies where schemaname = 'public' and tablename = 'devs' and policyname = 'devs_read'")
     if [ "$X" != t ]; then bad "правило devs_read старое: любой вошедший видит id аккаунтов команды — запусти push.sh (без check)"; OK=0; fi
     X=$(q "select prosrc ~ 'push:sub:' from pg_proc where oid = to_regprocedure('public.kv_player_cap(text)')")

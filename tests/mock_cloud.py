@@ -295,9 +295,6 @@ def delete_me(tag, uid):
     for k in ('comik:chars:' + tag, 'comik:bm:' + tag, 'push:sub:' + tag):
         if ROWS.pop(k, None) is not None:
             n += 1
-    # портреты своих листов — если на них больше никто не ссылается
-    rest = json.dumps([v for k, v in ROWS.items() if not k.startswith('comik:img:')])
-    imgs = sum(1 for h in pics if 'kvimg:' + h not in rest and ROWS.pop('comik:img:' + h, None) is not None)
     # живые игры: своя запись снимается с отметкой gone[тег] — не раньше «сейчас» и строго новее записи
     games = ROWS.get('comik:games:v1')
     for s in games if isinstance(games, list) else []:
@@ -308,18 +305,23 @@ def delete_me(tag, uid):
             s['players'] = [p for p in s['players'] if not any(p is m for m in me)]
             s['gone'] = dict(s['gone'] if isinstance(s.get('gone'), dict) else {})
             s['gone'][tag] = max(now, 1 + int(max(max(num(p.get('upd')), num(p.get('at'))) for p in me)))
-    # доска: свой тег с карточек снимается, rev растёт — условная запись ГМа поверх старой версии не пройдёт
+    # доска: свои карточки становятся ничьими (ownTag «-») и без портрета, rev растёт — условная запись ГМа
+    # поверх старой версии не пройдёт
     board = ROWS.get('comik:tracker:shared:v1')
     if isinstance(board, dict) and '"%s"' % tag in json.dumps(board).lower():
         for bv in board.values():
             for c in bv.get('list') if isinstance(bv, dict) and isinstance(bv.get('list'), list) else []:
                 if isinstance(c, dict) and str(c.get('ownTag') or '').lower() == tag:
-                    del c['ownTag']
+                    pics |= set(re.findall(r'kvimg:([0-9a-f]{32})', str(c.pop('ava', ''))))
+                    c['ownTag'] = '-'
         rev = str(board.get('rev') or '')
         board['rev'] = int(rev) + 1 if re.fullmatch(r'\d{1,15}', rev) else 1
     users = ROWS.get('comik:users:v1')
     if isinstance(users, list):
         ROWS['comik:users:v1'] = [u for u in users if not (isinstance(u, dict) and str(u.get('tag') or '').lower() == tag)]
+    # портреты своих листов и карточек — если на них больше никто не ссылается
+    rest = json.dumps([v for k, v in ROWS.items() if not k.startswith('comik:img:')])
+    imgs = sum(1 for h in pics if 'kvimg:' + h not in rest and ROWS.pop('comik:img:' + h, None) is not None)
     USERS.pop(tag + '@komikdnd.ru', None)
     return {'ok': True, 'tag': tag, 'rows': n, 'imgs': imgs}
 

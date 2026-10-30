@@ -47,6 +47,11 @@ const { launch, openPage, login, mock, rows, check, done } = require('./lib');
     const { page, ctx } = await page2('hinoma');
     const tags = await page.evaluate(([n]) => trkMergedList({}, [{ charId: 'tp1', name: 'Тест' }, { charId: 'p2c' }, { charId: n }, { name: 'Гоблин', foe: true, ownTag: 'x' }]).map(c => c.ownTag || '-').join(','), [npc.id]);
     check(tags === 'testplayer,player_two,hinoma,-', `ГМ при публикации ставит тег владельца листа (${tags})`);
+    // карточка удалённого аккаунта: сервер поставил «-»; лист с тем же id у ГМа (подделка) её не присваивает
+    const gone = await page.evaluate(() => { (CHARS_ALL.classic = CHARS_ALL.classic || []).push({ id: 'gone1', owner: 'player_two', name: 'Подделка' });
+      const c = trkMergedList({ 'c:gone1': { charId: 'gone1', ownTag: '-', hp: 3 } }, [{ charId: 'gone1', name: 'Ушедший', ava: 'kvimg:' + 'a'.repeat(32) }])[0];
+      return [c.ownTag, 'ava' in c, c.hp].join(','); });
+    check(gone === '-,false,3', `карточка удалённого аккаунта остаётся ничьей и без портрета (${gone})`);
     await ctx.close();
   }
 

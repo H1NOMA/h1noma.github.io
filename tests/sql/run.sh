@@ -130,6 +130,11 @@ eq "версия — прежняя + 3: сервер считает сам" "$(
 try ok hinoma "ГМ: условная запись по версии (как kvCasUpdate) проходит" "with x as (update kv set value = jsonb_set(value, '{rev}', to_jsonb($((REV + 4)))) where key = 'comik:tracker:shared:v1' and value->>'rev' = '$((REV + 3))' returning 1) select 1/count(*) from x"
 try ok testplayer "игрок за столом: журнал [] и запись задним числом с лишним полем" "update kv set value = jsonb_set(value, '{classic::hinoma,log}', '[{\"at\":0,\"t\":\"раньше всех\",\"k\":\"dmg\",\"x\":\"лишнее\"}]') where key = 'comik:tracker:shared:v1'"
 eq "прежнее осталось, новое дописано без лишнего" "$(val postgres "select jsonb_array_length(v#>'{classic::hinoma,log}'), v#>>'{classic::hinoma,log,0,t}', v#>'{classic::hinoma,log,0}' ? 'x' from $T")" "2|раньше всех|f"
+try ok testplayer "игрок за столом: 24 записи журнала «из будущего», честная, с часами на 5 и на 12 минут вперёд" "update kv set value = jsonb_set(value, '{classic::hinoma,log}',
+     (select jsonb_agg(jsonb_build_object('at', 1e15 + i, 't', 'мусор ' || i)) from generate_series(1, 24) i) || jsonb_build_array(
+     jsonb_build_object('at', $NOW, 't', 'урон 7'), jsonb_build_object('at', $NOW + 300000, 't', 'часы спешат'), jsonb_build_object('at', $NOW + 700000, 't', 'спешат сильно'))) where key = 'comik:tracker:shared:v1'"
+eq "из будущего (дальше 10 минут) не прошло — прежние и честные на месте" \
+   "$(val postgres "select string_agg(e->>'t', ',' order by i) from $T, jsonb_array_elements(v#>'{classic::hinoma,log}') with ordinality l(e, i)")" "раньше всех,урон,урон 7,часы спешат"
 try ok testplayer "игрок не за этим столом: журнал, стук, ХП чужой доски" "update kv set value = jsonb_set(jsonb_set(jsonb_set(value, '{legacy::hinoma,log}', '[]'), '{legacy::hinoma,joinAt}', '123'), '{legacy::hinoma,list,0,hp}', '0') where key = 'comik:tracker:shared:v1'"
 eq "ничего не прошло" "$(val postgres "select jsonb_array_length(v#>'{legacy::hinoma,log}'), coalesce(v#>>'{legacy::hinoma,joinAt}', '-'), v#>>'{legacy::hinoma,list,0,hp}' from $T")" "1|-|1"
 q -c "update kv set value = jsonb_set(value, '{0,players}', (value->0->'players') || '[{\"tag\":\"testplayer\",\"at\":9000,\"upd\":9000}]') where key = 'comik:games:v1'" >/dev/null
@@ -184,7 +189,8 @@ try fail testplayer "игрок: писать в журнал" "insert into kv_h
 # h <буква> — хэш-«портрет» из одной буквы (строки comik:img: пишет postgres — проверка хэша его не касается)
 h(){ printf "$1%.0s" $(seq 32); }
 # leaver <тег> <uid> — уходящий игрок: аккаунт со всем, что на него ссылается в auth, свои строки, портреты:
-# A — только в его листе, B — ещё у player_two, C — ещё на доске, E — ещё в архиве, D — в его листе в старом comik:chars:v1
+# A — только в его листе, B — ещё у player_two, C — ещё на доске (у NPC ГМа), E — ещё в архиве, D — в его листе в старом
+# comik:chars:v1, 7 — только на его карточке доски
 leaver(){ local t=$1 id=$2
   q -c "insert into auth.users (id, email) values ('$id', '$t@komikdnd.ru')" \
     -c "insert into auth.identities (user_id) values ('$id')" -c "insert into auth.mfa_factors (user_id) values ('$id')" \
@@ -196,7 +202,7 @@ leaver(){ local t=$1 id=$2
 }
 LID=00000000-0000-0000-0000-0000000000c1
 leaver leaver_one $LID
-q -c "insert into kv select 'comik:img:' || x, to_jsonb('data:image/png;base64,' || x) from unnest(array['$(h a)', '$(h b)', '$(h c)', '$(h d)', '$(h e)', '$(h f)']) x $UPS" \
+q -c "insert into kv select 'comik:img:' || x, to_jsonb('data:image/png;base64,' || x) from unnest(array['$(h a)', '$(h b)', '$(h c)', '$(h d)', '$(h e)', '$(h f)', '$(h 7)']) x $UPS" \
   -c "update kv set value = jsonb_set(value, '{classic,0,ava}', '\"kvimg:$(h b)\"') where key = 'comik:chars:player_two'" \
   -c "insert into kv values ('comik:archive:v1', '{\"news\":[{\"id\":\"n1\",\"img\":\"kvimg:$(h e)\"}]}') $UPS" \
   -c "insert into kv values ('comik:chars:v1', '{\"at\":5,\"classic\":[{\"id\":\"lv1\",\"owner\":\"@Leaver_One\",\"ava\":\"kvimg:$(h d)\"},{\"id\":\"ov1\",\"owner\":\"player_two\"}]}') $UPS" \
@@ -205,7 +211,7 @@ q -c "insert into kv select 'comik:img:' || x, to_jsonb('data:image/png;base64,'
         jsonb_build_object('id', 'g6', 'game', 'classic', 'gone', '{\"testplayer\":5}'::jsonb,
                            'players', jsonb_build_array(jsonb_build_object('tag', 'leaver_one', 'at', 1, 'upd', $NOW + 864000000))),
         '{\"id\":\"gt1\",\"deleted\":true,\"updatedAt\":7,\"played\":{\"t\":\"Игра\",\"chars\":[\"leaver_one_c1\"]}}'::jsonb) where key = 'comik:games:v1'" \
-  -c "update kv set value = jsonb_set(value, '{classic::hinoma,list}', (value#>'{classic::hinoma,list}') || '[{\"charId\":\"leaver_one_c1\",\"hp\":4,\"ownTag\":\"leaver_one\",\"ava\":\"kvimg:$(h c)\"}]') where key = 'comik:tracker:shared:v1'" \
+  -c "update kv set value = jsonb_set(jsonb_set(value, '{classic::hinoma,list}', (value#>'{classic::hinoma,list}') || '[{\"charId\":\"leaver_one_c1\",\"hp\":4,\"ownTag\":\"leaver_one\",\"ava\":\"kvimg:$(h c)\"},{\"charId\":\"leaver_one_c2\",\"hp\":5,\"ownTag\":\"Leaver_One\",\"ava\":\"kvimg:$(h 7)\"}]'), '{classic::hinoma,list,1,ava}', '\"kvimg:$(h c)\"') where key = 'comik:tracker:shared:v1'" \
   -c "update kv set value = value || '[5, {\"id\":\"gbad\",\"game\":\"classic\",\"players\":{\"tag\":\"leaver_one\"}}]' where key = 'comik:games:v1'" \
   -c "update kv set value = value || '{\"bad::x\":{\"list\":{\"ownTag\":\"leaver_one\"}}}' where key = 'comik:tracker:shared:v1'" \
   -c "update kv set value = value || '[{\"tag\":\"leaver_one\",\"createdAt\":1}]' where key = 'comik:users:v1'" \
@@ -236,9 +242,9 @@ REV=$(val postgres "select v->>'rev' from $T")
 TOMB=$(val postgres "select x::text from $G, jsonb_array_elements(v) x where x->>'id' = 'gt1'")
 UPD6=$(val postgres "select x->'players'->0->>'upd' from $G, jsonb_array_elements(v) x where x->>'id' = 'g6'")
 T0=$(val postgres "select $NOW")
-eq "ответ: ok, тег, удалено строк и портретов" "$(val leaver_one "select r->>'ok', r->>'tag', r->>'rows', r->>'imgs' from ($DEL('Leaver_One ') r) z")" "true|leaver_one|3|2"
+eq "ответ: ok, тег, удалено строк и портретов" "$(val leaver_one "select r->>'ok', r->>'tag', r->>'rows', r->>'imgs' from ($DEL('Leaver_One ') r) z")" "true|leaver_one|3|3"
 eq "свои строки удалены" "$(val postgres "$OWN")" "0"
-eq "портреты: только его (A, D) удалены; B (лист player_two), C (доска), E (архив), F (ничей) — на месте" \
+eq "портреты: только его (A, D, 7) удалены; B (лист player_two), C (NPC на доске), E (архив), F (ничей) — на месте" \
    "$(val postgres "select string_agg(left(substr(key, 11), 1), '' order by key) from kv where key ~ '^comik:img:(.)\1{31}$'")" "bcef"
 eq "расписание: запись снята, отметка gone не раньше «сейчас» и новее записи; чужая запись и надгробие — как были" \
    "$(val postgres "select string_agg(p->>'tag', ','), bool_and((x->'gone'->>'leaver_one')::numeric >= $T0) from $G, jsonb_array_elements(v) x, jsonb_array_elements(x->'players') p where x->>'id' = 'g5'")" "herr_teo|t"
@@ -247,9 +253,16 @@ eq "запись «из будущего» (часы спешили) — отм�
 eq "надгробие сыгранной игры не тронуто" "$(val postgres "select x::text from $G, jsonb_array_elements(v) x where x->>'id' = 'gt1'")" "$TOMB"
 eq "кривые записи (не объект, players/list не массив) не мешают и остаются как были" \
    "$(val postgres "select (select count(*) from $G, jsonb_array_elements(v) x where x = '5' or x->'players' = '{\"tag\":\"leaver_one\"}'), (select v#>>'{bad::x,list,ownTag}' from $T)")" "2|leaver_one"
-eq "доска: карточка осталась без ownTag, чужой тег на месте, версия + 1" \
-   "$(val postgres "select (select count(*) from jsonb_array_elements(v#>'{classic::hinoma,list}') c where c->>'charId' = 'leaver_one_c1' and not c ? 'ownTag'),
-      (select string_agg(c->>'ownTag', ',') from jsonb_array_elements(v#>'{classic::hinoma,list}') c), v->>'rev' from $T")" "1|player_two|$((REV + 1))"
+eq "доска: его карточки остались ничьими («-») и без портрета, чужой тег и портрет NPC на месте, версия + 1" \
+   "$(val postgres "select (select count(*) from jsonb_array_elements(v#>'{classic::hinoma,list}') c where c->>'charId' like 'leaver_one_c_' and c->>'ownTag' = '-' and not c ? 'ava'),
+      (select string_agg(c->>'ownTag', ',') from jsonb_array_elements(v#>'{classic::hinoma,list}') c), v#>>'{classic::hinoma,list,1,ava}' = 'kvimg:$(h c)', v->>'rev' from $T")" \
+   "2|player_two,-,-|t|$((REV + 1))"
+LC1="(select c from $T, jsonb_array_elements(v#>'{classic::hinoma,list}') c where c->>'charId' = 'leaver_one_c1')"
+try ok player_two "вписал id ничьей карточки в свой лист" "update kv set value = jsonb_set(value, '{classic}', (value->'classic') || '[{\"id\":\"leaver_one_c1\",\"owner\":\"player_two\"}]') where key = 'comik:chars:player_two'"
+try ok player_two "и пишет ей ХП, состояние и фишку" "update kv set value = jsonb_set(jsonb_set(value, '{classic::hinoma,list}', (select jsonb_agg(case when c->>'charId' = 'leaver_one_c1' then c || '{\"hp\":-999,\"conds\":[{\"t\":\"Мёртв\"}]}' else c end order by i)
+     from jsonb_array_elements(value#>'{classic::hinoma,list}') with ordinality t(c, i))), '{classic::hinoma,mapPos,c:leaver_one_c1}', '{\"x\":7,\"y\":7}') where key = 'comik:tracker:shared:v1'"
+eq "ничья карточка не присвоена: ХП, состояния, фишка — прежние" \
+   "$(val postgres "select x->>'hp', x ? 'conds', (select v#>'{classic::hinoma,mapPos}' ? 'c:leaver_one_c1' from $T) from $LC1 z(x)")" "4|f|f"
 eq "реестр логинов — без него" "$(val postgres "select string_agg(u->>'tag', ',' order by u->>'tag') from kv, jsonb_array_elements(value) u where key = 'comik:users:v1'")" "testplayer"
 eq "старое хранилище листов — без его листа, остальное как было" "$(val postgres "select value::text from kv where key = 'comik:chars:v1'")" '{"at": 5, "classic": [{"id": "ov1", "owner": "player_two"}]}'
 eq "старая общая push:subs — без его подписки" "$(val postgres "select string_agg(s->>'tag', ',') from kv, jsonb_array_elements(value) s where key = 'push:subs'")" "hinoma"

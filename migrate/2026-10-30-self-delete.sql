@@ -11,10 +11,11 @@
 --      проверяет вход, подтверждение (свой логин), что это не аккаунт команды и что пароль вводили не раньше
 --      10 минут назад (claim amr в токене); затем одной транзакцией:
 --        · свои строки comik:chars:<тег>, comik:bm:<тег>, push:sub:<тег>;
---        · портреты comik:img:<хэш>, на которые ссылались только его листы (на картинку из любой другой строки — нет);
+--        · портреты comik:img:<хэш>, на которые ссылались только его листы и карточки (на картинку из любой
+--          другой строки — нет);
 --        · свои записи на ещё не сыгранные игры (с отметкой gone[тег], чтобы старая вкладка не вернула запись),
---          тег ownTag со своих карточек на доске (версия доски rev + 1), себя из реестра логинов, свои листы
---          из замороженной comik:chars:v1, свои подписки из старой общей push:subs;
+--          со своих карточек на доске — тег ownTag (карточка становится ничьей: «-») и портрет (версия доски rev + 1),
+--          себя из реестра логинов, свои листы из замороженной comik:chars:v1, свои подписки из старой общей push:subs;
 --        · аккаунт: auth.users (identities, sessions, mfa — каскадом), refresh_tokens без сессии — отдельно.
 --      Надгробия сыгранных игр, журнал доски, тексты архива и хроники не трогает. Журнал правок kv_history и
 --      ежедневные копии хранят прежнее ещё до 7 дней (сеть безопасности при угоне аккаунта).
@@ -107,16 +108,22 @@ begin
     if nv is distinct from v then update public.kv set value = nv where key = 'comik:games:v1'; end if;
   end if;
 
-  -- доска ходов: со своих карточек снимаем ownTag (карточки остаются у ГМа). Версия rev + 1 — иначе условная запись
-  -- ГМа (kvCasUpdate) по прежней версии вернула бы тег из его памяти
+  -- доска ходов: свои карточки остаются у ГМа, но ничьими — ownTag «-» (не тег и не пусто). Без тега карточку
+  -- присвоил бы по id листа любой, кто впишет этот id в свой лист: его листа больше нет, id ни за кем.
+  -- Портрет с карточки снимаем — он тоже кандидат. Версия rev + 1 — иначе условная запись ГМа (kvCasUpdate)
+  -- по прежней версии вернула бы тег из его памяти
   select value into v from public.kv where key = 'comik:tracker:shared:v1' for update;
   if jsonb_typeof(v) = 'object' then
+    cand := cand || coalesce((select array_agg(m[1]) from jsonb_each(v) e(bk, bv),
+                                jsonb_array_elements(case when jsonb_typeof(bv->'list') = 'array' then bv->'list' else '[]'::jsonb end) c,
+                                regexp_matches(coalesce(c->>'ava', ''), 'kvimg:([0-9a-f]{32})', 'g') m
+                               where jsonb_typeof(c) = 'object' and komik_priv.komik_ntag(c->>'ownTag') = me), '{}');
     nv := coalesce((select jsonb_object_agg(bk, case
         when jsonb_typeof(bv) = 'object' and jsonb_typeof(bv->'list') = 'array'
              and exists (select 1 from jsonb_array_elements(case when jsonb_typeof(bv->'list') = 'array' then bv->'list' else '[]'::jsonb end) c
                           where jsonb_typeof(c) = 'object' and komik_priv.komik_ntag(c->>'ownTag') = me)
         then jsonb_set(bv, '{list}', (select jsonb_agg(case when jsonb_typeof(c) = 'object' and komik_priv.komik_ntag(c->>'ownTag') = me
-                                                            then c - 'ownTag' else c end order by i)
+                                                            then (c - 'ava') || '{"ownTag": "-"}'::jsonb else c end order by i)
                                         from jsonb_array_elements(bv->'list') with ordinality t(c, i)))
         else bv end)
       from jsonb_each(v) e(bk, bv)), '{}');

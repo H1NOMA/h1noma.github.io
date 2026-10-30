@@ -13698,8 +13698,10 @@ function trkMergedList(freshMap, list){
     if(isFoeCard(x)){ const f=stripAva(x); delete f.ownTag; return f; }
     const p=m[trkCardKey(x)];
     const r=stripAva(p?{...x, hp:p.hp, thp:p.thp, init:p.init, ds:p.ds, conds:Array.isArray(p.conds)?p.conds:(x.conds||[]), conc:(p.conc!=null?!!p.conc:!!x.conc)}:x);
-    const own=trkCardOwnTag(x) || (p && typeof p.ownTag==='string' ? p.ownTag : '');   // лист не дочитан — тег прежний
+    // «-» ставит сервер на карточки удалённого аккаунта: ничья навсегда — по листу с тем же id её не присвоить
+    const own=(p && p.ownTag==='-') ? '-' : (trkCardOwnTag(x) || (p && typeof p.ownTag==='string' ? p.ownTag : ''));   // лист не дочитан — тег прежний
     if(own) r.ownTag=own; else delete r.ownTag;
+    if(own==='-') delete r.ava;   // и портрет с неё сервер удалил
     return r;
   });
 }

@@ -137,7 +137,7 @@ async function register(page, tag, pass) {
       players: [{ tag, name: 'Уходящий', at: now - 1000 }, { tag: 'testplayer', name: 'Тест', at: now - 900 }] }]);
     const brd = r['comik:tracker:shared:v1'] || {};
     const rev0 = +brd.rev || 0;
-    brd['classic::hinoma'] = Object.assign({}, brd['classic::hinoma'], { list: [{ charId: 'x1', name: 'Уходящий', hp: 9, ownTag: tag }, { charId: 'x2', name: 'Тест', hp: 9, ownTag: 'testplayer' }] });
+    brd['classic::hinoma'] = Object.assign({}, brd['classic::hinoma'], { list: [{ charId: 'x1', name: 'Уходящий', hp: 9, ownTag: tag, ava: 'kvimg:' + pic }, { charId: 'x2', name: 'Тест', hp: 9, ownTag: 'testplayer' }] });
     r['comik:tracker:shared:v1'] = brd;
     await mock('/__mock/rows', 'POST', Object.entries(r).map(([key, value]) => ({ key, value })));
 
@@ -188,7 +188,8 @@ async function register(page, tag, pass) {
     const g = (r['comik:games:v1'] || []).find(x => x.id === 'gacc') || {};
     check(!(g.players || []).some(p => p.tag === tag) && (g.players || []).some(p => p.tag === 'testplayer') && (g.gone || {})[tag] > now, 'запись на игру снята (gone), чужая осталась');
     const bl = ((r['comik:tracker:shared:v1'] || {})['classic::hinoma'] || {}).list || [];
-    check(!bl.some(c => c.ownTag === tag) && bl.some(c => c.ownTag === 'testplayer') && +r['comik:tracker:shared:v1'].rev === rev0 + 1, 'на доске тег снят, rev вырос');
+    check(bl.some(c => c.charId === 'x1' && c.ownTag === '-' && !('ava' in c)) && bl.some(c => c.ownTag === 'testplayer') && +r['comik:tracker:shared:v1'].rev === rev0 + 1,
+      'на доске его карточка ничья («-») и без портрета, rev вырос');
 
     const dev = await page.evaluate(t => {
       const ls = Object.keys(localStorage), lc = JSON.parse(localStorage.getItem('comik:chars:v1') || 'null') || {};
