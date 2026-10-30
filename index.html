@@ -53,6 +53,8 @@
     --txt:#ececf1; --dim:#c4c5cf; --muted:#8f909c;
     --red:#ff4757; --red-dim:#e62e3f; --red-soft:rgba(255,71,87,.2);
     --glow:rgba(255,71,87,.1); --header:rgba(18,19,23,.92); --accent-rgb:255,71,87;
+    /* опасное действие — свой красный, во всех сеттингах один (4.6:1 на поверхностях) */
+    --danger:#ff5a66; --danger-rgb:255,90,102;
     --f-disp:'Exo 2',system-ui,sans-serif;
     --f-mono:'Roboto Mono',ui-monospace,monospace;
     --f-body:'Inter',system-ui,sans-serif;
@@ -215,9 +217,16 @@
   .set-row{display:flex;align-items:center;gap:13px;padding:14px 15px;cursor:pointer;color:var(--txt);background:none;border:none;width:100%;text-align:left;font:inherit}
   .set-row+.set-row,.set-iconwrap+.set-row{border-top:var(--hair) solid var(--line)}
   .set-row:hover{background:rgba(255,255,255,.03)}
-  .set-row .ri{width:30px;height:30px;background:none;display:flex;align-items:center;justify-content:center;font-size:1.12rem;flex:none}
+  /* значок строки — в плашке тоном акцента; вторая строка (small) — только когда что-то не так */
+  .set-row .ri{width:30px;height:30px;border-radius:9px;background:rgba(var(--accent-rgb),.12);color:var(--red-ink);display:flex;align-items:center;justify-content:center;flex:none}
+  .set-row .ri .bi{width:17px;height:17px}
   .set-row .rl{flex:1;min-width:0;font-size:.96rem}
-  .set-row .rl small{display:block;color:var(--muted);font-size:.72rem;margin-top:2px;white-space:normal}
+  .set-row .rl small{display:block;color:var(--muted);font-size:.74rem;margin-top:2px;white-space:normal}
+  .set-row .rl small.warn{color:#f0b35a}
+  .set-row .rl small[hidden]{display:none}
+  .set-row .ext{color:var(--muted);flex:none;font-size:1.05rem;line-height:1}
+  .set-row.danger{color:var(--danger)}
+  .set-row.danger .ri{background:rgba(var(--danger-rgb),.12);color:var(--danger)}
   .set-row .chev{color:var(--muted);flex:none;transition:transform .2s}
   .set-row .chev.open{transform:rotate(90deg)}
   /* ── «Сеттинги»: кто видит каждый мир (только владелец) ── */
@@ -258,7 +267,11 @@
   .au-agree{display:flex;align-items:flex-start;gap:9px;cursor:pointer;font-size:.84rem;color:var(--dim);line-height:1.45;margin:2px 0 6px}
   .au-agree input{width:18px;height:18px;accent-color:var(--red);flex:none;margin-top:1px;cursor:pointer}
   .au-agree .lnk{color:var(--red-ink);text-decoration:underline;text-underline-offset:2px;background:none;border:none;padding:0;font:inherit;cursor:pointer}
+  .au-agree[hidden]{display:none}
   .au-agree.invalid{color:var(--red-ink)}
+  /* вход и регистрация: главная во всю ширину, под ней тихая — переключить режим */
+  .au-acts{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+  .au-acts .btn{width:100%}
   .au-agree.invalid input{outline:2px solid var(--red);outline-offset:2px}
   .prof-av-big{width:76px;height:76px;border-radius:20px;display:flex;align-items:center;justify-content:center;font-family:var(--f-disp);font-weight:700;font-size:2.1rem;color:#fff;margin:0 auto 14px;border:var(--hair) solid var(--line2)}
   /* карточка профиля: шапка (аватар + имя + @логин в один ряд) и пресеты оформления */
@@ -276,7 +289,7 @@
   /* карточка профиля: аккаунт (закладки, уведомления, пароль, выход) и отдельно внизу — удаление */
   .pc-acts{margin:18px 0 24px}
   .pc-del{margin:0}
-  .pc-del .set-row{justify-content:center;color:var(--red-ink);font-family:var(--f-disp);font-weight:600;letter-spacing:.03em}
+  .pc-adapt{margin-bottom:12px}
   .ad-what{font-family:var(--f-body);color:var(--txt);line-height:1.55;font-size:.92rem;margin-bottom:16px}
   .ad-what b{color:var(--red-ink)}
   #adGo:disabled,#pwGo:disabled{opacity:.4;cursor:default;transform:none}
@@ -559,7 +572,6 @@
   .acct-bar .acct-who{font-family:var(--f-mono);font-size:.75rem;color:var(--dim);line-height:1.4}
   .acct-bar .acct-who b{color:var(--txt)}
   .acct-bar .acct-actions{display:flex;gap:8px}
-  .btn.sm{min-height:38px;padding:8px 16px;font-size:.76rem;border-radius:999px}
   .pcard.mine{border-color:rgba(var(--accent-rgb),.55);box-shadow:0 0 0 1px rgba(var(--accent-rgb),.15) inset}
   .pcard .plock.mine{color:var(--red-ink)}
   .players-bar .btn{width:100%}
@@ -629,12 +641,35 @@
   .field textarea{min-height:120px;resize:vertical;line-height:1.6}
   .field input:focus,.field textarea:focus,.field select:focus{outline:none;border-color:var(--red);box-shadow:0 0 0 3px rgba(var(--accent-rgb),.18),0 0 14px rgba(var(--accent-rgb),.12)}
   .row{display:grid;grid-template-columns:1fr;gap:0}
-  .btn{appearance:none;border:none;cursor:pointer;font-family:var(--f-disp);font-weight:600;font-size:.9rem;letter-spacing:.07em;text-transform:uppercase;padding:13px 22px;border-radius:14px;transition:transform .2s var(--spring),opacity .12s,filter .15s;display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:50px}
+  /* ── Кнопки — одна система. Размер: .btn — L (50), .sm — M (40, в карточках и окнах), .xs — S (32, панели доски).
+     Вид: .primary — главная, заливка акцентом (одна на экран); .ghost — обычная: рамка и лёгкий фон, видна и на
+     карточке (surface2); .quiet — тихая, текст акцентом без фона; .danger — опасная, свой красный, не акцент
+     сеттинга (в Классике «Удалить» было золотым, как «Записаться»), .danger.fill — последнее «Да, удалить».
+     Форма — скругление 14/12/10, круглые только значки (FAB, ✕, поиск) и чипы. Подпись не мельче 11 px */
+  .btn{appearance:none;border:1px solid transparent;cursor:pointer;font-family:var(--f-disp);font-weight:600;font-size:.9rem;letter-spacing:.07em;text-transform:uppercase;padding:13px 22px;border-radius:14px;transition:transform .2s var(--spring),opacity .12s,filter .15s,border-color .15s,background-color .15s;display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:50px}
   .btn.primary{background:var(--red);color:#0b0b0e;box-shadow:0 4px 18px rgba(var(--accent-rgb),.35)}
   .btn.primary:hover{filter:brightness(1.08)}
-  .btn.ghost{background:var(--surface2);color:var(--txt)}
-  .btn.danger{background:rgba(var(--accent-rgb),.14);color:var(--red-ink)}
+  .btn.ghost{background:rgba(255,255,255,.04);color:var(--txt);border-color:var(--line2)}
+  .btn.ghost:hover{border-color:rgba(var(--accent-rgb),.55)}
+  .btn.quiet{background:none;color:var(--red-ink);padding-left:10px;padding-right:10px;letter-spacing:.06em}
+  .btn.quiet:hover{background:rgba(var(--accent-rgb),.08)}
+  .btn.danger{background:rgba(var(--danger-rgb),.12);color:var(--danger);border-color:rgba(var(--danger-rgb),.45)}
+  .btn.danger.fill{background:var(--danger);color:#1a0b0d;border-color:var(--danger)}
   .btn:active{transform:scale(.96);opacity:.8}
+  .btn:disabled{opacity:.4;cursor:default;transform:none;filter:none}
+  .btn.sm{min-height:40px;padding:8px 16px;font-size:.76rem;border-radius:12px}
+  /* S: 32 px на вид, а зона касания — 40: невидимый край над и под кнопкой */
+  .btn.xs{position:relative;min-height:32px;padding:5px 12px;font-size:.6875rem;letter-spacing:.06em;border-radius:10px;gap:6px}
+  .btn.xs::after{content:"";position:absolute;left:0;right:0;top:-4px;bottom:-4px}
+  /* значки в кнопках и строках меню — линейные, в цвет текста (эмодзи на iPhone и Android рисуются по-разному) */
+  .bi{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;vertical-align:-.25em}
+  /* мелкие кнопки не из системы (броски, инструменты доски): значок по тексту */
+  .gm-rb .bi,.tb-tool .bi{width:15px;height:15px;margin-right:5px}
+  .ds-roll .bi{margin-right:7px}
+  .hp-calc-btn .bi{width:14px;height:14px;vertical-align:middle}
+  .btn.sm .bi,.btn.xs .bi{width:16px;height:16px}
+  /* статус вместо кнопки («✓ Вы записаны»): плашка, рядом — тихое действие */
+  .st-ok{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:999px;font:500 .6875rem/1.2 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:#7fe0a0;background:rgba(127,224,160,.1);border:1px solid rgba(127,224,160,.35)}
   .err{color:var(--red-ink);font-family:var(--f-mono);font-size:.72rem;margin-top:5px;display:none}
   .field.invalid input,.field.invalid textarea,.field.invalid select{border-color:var(--red)}
   .field.invalid .err{display:block}
@@ -1326,7 +1361,7 @@
   .dc-n{width:22px;text-align:center;font-family:var(--f-disp);font-weight:700;font-size:.92rem;color:var(--muted)}
   .dc-row.has .dc-n{color:var(--red-ink)}
   .dc-actions{display:flex;gap:8px}
-  .dc-actions .btn{flex:1;padding:11px 8px;font-size:.78rem}
+  .dc-actions .btn{flex:1}
   .tool-dice{display:flex;flex-wrap:wrap;gap:8px}
   .tool-die{flex:1 0 28%;min-width:70px;padding:11px 0;border-radius:12px;border:var(--hair) solid var(--line2);background:rgba(255,255,255,.05);color:var(--txt);font-family:var(--f-mono);font-size:.8rem;letter-spacing:.08em;cursor:pointer;transition:transform .12s}
   .tool-die:active{transform:scale(.94);color:var(--red-ink)}
@@ -1406,7 +1441,7 @@
   .tb-round .n{font-family:var(--f-disp);font-weight:700;font-size:1.5rem;color:var(--red-ink);line-height:1}
   .tb-round .l{font-family:var(--f-mono);font-size:.5rem;letter-spacing:.2em;text-transform:uppercase;color:var(--muted)}
   .tb-view{display:flex;background:var(--surface);border:var(--hair) solid var(--line2);border-radius:11px;padding:3px;gap:2px;margin-left:auto}
-  .tb-view button{border:none;background:none;color:var(--muted);font-family:var(--f-mono);font-size:.6rem;letter-spacing:.06em;text-transform:uppercase;padding:7px 11px;border-radius:8px;cursor:pointer}
+  .tb-view button{border:none;background:none;color:var(--muted);font-family:var(--f-mono);font-size:.6875rem;letter-spacing:.04em;text-transform:uppercase;padding:7px 11px;border-radius:8px;cursor:pointer}
   .tb-view button.on{background:var(--red-soft);color:var(--red-ink)}
   .tb-turn{display:flex;align-items:center;gap:10px;justify-content:space-between;border-top:var(--hair) solid var(--line);padding-top:11px}
   .tb-now{display:flex;flex-direction:column;align-items:center;min-width:0}
@@ -1436,7 +1471,7 @@
   .tb-selall{margin-bottom:10px}
   /* нижний ряд панели боя (только ГМ): бросок инициативы и переключатель «пропускать павших» */
   .tb-tools{display:flex;flex-wrap:wrap;gap:7px;border-top:var(--hair) solid var(--line);padding-top:10px}
-  .tb-tool{border:var(--hair) solid var(--line2);background:var(--surface);color:var(--dim);font-family:var(--f-mono);font-size:.64rem;letter-spacing:.04em;padding:9px 11px;border-radius:10px;cursor:pointer;min-height:38px}
+  .tb-tool{border:var(--hair) solid var(--line2);background:var(--surface);color:var(--dim);font-family:var(--f-mono);font-size:.6875rem;letter-spacing:.04em;padding:9px 11px;border-radius:10px;cursor:pointer;min-height:38px}
   .tb-tool.on{color:var(--red-ink);border-color:rgba(var(--accent-rgb),.5);background:rgba(var(--accent-rgb),.1)}
   .tb-mass{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin-bottom:12px;padding:10px 12px;border:var(--hair) solid rgba(var(--accent-rgb),.5);border-radius:12px;background:rgba(var(--accent-rgb),.09)}
   .tb-mass-n{font-family:var(--f-mono);font-size:.68rem;letter-spacing:.06em;color:var(--red-ink);margin-right:2px}
@@ -1492,7 +1527,7 @@
   .tb-cond.add.thp{background:rgba(106,169,255,.12);color:#9cc6ff;border:1px dashed rgba(106,169,255,.45)}
   .tb-cond.add.thp.on{background:rgba(106,169,255,.22);color:#dbeaff;border-style:solid}
   .tb-conds{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
-  .tb-cond{font-family:var(--f-mono);font-size:.52rem;letter-spacing:.03em;padding:3px 7px;border-radius:6px;background:rgba(217,86,78,.14);color:#e79a94;border:1px solid rgba(217,86,78,.32)}
+  .tb-cond{font-family:var(--f-mono);font-size:.6875rem;letter-spacing:.02em;line-height:1.25;padding:3px 7px;border-radius:8px;background:rgba(217,86,78,.14);color:#e79a94;border:1px solid rgba(217,86,78,.32)}
   .tb-cond.buff{background:rgba(120,196,107,.14);color:#9bd490;border-color:rgba(120,196,107,.32)}
   .tb-cond.add{background:var(--bg2);color:var(--muted);border:1px dashed var(--line2);cursor:pointer;padding:3px 8px}
   .tb-right{display:flex;flex-direction:column;align-items:center;gap:5px;min-width:40px}
@@ -1512,7 +1547,7 @@
   /* точки-кнопки шире прежних точек: в такой строке полоса ХП отдаёт им свои 25 px (телефон ГМа) */
   .tb-row.gmds .tb-hpbar{min-width:44px}
   .tb-dsb{grid-column:1/-1;display:flex;gap:7px;justify-content:flex-end;margin-top:7px}
-  .tb-dsb button{min-height:32px;border:var(--hair) solid var(--line2);background:var(--bg2);color:var(--dim);font-family:var(--f-mono);font-size:.58rem;letter-spacing:.04em;padding:6px 11px;border-radius:9px;cursor:pointer;white-space:nowrap}
+  .tb-dsb button{min-height:32px;border:var(--hair) solid var(--line2);background:var(--bg2);color:var(--dim);font-family:var(--f-mono);font-size:.6875rem;letter-spacing:.03em;padding:6px 11px;border-radius:10px;cursor:pointer;white-space:nowrap}
   .tb-dsb button:active{transform:scale(.95)}
   /* стабилизирован: отметок может не быть вовсе, поэтому состояние показываем рамкой и галочкой */
   .tb-dsb button.on{color:#84c97a;border-color:rgba(132,201,122,.5);background:rgba(132,201,122,.08)}
@@ -1553,9 +1588,9 @@
   .tb2 .tc-acchip{padding:0 6px 0 4px}
   .tb2 .tc-acchip .acsh{width:13px;height:13px;color:var(--red-ink);flex:0 0 auto}
   /* тонкая кнопка «＋ состояние» под фото (только ГМ) */
-  .tb2 .tc-statebtn{width:100%;background:#0e130e;border:none;border-top:var(--hair) solid var(--line2);color:var(--muted);font-family:var(--f-mono);font-size:.56rem;letter-spacing:.06em;padding:7px;cursor:pointer}
+  .tb2 .tc-statebtn{width:100%;background:#0e130e;border:none;border-top:var(--hair) solid var(--line2);color:var(--muted);font-family:var(--f-mono);font-size:.6875rem;letter-spacing:.02em;padding:7px;cursor:pointer}
   .tb2 .tc-btns{display:flex} .tb2 .tc-btns .tc-statebtn+.tc-statebtn{border-left:var(--hair) solid var(--line2)}
-  .tb2 .tc-btns .tc-statebtn{width:auto;flex:1 1 0;min-width:0;padding:7px 2px;white-space:nowrap}
+  .tb2 .tc-btns .tc-statebtn{width:auto;flex:1 1 0;min-width:0;padding:7px 2px;white-space:normal;line-height:1.2}
   .tb2 .tc-statebtn.thp.on{color:#9cc6ff}
   @media(min-width:560px){ .tb2.trk-grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))} }
   /* карта боя */
@@ -1575,7 +1610,6 @@
     background-size:calc(100%/var(--cols,12)) calc(100%/var(--cols,12))}
   .mp-tok{position:absolute;transform:translate(-50%,-50%);width:calc(100%/var(--cols,12) - 3px);min-width:22px;display:flex;flex-direction:column;align-items:center;gap:1px;cursor:default;z-index:2}
   .mp-ctrl{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:8px}
-  .mp-ctrl .btn.sm{padding:7px 11px}
   .mp-gc{display:flex;align-items:center;gap:6px;font-family:var(--f-mono);font-size:.66rem;color:var(--muted);margin-left:auto}
   .mp-gc button{width:26px;height:26px;border-radius:7px;border:var(--hair) solid var(--line2);background:var(--surface);color:var(--dim);font-size:1rem;cursor:pointer}
   .mp-gc b{font-family:var(--f-disp);color:var(--txt);min-width:20px;text-align:center}
@@ -1591,7 +1625,7 @@
   .tbp-box{max-width:340px;width:calc(100vw - 40px)}
   .tbp-h{font-family:var(--f-mono);font-size:.56rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:12px 0 6px;text-align:left}
   .tbp-grid{display:flex;flex-wrap:wrap;gap:6px}
-  .tbp-c{font-family:var(--f-mono);font-size:.66rem;padding:6px 9px;border-radius:8px;background:var(--bg2);border:var(--hair) solid var(--line2);color:var(--dim);cursor:pointer}
+  .tbp-c{font-family:var(--f-mono);font-size:.6875rem;padding:6px 9px;border-radius:8px;background:var(--bg2);border:var(--hair) solid var(--line2);color:var(--dim);cursor:pointer}
   .tbp-c.on{background:rgba(217,86,78,.18);border-color:rgba(217,86,78,.55);color:#e79a94}
   .tbp-c.buff.on{background:rgba(120,196,107,.18);border-color:rgba(120,196,107,.55);color:#9bd490}
   /* состояния на себя: игрок вешает их сам — вкладка пульта на десктопе и секция панели под доской на телефоне.
@@ -1666,7 +1700,7 @@
   .ob-title{font-family:var(--f-mono);font-size:.72rem;letter-spacing:.18em;color:var(--red-ink);text-transform:uppercase;margin-bottom:10px}
   .ob-steps{margin:0 0 12px 18px;display:flex;flex-direction:column;gap:7px;font-size:.86rem;color:var(--muted)}
   .ob-steps b{color:var(--txt)}
-  .ob-x{position:absolute;top:8px;right:8px;width:30px;height:30px;background:none;border:none;color:var(--dim);cursor:pointer;font-size:.9rem}
+  .ob-x{position:absolute;top:4px;right:4px;width:40px;height:40px;border-radius:50%;background:none;border:none;color:var(--dim);cursor:pointer;font-size:.9rem}
   /* две кнопки в ряд — только когда обе влезают: в узкой колонке новостей (1340–1599, открытый карман)
      «КАЛЬКУЛЯТОР» одним словом шире половины карточки и вылезал за её рамку */
   .ob-card .row{grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px}
@@ -1791,7 +1825,7 @@
   .dos-row .v{flex:1;color:var(--txt);font-size:.9rem;line-height:1.45;overflow-wrap:anywhere}
   /* --- редактор карточки --- */
   .ce-imgrow{display:flex;align-items:center;gap:10px}
-  .ce-imgrow .btn{flex:1;padding:11px 8px;font-size:.78rem}
+  .ce-imgrow .btn{flex:1}
   .ce-thumb{width:52px;height:52px;border-radius:10px;overflow:hidden;border:1px dashed var(--line2);flex:0 0 auto;background:var(--bg2)}
   .ce-thumb img{width:100%;height:100%;object-fit:cover;display:block}
   .ce-row{display:flex;gap:8px;margin-top:8px}
@@ -1873,6 +1907,8 @@
   /* киберпанк-детали выключены вне ASSIMILATION */
   [data-project="legacy"] body::after,[data-project="neverland"] body::after,[data-project="classic"] body::after,[data-project="skazki"] body::after{opacity:0}
   [data-project="legacy"] .btn.primary,[data-project="neverland"] .btn.primary,[data-project="terra"] .btn.primary{clip-path:none;filter:none;box-shadow:0 6px 14px rgba(var(--accent-rgb),.28)}
+  /* срез угла — только у большой главной: у M и S он съедал скругление, а тень обрезалась прямоугольником */
+  .btn.primary.sm,.btn.primary.xs{clip-path:none;filter:none;box-shadow:0 4px 12px rgba(var(--accent-rgb),.24)}
 
   /* --- LEGACY: лунное свечение --- */
   [data-project="legacy"] .dr-svg{filter:drop-shadow(0 0 15px rgba(160,143,247,.6)) drop-shadow(0 0 30px rgba(90,208,255,.25))}
@@ -1930,8 +1966,6 @@
 
   .acc-tabs{display:flex;gap:6px;margin-bottom:16px;background:var(--bg2);border-radius:12px;padding:4px}
   .acc-tab{flex:1;background:none;border:none;cursor:pointer;color:var(--muted);font-family:var(--f-mono);font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;padding:9px;border-radius:9px;transition:.15s}
-  .acc-me{text-align:center;padding:10px 0}
-  .acc-tag{font-family:var(--f-disp);font-weight:700;font-size:1.3rem;color:var(--red-ink)}
   .acc-tab.on{background:var(--surface);color:var(--red-ink);box-shadow:inset 0 0 0 1px rgba(var(--accent-rgb),.3)}
   /* ===== оформления игр ===== */
   /* LEGACY — лунно-таинственный */
@@ -2129,7 +2163,7 @@
   .arch-pick{margin-top:16px;background:var(--surface);border:var(--hair) solid var(--line2);border-radius:12px;padding:12px}
   .arch-lbl{font-family:var(--f-mono);font-size:.56rem;letter-spacing:.18em;text-transform:uppercase;color:var(--red-ink);margin-bottom:8px}
   .arch-chips{display:flex;flex-wrap:wrap;gap:6px}
-  .arch-chip{background:var(--bg2);border:var(--hair) solid var(--line2);border-radius:999px;padding:8px 13px;color:var(--dim);font-family:var(--f-mono);font-size:.68rem;cursor:pointer;transition:.15s}
+  .arch-chip{background:var(--bg2);border:var(--hair) solid var(--line2);border-radius:999px;padding:8px 13px;color:var(--dim);font-family:var(--f-mono);font-size:.6875rem;cursor:pointer;transition:.15s}
   .arch-chip.on{background:var(--red-soft);border-color:rgba(var(--accent-rgb),.55);color:var(--red-ink)}
   .trk-sess{display:flex;flex-wrap:wrap;gap:8px}
   .arch-desc{margin:9px 0 0;font-size:.85rem;line-height:1.5;color:var(--dim)}
@@ -2216,7 +2250,7 @@
   .tline-done{display:inline-block;font-family:var(--f-mono);font-size:.55rem;letter-spacing:.08em;text-transform:uppercase;
     color:#0b0b0e;background:#3ecf6a;padding:2px 8px;border-radius:6px;font-weight:700;margin-top:8px;box-shadow:0 0 10px rgba(62,207,106,.35)}
   .tline-acts{display:flex;gap:7px;margin-top:9px}
-  .tline-acts .ta{font-family:var(--f-mono);font-size:.6rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);
+  .tline-acts .ta{font-family:var(--f-mono);font-size:.6875rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);
     background:rgba(255,255,255,.05);border:var(--hair) solid var(--line2);border-radius:8px;padding:5px 10px;cursor:pointer}
   .tline-acts .ta:hover{color:var(--red-ink);border-color:rgba(var(--accent-rgb),.5)}
   .tline-acts .ta.del{margin-left:auto;color:#e79a94}
@@ -2534,7 +2568,6 @@
   @media(min-width:640px){#view-chrono .chrono-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}}
   .chrono-branches{display:none;gap:10px;margin:-2px 0 4px}
   .chrono-branches.open{display:flex;animation:fade .18s}
-  .chrono-branches .btn{flex:1;padding:13px 8px;font-size:.8rem}
   .gate{max-width:430px;text-align:center;margin:30px auto;background:var(--surface);border:var(--hair) solid var(--line);border-radius:var(--r-lg);padding:30px 22px}
   .gate .ico{width:44px;height:44px;margin-bottom:14px}
   .gate h2{font-family:var(--f-disp);font-weight:700;font-size:1.2rem;text-transform:uppercase;letter-spacing:.05em;margin-bottom:7px}
@@ -2572,11 +2605,11 @@
   .modal .unlock{margin-top:18px;padding-top:16px;border-top:1px solid var(--line)}
   .modal .pacts{display:flex;gap:10px;margin-top:6px;flex-wrap:wrap}
   .modal .pacts .btn{flex:1;min-width:130px}
-  /* действия инлайн-листа (PDF · JSON · Удалить): без наложения — PDF и JSON поровну слева/справа,
-     «Удалить персонажа» отдельной строкой на всю ширину и чуть ниже */
+  /* действия инлайн-листа (PDF · JSON · Удалить) — одним рядом кнопок M; не влезли — переносятся */
   #playerEditor .isheet-acts{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
-  #playerEditor .isheet-acts .btn{flex:1 1 calc(50% - 5px);min-width:0}
-  #playerEditor .isheet-acts .btn.danger{flex-basis:100%;margin-top:6px}
+  #playerEditor .isheet-acts .btn{flex:1 1 auto;min-width:0}
+  /* вопрос «Удалить безвозвратно?» перед последним подтверждением */
+  .del-q{font-family:var(--f-mono);font-size:.78rem;color:var(--danger);align-self:center}
 
   /* toast */
   .toast{position:fixed;bottom:calc(var(--botnav-h) + 14px + env(safe-area-inset-bottom));left:0;right:0;margin:0 auto;width:fit-content;transform:translateY(16px) scale(.94);z-index:130;background:var(--glass2);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border:var(--hair) solid var(--line2);border-radius:999px;box-shadow:0 8px 28px rgba(0,0,0,.4);padding:9px 26px;color:var(--txt);font-family:var(--f-mono);font-weight:700;font-size:.82rem;letter-spacing:.02em;display:flex;align-items:center;gap:9px;opacity:0;pointer-events:none;transition:transform .35s var(--spring),opacity .25s;max-width:94vw}
@@ -2587,19 +2620,9 @@
   .toast .tact{appearance:none;border:none;margin:0 0 0 4px;padding:0 14px;min-height:44px;border-radius:999px;background:rgba(255,255,255,.1);color:var(--txt);font:inherit;letter-spacing:.02em;cursor:pointer;pointer-events:auto;white-space:nowrap;transition:transform .12s var(--spring)}
   .toast .tact:active{transform:scale(.95)}
 
-  /* ── соцкнопки на новостной странице (Boosty / Telegram) — обведённые «пилюли» с фирменным цветом ── */
+  /* ── Boosty на новостной странице (десктоп) — обычная кнопка, значок своего цвета ── */
   .news-socials{display:none}                 /* по умолчанию скрыты; в мобилке соцсети живут в подвале */
-  .soc-pill{display:flex;align-items:center;justify-content:center;gap:10px;padding:13px 12px;border-radius:12px;
-    font-family:var(--f-disp);font-weight:600;font-size:.95rem;letter-spacing:.02em;color:var(--txt);text-decoration:none;
-    background:rgba(8,16,30,.5);border:1.5px solid var(--pc);
-    box-shadow:0 0 0 1px rgba(0,0,0,.25) inset,0 0 15px -5px var(--pc);
-    transition:transform .12s ease,box-shadow .2s ease,background .2s ease;cursor:pointer}
-  .soc-pill svg{width:22px;height:22px;flex:none;color:var(--pc)}
-  .soc-pill:hover{transform:translateY(-1px);background:rgba(18,32,52,.62);box-shadow:0 0 0 1px rgba(0,0,0,.25) inset,0 0 22px -4px var(--pc)}
-  .soc-pill:active{transform:translateY(0)}
-  .soc-pill.boosty{--pc:#f0592a}
-  .soc-pill.soon{opacity:.7;cursor:default}
-  .soc-pill.soon:hover{transform:none;background:rgba(8,16,30,.5);box-shadow:0 0 0 1px rgba(0,0,0,.25) inset,0 0 15px -5px var(--pc)}
+  .soc-boosty .bi{fill:#f0592a;stroke:none}
 
   footer{max-width:var(--shell);margin:0 auto;padding:24px 15px calc(var(--botnav-h) + 34px);color:var(--muted);font-family:var(--f-mono);font-size:.72rem;letter-spacing:.03em;line-height:1.7;border-top:1px solid var(--line);position:relative;z-index:2}
   footer .ps{margin-top:10px}
@@ -2762,7 +2785,7 @@
   .bm-del{flex:0 0 34px;height:34px;border:none;border-radius:10px;background:rgba(255,255,255,.06);color:var(--dim);cursor:pointer}
 
   /* ====== Источники ====== */
-  .src-chip{font-family:var(--f-mono);font-size:.66rem;letter-spacing:.06em;font-style:normal;color:var(--red-ink);background:var(--red-soft);border:1px solid rgba(var(--accent-rgb),.5);border-radius:6px;padding:3px 8px;margin-right:7px;cursor:pointer;font-weight:700}
+  .src-chip{font-family:var(--f-mono);font-size:.6875rem;letter-spacing:.06em;font-style:normal;color:var(--red-ink);background:var(--red-soft);border:1px solid rgba(var(--accent-rgb),.5);border-radius:6px;padding:3px 8px;margin-right:7px;cursor:pointer;font-weight:700}
   .src-chip.open{white-space:normal;text-align:left;line-height:1.5}
   .src-chip i{color:var(--muted);font-style:italic;font-weight:400}
   .src-mini{font-family:var(--f-mono);font-size:.6rem;letter-spacing:.06em;color:var(--muted);border:1px solid var(--line2);border-radius:5px;padding:3px 6px;font-weight:600}
@@ -2777,10 +2800,10 @@
   .sec-filt-btn .sec-filt-n{position:absolute;top:-5px;right:-5px;min-width:16px;height:16px;padding:0 4px;border-radius:999px;background:var(--red);color:#0b0b0e;font-family:var(--f-mono);font-weight:700;font-size:.56rem;display:flex;align-items:center;justify-content:center}
   .sec-filt-panel{display:none;margin-top:8px;background:var(--surface2);border:var(--hair) solid var(--line2);border-radius:14px;padding:11px 12px;flex-direction:column;gap:9px}
   .sec-filt-panel.open{display:flex;animation:subDrop .24s var(--spring)}
-  .sec-filt-clear{align-self:flex-start;margin-top:2px;font-family:var(--f-mono);font-size:.62rem;letter-spacing:.04em;color:var(--red-ink);background:none;border:none;cursor:pointer;padding:2px 0;text-transform:uppercase}
+  .sec-filt-clear{align-self:flex-start;margin-top:2px;font-family:var(--f-mono);font-size:.6875rem;letter-spacing:.04em;color:var(--red-ink);background:none;border:none;cursor:pointer;padding:2px 0;text-transform:uppercase}
   .sec-src-row{display:flex;align-items:center;gap:6px;overflow-x:auto;padding-bottom:2px;margin-top:8px;-webkit-overflow-scrolling:touch}
   .sec-src-row .sec-frow-l{flex:0 0 auto;font-family:var(--f-mono);font-size:.58rem;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin-right:2px}
-  .sec-src{flex:0 0 auto;font-family:var(--f-mono);font-size:.66rem;letter-spacing:.06em;font-weight:700;color:var(--muted);background:var(--surface2);border:var(--hair) solid var(--line2);border-radius:999px;padding:7px 12px;cursor:pointer}
+  .sec-src{flex:0 0 auto;font-family:var(--f-mono);font-size:.6875rem;letter-spacing:.06em;font-weight:700;color:var(--muted);background:var(--surface2);border:var(--hair) solid var(--line2);border-radius:999px;padding:7px 12px;cursor:pointer}
   .sec-src.on{color:var(--red-ink);border-color:rgba(var(--accent-rgb),.55);background:var(--red-soft)}
 
   /* ====== Статблок божества ====== */
@@ -2924,9 +2947,11 @@
   .gs-ava{width:40px;height:40px;border-radius:12px;flex:none;display:flex;align-items:center;justify-content:center;font-family:var(--f-disp);font-weight:700;font-size:1.02rem;color:#fff;background:var(--red);border:var(--hair) solid var(--line2);cursor:pointer;padding:0;overflow:hidden;transition:transform .12s,border-color .12s}
   .gs-ava img{width:100%;height:100%;object-fit:cover;display:block}
   .gs-ava:hover{border-color:var(--red);transform:translateY(-1px)}
-  .gs-kick{background:none;border:none;color:var(--dim);cursor:pointer;font-size:.7rem;padding:0}
+  /* крестик «убрать игрока»: значок мелкий, а зона касания — 32 px; отрицательный отступ не раздувает плашку */
+  .gs-kick{background:none;border:none;color:var(--dim);cursor:pointer;font-size:.75rem;line-height:1;width:32px;height:32px;margin:-9px -10px -9px -6px;padding:0;border-radius:50%;display:inline-grid;place-items:center;vertical-align:middle}
+  .gs-kick:hover{color:var(--danger);background:rgba(var(--danger-rgb),.1)}
   .gs-charlink{background:none;border:none;color:var(--red-ink);cursor:pointer;font:inherit;padding:0;text-decoration:underline;text-underline-offset:2px}
-  .gs-act{display:flex;gap:8px;align-items:center}
+  .gs-act{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 
   .dev-toggle{margin-left:auto;flex:0 0 auto;width:44px;height:44px;border-radius:50%;border:var(--hair) solid var(--line2);background:var(--glass2);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;transition:border-color .15s,box-shadow .2s}
   .dev-toggle .dt-dot{width:14px;height:14px;border-radius:50%;background:var(--dim);transition:background .15s,box-shadow .15s}
@@ -3879,9 +3904,9 @@ html.dr-live #appPane{box-shadow:-2px 0 0 0 var(--line2), 0 0 46px rgba(0,0,0,.5
 .mpm-gen{background:var(--surface2);color:var(--dim)}
 .mpm-gen svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
 .mpm-new{border-style:dashed}
-.mpm-del{display:inline-flex;align-items:center;gap:7px;color:var(--muted)}
+.mpm-del{display:inline-flex;align-items:center;gap:7px}
 .mpm-del svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
-.mpm-del.sure{color:#fff;background:#b3261e;border-color:transparent}
+.mpm-del.sure{color:#1a0b0d;background:var(--danger);border-color:var(--danger)}
 @media (prefers-reduced-motion:reduce){ .mpg-pl-bd,.mpg-chev{transition:none} .mpg-pl.flash{animation:none} }
 </style>
 
@@ -4372,13 +4397,14 @@ if(/Android/i.test(navigator.userAgent||'')) d.classList.add('lite');}catch(e){}
       <div id="nextGame" hidden></div>
       <div class="signup-bar">
         <button class="btn primary" style="width:100%" id="signupBtn" hidden onclick="openGameSignup()">Записаться на игру</button>
-        <button class="btn ghost" style="width:100%;margin-top:8px" id="schedBtn" hidden onclick="openSchedule(CUR_PROJECT)">Расписание игр · ГМ</button>
+        <button class="btn ghost" style="width:100%;margin-top:8px" id="schedBtn" hidden onclick="openSchedule(CUR_PROJECT)">Расписание</button>
       </div>
       <div id="onboardCard" hidden></div>
-      <div id="admNewsBar" hidden style="margin:14px 0"><button class="btn primary" style="width:100%" onclick="openNewsEditor()">+ Новость</button></div>
+      <!-- −6: сходится с нижним отступом записи в те же 8 px, что между «Записаться» и «Расписание» -->
+      <div id="admNewsBar" hidden style="margin:-6px 0 14px"><button class="btn ghost" style="width:100%" onclick="openNewsEditor()">＋ Новость</button></div>
       <div class="news-socials">
-        <a class="soc-pill boosty" href="https://boosty.to/komik_dnd" target="_blank" rel="noopener" title="Boosty КОМИК" aria-label="Boosty">
-          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M13.9 2 6.2 13.2h4l-2.3 8.8L18 9.7h-4.2z"/></svg>Boosty</a>
+        <a class="btn ghost soc-boosty" href="https://boosty.to/komik_dnd" target="_blank" rel="noopener" title="Boosty КОМИК" aria-label="Boosty КОМИК">
+          <svg class="bi" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.9 2 6.2 13.2h4l-2.3 8.8L18 9.7h-4.2z"/></svg>Boosty</a>
       </div>
     </div>
     <div class="news-feed" id="newsFeed"></div>
@@ -4388,12 +4414,12 @@ if(/Android/i.test(navigator.userAgent||'')) d.classList.add('lite');}catch(e){}
 
   <!-- ARCHIVE -->
   <section id="view-world" class="view">
-    <button class="btn ghost" id="chronoEntry" style="width:100%;margin-bottom:14px" onclick="go('chrono')">📜 Хронология мира</button>
+    <button class="btn ghost" id="chronoEntry" style="width:100%;margin-bottom:14px" onclick="go('chrono')"><svg class="bi" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 12a8.5 8.5 0 102.5-6"/><path d="M3.5 4v4.5H8M12 7.5V12l3 2"/></svg>Хронология мира</button>
         <div class="grid">
       <div class="content-col">
         <div id="secFilter" class="sec-filter" hidden></div>
         <aside class="cats"><h4>КАТЕГОРИИ</h4><div class="cat-wrap" id="cats"></div></aside>
-        <div id="admCardBar" hidden style="margin-bottom:14px"><button class="btn primary" style="width:100%" onclick="openCardEditor()">+ Карточка</button></div>
+        <div id="admCardBar" hidden style="margin-bottom:14px"><button class="btn primary" style="width:100%" onclick="openCardEditor()">＋ Карточка</button></div>
         <div class="cards" id="cards"></div>
         <article class="story" id="story" hidden></article>
       </div>
@@ -4500,8 +4526,9 @@ if(/Android/i.test(navigator.userAgent||'')) d.classList.add('lite');}catch(e){}
   <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
 </button>
 
-<button class="fab-side imp-circle" id="importCircle" onclick="importCharPick()" aria-label="Применить лист JSON" title="Импорт персонажа из JSON">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v11M8 10.5l4 4 4-4"/><path d="M5 20h14"/></svg>
+<!-- значок — лист со стрелкой внутрь: у «Скачать JSON» в листе стрелка вниз, раньше они были одинаковыми -->
+<button class="fab-side imp-circle" id="importCircle" onclick="importCharPick()" aria-label="Импорт персонажа из JSON" title="Импорт персонажа из JSON">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z"/><path d="M14 3v5h5M12 11v6.5M9 14.5l3 3 3-3"/></svg>
 </button>
 <input type="file" id="importCharFile" accept="application/json,.json" hidden onchange="importCharFile(this)">
 
@@ -4548,8 +4575,8 @@ if(/Android/i.test(navigator.userAgent||'')) d.classList.add('lite');}catch(e){}
   </div>
   <div class="dc-result" id="dcResult"></div>
   <div class="dc-actions">
-    <button class="btn ghost" onclick="calcReset()">Сброс</button>
-    <button class="btn primary" onclick="calcRoll()">Бросить</button>
+    <button class="btn ghost sm" onclick="calcReset()">Сброс</button>
+    <button class="btn primary sm" onclick="calcRoll()">Бросить</button>
   </div>
 </div>
 
@@ -4614,6 +4641,34 @@ if(/Android/i.test(navigator.userAgent||'')) d.classList.add('lite');}catch(e){}
    Раньше массив был размножен по файлу вручную, и новый сеттинг требовал полутора десятков правок. */
 const ALL_GAMES=['legacy','neverland','assimilation','terra','classic','skazki','gw'];
 const emptyGames=()=>{ const o={}; ALL_GAMES.forEach(g=>o[g]=[]); return o; };
+/* ====================== Значки кнопок и строк меню ======================
+   Линейные, в цвет текста (.bi): эмодзи в подписях на iPhone и Android рисуются по-разному и не следуют за сеттингом */
+const BI_PATH={
+  print:'<path d="M6 9V3h12v6M6 18H4v-7h16v7h-2M7 14h10v7H7z"/>',
+  download:'<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>',
+  trash:'<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',
+  bookmark:'<path d="M6 3.5h12v17l-6-4-6 4z"/>',
+  bell:'<path d="M6 16V11a6 6 0 0112 0v5l1.5 2h-15zM10 20.5h4"/>',
+  lock:'<rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8 10.5V8a4 4 0 018 0v2.5"/>',
+  ext:'<path d="M14 4h6v6M20 4l-9 9M18 14v5H5V6h5"/>',
+  logout:'<path d="M14 4h5v16h-5M10 8l-4 4 4 4M6 12h10"/>',
+  palette:'<path d="M12 3.5a8.5 8.5 0 100 17c1.1 0 1.7-.7 1.7-1.6 0-1.2-1-1.5-1-2.5 0-1 .8-1.6 1.8-1.6H17a3.5 3.5 0 003.5-3.5c0-4.3-3.8-7.8-8.5-7.8z"/><circle cx="7.8" cy="11.2" r="1"/><circle cx="10.6" cy="7.6" r="1"/><circle cx="15.2" cy="8.2" r="1"/>',
+  app:'<rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/>',
+  a11y:'<circle cx="12" cy="4.8" r="1.6"/><path d="M5 8.6l7 1.4 7-1.4M12 10v4.6M12 14.6l-3 6M12 14.6l3 6"/>',
+  dice:'<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 7.6l-4.8 7.8h9.6z"/>',
+  flask:'<path d="M9 3h6M10 3v6l-5 9a2 2 0 001.8 3h10.4a2 2 0 001.8-3l-5-9V3M7.5 15h9"/>',
+  save:'<path d="M5 4h11l3 3v13H5z"/><path d="M8 4v5h7V4M8 20v-6h8v6"/>',
+  restore:'<path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 010 12h-3"/>',
+  image:'<rect x="3.5" y="5" width="17" height="14" rx="2.5"/><circle cx="9" cy="10" r="1.6"/><path d="M20.5 15.5L16 11l-8 8"/>',
+  megaphone:'<path d="M4 10v4h3l7 4V6l-7 4zM17.5 9a4 4 0 010 6"/>',
+  book:'<path d="M4 5.5A1.5 1.5 0 015.5 4H10a2 2 0 012 2 2 2 0 012-2h4.5A1.5 1.5 0 0120 5.5V18a1 1 0 01-1 1h-5a2 2 0 00-2 2 2 2 0 00-2-2H5a1 1 0 01-1-1z"/>',
+  up:'<path d="M12 19V5M6 11l6-6 6 6"/>',
+  user:'<circle cx="12" cy="8" r="4"/><path d="M4.5 20.5a7.5 7.5 0 0115 0"/>',
+  checkall:'<rect x="4" y="4" width="16" height="16" rx="3.5"/><path d="M8.5 12l2.5 2.5 4.5-5"/>',
+  calc:'<rect x="4.5" y="3" width="15" height="18" rx="3"/><path d="M8 7.5h8M8.5 12.5h.01M12 12.5h.01M15.5 12.5h.01M8.5 16h.01M12 16h.01M15.5 16h.01"/>',
+  skull:'<path d="M12 3a7.5 7.5 0 00-7.5 7.5c0 2.4 1.1 4.5 2.9 5.9V19a1 1 0 001 1h7.2a1 1 0 001-1v-2.6c1.8-1.4 2.9-3.5 2.9-5.9A7.5 7.5 0 0012 3z"/><circle cx="9" cy="11" r="1.6"/><circle cx="15" cy="11" r="1.6"/><path d="M10.5 20v-2.5M13.5 20v-2.5"/>',
+};
+const bi=n=>`<svg class="bi" viewBox="0 0 24 24" aria-hidden="true">${BI_PATH[n]||''}</svg>`;
 /* ====================== Категории и подкатегории ====================== */
 const ASSIM_CATS = [
   {id:'character', label:'Персонаж', type:'cards', subs:[
@@ -6220,19 +6275,20 @@ function updateOnboard(){
   el.hidden=false;
   // кнопки записи нет, пока в сеттинге нет анонса (updateNextGame) — не отсылаем к пустому месту
   const su=document.getElementById('signupBtn');
-  const signup=(su && !su.hidden) ? 'кнопка «Записаться на игру» выше.' : 'кнопка «Записаться на игру» появится выше, когда Мастер анонсирует игру.';
+  const signup=(su && !su.hidden) ? 'кнопка «Записаться на игру» выше.' : 'кнопка появится выше, когда Мастер анонсирует игру.';
+  // кнопки — в карточке, поэтому M: главная L на экране одна — «Записаться на игру»
   el.innerHTML=`<div class="ob-card">
     <button class="ob-x" onclick="obDismiss()" aria-label="Скрыть">✕</button>
     <div class="ob-title">С чего начать</div>
     <ol class="ob-steps">
-      <li><b>Создай аккаунт</b> — персонажи и записи на игры привязаны к профилю.</li>
-      <li><b>Собери персонажа</b> — калькулятор характеристик всё посчитает сам.</li>
+      <li><b>Создай аккаунт</b> — в нём персонажи и записи.</li>
+      <li><b>Собери персонажа</b> — статы посчитает калькулятор.</li>
       <li><b>Запишись на игру</b> — ${signup}</li>
-      <li><b>Включи уведомления</b> — в профиле (кнопка с буквой твоего имени), чтобы не пропустить новые игры.</li>
+      <li><b>Включи уведомления</b> — в профиле.</li>
     </ol>
     <div class="row">
-      <button class="btn primary" onclick="openAuth('register')">Создать аккаунт</button>
-      <button class="btn ghost" onclick="go('players');openStatCalc()">Калькулятор</button>
+      <button class="btn primary sm" onclick="openAuth('register')">Создать аккаунт</button>
+      <button class="btn ghost sm" onclick="go('players');openStatCalc()">${bi('calc')}Калькулятор</button>
     </div></div>`;
   // новичку один раз подсвечиваем, что название сеттинга в шапке — переключатель
   if(typeof obSpotlight==='function') obSpotlight();
@@ -6554,7 +6610,7 @@ function renderStory(){
     <div id="storyBody" class="chrono-body${ADMIN?' editing':''}"${ADMIN?' contenteditable="true"':''}>${sanitizeHTML(html)}</div>
     ${(!html && !ADMIN)?`<div class="ph">РАЗДЕЛ В РАЗРАБОТКЕ<span>Здесь появится история мира ${esc(PROJECT_TITLES[CUR_PROJECT].replace(/<[^>]*>/g,''))}.</span></div>`:''}
     ${ADMIN?`<div class="chrono-tools">
-      <button class="btn ghost" onclick="storyImg()">+ Фото</button>
+      <button class="btn ghost" onclick="storyImg()">＋ Фото</button>
       <button class="btn primary" onclick="storySave()">Сохранить</button>
     </div>
     <input type="file" id="storyFile" accept="image/*" hidden onchange="storyImgPick(this)">`:''}`;
@@ -7112,7 +7168,7 @@ function openChronoGame(camp, id){
     <div class="top">${rune('history',24)}<span class="clabel">${esc(CHRONO_NAMES[camp]||camp)} · игра</span></div>
     <div class="cg-edithead">
       <div class="field" style="flex:1;margin:0"><label>Название</label><input id="cg-title" maxlength="80" value="${esc(g.title||'')}"></div>
-      <button class="btn primary cg-announce" onclick="announceChronoGame()" title="Анонсировать">📣 Анонсировать</button>
+      <button class="btn primary cg-announce" onclick="announceChronoGame()" title="Анонсировать">${bi('megaphone')}Анонсировать</button>
     </div>
     ${g.played?'<div class="cg-done-line">✓ Игра пройдена</div>':''}
     <div class="row">
@@ -7191,7 +7247,7 @@ function openTagPicker(){
   EDIT_DRAFT = ceSnapshot();   // сохраняем уже введённые поля, чтобы возврат из пикера их не стёр
   const m=document.getElementById('modal');
   m.dataset.back='card';
-  m.innerHTML=`<button class="x" onclick="closeTagPicker()">✕</button>
+  m.innerHTML=`<button class="x" onclick="closeTagPicker()" aria-label="Закрыть">✕</button>
     <h2 style="font-family:var(--f-disp);color:var(--txt);margin-bottom:12px">Теги</h2>
     <div class="field"><input id="tagq" placeholder="Поиск или новый тег…" autocomplete="off" oninput="renderTagList(this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();addTagFromInput();}"></div>
     <div id="tagList" class="at-list"></div>
@@ -7208,7 +7264,7 @@ function renderTagList(q){
     return `<button class="at-item${on?' on':''}" data-tag="${esc(t)}" onclick="toggleTagEl(this)"><span class="at-t">#${esc(t)}</span><span class="at-c">${on?'✓':''}</span></button>`;
   }).join('');
   if(q && !allTags().some(t=>t.toLowerCase()===q)){
-    html = `<button class="at-item new" onclick="addTagFromInput()"><span class="at-t">+ Создать «${esc(q)}»</span></button>` + html;
+    html = `<button class="at-item new" onclick="addTagFromInput()"><span class="at-t">＋ Создать «${esc(q)}»</span></button>` + html;
   }
   el.innerHTML = html || '<div class="chat-empty" style="padding:18px;text-align:center;color:var(--muted)">Ничего не найдено</div>';
 }
@@ -7277,7 +7333,7 @@ function openCardEditor(id){
   const defCat = (!e && !returning && activeCat!=='all' && cardCats.some(c=>c.id===activeCat)) ? activeCat : '';
   const defSub = (!e && !returning && defCat && activeSub) ? activeSub : '';
   const m=document.getElementById('modal');
-  m.innerHTML=`<button class="x" onclick="closeModal()">✕</button>
+  m.innerHTML=`<button class="x" onclick="closeModal()" aria-label="Закрыть">✕</button>
     <h2 style="font-family:var(--f-disp);color:var(--txt);margin-bottom:14px">${e?'Карточка':'Новая карточка'}</h2>
     <div class="field"><label>Категория</label><select id="ce-cat" onchange="onCatChangeEd()">${cardCats.map(c=>`<option value="${c.id}"${(e?e.cat===c.id:(defCat&&defCat===c.id))?' selected':''}>${c.label}</option>`).join('')}</select></div>
     <div class="field"><label>Подкатегория</label><select id="ce-sub" onchange="ceToggleStat()"></select></div>
@@ -7287,19 +7343,19 @@ function openCardEditor(id){
     <div class="field"><label>Изображение</label>
       <div class="ce-imgrow">
         <span class="ce-thumb" id="ceThumb">${EDIT_IMG?imgTag(EDIT_IMG,''):''}</span>
-        <button class="btn ghost" onclick="document.getElementById('ceFile').click()">Выбрать</button>
-        <button class="btn ghost" onclick="ceImgClear()">Убрать</button>
+        <button class="btn ghost sm" onclick="document.getElementById('ceFile').click()">Выбрать</button>
+        <button class="btn ghost sm" onclick="ceImgClear()">Убрать</button>
       </div>
       <input type="file" id="ceFile" accept="image/*" hidden onchange="ceImgPick(this)">
     </div>
-    <div class="field"><label>Значок (слева от названия)</label>
+    <div class="field"><label>Значок</label>
       <input id="ceIcoQ" class="ico-q" type="search" placeholder="Найти значок" autocomplete="off" oninput="ceIcoFilter(this.value)">
       <div class="ico-grid" id="ceIcoGrid">${ceIcoGridHtml()}</div>
     </div>
     <div class="field"><label>Описание</label><textarea id="ce-body" rows="5">${e?esc(e.body||''):''}</textarea></div>
     <div class="field"><label>Досье</label>
       <div id="ceRows"></div>
-      <button class="btn ghost" style="width:100%;margin-top:8px" onclick="ceAddRow()">+ Поле</button>
+      <button class="btn ghost" style="width:100%;margin-top:8px" onclick="ceAddRow()">＋ Поле</button>
     </div>
     <div class="field" id="ce-statwrap" style="display:none"><label>Статблок</label>
       <div class="dstat-grid">${DEITY_STAT_FIELDS.map(([k,lbl])=>`<div class="dstat"><label>${lbl}</label><input id="ces-${k}" maxlength="80" value="${esc((CE_STAT&&CE_STAT[k])||'')}"></div>`).join('')}</div>
@@ -7310,19 +7366,19 @@ function openCardEditor(id){
       <div class="field"><label>Форма правления</label><input id="cel-gov" maxlength="80" placeholder="напр. монархия, совет" value="${esc((CE_LOC&&CE_LOC.gov)||'')}"></div>
       <div class="field"><label>Быстрые разделы локации</label>
         <div class="row" style="gap:6px;flex-wrap:wrap">
-          <button class="btn ghost sm" type="button" onclick="ceAddSec('Устройство','')">+ Устройство</button>
-          <button class="btn ghost sm" type="button" onclick="ceAddSec('Что искать','')">+ Что искать</button>
-          <button class="btn ghost sm" type="button" onclick="ceAddSec('Опасности','')">+ Опасности</button>
+          <button class="btn ghost sm" type="button" onclick="ceAddSec('Устройство','')">＋ Устройство</button>
+          <button class="btn ghost sm" type="button" onclick="ceAddSec('Что искать','')">＋ Что искать</button>
+          <button class="btn ghost sm" type="button" onclick="ceAddSec('Опасности','')">＋ Опасности</button>
         </div>
       </div>
     </div>
     <div class="field"><label>Разделы карточки</label>
       <div id="ceSecs"></div>
-      <button class="btn ghost" style="width:100%;margin-top:8px" type="button" onclick="ceAddSec('','')">+ Добавить раздел</button>
+      <button class="btn ghost" style="width:100%;margin-top:8px" type="button" onclick="ceAddSec('','')">＋ Раздел</button>
     </div>
     <div class="field"><label>Теги</label>
       <div class="tagbox" id="ceTagBox"></div>
-      <button class="btn ghost" style="width:100%;margin-top:8px" onclick="openTagPicker()">+ Выбрать теги</button>
+      <button class="btn ghost" style="width:100%;margin-top:8px" onclick="openTagPicker()">Теги…</button>
       <input type="hidden" id="ce-tags" value="${e?esc((e.tags||[]).join(', ')):''}">
     </div>
     <div class="chrono-tools">
@@ -7376,14 +7432,14 @@ function ceRestore(d){
 function ceAddSec(h,t){
   const w=document.getElementById('ceSecs'); if(!w) return;
   const d=document.createElement('div'); d.className='ce-sec';
-  d.innerHTML=`<div class="ce-sec-top"><input class="ce-sh" placeholder="Заголовок раздела" maxlength="40" value="${esc(h||'')}"><button class="ce-x" onclick="this.closest('.ce-sec').remove()">✕</button></div>`+
+  d.innerHTML=`<div class="ce-sec-top"><input class="ce-sh" placeholder="Заголовок раздела" maxlength="40" value="${esc(h||'')}"><button class="ce-x" onclick="this.closest('.ce-sec').remove()" aria-label="Убрать">✕</button></div>`+
     `<textarea class="ce-st" rows="3" placeholder="Текст раздела">${esc(t||'')}</textarea>`;
   w.appendChild(d);
 }
 function ceAddRow(k,v){
   const w=document.getElementById('ceRows'); if(!w) return;
   const d=document.createElement('div'); d.className='ce-row';
-  d.innerHTML=`<input class="ce-k" placeholder="Поле" maxlength="30" value="${esc(k||'')}"><input class="ce-v" placeholder="Значение" maxlength="140" value="${esc(v||'')}"><button class="ce-x" onclick="this.parentNode.remove()">✕</button>`;
+  d.innerHTML=`<input class="ce-k" placeholder="Поле" maxlength="30" value="${esc(k||'')}"><input class="ce-v" placeholder="Значение" maxlength="140" value="${esc(v||'')}"><button class="ce-x" onclick="this.parentNode.remove()" aria-label="Убрать">✕</button>`;
   w.appendChild(d);
 }
 function ceImgPick(inp){
@@ -7730,7 +7786,7 @@ function renderNews(){
 function openNews(id){
   const n=NEWS.find(x=>x.id===id); if(!n) return;
   const m=document.getElementById('modal');
-  m.innerHTML=`<button class="x" onclick="closeModal()">✕</button>
+  m.innerHTML=`<button class="x" onclick="closeModal()" aria-label="Закрыть">✕</button>
     <div class="news-full">
       ${n.img?`<div class="nimg-full">${imgTag(n.img)}</div>`:''}
       <div class="kicker" style="margin-bottom:6px">${fmtDate(n.date)}</div>
@@ -7746,14 +7802,14 @@ function openNewsEditor(id){
   const n=id?NEWS.find(x=>x.id===id):null;
   NEWS_IMG=(n&&n.img)||'';
   const m=document.getElementById('modal');
-  m.innerHTML=`<button class="x" onclick="closeModal()">✕</button>
+  m.innerHTML=`<button class="x" onclick="closeModal()" aria-label="Закрыть">✕</button>
     <h2 style="font-family:var(--f-disp);color:var(--txt);margin-bottom:14px">${n?'Новость':'Новая новость'}</h2>
     <div class="field" id="nw-f-title"><label>Заголовок <span class="req">*</span></label><input id="nw-title" maxlength="120" value="${n?esc(n.title):''}"><div class="err">Укажите заголовок</div></div>
     <div class="field"><label>Фото</label>
       <div class="ce-imgrow">
         <span class="ce-thumb" id="nwThumb">${NEWS_IMG?imgTag(NEWS_IMG,''):''}</span>
-        <button class="btn ghost" onclick="document.getElementById('nwFile').click()">Выбрать</button>
-        <button class="btn ghost" onclick="nwImgClear()">Убрать</button>
+        <button class="btn ghost sm" onclick="document.getElementById('nwFile').click()">Выбрать</button>
+        <button class="btn ghost sm" onclick="nwImgClear()">Убрать</button>
       </div>
       <input type="file" id="nwFile" accept="image/*" hidden onchange="nwImgPick(this)">
     </div>
@@ -8214,7 +8270,8 @@ function gsCardHtml(s, past){
   const left=seatsLeft(s), mine=myEntry(s), live=!!trkLiveBoardOfGame(s.id);
   const players=(s.players||[]).map((p,i)=>gsAvaHtml(p,i,s.id)).join('');
   let act;
-  if(mine) act=`<button class="btn ghost sm" onclick="cancelSignup('${s.id}')">Вы записаны — отменить</button>`;
+  // статус — плашкой, отмена — тихой кнопкой рядом: «Вы записаны — отменить» читалось как одно действие
+  if(mine) act=`<span class="st-ok">✓ Вы записаны</span><button class="btn quiet sm" onclick="cancelSignup('${s.id}')">Отменить запись</button>`;
   else if(left<=0) act='<span class="badge">Мест нет</span>';
   else if(!SESSION) act=`<button class="btn primary sm" onclick="toast('Запись доступна после входа');openAccessModal(null,'account')">Войти и записаться</button>`;
   else act=`<button class="btn primary sm" onclick="openSignupForm('${s.id}')">Записаться</button>`;
@@ -8248,7 +8305,7 @@ function openSignupForm(id){
     <h2>${esc(s.title||'Сессия')}</h2>
     <div class="field" id="gs-f-name"><label>Ваше имя <span class="req">*</span></label><input id="gs-name" maxlength="40" value="${esc((mine&&mine.name)||profName(SESSION))}"></div>
     <div class="field"><label>Персонаж</label><select id="gs-char">
-      <option value="">Без персонажа (пока)</option>
+      <option value="">Без персонажа</option>
       ${myChars.map(c=>`<option value="${c.id}"${c.id===selId?' selected':''}>${esc(c.name)}${c.role?` — ${esc(roleLabel(c))}`:''}</option>`).join('')}
     </select></div>
     ${myChars.length?'':`<p class="note">В игре ${esc(gameTitle(s.game))} у вас пока нет персонажей — создать можно в разделе «Игроки».</p>`}
@@ -8340,7 +8397,7 @@ function openSchedule(game){
   const allowed = isDev() ? visibleProjects() : ['classic'].filter(g=>projectVisible(g));
   if(!allowed.length){ toast('Нет открытых сеттингов для анонса'); return; }
   // кнопка на новостях передаёт текущий сеттинг: без него расписание открывалось на прошлом выборе
-  // (по умолчанию TERRA), и «+ Ячейка сессии» из LEGACY создавала игру в TERRA
+  // (по умолчанию TERRA), и «＋ Новая игра» из LEGACY создавала игру в TERRA
   if(game && allowed.includes(game)) SCHED_GAME=game;
   if(!allowed.includes(SCHED_GAME)) SCHED_GAME=allowed[0];
   const chips=allowed.map(g=>`<button class="sp-cls${SCHED_GAME===g?' on':''}" onclick="openSchedule('${g}')">${esc(gameTitle(g))}</button>`).join('');
@@ -8357,7 +8414,7 @@ function openSchedule(game){
         ${s.price?`<span>💳 ${esc(s.price)}</span>`:''}
         <span>Свободно: ${seatsLeft(s)} из ${esc(String(s.seats||0))}</span>
       </div>
-      ${(s.players||[]).length?`<div class="gs-players">${s.players.map((p,i)=>`<span class="tag">${esc(p.name)}${p.charId?` · <button class="gs-charlink" onclick="openPlayer('${p.charId}')">${esc(p.charName||'персонаж')}</button>`:(p.charName?` · ${esc(p.charName)}`:'')} <button class="gs-kick" onclick="kickPlayer('${s.id}',${i})" title="Убрать">✕</button></span>`).join('')}</div>`:'<div class="opt">Записей пока нет</div>'}
+      ${(s.players||[]).length?`<div class="gs-players">${s.players.map((p,i)=>`<span class="tag">${esc(p.name)}${p.charId?` · <button class="gs-charlink" onclick="openPlayer('${p.charId}')">${esc(p.charName||'персонаж')}</button>`:(p.charName?` · ${esc(p.charName)}`:'')} <button class="gs-kick" onclick="kickPlayer('${s.id}',${i})" title="Убрать игрока" aria-label="Убрать игрока">✕</button></span>`).join('')}</div>`:'<div class="opt">Записей пока нет</div>'}
       <div class="gs-act">
         <button class="btn ghost sm" onclick="openCellEditor('${s.id}')">Редактировать</button>
         <button class="btn primary sm" onclick="gamePlayed(this.dataset.id,this)" data-id="${esc(s.id)}">Игра сыграна</button>
@@ -8369,7 +8426,7 @@ function openSchedule(game){
     <div class="top">${rune('history',24)}<span class="clabel">Расписание игр</span></div>
     <h2>Расписание игр</h2>
     <div class="sp-clsrow" style="margin-bottom:12px">${chips}</div>
-    <button class="btn primary" style="width:100%;margin-bottom:12px" onclick="openCellEditor(null)">+ Ячейка сессии</button>
+    <button class="btn primary" style="width:100%;margin-bottom:12px" onclick="openCellEditor(null)">＋ Новая игра</button>
     ${body}`;
   document.getElementById('scrim').classList.add('open');
 }
@@ -8437,8 +8494,8 @@ function openCellEditor(id){
       <div class="field"><label>Время проведения</label><input id="gc-time" maxlength="60" placeholder="18:00" value="${s?esc(s.time||''):''}"></div>
     </div>
     ${!s ? (projLevel(SCHED_GAME)==='all'
-      ? `<label class="ck-line" style="margin-bottom:6px"><input type="checkbox" id="gc-notify" checked> 🔔 Оповестить подписчиков о новой игре</label>`
-      : `<p class="note" style="margin:0 0 8px">🔕 ${esc(gameTitle(SCHED_GAME))} скрыт от игроков — оповещение не отправляется</p>`) : ''}
+      ? `<label class="ck-line" style="margin-bottom:6px"><input type="checkbox" id="gc-notify" checked> Оповестить игроков</label>`
+      : `<p class="note" style="margin:0 0 8px">Сеттинг скрыт — без оповещения</p>`) : ''}
     <div class="pacts">
       <button class="btn primary" onclick="saveCell(${s?`'${s.id}'`:'null'})">Сохранить</button>
       <button class="btn ghost" onclick="openSchedule()">Назад</button>
@@ -8632,42 +8689,22 @@ function devToggleAdmin(){
   toast(ADMIN ? 'Game Master: включён' : 'Game Master: выключен');
 }
 function admClick(){ openAccessModal(null,'account'); }
-/* меню «@»: только аккаунт — уровни доступа и пароли разделов упразднены */
+/* меню «@» — то же окно входа, что и openAuth (раньше было два разных: без заголовка и кнопки столбиком —
+   и с заголовком и кнопками в ряд). С сессией аккаунтом управляют в карточке профиля */
 function openAccessModal(hint, tab){
-  let accountPane;
-  if(SESSION){
-    accountPane = `<div class="acc-me"><div class="kicker" style="margin-bottom:4px">Вы вошли как</div><div class="acc-tag">${esc(dispTag(SESSION))}</div></div>
-      <button class="btn ghost" data-push style="width:100%;margin-top:12px" onclick="pushToggle()">Уведомления о новых играх</button>
-      <button class="btn ghost" style="width:100%;margin-top:8px" onclick="logout();closeModal()">Выйти из аккаунта</button>`;
-  } else {
-    accountPane = `<div class="field" id="au-f-tag"><label>Логин <span class="req">*</span></label>
-        <input id="au-tag" maxlength="32" placeholder="login" autocapitalize="off" autocomplete="username" spellcheck="false"><div class="err">Логин: 4–32 символа — латиница, цифры или _</div></div>
-      <div class="field" id="au-f-pass"><label>Пароль <span class="req">*</span></label>
-        <input id="au-pass" type="password" maxlength="100" autocomplete="current-password" onkeydown="if(event.key==='Enter')authSubmit()"><div class="err">Минимум 8 символов</div></div>
-      <div class="field" id="au-f-pass2" hidden><label>Повторите пароль <span class="req">*</span></label>
-        <input id="au-pass2" type="password" maxlength="100" autocomplete="new-password" onkeydown="if(event.key==='Enter')authSubmit()"><div class="err">Пароли не совпадают</div></div>
-      <label class="au-agree" id="au-f-agree" hidden><input type="checkbox" id="au-agree"><span>Я ознакомлен(а) и согласен(на) с <button type="button" class="lnk" onclick="openPolicy(true)">политикой и условиями</button> и <button type="button" class="lnk" onclick="openTerms(true)">условиями платных игр</button>.</span></label>
-      <button class="btn primary" style="width:100%;margin-top:6px" id="auSubmit" onclick="authSubmit()">Войти</button>
-      <button class="btn ghost" style="width:100%;margin-top:8px" id="auToggle" onclick="toggleAuthMode()">Создать аккаунт</button>
-      <p class="note" style="margin-top:10px">Вход по логину и паролю работает на любом устройстве. Не используйте здесь пароль от важных сервисов.</p>`;
-  }
-  const m=document.getElementById('modal');
-  m.innerHTML=`<button class="x" onclick="closeModal()">✕</button>
-    ${hint?`<p class="note" style="margin-bottom:10px">${hint}</p>`:''}
-    <div id="accPane-account">${accountPane}</div>`;
-  document.getElementById('scrim').classList.add('open');
-  AUTH_MODE='login';
-  if(SESSION && typeof pushRenderBtn==='function') pushRenderBtn();
-  setTimeout(()=>{ const t=pf('au-tag'); if(t) t.focus(); },60);
+  if(SESSION){ openProfileCard(); return; }
+  openAuth('login', hint);
 }
 let AUTH_MODE='login';
+/* режим меняется на месте: набранный логин и пароль не теряются */
 function toggleAuthMode(){
   AUTH_MODE = AUTH_MODE==='login'?'register':'login';
   const reg=AUTH_MODE==='register';
   const p2=document.getElementById('au-f-pass2'); if(p2) p2.hidden=!reg;
   const ag=document.getElementById('au-f-agree'); if(ag){ ag.hidden=!reg; if(!reg) ag.classList.remove('invalid'); }
-  const sb=document.getElementById('auSubmit'); if(sb) sb.textContent=reg?'Зарегистрироваться':'Войти';
-  const tg=document.getElementById('auToggle'); if(tg) tg.textContent=reg?'У меня есть аккаунт':'Создать аккаунт';
+  const h=document.getElementById('auTitle'); if(h) h.textContent=reg?'Регистрация':'Вход';
+  const sb=document.getElementById('auSubmit'); if(sb) sb.textContent=reg?'Создать аккаунт':'Войти';
+  const tg=document.getElementById('auToggle'); if(tg) tg.textContent=reg?'Уже есть аккаунт':'Создать аккаунт';
   const pw=pf('au-pass'); if(pw) pw.setAttribute('autocomplete', reg?'new-password':'current-password');
 }
 function authSubmit(){ if(AUTH_MODE==='register') doRegister(); else doLogin(); }
@@ -8675,15 +8712,15 @@ function openChronoBranch(camp,branch){
   if(!hasChronoAccess(camp)) return;
   const key=camp+':'+branch, html=CHRONO_DATA[key]||'';
   const m=document.getElementById('modal');
-  m.innerHTML=`<button class="x" onclick="closeModal()">✕</button>
+  m.innerHTML=`<button class="x" onclick="closeModal()" aria-label="Закрыть">✕</button>
     <div class="kicker" style="margin-bottom:6px">${esc(CHRONO_NAMES[camp]||'')}</div>
     <h2 style="font-family:var(--f-disp);color:var(--txt);text-transform:uppercase;letter-spacing:.06em;margin-bottom:16px">${esc(branch)}</h2>
     <div id="chronoBody" class="chrono-body${ADMIN?' editing':''}"${ADMIN?' contenteditable="true"':''}>${sanitizeHTML(html)}</div>
     ${(!html && !ADMIN)?'<div class="empty">Раздел в разработке. Материалы появятся позже.</div>':''}
     ${ADMIN?`<div class="chrono-tools">
-      <button class="btn ghost" onclick="chronoImg()">+ Фото</button>
+      <button class="btn ghost" onclick="chronoImg()">＋ Фото</button>
       <button class="btn primary" onclick="chronoSave('${camp}','${branch}')">Сохранить</button>
-      <button class="btn ghost" onclick="exportSite()">Скачать данные (zip)</button>
+      <button class="btn ghost" onclick="exportSite()">${bi('download')}Скачать архив</button>
     </div>
     <input type="file" id="chronoFile" accept="image/*" hidden onchange="chronoImgPick(this)">`:''}`;
   document.getElementById('scrim').classList.add('open');
@@ -8953,10 +8990,9 @@ function openProfileCard(){
       <div class="pc-idn"><div class="nm" id="pcName">${esc(profName(SESSION)||dispTag(SESSION))}</div><div class="lg">@${esc(dispTag(SESSION))}</div></div>
     </div>
     <div class="field" style="margin-bottom:11px"><input id="pc-name" maxlength="40" placeholder="Имя" value="${esc(p.name||'')}" oninput="pcName(this.value)"></div>
-    <button type="button" class="pc-adapt-row" id="pcAdaptRow" role="switch" aria-checked="${PROF_TMP.adapt}" onclick="pcAdapt()" style="display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;cursor:pointer;background:rgba(0,0,0,.22);border:var(--hair) solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px;color:inherit;font:inherit;text-align:left">
-      <span style="font-family:var(--f-disp);font-weight:600">Адаптировать под сеттинг</span>
-      <span class="set-sw${PROF_TMP.adapt?' on':''}" id="pcAdaptSw"></span>
-    </button>
+    <div class="set-grp pc-adapt"><button type="button" class="set-row" id="pcAdaptRow" role="switch" aria-checked="${PROF_TMP.adapt}" onclick="pcAdapt()">
+      <span class="ri">${bi('palette')}</span><span class="rl">Цвет сеттинга</span><span class="set-sw${PROF_TMP.adapt?' on':''}" id="pcAdaptSw"></span>
+    </button></div>
     <div id="pcManual"${PROF_TMP.adapt?' class="pc-off" inert':''}>
       <div class="pc-presets">${presetHtml}<button type="button" class="pc-preset more" onclick="pcMore()" title="Свои цвета" aria-label="Свои цвета" aria-expanded="false">+</button></div>
       <div id="pcCustom" hidden>
@@ -8966,13 +9002,13 @@ function openProfileCard(){
     </div>
     <button class="btn primary" style="width:100%;margin-top:14px" onclick="pcSave()">Сохранить</button>
     <div class="set-grp pc-acts">
-      <button class="set-row" onclick="openBookmarks()"><span class="ri">🔖</span><span class="rl">Закладки</span>${CHEV}</button>
-      <button class="set-row" onclick="pushToggle()"><span class="ri">🔔</span><span class="rl">Уведомления о новых играх<small id="pushNote">Пуш при анонсе сессии</small></span><span class="set-sw" id="pushBtn"></span></button>
-      <button class="set-row" onclick="openPassChange()"><span class="ri">🔒</span><span class="rl">Сменить пароль</span>${CHEV}</button>
-      <button class="set-row" onclick="editUserData()"><span class="ri">✏️</span><span class="rl">Сменить логин<small>Через администратора</small></span>${CHEV}</button>
-      <button class="set-row" onclick="closeModal();logout()"><span class="ri">🚪</span><span class="rl">Выйти</span></button>
+      <button class="set-row" onclick="openBookmarks()"><span class="ri">${bi('bookmark')}</span><span class="rl">Закладки</span>${CHEV}</button>
+      <button class="set-row" onclick="pushToggle()"><span class="ri">${bi('bell')}</span><span class="rl">Уведомления<small id="pushNote" class="warn" hidden></small></span><span class="set-sw" id="pushBtn"></span></button>
+      <button class="set-row" onclick="openPassChange()"><span class="ri">${bi('lock')}</span><span class="rl">Пароль</span>${CHEV}</button>
+      <button class="set-row" onclick="editUserData()" title="Сменить логин — через администратора"><span class="ri">${bi('ext')}</span><span class="rl">Логин</span><span class="ext" aria-hidden="true">↗</span></button>
+      <button class="set-row" onclick="closeModal();logout()"><span class="ri">${bi('logout')}</span><span class="rl">Выйти</span></button>
     </div>
-    <div class="set-grp pc-del" id="pcDel" hidden><button class="set-row" onclick="openAccDelete()">Удалить аккаунт</button></div>`;
+    <div class="set-grp pc-del" id="pcDel" hidden><button class="set-row danger" onclick="openAccDelete()"><span class="ri">${bi('trash')}</span><span class="rl">Удалить аккаунт</span></button></div>`;
   document.getElementById('scrim').classList.add('open');
   if(typeof pushRenderBtn==='function') pushRenderBtn();
   // удаление — только игроку и только если облако его умеет (API 4); у команды аккаунт привязан к правам сервера
@@ -9075,7 +9111,7 @@ function openAccDelete(){
     <div class="field" id="ad-f-pass"><label>Пароль</label>
       <input id="ad-pass" type="password" maxlength="100" autocomplete="current-password" oninput="accDelCheck()" onkeydown="if(event.key==='Enter')accDelete()"><div class="err">Неверный пароль</div></div>
     <div class="pacts">
-      <button class="btn danger" id="adGo" disabled onclick="accDelete()">Удалить навсегда</button>
+      <button class="btn danger fill" id="adGo" disabled onclick="accDelete()">Удалить</button>
       <button class="btn ghost" onclick="closeOverlay()">Отмена</button>
     </div>`;
   document.getElementById('scrim2').classList.add('open');
@@ -9218,7 +9254,7 @@ function renderAcct(){
     if(SESSION){
       el.innerHTML = `<span class="acct-who">Вы вошли как <b>${esc(dispTag(SESSION))}</b></span><button class="btn ghost sm" onclick="logout()">Выйти</button>`;
     } else {
-      el.innerHTML = `<span class="acct-actions"><button class="btn primary sm" onclick="openAccessModal(null,'account')">Войти</button><button class="btn ghost sm" onclick="openAccessModal(null,'account');setTimeout(toggleAuthMode,80)">Регистрация</button></span>`;
+      el.innerHTML = `<span class="acct-actions"><button class="btn primary sm" onclick="openAccessModal(null,'account')">Войти</button><button class="btn ghost sm" onclick="openAuth('register')">Регистрация</button></span>`;
     }
   }
   renderAvatarBtn();
@@ -9229,25 +9265,26 @@ function renderAvatarBtn(){
   if(SESSION){ b.textContent=profInitial(SESSION); b.style.background=profBg(SESSION); b.style.color=profInk(SESSION); b.title='Профиль · '+dispTag(SESSION); b.setAttribute('aria-label','Профиль'); }
   else { b.textContent='?'; b.style.background='var(--surface2)'; b.style.color='var(--dim)'; b.title='Войти'; b.setAttribute('aria-label','Войти'); }   // --dim, как в шторке: --muted на круге не добирал контраста
 }
-function openAuth(mode){
-  const reg = mode==='register';
+function openAuth(mode, hint){
   document.getElementById('modal').innerHTML = `
     <button class="x" onclick="closeModal()" aria-label="Закрыть">✕</button>
-    <div class="top">${rune('character',24)}<span class="clabel">${reg?'Регистрация':'Вход'}</span></div>
-    <h2>${reg?'Создать аккаунт':'Войти в аккаунт'}</h2>
+    <div class="top">${rune('character',24)}<span class="clabel">Аккаунт</span></div>
+    <h2 id="auTitle">Вход</h2>
+    ${hint?`<p class="note" style="margin:0 0 12px">${hint}</p>`:''}
     <div class="field" id="au-f-tag"><label>Логин <span class="req">*</span></label>
       <input id="au-tag" maxlength="32" placeholder="login" autocapitalize="off" autocomplete="username" spellcheck="false"><div class="err">Логин: 4–32 символа — латиница, цифры или _</div></div>
     <div class="field" id="au-f-pass"><label>Пароль <span class="req">*</span></label>
-      <input id="au-pass" type="password" maxlength="100" autocomplete="${reg?'new-password':'current-password'}" onkeydown="if(event.key==='Enter')${reg?'doRegister()':'doLogin()'}"><div class="err">Минимум 8 символов</div></div>
-    ${reg?`<div class="field" id="au-f-pass2"><label>Повторите пароль <span class="req">*</span></label>
-      <input id="au-pass2" type="password" maxlength="100" autocomplete="new-password" onkeydown="if(event.key==='Enter')doRegister()"><div class="err">Пароли не совпадают</div></div>
-    <label class="au-agree" id="au-f-agree"><input type="checkbox" id="au-agree"><span>Я ознакомлен(а) и согласен(на) с <button type="button" class="lnk" onclick="openPolicy(true)">политикой и условиями</button> и <button type="button" class="lnk" onclick="openTerms(true)">условиями платных игр</button>.</span></label>`:''}
-    <div class="pacts">
-      <button class="btn primary" onclick="${reg?'doRegister()':'doLogin()'}">${reg?'Зарегистрироваться':'Войти'}</button>
-      <button class="btn ghost" onclick="openAuth('${reg?'login':'register'}')">${reg?'У меня есть аккаунт':'Создать аккаунт'}</button>
+      <input id="au-pass" type="password" maxlength="100" autocomplete="current-password" onkeydown="if(event.key==='Enter')authSubmit()"><div class="err">Минимум 8 символов</div></div>
+    <div class="field" id="au-f-pass2" hidden><label>Повторите пароль <span class="req">*</span></label>
+      <input id="au-pass2" type="password" maxlength="100" autocomplete="new-password" onkeydown="if(event.key==='Enter')authSubmit()"><div class="err">Пароли не совпадают</div></div>
+    <label class="au-agree" id="au-f-agree" hidden><input type="checkbox" id="au-agree"><span>Я ознакомлен(а) и согласен(на) с <button type="button" class="lnk" onclick="openPolicy(true)">политикой и условиями</button> и <button type="button" class="lnk" onclick="openTerms(true)">условиями платных игр</button>.</span></label>
+    <div class="au-acts">
+      <button class="btn primary" id="auSubmit" onclick="authSubmit()">Войти</button>
+      <button class="btn quiet" id="auToggle" onclick="toggleAuthMode()">Создать аккаунт</button>
     </div>
-    <p class="note">Вход по логину и паролю работает на любом устройстве. Не используйте здесь пароль от важных сервисов.</p>`;
+    <p class="note">Не используйте пароль от важных сервисов.</p>`;
   document.getElementById('scrim').classList.add('open');
+  AUTH_MODE='login'; if(mode==='register') toggleAuthMode();
   setTimeout(()=>{ const t=pf('au-tag'); if(t) t.focus(); }, 60);
 }
 async function doRegister(){
@@ -9502,9 +9539,8 @@ function renderPlayers(){
     // поэтому пустой раздел обязан сам сказать, куда жать: иначе человек
     // видит чистый экран без единой зацепки.
     el.innerHTML = SESSION
-      ? `<div class="empty pl-empty">[ ПУСТО ]<br>Здесь появятся ваши персонажи.<br>
-           <span class="pl-empty-hint hint-mob">Нажмите «＋ Добавить персонажа» сверху; калькулятор характеристик — кнопка рядом с ней.</span>
-           <span class="pl-empty-hint hint-desk">Нажмите <b>＋</b> в правом нижнем углу — начнём с калькулятора характеристик.</span></div>`
+      ? `<div class="empty pl-empty">Персонажей пока нет
+           <span class="pl-empty-hint hint-desk">Новый — кнопкой <b>＋</b> в правом нижнем углу</span></div>`
       : `<div class="empty">[ ЛИЧНЫЙ РАЗДЕЛ ]<br>войдите в аккаунт — здесь появятся ваши персонажи</div>`;
     masonry(el, PL_MAS);   // плиток нет — обычная сетка, иначе заглушка сжалась бы в строку 4 px
     return;
@@ -9815,7 +9851,7 @@ function sheetWpnBlock(p, list){
   return `<div class="field"><label>${L.wpn}</label>
     <div class="wpn-head"><span>Название</span><span>Бонус/СЛ</span><span>Урон и вид</span><span>Заметки</span><span></span></div>
     <div id="${p}-wpns">${rows}</div>
-    <button type="button" class="btn ghost" style="width:100%;margin-top:8px" onclick="addWpnRow('${p}')">+ Оружие</button>
+    <button type="button" class="btn ghost" style="width:100%;margin-top:8px" onclick="addWpnRow('${p}')">＋ Оружие</button>
   </div>`;
 }
 function addWpnRow(p){ const c=document.getElementById(p+'-wpns'); if(c) c.insertAdjacentHTML('beforeend', wpnRowHtml()); }
@@ -9838,7 +9874,7 @@ function sheetInvBlock(p, list){
   return `<div class="field"><label>Сокровища</label>
     <div class="inv-head"><span>Предмет</span><span>Кол-во</span><span></span></div>
     <div id="${p}-inv">${rows}</div>
-    <button type="button" class="btn ghost" style="width:100%;margin-top:8px" onclick="addInvRow('${p}')">+ Предмет</button>
+    <button type="button" class="btn ghost" style="width:100%;margin-top:8px" onclick="addInvRow('${p}')">＋ Предмет</button>
   </div>`;
 }
 function addInvRow(p){ const c=document.getElementById(p+'-inv'); if(c) c.insertAdjacentHTML('beforeend', invRowHtml()); }
@@ -10411,7 +10447,7 @@ function renderStatCalc(){
       <button class="sp-cls${PB.mode==='points'?' on':''}" onclick="pbMode('points')">Покупка очков</button>
       <button class="sp-cls${PB.mode==='rolls'?' on':''}" onclick="pbMode('rolls')">Броски 4d6</button>
     </div>
-    ${PB.mode==='rolls'?`<button class="btn ghost" style="width:100%;margin-bottom:10px" onclick="pbRoll()">🎲 Перебросить (${PB.pool.join(', ')})</button>`:''}
+    ${PB.mode==='rolls'?`<button class="btn ghost" style="width:100%;margin-bottom:10px" onclick="pbRoll()">${bi('dice')}Перебросить (${PB.pool.join(', ')})</button>`:''}
     <div class="field"><label>${assim?'Происхождение':'Раса'}</label>
       <select onchange="pbRacePick(this.value)">
         <option value="">— без бонусов —</option>
@@ -10677,7 +10713,7 @@ function openNewPlayer(){
     <button class="x" onclick="closeModal()" aria-label="Закрыть">✕</button>
     <div class="top">${rune('character',24)}<span class="clabel">Новый лист · ${esc(dispTag(SESSION))}</span></div>
     <h2>Создать персонажа</h2>
-    <button type="button" class="btn ghost" style="width:100%;margin-bottom:14px" onclick="randomizeNewChar()">🎲 Случайный персонаж</button>
+    <button type="button" class="btn ghost" style="width:100%;margin-bottom:14px" onclick="randomizeNewChar()">${bi('dice')}Случайный персонаж</button>
     ${sheetEditorBody('np', {}, CUR_PROJECT)}
     <div class="pacts"><button class="btn primary" onclick="createPlayer()">Создать</button><button class="btn ghost" onclick="closeModal()">Отмена</button></div>
     <p class="note">Лист привязывается к вашему аккаунту ${esc(dispTag(SESSION))} — редактировать сможете только вы.</p>`;
@@ -10784,7 +10820,7 @@ function sheetStatsBlock(p, c){
   c=c||{}; const L=sheetL();
   const calc=hpCalcAvailable();
   const hpStat = calc
-    ? `<div class="stat hp-stat"><label>${L.hp} <button type="button" id="${p}-hpcalc-btn" class="hp-calc-btn" onclick="edHpCalcToggle('${p}')" aria-label="Расчёт хитов" title="Расчёт хитов">🖩</button></label><input id="${p}-hp" maxlength="9" data-manual="${c.hpManual?'1':''}" oninput="edHpManual('${p}',this)" value="${esc(c.hp||'')}"></div>`
+    ? `<div class="stat hp-stat"><label>${L.hp} <button type="button" id="${p}-hpcalc-btn" class="hp-calc-btn" onclick="edHpCalcToggle('${p}')" aria-label="Расчёт хитов" title="Расчёт хитов">${bi('calc')}</button></label><input id="${p}-hp" maxlength="9" data-manual="${c.hpManual?'1':''}" oninput="edHpManual('${p}',this)" value="${esc(c.hp||'')}"></div>`
     : `<div class="stat"><label>${L.hp}</label><input id="${p}-hp" maxlength="9" data-manual="${c.hpManual?'1':''}" oninput="edHpManual('${p}',this)" value="${esc(c.hp||'')}"></div>`;
   return `<div class="sheet-stats">
     ${hpStat}
@@ -11570,7 +11606,7 @@ function sheetEditorBody(p, c, game){
   tabs.push({k:'pers', t:'Личность', html:`
       ${dnd?sheetFeatsBlock(p):''}
       <div class="field"><label>${L.cfeats}</label>
-        ${dnd?`<button type="button" class="btn ghost sm" style="width:100%;margin-bottom:6px" onclick="openClassFeatures('${p}')">📖 Умения класса по уровням</button>`:''}
+        ${dnd?`<button type="button" class="btn ghost sm" style="width:100%;margin-bottom:6px" onclick="openClassFeatures('${p}')" title="Умения класса по уровням">${bi('book')}Умения класса</button>`:''}
         <textarea id="${p}-cfeats" maxlength="2000">${esc(c.cfeats||c.feats||'')}</textarea></div>
       <div class="field"><label>${L.rfeats}</label><textarea id="${p}-rfeats" maxlength="2000">${esc(c.rfeats||'')}</textarea></div>
       <input type="hidden" id="${p}-tfeats" value="${esc(c.tfeats||'')}">
@@ -11828,7 +11864,7 @@ function openPlayer(id){
   let editBlock;
   if(ownW){   // владелец — или лист под кодом, код к которому уже введён
     editBlock = `<div class="unlock"><button class="btn primary" onclick="renderPlayerEditor('${c.id}')">Редактировать</button>
-      <button class="btn ghost" style="margin-top:8px" onclick="openLevelUp('${c.id}')">⬆ Новый уровень</button></div>`;
+      <button class="btn ghost" style="margin-top:8px" onclick="openLevelUp('${c.id}')">${bi('up')}Новый уровень</button></div>`;
   } else if(!c.owner && c.codeHash){
     editBlock = `<div class="unlock">
       <div class="field" style="margin-bottom:10px"><label>Код для редактирования</label>
@@ -11879,8 +11915,8 @@ function openPlayer(id){
     </div>
     </div>
     <div class="row cs-actions" style="margin:4px 0 10px">
-      <button class="btn ghost" onclick="printSheet('${c.id}')">🖨 PDF</button>
-      <button class="btn ghost" onclick="exportChar('${c.id}')">⬇ Лист JSON</button>
+      <button class="btn ghost sm" onclick="printSheet('${c.id}')" title="Лист для печати или PDF">${bi('print')}PDF</button>
+      <button class="btn ghost sm" onclick="exportChar('${c.id}')" title="Скачать лист в JSON">${bi('download')}JSON</button>
     </div>
     ${editBlock}`;
   document.getElementById('scrim').classList.add('open');
@@ -12248,22 +12284,20 @@ function openInlineSheet(id, tileEl, animate){
   const host=document.getElementById('playerEditor'); if(!host) return;
   spInit('ep', c.spellcasting); featInit(c.featsList); hpRollsInit(c); AVA_TMP=c.ava||'';
   host.innerHTML = `<div class="isheet-bar">
-      <button class="btn ghost sm" onclick="closeInlineSheet()">← К персонажам</button>
+      <button class="btn ghost sm" onclick="closeInlineSheet()">← Персонажи</button>
       <button class="btn ghost sm ma-toggle" onclick="toggleMiniArch()" title="Архив сеттинга"${assimArchLocked()?' hidden':''}>
-        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px"><path d="M4 5.5A1.5 1.5 0 015.5 4H10a2 2 0 012 2 2 2 0 012-2h4.5A1.5 1.5 0 0120 5.5V18a1 1 0 01-1 1h-5a2 2 0 00-2 2 2 2 0 00-2-2H5a1 1 0 01-1-1z"/></svg>
-        Архив
+        ${bi('book')}Архив
       </button>
       <button class="btn ghost sm ds-only" onclick="toggleSheetCalc()" title="Калькулятор характеристик">
-        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px"><rect x="4.5" y="3" width="15" height="18" rx="3"/><path d="M8 7.5h8M8.5 12.5h.01M12 12.5h.01M15.5 12.5h.01M8.5 16h.01M12 16h.01M15.5 16h.01"/></svg>
-        Калькулятор
+        ${bi('calc')}Калькулятор
       </button>
       <span class="isave" id="isaveStatus" data-st="saved"></span>
     </div>
     ${sheetEditorBody('ep', c, charGame(c))}
     <div class="pacts isheet-acts" style="margin-top:16px">
-      <button class="btn ghost" onclick="flushInlineSave();printSheet('${id}')">🖨 PDF</button>
-      <button class="btn ghost" onclick="flushInlineSave();exportChar('${id}')">⬇ Лист JSON</button>
-      <button class="btn danger" onclick="confirmDeleteInline('${id}')">Удалить персонажа</button>
+      <button class="btn ghost sm" onclick="flushInlineSave();printSheet('${id}')" title="Лист для печати или PDF">${bi('print')}PDF</button>
+      <button class="btn ghost sm" onclick="flushInlineSave();exportChar('${id}')" title="Скачать лист в JSON">${bi('download')}JSON</button>
+      <button class="btn danger sm" onclick="confirmDeleteInline('${id}')" title="Удалить персонажа">${bi('trash')}Удалить</button>
     </div>`;
   host.hidden=false;
   const view=document.getElementById('view-players'); if(view) view.classList.add('inline-open');
@@ -12316,14 +12350,14 @@ async function closeInlineSheet(){
 function confirmDeleteInline(id){
   const el=document.querySelector('#playerEditor .pacts'); if(!el) return;
   if(!el.dataset.orig) el.dataset.orig=el.innerHTML;   // «Отмена» вернёт ряд целиком (PDF, JSON), а не одну кнопку удаления
-  el.innerHTML = `<span style="font-family:var(--f-mono);font-size:.78rem;color:var(--red-ink);align-self:center">Удалить безвозвратно?</span>
-    <button class="btn danger" onclick="deleteInline('${id}')">Да, удалить</button>
-    <button class="btn ghost" onclick="confirmDeleteInlineCancel('${id}')">Отмена</button>`;
+  el.innerHTML = `<span class="del-q">Удалить безвозвратно?</span>
+    <button class="btn danger fill sm" onclick="deleteInline('${id}')">Да, удалить</button>
+    <button class="btn ghost sm" onclick="confirmDeleteInlineCancel('${id}')">Отмена</button>`;
 }
 function confirmDeleteInlineCancel(id){
   const el=document.querySelector('#playerEditor .pacts'); if(!el) return;
   if(el.dataset.orig){ el.innerHTML=el.dataset.orig; delete el.dataset.orig; }
-  else el.innerHTML=`<button class="btn danger" onclick="confirmDeleteInline('${id}')">Удалить персонажа</button>`;
+  else el.innerHTML=`<button class="btn danger sm" onclick="confirmDeleteInline('${id}')" title="Удалить персонажа">${bi('trash')}Удалить</button>`;
 }
 async function deleteInline(id){
   const c=CHARS.find(x=>x.id===id); if(c && !canEdit(c)){ toast('Нет прав на удаление'); return; }
@@ -12338,8 +12372,8 @@ async function deleteInline(id){
 }
 function confirmDeletePlayer(id){
   const el=document.querySelector('#modal .pacts');
-  if(el) el.innerHTML = `<span style="font-family:var(--f-mono);font-size:.78rem;color:var(--red-ink);align-self:center">Удалить безвозвратно?</span>
-    <button class="btn danger" onclick="deletePlayer('${id}')">Да, удалить</button>
+  if(el) el.innerHTML = `<span class="del-q">Удалить безвозвратно?</span>
+    <button class="btn danger fill" onclick="deletePlayer('${id}')">Да, удалить</button>
     <button class="btn ghost" onclick="renderPlayerEditor('${id}')">Отмена</button>`;
 }
 /* hinoma удаляет лист игрока. Лист лежит в строке игрока comik:chars:<тег> — пишем надгробие прямо туда (команде сервер
@@ -12348,8 +12382,8 @@ function confirmDeletePlayer(id){
 function canDeleteOther(c){ return !!(c && !c.alias && !c.deleted && c.owner && !isOwner(c) && SESSION && currentTag()===PROJ_OWNER && supa); }
 function confirmDeleteOther(id){
   const el=document.getElementById('pp-del'); if(!el) return;
-  el.innerHTML=`<span style="font-family:var(--f-mono);font-size:.78rem;color:var(--red-ink);align-self:center">Удалить безвозвратно?</span>
-    <button class="btn danger" onclick="deleteOtherChar('${id}')">Да, удалить</button>
+  el.innerHTML=`<span class="del-q">Удалить безвозвратно?</span>
+    <button class="btn danger fill" onclick="deleteOtherChar('${id}')">Да, удалить</button>
     <button class="btn ghost" onclick="openPlayer('${id}')">Отмена</button>`;
 }
 async function deleteOtherChar(id){
@@ -12467,7 +12501,7 @@ function openHeroEditor(){
   if(!ADMIN){ toast('Менять приветствие можно только в режиме ГМ'); return; }
   const g=GAME_HERO[CUR_PROJECT], o=HERO_EDITS[CUR_PROJECT]||{};
   const m=document.getElementById('modal');
-  m.innerHTML=`<button class="x" onclick="closeModal()">✕</button>
+  m.innerHTML=`<button class="x" onclick="closeModal()" aria-label="Закрыть">✕</button>
     <div class="kicker" style="margin-bottom:6px">${PROJECT_TITLES[CUR_PROJECT].replace(/<[^>]*>/g,'')}</div>
     <h2 style="font-family:var(--f-disp);color:var(--txt);margin-bottom:14px">Приветствие</h2>
     <div class="field" id="he-f-title"><label>Заголовок <span class="req">*</span></label><input id="he-title" maxlength="80" value="${esc(o.title||g.title)}"><div class="err">Укажите заголовок</div></div>
@@ -13228,31 +13262,32 @@ function renderSettings(){
   if(!SESSION){
     // закладки гостя — на устройстве, профиля у него нет, а на 880–1179 нет ни шторки, ни рейла: вход в них здесь
     el.innerHTML = `<div class="set-page">
-      <div class="set-prof" style="justify-content:center;gap:10px">
+      <div class="set-prof au-acts">
         <button class="btn primary" onclick="openAccessModal(null,'account')">Войти</button>
-        <button class="btn ghost" onclick="openAccessModal(null,'account');setTimeout(toggleAuthMode,80)">Регистрация</button>
+        <button class="btn quiet" onclick="openAuth('register')">Создать аккаунт</button>
       </div>
       <div class="set-grp">
-        <button class="set-row" onclick="openBookmarks()"><span class="ri">🔖</span><span class="rl">Закладки</span>${CHEV}</button>
+        <button class="set-row" onclick="openBookmarks()"><span class="ri">${bi('bookmark')}</span><span class="rl">Закладки</span>${CHEV}</button>
       </div>
       <div class="set-gt">Внешний вид</div>
       <div class="set-grp">
-        <button class="set-row" onclick="setToggleIcons()"><span class="ri">🎨</span><span class="rl">Иконка приложения</span><span class="set-iconprev" style="background-image:url(icon-${esc(cur)}-192.png)"></span>${CHEV}</button>
+        <button class="set-row" onclick="setToggleIcons()"><span class="ri">${bi('app')}</span><span class="rl">Иконка приложения</span><span class="set-iconprev" style="background-image:url(icon-${esc(cur)}-192.png)"></span>${CHEV}</button>
         ${iconGrid}
-        <button class="set-row" onclick="openA11y()"><span class="ri">♿</span><span class="rl">Доступность</span>${CHEV}</button>
+        <button class="set-row" onclick="openA11y()"><span class="ri">${bi('a11y')}</span><span class="rl">Доступность</span>${CHEV}</button>
       </div></div>`;
     return;
   }
   const gmRows = isDev() ? `
-      <button class="set-row" onclick="devToggleAdmin()"><span class="ri">🎲</span><span class="rl">Режим Game Master<small>Доска ходов, архив, новости</small></span><span class="set-sw${ADMIN?' on':''}"></span></button>
-      <button class="set-row" onclick="pushTest()"><span class="ri">🧪</span><span class="rl">Тест уведомления</span>${CHEV}</button>` : '';
+      <button class="set-row" onclick="devToggleAdmin()" role="switch" aria-checked="${ADMIN}"><span class="ri">${bi('dice')}</span><span class="rl">Режим ГМ</span><span class="set-sw${ADMIN?' on':''}"></span></button>
+      <button class="set-row" onclick="pushTest()"><span class="ri">${bi('flask')}</span><span class="rl">Тест уведомления</span></button>` : '';
+  // группу видит только hinoma — пометка «только ГМ» в заголовке ни к чему
   const dataGrp = isHinoma ? `
-      <div class="set-gt">Данные · только ГМ</div>
+      <div class="set-gt">Данные</div>
       <div class="set-grp">
-        <button class="set-row" onclick="downloadBackup()"><span class="ri">💾</span><span class="rl">Резервная копия</span>${CHEV}</button>
-        <button class="set-row" onclick="exportSite()"><span class="ri">⬇️</span><span class="rl">Скачать данные (zip)</span>${CHEV}</button>
-        <button class="set-row" onclick="document.getElementById('bkFile').click()"><span class="ri">↩️</span><span class="rl">Восстановить из копии</span>${CHEV}</button>
-        <button class="set-row" onclick="shrinkCloudImages()"><span class="ri">🗜️</span><span class="rl">Сжать картинки<small>Фото новостей и карточек архива в облаке</small></span>${CHEV}</button>
+        <button class="set-row" onclick="downloadBackup()"><span class="ri">${bi('save')}</span><span class="rl">Резервная копия</span>${CHEV}</button>
+        <button class="set-row" onclick="exportSite()"><span class="ri">${bi('download')}</span><span class="rl">Скачать архив</span>${CHEV}</button>
+        <button class="set-row" onclick="document.getElementById('bkFile').click()"><span class="ri">${bi('restore')}</span><span class="rl">Восстановить из копии</span>${CHEV}</button>
+        <button class="set-row" onclick="shrinkCloudImages()" title="Фото новостей и карточек архива в облаке"><span class="ri">${bi('image')}</span><span class="rl">Сжать картинки</span>${CHEV}</button>
         <input type="file" id="bkFile" accept="application/json" hidden onchange="restoreBackup(this)">
       </div>` : '';
   // закладки, уведомления, пароль, выход и удаление аккаунта — в карточке профиля (тап по шапке)
@@ -13265,9 +13300,9 @@ function renderSettings(){
     ${gmRows?`<div class="set-grp">${gmRows}</div>`:''}
     <div class="set-gt">Внешний вид</div>
     <div class="set-grp">
-      <button class="set-row" onclick="setToggleIcons()"><span class="ri">🎨</span><span class="rl">Иконка приложения</span><span class="set-iconprev" style="background-image:url(icon-${esc(cur)}-192.png)"></span>${CHEV}</button>
+      <button class="set-row" onclick="setToggleIcons()"><span class="ri">${bi('app')}</span><span class="rl">Иконка приложения</span><span class="set-iconprev" style="background-image:url(icon-${esc(cur)}-192.png)"></span>${CHEV}</button>
       ${iconGrid}
-      <button class="set-row" onclick="openA11y()"><span class="ri">♿</span><span class="rl">Доступность</span>${CHEV}</button>
+      <button class="set-row" onclick="openA11y()"><span class="ri">${bi('a11y')}</span><span class="rl">Доступность</span>${CHEV}</button>
     </div>
     ${dataGrp}
   </div>`;
@@ -14147,7 +14182,7 @@ function renderTrkLog(){
   const box=document.getElementById('trkLogBox'); if(!box) return;
   const log=arc.slice().reverse();   // архив этого устройства ⊇ хвост в облаке
   if(!log.length){ box.innerHTML='<div class="empty">Здесь появятся действия: вступление в бой, добавление существ, урон, смерти, броски, переводы денег.</div>'; return; }
-  box.innerHTML=`<div class="tlog-top"><span class="tlog-n">${log.length}</span><button class="btn ghost sm" onclick="trkLogClear()">Очистить</button></div>
+  box.innerHTML=`<div class="tlog-top"><span class="tlog-n">${log.length}</span><button class="btn ghost xs" onclick="trkLogClear()">Очистить</button></div>
     <div class="tlog">${log.map(e=>`<div class="tlog-row"><span class="ic">${trkLogIcon(e.k)}</span><span class="tx">${esc(e.t||'')}</span><span class="ti">${trkLogTime(e.at)}</span></div>`).join('')}</div>`;
 }
 function trkLogClear(){
@@ -14610,7 +14645,7 @@ function trkRowHtml(x,o){
     const stab=!!(ds.st || (ds.s||0)>=3);
     right=`<div class="tb-ds${o.edit?' gm':''}${stab?' stab':''}"${stab?' title="Стабилизирован"':''}><div class="ds-s">${pips('s',ds.s||0)}</div><div class="ds-f">${pips('f',ds.f||0)}</div></div>`;
     // команды — отдельной полосой во всю ширину строки: в правой колонке они ужимали имя и полосу ХП до нечитаемого
-    if(o.edit) dsCmd=`<div class="tb-dsb"><button onclick="trkGmDsHeal(${o.idx})" title="Поднять с 1 ХП">✚1 ХП</button><button class="${stab?'on':''}" onclick="trkGmDsStab(${o.idx})" title="Снять спасброски, оставить 0 ХП">${stab?'Стабилизирован ✓':'Стабилизирован'}</button></div>`;
+    if(o.edit) dsCmd=`<div class="tb-dsb"><button onclick="trkGmDsHeal(${o.idx})" title="Поднять с 1 ХП">＋1 ХП</button><button class="${stab?'on':''}" onclick="trkGmDsStab(${o.idx})" title="Снять спасброски, оставить 0 ХП">${stab?'Стабилизирован ✓':'Стабилизирован'}</button></div>`;
   } else if(foe && o.playerView){ right=`<div class="tb-ac hid">КД —</div>`;
   } else if(o.edit){ right=`<div class="tb-ac"><input class="tb-ac-in" value="${esc(String(x.ac||''))}" placeholder="КД" onchange="trkSet(${o.idx},'ac',this.value)"></div>`;
   } else { right=`<div class="tb-ac"><b>${x.ac?esc(String(x.ac)):'—'}</b><span>КД</span></div>`; }
@@ -14652,8 +14687,8 @@ function trkCombatBar(o){
     </div>
     <div class="tb-turn">${nav}</div>
     ${gm?`<div class="tb-tools">
-      <button class="tb-tool" onclick="trkRollInit()" title="Бросок d20 + ЛОВ всем врагам без инициативы">🎲 Инициатива</button>
-      <button class="tb-tool${trkSkipDead()?' on':''}" onclick="trkSkipDeadToggle()" title="Не давать ход выбывшим из боя">💀 Пропускать павших</button>
+      <button class="tb-tool" onclick="trkRollInit()" title="Бросок d20 + ЛОВ всем врагам без инициативы">${bi('dice')}Инициатива</button>
+      <button class="tb-tool${trkSkipDead()?' on':''}" onclick="trkSkipDeadToggle()" title="Не давать ход выбывшим из боя">${bi('skull')}Пропускать павших</button>
     </div>`:''}
   </div>`;
 }
@@ -14824,8 +14859,8 @@ function trkAutoPos(order, pos, cols){
 /* кнопки карты для ГМа: фон и размер сетки */
 function trkMapCtrlHtml(bg, cols){
   return `<div class="mp-ctrl">
-      <button class="btn ghost sm" onclick="trkMapBgPick()">🖼 ${bg?'Сменить фон':'Фон карты'}</button>
-      ${bg?`<button class="btn ghost sm" onclick="trkMapBgClear()">Убрать фон</button>`:''}
+      <button class="btn ghost xs" onclick="trkMapBgPick()">${bi('image')}${bg?'Сменить фон':'Фон карты'}</button>
+      ${bg?`<button class="btn ghost xs" onclick="trkMapBgClear()">Убрать фон</button>`:''}
       <span class="mp-gc">Сетка <button onclick="trkMapColsAdj(-1)" aria-label="Меньше">−</button><b>${cols}</b><button onclick="trkMapColsAdj(1)" aria-label="Больше">+</button></span>
       <input type="file" id="mpBgFile" accept="image/*" hidden onchange="trkMapBgSet(this)">
     </div>`;
@@ -15175,10 +15210,10 @@ function renderTrackerCore(){
   const empty=view==='cards'?'<div class="empty" style="grid-column:1/-1">Пусто. Выбери партию или добавь участников вручную.</div>':'<div class="empty">Пусто. Выбери партию или добавь участников вручную.</div>';
   const massBar = TRK_SEL.size?`<div class="tb-mass"><span class="tb-mass-n">Выбрано ${TRK_SEL.size}</span>
       <button class="dmg" onclick="trkMassHp('dmg')">− Урон</button>
-      <button class="heal" onclick="trkMassHp('heal')">+ Лечение</button>
+      <button class="heal" onclick="trkMassHp('heal')">＋ Лечение</button>
       <button onclick="trkMassClearConds()">Снять состояния</button>
       <button class="del" onclick="trkMassDelete()">Убрать</button>
-      <button class="x" onclick="trkSelClear()">✕</button>
+      <button class="x" onclick="trkSelClear()" aria-label="Снять выбор">✕</button>
     </div>`:'';
   const hasFoes=TRK.list.some(isFoeCard);
   const partyField=`<div class="field" style="margin-bottom:10px"><label>Актуальная партия</label>
@@ -15194,25 +15229,23 @@ function renderTrackerCore(){
       <button class="btn ghost" onclick="trkClear()">Очистить</button>
     </div>`;
   const restoreBtn=(TRK.lastBoard&&(TRK.lastBoard.list||[]).length)?`<div class="row" style="margin-top:8px">
-      <button class="btn ghost" style="width:100%" onclick="trkRestoreLast()">↩ Вернуть прошлый бой (${TRK.lastBoard.list.length})</button>
+      <button class="btn ghost" style="width:100%" onclick="trkRestoreLast()" title="Вернуть прошлый бой">${bi('restore')}Вернуть бой (${TRK.lastBoard.list.length})</button>
     </div>`:'';
   const npcBtn=`<div class="row" style="margin-top:8px">
-      <button class="btn ghost" style="width:100%" onclick="openNewNpc()">＋ Создать NPC-лист (с фото)</button>
+      <button class="btn ghost" style="width:100%" onclick="openNewNpc()" title="Создать NPC-лист с фото">＋ NPC</button>
     </div>`;
-  const activeRow=`<div class="trk-active${isActive?' on':''}" onclick="trkToggleActive()"><span class="dot"></span>
-      <span>${isActive?'Доска активна — игроки видят её вживую':'Сделать доску активной для игроков'}</span></div>`;
+  const foesBtn=hasFoes?`<div class="row" style="margin-top:10px"><button class="btn ghost" style="width:100%" onclick="trkSelAllFoes()" title="Выбрать всех врагов">${bi('checkall')}Все враги</button></div>`:'';
   if(view==='stage'){
     const src0={order, activeKey:TRK.activeKey, proj:CUR_PROJECT, playerView:false};
     const gmPanel=`<div class="bv2-gm">
       <div class="bv2-gm-col">
         <div class="bv2-gm-h">Бой</div>
-        ${activeRow}${partyField}${addField}
+        ${partyField}${addField}
       </div>
       <div class="bv2-gm-col">
         <div class="bv2-gm-h">Карта и участники</div>
         ${trkMapCtrlHtml(trkMapBgOf(src0), trkMapColsOf(src0))}
-        ${hasFoes?`<div class="row" style="margin-top:10px"><button class="btn ghost" style="width:100%" onclick="trkSelAllFoes()">☑ Выбрать всех врагов</button></div>`:''}
-        ${restoreBtn}${npcBtn}
+        ${foesBtn}${restoreBtn}${npcBtn}
       </div>
     </div>`;
     box.innerHTML=guestHint+trkStageHtml({gm:true, order, activeKey:TRK.activeKey, round:TRK.round||1,
@@ -15225,7 +15258,7 @@ function renderTrackerCore(){
     trkCombatBar({round:TRK.round||1, whoName:(who&&who.name)||'—', gm:true})+`
     <div class="trk-active${isActive?' on':''}" onclick="trkToggleActive()"><span class="dot"></span>
       <span>${isActive?'Доска активна — игроки видят её вживую':'Сделать доску активной для игроков'}</span></div>
-    ${hasFoes?`<button class="btn ghost sm tb-selall" onclick="trkSelAllFoes()">☑ Выбрать всех врагов</button>`:''}
+    ${hasFoes?`<button class="btn ghost sm tb-selall" onclick="trkSelAllFoes()" title="Выбрать всех врагов">${bi('checkall')}Все враги</button>`:''}
     ${massBar}
     <div class="field" style="margin-bottom:10px"><label>Актуальная партия</label>
       <select onchange="trkPartyPick(this.value)">
@@ -15242,12 +15275,7 @@ function renderTrackerCore(){
       <button class="btn primary" onclick="trkAddManual()">Добавить</button>
       <button class="btn ghost" onclick="trkClear()">Очистить</button>
     </div>
-    ${(TRK.lastBoard&&(TRK.lastBoard.list||[]).length)?`<div class="row" style="margin-top:8px">
-      <button class="btn ghost" style="width:100%" onclick="trkRestoreLast()">↩ Вернуть прошлый бой (${TRK.lastBoard.list.length})</button>
-    </div>`:''}
-    <div class="row" style="margin-top:8px">
-      <button class="btn ghost" style="width:100%" onclick="openNewNpc()">＋ Создать NPC-лист (с фото)</button>
-    </div>`;
+    ${restoreBtn}${npcBtn}`;
   trkSetSig();
   // десктоп-ГМ: карта — отдельным окном справа (единственный #mpGrid); иначе карта в основной колонке по переключателю
   const _mapAside=document.getElementById('trkMapAside');
@@ -15319,12 +15347,14 @@ function trkStripCard(x, o){
    Классы tb-round / tb-now / tb-sync — те же, что у старой панели: живой патч их находит */
 function trkStageHud(S){
   const gm=!!S.gm, sync=trkSyncState();
+  // эфир — одной кнопкой здесь (строка «Сделать доску активной» под картой её дублировала): включить —
+  // «Показать игрокам», выключить — «В эфире» со второго нажатия: выключение завершает игру и очищает доску
   const live = gm
-    ? (S.isActive ? `<span class="bv2-live on" title="Игроки видят доску вживую">В эфире</span>`
-                  : `<button class="bv2-live" onclick="trkToggleActive()" title="Сделать доску активной для игроков">Показать игрокам</button>`)
+    ? (S.isActive ? `<button class="bv2-live on" onclick="bv2LiveOff(this)" aria-pressed="true" title="Игроки видят доску. Завершить игру — доска очистится">В эфире</button>`
+                  : `<button class="bv2-live" onclick="trkToggleActive()" aria-pressed="false" aria-label="Показать игрокам" title="Показать доску игрокам вживую">Показать<span class="lv-more"> игрокам</span></button>`)
     : '';
-  const tools = gm ? `<button class="bv2-ib" onclick="trkRollInit()" title="Бросок d20 + ЛОВ всем врагам без инициативы">🎲</button>
-      <button class="bv2-ib${trkSkipDead()?' on':''}" onclick="trkSkipDeadToggle()" title="Не давать ход выбывшим из боя">💀</button>` : '';
+  const tools = gm ? `<button class="bv2-ib" onclick="trkRollInit()" title="Бросок d20 + ЛОВ всем врагам без инициативы" aria-label="Бросок d20 + ЛОВ всем врагам без инициативы">${bi('dice')}</button>
+      <button class="bv2-ib${trkSkipDead()?' on':''}" onclick="trkSkipDeadToggle()" title="Не давать ход выбывшим из боя" aria-label="Не давать ход выбывшим из боя" aria-pressed="${trkSkipDead()}">${bi('skull')}</button>` : '';
   return `<div class="bv2-hud">
     <div class="bv2-hl">
       <button class="tb-round"${gm?' onclick="trkRoundReset()" title="Сбросить бой"':' disabled'}><span class="n">${parseInt(S.round,10)||1}</span><span class="l">раунд</span></button>
@@ -15338,7 +15368,7 @@ function trkStageHud(S){
       ${live}${tools}
       <span class="bv2-zoom">
         <button class="bv2-ib" onclick="bv2Zoom(-1)" aria-label="Отдалить">−</button>
-        <button class="bv2-ib bv2-zl" onclick="bv2Zoom(0)" title="Вписать карту / во всю ширину" id="bv2Zl">${Math.round(BV2_Z*100)}%</button>
+        <button class="bv2-ib bv2-zl" onclick="bv2Zoom(0)" title="Масштаб: вписать карту / во всю ширину" aria-label="Масштаб ${Math.round(BV2_Z*100)}%" id="bv2Zl">${Math.round(BV2_Z*100)}%</button>
         <button class="bv2-ib" onclick="bv2Zoom(1)" aria-label="Приблизить">+</button>
       </span>
       <span class="tb-sync ${sync.cls}" id="trkSync" title="${esc(sync.txt)}" aria-label="${esc(sync.txt)}" role="img"></span>
@@ -15351,7 +15381,7 @@ function trkStageIns(S){
   const x=S.order.find(y=>trkCardKey(y)===TRK_V2_INS);
   if(!x){ TRK_V2_INS=''; return ''; }
   const o=S.cardO(x);
-  const open=o.openJs?`<button class="btn ghost sm" onclick="${o.openJs}">${S.gm?'Лист':'Мой лист'}</button>`:'';
+  const open=o.openJs?`<button class="btn ghost xs" onclick="${o.openJs}">${S.gm?'Лист':'Мой лист'}</button>`:'';
   return `<div class="bv2-insp${S.gm?' gm':''}" id="bv2Insp" data-for="${esc(TRK_V2_INS)}">
     <div class="bv2-insp-h"><span class="bv2-insp-t">${esc(x.name||'—')}</span>${open}
       <button class="bv2-x" onclick="bv2Inspect('')" aria-label="Закрыть">✕</button></div>
@@ -15379,6 +15409,12 @@ function trkStageHtml(S){
   </div>`;
 }
 function bv2Inspect(key){ TRK_V2_INS=(TRK_V2_INS===key?'':key); renderTracker(); }
+/* «В эфире» гасит эфир со второго нажатия — как «Игра сыграна»: выключение очищает доску (вернуть — «Вернуть бой») */
+function bv2LiveOff(b){
+  if(b && !b.dataset.arm){ b.dataset.arm='1'; b.textContent='Завершить?';
+    setTimeout(()=>{ if(b.isConnected && b.dataset.arm){ delete b.dataset.arm; b.textContent='В эфире'; } }, 4000); return; }
+  trkToggleActive();
+}
 /* карточка и её фишка подсвечивают друг друга */
 function bv2Pair(k,on){
   const st=document.getElementById('bv2Stage'); if(!st) return;
@@ -15449,7 +15485,7 @@ function bv2Fit(){
 function bv2Apply(){
   const box=document.getElementById('bv2Map'); if(!box||!BV2_FIT) return;
   box.style.width=Math.round(BV2_FIT*BV2_Z)+'px';
-  const zl=document.getElementById('bv2Zl'); if(zl) zl.textContent=Math.round(BV2_Z*100)+'%';
+  const zl=document.getElementById('bv2Zl'); if(zl){ zl.textContent=Math.round(BV2_Z*100)+'%'; zl.setAttribute('aria-label','Масштаб '+zl.textContent); }
   const st=document.getElementById('bv2Stage'); if(st) st.classList.toggle('zoomed', BV2_Z>1.001);
 }
 /* масштаб с «якорем»: точка карты под курсором (или центр вида) остаётся на месте */
@@ -15708,7 +15744,7 @@ function playerMePanel(vp){
     </div>
     <div class="tm-btns">
       <button class="tm-btn dmg" onclick="playerHpAdjust('dmg')">− Урон</button>
-      <button class="tm-btn heal" onclick="playerHpAdjust('heal')">＋ Восполнить</button>
+      <button class="tm-btn heal" onclick="playerHpAdjust('heal')">＋ Лечение</button>
     </div>
     ${dying?deathSavesHtml(my):playerCharBlock(vp,my)}
   </div>`;
@@ -15833,7 +15869,7 @@ function deathSavesHtml(my){
     ${res}
     ${dead?`<div class="ds-end dead">Персонаж мёртв</div>`
       :stable?`<div class="ds-end stable">Стабилизирован</div>`
-      :`<button class="ds-roll" onclick="rollDeathSave()">🎲 Бросить d20</button>
+      :`<button class="ds-roll" onclick="rollDeathSave()">${bi('dice')}Бросить d20</button>
         <button class="ds-stab" onclick="dsStabilize()">Стабилизирован</button>`}
   </div>`;
 }
@@ -16160,7 +16196,7 @@ function trkSuggest(q){
   const hits=ARCHIVE.filter(c=>c.sub==='bestiary' && searchNorm(c.title).includes(q)).slice(0,6);  // из архива сеттинга: в сказках классических чудищ нет
   // id листа пишет его владелец (строка comik:chars:<тег>) — в data-атрибут, а не в JS-строку обработчика
   el.innerHTML =
-    chars.map(c=>`<button class="btn ghost sm" style="margin:6px 6px 0 0" data-id="${esc(c.id)}" onclick="trkAddChar(this.dataset.id)">👤 ${esc(c.name)}</button>`).join('') +
+    chars.map(c=>`<button class="btn ghost sm" style="margin:6px 6px 0 0" data-id="${esc(c.id)}" onclick="trkAddChar(this.dataset.id)">${bi('user')}${esc(c.name)}</button>`).join('') +
     hits.map(c=>`<button class="btn ghost sm" style="margin:6px 6px 0 0" data-id="${esc(c.id)}" onclick="trkAddBeast(this.dataset.id)">${esc(c.title)}</button>`).join('');
 }
 /* добавить на доску уже существующий лист (NPC ГМа или персонаж) — с фото и статами */
@@ -16236,11 +16272,11 @@ function gmCreaturePanel(x,i){
     ${open?`<div class="gm-cre-b">
       <div class="gm-cre-ctrl">
         <button class="tm-btn dmg" onclick="gmHpPrompt(${i},'dmg')">− Урон</button>
-        <button class="tm-btn heal" onclick="gmHpPrompt(${i},'heal')">＋ Лечить</button>
+        <button class="tm-btn heal" onclick="gmHpPrompt(${i},'heal')">＋ Лечение</button>
         <button class="tm-btn" onclick="trkThpPrompt(${i})" title="Временные хиты">＋ВХ${th?' '+th:''}</button>
         <div class="gm-cre-init"><span>Иниц</span><input inputmode="numeric" value="${esc(String(x.init??0))}" onchange="trkSet(${i},'init',this.value)"></div>
       </div>
-      ${isFoeCard(x)?`<div class="gm-cre-more"><button class="btn ghost sm" onclick="gmCreDup(${i})">＋ ещё такой же</button></div>`:''}
+      ${isFoeCard(x)?`<div class="gm-cre-more"><button class="btn ghost xs" onclick="gmCreDup(${i})">＋ ещё такой же</button></div>`:''}
       ${gmCreatureBody(x,i)}
     </div>`:''}
   </div>`;
@@ -16311,7 +16347,7 @@ function gmActionsHtml(i, acts){
   if(!acts.length) return '';
   return `<div class="gm-sb"><div class="dstat-head">Действия</div><div class="gm-act">${acts.map((a,ai)=>`<div class="gm-act-r">
       <div class="gm-act-n">${esc(a.name)}</div>
-      <div class="gm-act-b">${a.atk!=null?`<button class="gm-rb hit" onclick="gmCreRoll(${i},${ai},'hit')">🎲 попадание <b>${fmtBonus(a.atk)}</b></button>`:''}${a.dmg?`<button class="gm-rb dmg" onclick="gmCreRoll(${i},${ai},'dmg')">🎲 урон <b>${esc(a.dmg)}${a.dmg2?(' + '+a.dmg2):''}</b></button>`:''}</div>
+      <div class="gm-act-b">${a.atk!=null?`<button class="gm-rb hit" onclick="gmCreRoll(${i},${ai},'hit')">${bi('dice')}попадание <b>${fmtBonus(a.atk)}</b></button>`:''}${a.dmg?`<button class="gm-rb dmg" onclick="gmCreRoll(${i},${ai},'dmg')">${bi('dice')}урон <b>${esc(a.dmg)}${a.dmg2?(' + '+a.dmg2):''}</b></button>`:''}</div>
     </div>`).join('')}</div></div>`;
 }
 /* бросок прямо с доски: результат в тост (ГМ смотрит на пульт) и в журнал (видно, что было в бою) */
@@ -16729,25 +16765,17 @@ async function pushHeal(force){
     pushRenderBtn();
   }catch(e){}
 }
-/* кнопок две: переключатель в карточке профиля (#pushBtn) и кнопка в меню аккаунта ([data-push]) — раньше у обеих
-   был id="pushBtn", и getElementById обновлял только первую, так что в меню состояние не показывалось */
+/* переключатель уведомлений — в карточке профиля (кнопка в меню аккаунта ушла вместе с самим меню) */
 function pushRenderBtn(){
-  document.querySelectorAll('#pushBtn,[data-push]').forEach(pushRenderOne);
+  document.querySelectorAll('#pushBtn').forEach(pushRenderOne);
 }
 function pushRenderOne(el){
   pushStatus().then(st=>{
-    if(el.classList.contains('set-sw')){   // новый вид: переключатель в карточке профиля
-      el.classList.toggle('on', st==='on');
-      el.classList.toggle('disabled', st==='unsupported'||st==='denied');
-      const note=document.getElementById('pushNote');
-      if(note) note.textContent = st==='denied'?'Заблокировано в настройках устройства' : st==='unsupported'?'Недоступно на этом устройстве' : 'Пуш при анонсе сессии';
-      return;
-    }
-    const m={unsupported:['Уведомления недоступны на этом устройстве',true],
-      denied:['🔕 Уведомления заблокированы',false],
-      off:['🔔 Включить уведомления о новых играх',false],
-      on:['🔕 Выключить уведомления',false]};
-    const [txt,dis]=m[st]||m.off; el.textContent=txt; el.disabled=!!dis; el.classList.toggle('on', st==='on');
+    el.classList.toggle('on', st==='on');
+    el.classList.toggle('disabled', st==='unsupported'||st==='denied');
+    // вторая строка — только когда включить нельзя
+    const note=document.getElementById('pushNote');
+    if(note){ const t = st==='denied'?'Запрещены в настройках телефона' : st==='unsupported'?'Недоступно на этом устройстве' : ''; note.textContent=t; note.hidden=!t; }
   });
 }
 /* открыть меню конкретной игры по id (по тапу на уведомление).
@@ -17950,7 +17978,7 @@ function mplMoveMenu(tid){
       <button class="mpm-opt mpm-new" onclick="closeModal();mplCreate('${tid}')">
         <span class="mpg-ava mpm-gen">${MP_ICO.plus}</span><span class="mpm-nm">Новый плейлист</span><span class="mpm-sub">и сразу туда</span></button>
     </div>
-    <div class="pacts"><button class="btn ghost mpm-del" id="mpmDel" onclick="mplTrackDelete('${tid}',this)">${MP_ICO.trash}Удалить трек</button></div>`;
+    <div class="pacts"><button class="btn danger mpm-del" id="mpmDel" onclick="mplTrackDelete('${tid}',this)">${MP_ICO.trash}Удалить трек</button></div>`;
   document.getElementById('scrim').classList.add('open');
 }
 function mplMovePick(tid, pid){
@@ -18490,14 +18518,14 @@ function openInstallHelp(){
   #view-world #admCardBar{grid-column:2;grid-row:1;display:flex;margin:0 !important;
     align-self:start}
   #view-world .cats,#view-world #cards,#view-world .story,#view-world #deskDir{grid-column:1/-1}
-  #view-world #admCardBar .btn{width:auto !important;padding:0 28px;white-space:nowrap}
+  #view-world #admCardBar .btn{width:auto !important;white-space:nowrap}
   #trkBox .field select,#trkBox .field input{max-width:520px}
   /* .row — сетка из двух равных колонок. Если кнопка в ряду одна, обрезка
      ряда пополам ужимала её вдвое и ломала надпись на две строки: такому
      ряду отдаём ширину по содержимому. */
   #trkBox .row{max-width:520px}
   #trkBox .row:has(> *:only-child){display:flex;max-width:none}
-  #trkBox .row:has(> *:only-child) > .btn{width:auto !important;padding:0 26px}
+  #trkBox .row:has(> *:only-child) > .btn{width:auto !important}
   #view-news .signup-bar .btn,#view-news #admNewsBar .btn{max-width:100%}
 }
 
@@ -18718,7 +18746,7 @@ function openInstallHelp(){
   .pd-hpb.dmg:hover{color:#e0776d;border-color:rgba(224,119,109,.55)}
   .pd-hpb.heal:hover{color:#84c97a;border-color:rgba(132,201,122,.55)}
   .pd-tabs{flex:none;display:flex;gap:4px;margin-left:auto}
-  .pd-tab{font-family:var(--f-mono);font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;
+  .pd-tab{font-family:var(--f-mono);font-size:.6875rem;letter-spacing:.08em;text-transform:uppercase;
     color:var(--dim);background:none;border:var(--hair) solid transparent;border-radius:10px;
     padding:8px 12px;cursor:pointer;white-space:nowrap;transition:background .15s,color .15s,border-color .15s}
   .pd-tab:hover{background:var(--surface2);color:var(--txt)}
@@ -19722,15 +19750,17 @@ html.board-v2 #pdock .pd-tab:not([data-k]){display:none}          /* кореш�
 .bv2-hud .tb-sync{margin:0 6px 0 4px}
 .bv2-ib{min-width:34px;height:34px;padding:0 7px;border-radius:10px;border:var(--hair) solid var(--line2);background:var(--surface);
   color:var(--dim);font:600 .95rem/1 var(--f-disp);cursor:pointer;display:inline-grid;place-items:center}
+.bv2-ib .bi{width:18px;height:18px}
 .bv2-ib:hover{color:var(--txt);border-color:var(--red)}
 .bv2-ib.on{background:rgba(var(--accent-rgb),.18);border-color:var(--red);color:var(--txt)}
 .bv2-zoom{display:inline-flex;gap:3px;padding-left:5px;border-left:var(--hair) solid var(--line2);margin-left:2px}
-.bv2-zl{font:600 .6rem/1 var(--f-mono);letter-spacing:.04em;min-width:44px}
-.bv2-live{display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 12px;border-radius:999px;white-space:nowrap;
-  font:600 .6rem/1 var(--f-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--muted);
+.bv2-zl{font:600 .6875rem/1 var(--f-mono);letter-spacing:.02em;min-width:44px}
+/* эфир — кнопка S, как и соседние значки: скругление 10, подпись 11 px */
+.bv2-live{display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 11px;border-radius:10px;white-space:nowrap;
+  font:600 .6875rem/1 var(--f-disp);letter-spacing:.06em;text-transform:uppercase;color:var(--dim);
   background:var(--surface);border:var(--hair) dashed var(--line2);cursor:pointer}
 .bv2-live::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--line2)}
-.bv2-live.on{cursor:default;color:#9fdc95;border:var(--hair) solid rgba(132,201,122,.45);background:rgba(132,201,122,.1)}
+.bv2-live.on{color:#9fdc95;border:var(--hair) solid rgba(132,201,122,.45);background:rgba(132,201,122,.1)}
 .bv2-live.on::before{background:#84c97a;box-shadow:0 0 0 3px rgba(132,201,122,.2);animation:bv2Pulse 1.8s ease-in-out infinite}
 @keyframes bv2Pulse{50%{box-shadow:0 0 0 6px rgba(132,201,122,0)}}
 /* ── лента карточек ── */
@@ -19819,8 +19849,8 @@ html.board-v2 #pdock .pd-tab:not([data-k]){display:none}          /* кореш�
 .bv2-gm{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:16px;margin-top:6px;position:relative;z-index:1}
 .bv2-gm-col{background:var(--surface);border:var(--hair) solid var(--line2);border-radius:var(--r-md);padding:16px}
 .bv2-gm-h{font-family:var(--f-mono);font-size:.62rem;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-bottom:12px}
-.bv2-gm .trk-active{margin-bottom:12px}
 .bv2-gm .mp-ctrl{margin-top:0}
+.bv2-gm .row{gap:8px}
 .bv2-gm .row > .btn:only-child{grid-column:1 / -1;width:100%}   /* одиночная кнопка — во всю колонку, а не в половину */
 /* ── ТЕЛЕФОН: та же сцена во всю ширину экрана ── */
 @media(max-width:759px){
@@ -19839,8 +19869,12 @@ html.board-v2 #pdock .pd-tab:not([data-k]){display:none}          /* кореш�
   .bv2-hud .tb-tbtn{width:34px;height:34px}
   .bv2-hud .tb-tbtn.main{padding:0 11px;font-size:.86rem}
   .bv2-ib{min-width:30px;height:30px;padding:0 5px;font-size:.85rem}
+  .bv2-ib .bi{width:16px;height:16px}
   .bv2-zl{min-width:38px}
-  .bv2-live{height:30px;padding:0 9px;font-size:.52rem}
+  .bv2-live{height:30px;padding:0 9px;gap:6px}
+  /* подпись в 11 px целиком («Показать игрокам») выталкивала масштаб и точку связи за край узкого телефона */
+  @media(max-width:419px){ .bv2-live .lv-more{display:none} }
+  @media(max-width:359px){ .bv2.gm .bv2-hr{gap:3px} }
   /* у игрока справа — только масштаб и точка связи */
   .bv2:not(.gm) .bv2-zl{display:none}
   .bv2-strip{padding:22px 0 12px}
@@ -19870,7 +19904,6 @@ html.board-v2 #pdock .pd-tab:not([data-k]){display:none}          /* кореш�
   .bv2-insp{left:6px!important;right:6px;width:auto;max-height:62%;overflow:auto;border-radius:16px;padding:8px 8px 10px}
   .bv2-insp::after{display:none}
   .bv2-gm{grid-template-columns:1fr;margin:8px 15px 0}
-  .bv2-gm .btn{letter-spacing:.04em;font-size:.84rem;padding-left:14px;padding-right:14px}
   html.board-v2 #trkBox > .trk-note,html.board-v2 #trkBox > .trk-guest{margin-left:15px;margin-right:15px}
 }
 /* у ГМа инструменты — вторым этажом во всю ширину. Не только на телефоне: до 1000 px в одну строку

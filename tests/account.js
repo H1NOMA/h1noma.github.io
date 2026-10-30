@@ -42,7 +42,7 @@ async function register(page, tag, pass) {
     await page.click('#drAva');
     await page.waitForSelector('#modal .pc-acts', { timeout: 5000 });
     const rowsTxt = await page.$$eval('#modal .pc-acts .set-row .rl', els => els.map(e => e.childNodes[0].textContent.trim()));
-    check(['Закладки', 'Уведомления о новых играх', 'Сменить пароль', 'Сменить логин', 'Выйти'].every(t => rowsTxt.includes(t)), 'в профиле: закладки, уведомления, пароль, логин, выход (' + rowsTxt.join(', ') + ')');
+    check(['Закладки', 'Уведомления', 'Пароль', 'Логин', 'Выйти'].every(t => rowsTxt.includes(t)), 'в профиле: закладки, уведомления, пароль, логин, выход (' + rowsTxt.join(', ') + ')');
     check(await page.evaluate(() => !!document.querySelector('#modal #pushBtn.set-sw')), 'переключатель уведомлений — в профиле');
     check(await page.waitForFunction(() => { const d = document.getElementById('pcDel'); return d && !d.hidden; }, null, { timeout: 8000 }).then(() => true, () => false), '«Удалить аккаунт» есть (облако API 4)');
     await page.click('#modal .pc-acts .set-row:has-text("Закладки")');
@@ -187,8 +187,8 @@ async function register(page, tag, pass) {
     await page.waitForSelector('#modal .pc-presets');
     check(await page.evaluate(() => { const box = document.querySelector('#modal .pc-presets').getBoundingClientRect(), m = document.querySelector('#modal .pc-preset.more').getBoundingClientRect(); return m.width > 30 && m.left >= box.left && m.right <= box.right + 0.5; }), '«+ Свои цвета» целиком в карточке');
     check(await page.evaluate(() => document.querySelectorAll('#modal .pc-presets button, #modal .prof-swatches button').length === PROFILE_PRESETS.length + 1 + PROFILE_COLORS.length + INK_COLORS.length), 'пресеты, «+» и свотчи — кнопки');
-    await page.click('#pcAdaptRow >> text=Адаптировать под сеттинг');
-    check(await page.evaluate(() => PROF_TMP.adapt === true && document.getElementById('pcAdaptRow').getAttribute('aria-checked') === 'true' && document.getElementById('pcManual').inert), 'клик по подписи «Адаптировать под сеттинг» включает её (ручной подбор — мимо клавиатуры)');
+    await page.click('#pcAdaptRow >> text=Цвет сеттинга');
+    check(await page.evaluate(() => PROF_TMP.adapt === true && document.getElementById('pcAdaptRow').getAttribute('aria-checked') === 'true' && document.getElementById('pcManual').inert), 'клик по подписи «Цвет сеттинга» включает её (ручной подбор — мимо клавиатуры)');
     await page.focus('#pcAdaptRow'); await page.keyboard.press('Enter');
     check(await page.evaluate(() => PROF_TMP.adapt === false && !document.getElementById('pcManual').inert), 'Enter по строке — выключает');
     await page.focus('#modal .pc-preset[data-bg]'); await page.keyboard.press('Space');
@@ -221,7 +221,7 @@ async function register(page, tag, pass) {
     check(v === 4 && !(await delShown(page)), `облако API ${v}, а «Удалить аккаунт» у команды нет`);
     await page.evaluate(() => { closeModal(); go('settings'); });
     await page.waitForTimeout(300);
-    check(await page.evaluate(() => /Режим Game Master/.test(document.getElementById('settingsPage').textContent)), 'командные пункты настроек на месте');
+    check(await page.evaluate(() => /Режим ГМ/.test(document.getElementById('settingsPage').textContent)), 'командные пункты настроек на месте');
     check(errs.length === 0, errLine(errs));
     await ctx.close();
   }
@@ -253,7 +253,7 @@ async function register(page, tag, pass) {
 
     // смена пароля
     await page.evaluate(() => openProfileCard());
-    await page.click('#modal .pc-acts .set-row:has-text("Сменить пароль")');
+    await page.click('#modal .pc-acts .set-row:has-text("Пароль")');
     await page.waitForSelector('#modal2 #pw-cur', { timeout: 3000 });
     await page.fill('#pw-cur', P1); await page.fill('#pw-new', P2); await page.fill('#pw-new2', P2 + 'x');
     await page.click('#pwGo');
@@ -309,7 +309,7 @@ async function register(page, tag, pass) {
     await page.fill('#ad-tag', tag.toUpperCase()); await page.fill('#ad-pass', 'short');
     const d2 = await dis();
     await page.fill('#ad-pass', P2);
-    check(d0 && d1 && d2 && !(await dis()), '«Удалить навсегда» активна только при своём логине и пароле от 8 символов');
+    check(d0 && d1 && d2 && !(await dis()), '«Удалить» активна только при своём логине и пароле от 8 символов');
 
     // отказы: человеческие слова, ничего не удалено, листы после них снова пишутся
     const fails = [
