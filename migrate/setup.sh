@@ -300,7 +300,7 @@ SQL
 # при каждом запуске: конечное состояние у свежего и у давно работающего сервера одинаковое, а правится оно
 # в одном месте (migrate/*.sql). Не скачались/не применились — запись в kv закрыта всем (RLS без разрешающих
 # правил), сайт только читает; это чинит push.sh. Ставить дальше Caddy и функции это не мешает — поэтому не выходим.
-MIGS="2026-09-21-rls.sql 2026-09-25-email-domain.sql 2026-09-26-projects-owner.sql 2026-09-27-hardening.sql 2026-10-28-images.sql 2026-10-29-security.sql"
+MIGS="2026-09-21-rls.sql 2026-09-25-email-domain.sql 2026-09-26-projects-owner.sql 2026-09-27-hardening.sql 2026-10-28-images.sql 2026-10-29-security.sql 2026-10-30-self-delete.sql"
 # скачанный файл годится, если он наш и целый: ровно одна строка «begin;» и одна «commit;» — последней
 mig_ok(){ sed -i 's/\r$//' "$1" && grep -q 'комик\|КОМИК' "$1" && [ "$(grep -cx 'begin;' "$1")" = 1 ] \
   && [ "$(grep -cx 'commit;' "$1")" = 1 ] && [ "$(grep -v '^[[:space:]]*$' "$1" | tail -1)" = 'commit;' ]; }
@@ -432,11 +432,34 @@ else
     # триггерами (проверка адреса, внешние ключи): это уже проверенные аккаунты. Команда (devs) — в той же
     # транзакции: не загрузилось что-то одно — не загрузилось ничего.
     # session_replication_role для postgres разрешает supautils; не вышло — пробуем суперпользователем образа.
+    # Удалённые игроками аккаунты (10-30; их список — в той же копии, «-- komik:gone») из копии не воскресают: в той же
+    # транзакции удаляем их снова (триггеры выключены — каскад тоже, поэтому identities явно), а их следы в kv
+    # (данные выше могли прийти из копии, снятой до удаления) убирает komik_forget. Не вышло — только предупреждение:
+    # остальные аккаунты всё равно загружаются
+    GONE_SQL=$(cat <<'SQL'
+do $komik$
+declare t text;
+begin
+  if to_regclass('komik_priv.komik_gone') is null then return; end if;
+  delete from auth.identities i using komik_priv.komik_gone g where i.user_id = g.uid;
+  delete from auth.users u using komik_priv.komik_gone g where u.id = g.uid;
+  if to_regprocedure('komik_priv.komik_forget(text)') is null then return; end if;
+  for t in select distinct g.tag from komik_priv.komik_gone g
+            where not exists (select 1 from auth.users u where lower(u.email) = g.tag || '@komikdnd.ru') loop
+    perform komik_priv.komik_forget(t);
+  end loop;
+exception when others then
+  raise warning 'аккаунты, удалённые игроками, после загрузки снова не удалились (%) — покажи это программисту', sqlerrm;
+end $komik$;
+SQL
+)
     ERRF=$(mktemp)
-    load_auth(){ { echo 'begin;'; echo 'SET session_replication_role = replica;'; gzip -dc "$DUMP"; echo 'commit;'; } \
+    load_auth(){ { echo 'begin;'; echo 'SET session_replication_role = replica;'; gzip -dc "$DUMP"; printf '%s\n' "$GONE_SQL"; echo 'commit;'; } \
       | docker exec -i supabase-db psql -q -v ON_ERROR_STOP=1 -U "$1" -d postgres >/dev/null 2>>"$ERRF"; }
     if load_auth postgres || load_auth supabase_admin; then
       echo "  аккаунтов загружено: $(docker exec supabase-db psql -U postgres -d postgres -tAc 'select count(*) from auth.users') ✓"
+      # предупреждения блоков копии (команда, удалённые аккаунты) — на экран: при удачной загрузке их иначе не видно
+      sed -n 's/^WARNING:  /  ⚠ /p' "$ERRF" | sort -u
       # grep -c, а не -q: -q бросает чтение на первом совпадении, и pipefail счёл бы SIGPIPE у gzip ошибкой
       [ "$(gzip -dc "$DUMP" | grep -c '^-- komik:devs')" -gt 0 ] \
         || warn "в этой копии аккаунтов нет состава команды (копия старая) — если кого-то снимал или добавлял, повтори migrate/RESTORE.md, пункты 6–7"
