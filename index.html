@@ -17344,11 +17344,21 @@ boot();
     c.animate([{opacity:0},{opacity:1}], {duration:200, easing:'ease-out'});
   }
   const fromPill=r=>`translate3d(${(M.cx-r.left-r.width/2).toFixed(1)}px,${(M.cy-r.top-r.height/2).toFixed(1)}px,0) scale(${(M.pw/r.width).toFixed(3)},${(M.ph/r.height).toFixed(3)})`;
+  // жест шторки ведут с любого места полотна — и с самой копии. Пока палец на экране, она цель касания: вынутая
+  // из DOM, она не донесла бы touchmove/touchend до #appPane — шторка не открылась бы, а dr-live так и остался бы
+  // на <html>. Поэтому сразу копию только прячем, а из DOM убираем, когда касаний не осталось
+  let tch=0; const gone=[];
+  document.addEventListener('touchstart', e=>{ tch=e.touches.length; }, {capture:true, passive:true});
+  ['touchend','touchcancel'].forEach(t=>document.addEventListener(t, e=>{
+    tch=e.touches.length;
+    if(!tch && gone.length) setTimeout(()=>{ if(!tch) gone.splice(0).forEach(n=>n.remove()); });
+  }, {capture:true, passive:true}));
   function peekClose(now){
     if(!pk) return;
     const c=pk; pk=null; lock.classList.remove('peek');
     if(pkA){ try{ pkA.cancel(); }catch(e){} pkA=null; }
-    if(now || RM.matches || !c.animate || !on){ c.remove(); return; }
+    if(now){ c.hidden=true; c.removeAttribute('id'); if(tch) gone.push(c); else c.remove(); return; }
+    if(RM.matches || !c.animate || !on){ c.remove(); return; }
     // упирается: сначала чуть подаётся наружу, потом сдаётся и уходит в пилюлю с разгоном
     const a=c.animate([{transform:'none', opacity:1, easing:'cubic-bezier(.3,0,.4,1)'},
       {transform:'scale(1.035)', opacity:1, offset:.24, easing:'cubic-bezier(.55,0,.85,.35)'},

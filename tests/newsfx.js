@@ -276,6 +276,23 @@ async function peek(b, shots) {
   await page.click('#sideDrawer [data-nav="news"]');
   await page.waitForTimeout(700);
   check(await page.evaluate(() => !document.documentElement.classList.contains('dr-open')), 'первый же тап в шторке срабатывает (она закрылась)');
+  // шторку тянут и с самого раскрытого (жест — с любого места полотна): копия — цель касания, вынутая из DOM
+  // посреди жеста, она оборвала бы его — шторка не открылась бы, dr-live остался бы на <html>
+  await page.waitForTimeout(400);
+  await scrollTo(page, 0);
+  check(await absorb(page), 'приветствие снова впиталось');
+  await page.click('#projBtn'); await page.waitForTimeout(800);
+  const pr = await peekBox(page);
+  check(!!pr, 'тап по пилюле раскрыл приветствие');
+  if (pr) {
+    const y = Math.round((pr.pk.t + pr.pk.b) / 2), sw2 = []; for (let x = 40; x <= 320; x += 20) sw2.push({ x, y });
+    await touch(cdp, page, sw2);
+    await page.waitForTimeout(600);
+    const d = await page.evaluate(() => ({ pk: document.querySelectorAll('.hero-peek').length, open: document.documentElement.classList.contains('dr-open') }));
+    check(!d.pk && d.open, `жест шторки с самого раскрытого: оно убрано, шторка открыта (${JSON.stringify(d)})`);
+    await page.evaluate(() => closeNavDrawer()); await page.waitForTimeout(700);
+    check(await page.evaluate(() => !document.documentElement.classList.contains('dr-live')), 'шторку закрыли — dr-live снят, жест не завис');
+  }
   check(errs.length === 0, 'раскрытое: ошибок в консоли нет' + (errs.length ? '\n    ' + [...new Set(errs)].slice(0, 6).join('\n    ') : ''));
   await ctx.close();
 }
