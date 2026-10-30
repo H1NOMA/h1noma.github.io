@@ -206,6 +206,24 @@ verify(){
     X=$(q "select count(*) from pg_trigger t join pg_proc f on f.oid = t.tgfoid where t.tgrelid = to_regclass('auth.users') and t.tgname = 'komik_email_guard' and t.tgenabled <> 'D' and f.prosrc ~ 'сменить нельзя'")
     if [ "$X" = 1 ]; then echo "  аккаунты: только тег@komikdnd.ru, сменить адрес нельзя ✓"
     else bad "нет защиты адресов аккаунтов (триггер komik_email_guard): игрок может переименоваться в логин команды"; OK=0; fi
+    # 10-30: игрок удаляет свой аккаунт сам — функция работает от владельца (postgres), и ему нужно право удалить строку
+    # auth.users (и пройти её правила строк, если они включены): иначе функция откатывается и удалиться нельзя
+    X=$(q "select p.prosecdef and public.komik_api_version() >= 4 and has_table_privilege(p.proowner, 'auth.users', 'DELETE')
+                  and (r.rolsuper or r.rolbypassrls or c.relowner = p.proowner or not c.relrowsecurity)
+             from pg_proc p join pg_roles r on r.oid = p.proowner, pg_class c
+            where p.oid = to_regprocedure('public.komik_delete_me(text)') and c.oid = to_regclass('auth.users')")
+    if [ "$X" = t ]; then echo "  удаление аккаунта игроком: работает (API 4) ✓"
+    else bad "игрок не может удалить свой аккаунт: нет функции komik_delete_me (API 4) или у её владельца нет права удалять из auth.users — запусти push.sh (без check); не помогло — покажи программисту"; OK=0; fi
+    # (страж общих строк и журнал выше считаются по именам — третий триггер на kv их не сбивает)
+    X=$(q "select count(*) from pg_trigger where tgenabled <> 'D' and ((tgrelid = to_regclass('public.kv') and tgname = 'komik_kv_gone')
+                                                                   or (tgrelid = to_regclass('auth.users') and tgname = 'komik_signup_gone'))")
+    if [ "$X" != 2 ]; then bad "нет триггеров komik_kv_gone/komik_signup_gone: удалённый аккаунт ещё час пишет в базу, а его логин сразу занимают — запусти push.sh (без check)"; OK=0; fi
+    # копия аккаунтов старше удаления хранит удалённого: при переезде setup.sh его вернул бы
+    T=$(find /root -maxdepth 1 -name 'auth-*.sql.gz' -printf '%T@\n' 2>/dev/null | sort -nr | head -n 1 | cut -d. -f1)
+    if [ -n "$T" ]; then
+      X=$(q "select count(*) from komik_priv.komik_gone where at > to_timestamp($T)")
+      if [ -n "$X" ] && [ "$X" != 0 ]; then warn "после последней копии аккаунтов игроки удалили аккаунтов: $X — сделай свежую копию (migrate/RESTORE.md, пункт 1)"; fi
+    fi
     echo "  команда (права — у аккаунта, не у логина):"
     X=""
     while IFS='|' read -r T S; do
@@ -393,12 +411,14 @@ say "5/7 · Защита аккаунтов и правил сайта"
 #   09-21 — права записи по ролям (снимает kv_write «любой пишет всё» и RPC в обход правил);
 #   09-25 — тег только с адреса @komikdnd.ru;  09-26 — comik:projects:v1 пишет только hinoma;
 #   09-27 — права команды у аккаунтов, игроки без удаления, переименования и с потолком размера, адрес не меняется;
-#   10-28 — фото отдельными строками comik:img:<хэш> (сервер проверяет хэш, игрок пишет свои портреты).
+#   10-28 — фото отдельными строками comik:img:<хэш> (сервер проверяет хэш, игрок пишет свои портреты);
+#   10-29 — в общих строках игрок меняет только своё, чтение белым списком, журнал правок;
+#   10-30 — игрок сам удаляет свой аккаунт (komik_delete_me, API 4).
 # 09-21..09-26 пересоздают свои (более мягкие) версии, 09-27 возвращает строгие — поэтому она после них,
 # а применяем только если скачались ВСЕ: иначе повторный запуск ослабил бы уже укреплённую базу.
 # И применяем ОДНОЙ транзакцией (mig_sql): снаружи мягкого промежуточного состояния никто не видит,
 # а сбой или Ctrl+C в любом месте откатывает всё — база остаётся как была.
-MIGS="2026-09-21-rls.sql 2026-09-25-email-domain.sql 2026-09-26-projects-owner.sql 2026-09-27-hardening.sql 2026-10-28-images.sql 2026-10-29-security.sql"
+MIGS="2026-09-21-rls.sql 2026-09-25-email-domain.sql 2026-09-26-projects-owner.sql 2026-09-27-hardening.sql 2026-10-28-images.sql 2026-10-29-security.sql 2026-10-30-self-delete.sql"
 # скачанный файл годится, если он наш и целый: ровно одна строка «begin;» и одна «commit;» — последней
 # (обрезанный файл её не содержит; по этим строкам mig_sql и склеивает файлы в одну транзакцию)
 mig_ok(){ sed -i 's/\r$//' "$1" && grep -q 'комик\|КОМИК' "$1" && [ "$(grep -cx 'begin;' "$1")" = 1 ] \

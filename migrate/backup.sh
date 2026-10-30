@@ -16,7 +16,8 @@
 #   · в /var/www/komik-backup — kv-ГГГГ-ММ-ДД.json.gz.gpg за 7 последних дней, latest.json.gz.gpg и latest.txt
 #     (дата, имя, sha256, размер). Caddy отдаёт их по https://cloud.komikdnd.ru/backup/<имя> (без списка файлов);
 #     GitHub (.github/workflows/backup-kv.yml) забирает latest в ветку backups. Открытого текста там больше нет.
-#   · заодно — уборка копий в /root старше недели (kv-before-restore-*, kv-before-push-*, auth-* кроме самой свежей).
+#   · заодно — уборка копий в /root старше недели (kv-before-restore-*, kv-before-push-*, auth-* кроме самой свежей),
+#     журнала правок kv_history (не дольше 7 дней) и следов аккаунтов, удалённых самими игроками (10-30).
 #  Расшифровать вручную — migrate/RESTORE.md, раздел 10.
 #  Песочница (без root и без docker; tests/README.md):
 #    KOMIK_BK_DIR=… KOMIK_BK_PASS=… KOMIK_BK_DUMP_CMD='cat kv.json' KOMIK_BK_NOPRUNE=1 bash migrate/backup.sh
@@ -136,6 +137,32 @@ mapfile -t OLD < <(find "$OUT" -maxdepth 1 -name 'kv-*.json.gz.gpg' -printf '%f\
 for f in "${OLD[@]}"; do rm -f -- "${OUT:?}/$f"; done
 N=$(find "$OUT" -maxdepth 1 -name 'kv-*.json.gz.gpg' | wc -l)
 echo "Копия $F: строк $ROWS${PREV:+ (в прошлой $PREV)}, $(du -h "$OUT/$F" | cut -f1), зашифрована; копий на сервере: $N"
+
+# ── уборка в базе (копия уже снята): журнал правок kv_history живёт не дольше 7 дней — раз в сутки убираем всё старше
+#    6 (сам журнал чистит себя лишь изредка). Удалённые игроками аккаунты (10-30): их следы в kv — ещё раз (могли
+#    вернуться из старой вкладки или копии), а через 90 дней логин свободен и запись о нём больше не нужна ──
+if [ -z "${KOMIK_BK_DUMP_CMD:-}" ]; then
+  docker exec -i supabase-db psql -U postgres -d postgres -v ON_ERROR_STOP=1 -qtA >/dev/null <<'SQL' \
+    || warn "уборка журнала правок и удалённых аккаунтов не прошла (база не ответила?) — копия при этом снята"
+do $komik$
+begin
+  if to_regclass('public.kv_history') is not null then
+    delete from public.kv_history where at < now() - interval '6 days';
+  end if;
+end $komik$;
+do $komik$
+declare t text;
+begin
+  if to_regclass('komik_priv.komik_gone') is not null and to_regprocedure('komik_priv.komik_forget(text)') is not null then
+    for t in select distinct g.tag from komik_priv.komik_gone g
+              where not exists (select 1 from auth.users u where lower(u.email) = g.tag || '@komikdnd.ru') loop
+      perform komik_priv.komik_forget(t);
+    end loop;
+    delete from komik_priv.komik_gone where at < now() - interval '90 days';
+  end if;
+end $komik$;
+SQL
+fi
 
 # ── уборка в /root: копии старше недели (последняя копия аккаунтов остаётся всегда — её берёт setup.sh) ──
 if [ -z "${KOMIK_BK_NOPRUNE:-}" ]; then

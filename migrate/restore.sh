@@ -15,7 +15,9 @@
 #  Копии на самом сервере (kv-before-restore-*, auth-*) тоже живут неделю; последняя копия аккаунтов — всегда.
 #  Строки из копии записываются поверх текущих; строк, которых в копии нет, скрипт не удаляет.
 #  Листы персонажей (comik:chars:<тег>) пишутся со свежей отметкой времени: иначе устройства игроков, где лист
-#  удалён или правился позже копии, по свежести снова перебили бы возвращённый лист.
+#  удалён или правился позже копии, по свежести снова перебили бы возвращённый лист; недостающие портреты листа
+#  (comik:img:<хэш>) возвращаются из той же копии. Аккаунты, удалённые самими игроками (10-30), не воскресают:
+#  их строки не пишутся, а следы в общих строках после записи убираются снова (RESTORE.md, раздел 13).
 #  Перед записью спрашивает «да» и сохраняет текущую таблицу в /root/kv-before-restore-<время>.json.gz.
 # ══════════════════════════════════════════════════════════════════
 set -euo pipefail
@@ -87,14 +89,33 @@ select E'-- komik:devs · команда: тег → аккаунт (restore.sh 
   from public.devs d
 SQL
   ) || DEVS_SQL=""
+  # Удалённые игроками аккаунты (10-30) — туда же, строкой «-- komik:gone»: на новом сервере их логин 90 дней не занять,
+  # а setup.sh после загрузки удаляет эти аккаунты снова. Список снимаем ПОСЛЕ аккаунтов: кто удалился между ними,
+  # окажется и там, и там — и при загрузке будет удалён. Нет таблицы (сервер без 10-30) — копия без этого блока
+  gone_sql(){ docker exec -i supabase-db psql -U postgres -d postgres -v ON_ERROR_STOP=1 -tA 2>/dev/null <<'SQL' || true
+select E'-- komik:gone · удалённые игроками аккаунты (restore.sh accounts)\n'
+    || E'do $komik$ begin\n'
+    || E'  if to_regclass(''komik_priv.komik_gone'') is not null then\n'
+    || coalesce(string_agg(format('    insert into komik_priv.komik_gone(uid, tag, at) values (%L, %L, %L) on conflict (uid) do nothing;',
+                                  g.uid, g.tag, g.at), E'\n' order by g.at), '    null;')
+    || E'\n  else\n    raise warning ''список удалённых аккаунтов из копии не загружен: нет komik_priv.komik_gone — запусти push.sh'';\n'
+    || E'  end if;\n'
+    -- не загрузился список — не беда для остальных аккаунтов: только предупреждение
+    || E'exception when others then\n  raise warning ''список удалённых аккаунтов из копии не загружен (%)'', sqlerrm;\n'
+    || E'end $komik$;'
+  from komik_priv.komik_gone g
+SQL
+  }
   # grep -c, а не -q: -q бросает чтение на первом совпадении, gzip получает SIGPIPE, и pipefail считает это ошибкой
   if { docker exec supabase-db pg_dump -U postgres -d postgres --data-only -t auth.users -t auth.identities \
-         && printf '%s\n' "$DEVS_SQL"; } | gzip -9 > "$F.part" \
+         && printf '%s\n' "$DEVS_SQL" && gone_sql; } | gzip -9 > "$F.part" \
      && [ "$(gzip -dc "$F.part" | grep -c '^COPY auth.users')" -gt 0 ]; then
     mv "$F.part" "$F"; chmod 600 "$F"
     echo "  сохранено: $F — аккаунтов $(docker exec supabase-db psql -U postgres -d postgres -tAc 'select count(*) from auth.users'), $(du -h "$F" | cut -f1)"
     if [ -n "$DEVS_SQL" ]; then echo "  команда: $(docker exec supabase-db psql -U postgres -d postgres -tAc "select string_agg(tag, ', ' order by tag) from public.devs") ✓"
     else warn "состав команды (public.devs) в копию не попал — после переезда повтори migrate/RESTORE.md, пункты 6–7"; fi
+    N=$(gzip -dc "$F" | grep -c '^    insert into komik_priv.komik_gone' || true)
+    [ "${N:-0}" = 0 ] || echo "  удалённые игроками аккаунты: $N — при переезде не вернутся, их логин 90 дней не занять ✓"
   else
     rm -f "$F.part"; bad "копия не получилась — пришли этот вывод программисту"; exit 1
   fi
@@ -159,12 +180,21 @@ if ! docker exec supabase-db psql -U postgres -d postgres -tAc \
 fi
 chmod 600 "$BEFORE"
 say "Что вернётся из $LABEL"
+# аккаунты, которые игроки удалили сами (10-30), а логин с тех пор никто не занял: их строк из копии не возвращаем
+GONE=$(docker exec supabase-db psql -U postgres -d postgres -tAc "select string_agg(distinct g.tag, ' ') from komik_priv.komik_gone g
+  where not exists (select 1 from auth.users u where lower(u.email) = g.tag || '@komikdnd.ru')" 2>/dev/null || true)
+[[ "$GONE" =~ ^[a-z0-9_\ ]*$ ]] || GONE=""
 
 # что именно запишем: только key и value (в старых копиях есть лишний столбец updated_at) + что изменится
 set +e
-python3 - "$SNAP" "$A2" "$BEFORE" "$WORK/payload.json" "$WORK/keys.txt" <<'PY'
+python3 - "$SNAP" "$A2" "$BEFORE" "$WORK/payload.json" "$WORK/keys.txt" "$GONE" <<'PY'
 import gzip, json, re, sys, time
-snap, key, before, out, keysf = sys.argv[1:6]
+snap, key, before, out, keysf, gone = sys.argv[1:7]
+gone = set(gone.split())
+# свои строки игрока, который удалил аккаунт сам: он их удалил — из копии они не возвращаются
+def gone_of(k):
+    m = re.fullmatch(r'(?:comik:chars:|comik:bm:|push:sub:)([a-z0-9_]{4,32})', k)
+    return m.group(1) if m and m.group(1) in gone else ''
 try:
     rows = json.load(gzip.open(snap, 'rt', encoding='utf-8'))
     assert isinstance(rows, list) and rows
@@ -175,6 +205,14 @@ try:
 except Exception:
     print('  не смог сохранить текущую таблицу — ничего не трогаю'); sys.exit(4)
 rows = [{'key': r['key'], 'value': r.get('value')} for r in rows if isinstance(r, dict) and isinstance(r.get('key'), str)]
+allrows = rows
+if key and gone_of(key):
+    print('  аккаунт %s игрок удалил сам — его строки не возвращаю (вернуть человека — migrate/RESTORE.md, раздел 13)' % gone_of(key))
+    sys.exit(6)
+skip = [] if key else sorted(r['key'] for r in rows if gone_of(r['key']))
+if skip:
+    rows = [r for r in rows if not gone_of(r['key'])]
+    print('  строки аккаунтов, удалённых самими игроками, не вернутся: ' + ', '.join(skip[:10]) + (' …' if len(skip) > 10 else ''))
 if key:
     one = [r for r in rows if r['key'] == key]
     if not one:
@@ -196,6 +234,13 @@ else:
     print('  изменится: %d%s' % (len(chg), (' — ' + ', '.join(chg[:15]) + (' …' if len(chg) > 15 else '')) if chg else ''))
     print('  появится:  %d%s' % (len(new), (' — ' + ', '.join(new[:15]) + (' …' if len(new) > 15 else '')) if new else ''))
     print('  без изменений: %d; строки, которых в копии нет, останутся как есть' % same)
+# портреты листа (kvimg:<хэш>): их строки удаляются вместе с аккаунтом (10-30) — недостающие берём из той же копии
+if key.startswith('comik:chars:'):
+    refs = set(re.findall(r'kvimg:([0-9a-f]{32})', json.dumps(rows[0]['value'])))
+    imgs = [r for r in allrows if r['key'].startswith('comik:img:') and r['key'][10:] in refs and r['key'] not in cur]
+    if imgs:
+        rows = rows + imgs
+        print('  портретов этих листов нет в базе: %d — вернутся из той же копии' % len(imgs))
 # пишем только то, что меняется (сравнение — до отметок времени ниже)
 todo = [r for r in rows if r['key'] not in cur or cur[r['key']] != r['value']]
 # Листы игрока сливаются на устройствах по свежести (updatedAt), а удаление — надгробие с более новой отметкой:
@@ -244,6 +289,13 @@ CODE=$(curl -sS -o "$WORK/resp" -w '%{http_code}' --max-time 120 -X POST "http:/
 if [[ "$CODE" == 2?? ]]; then
   say "Готово ✓"
   echo "Данные записаны. Проверь у себя: обнови страницу сайта."
+  # удалённые игроками аккаунты: их следы в общих строках из копии (запись на игры, тег на доске, реестр) — убираем снова
+  if [ -n "$GONE" ]; then
+    if docker exec supabase-db psql -U postgres -d postgres -v ON_ERROR_STOP=1 -qtAc \
+         "select komik_priv.komik_forget(t) from unnest(string_to_array('$GONE', ' ')) t" >/dev/null 2>&1; then
+      echo "  удалённые игроками аккаунты ($GONE): их следы в вернувшемся убраны ✓"
+    else warn "следы удалённых игроками аккаунтов ($GONE) убрать не вышло — их уберёт ночная копия (komik-backup)"; fi
+  fi
   # расписание: удалённые игры открытая вкладка помнит до перезагрузки (GAMES_GONE в index.html) и живую игру
   # с тем же id не принимает, как бы свежа та ни была, — не покажет и при следующей записи на игру снова сотрёт
   if grep -q ' comik:games:v1$' "$WORK/keys.txt"; then
