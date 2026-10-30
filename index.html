@@ -6320,6 +6320,9 @@ function itemRarityInfo(e){
   if(/редк/.test(v)) return RARITY_DEFS[2];
   return RARITY_VARIES;
 }
+/* «е» и «ё» в поиске — одна буква: «зеленый» находит «зелёный». Запрос приводим при сравнении, а не в SEC_Q:
+   поле поиска перерисовывается с его значением, и набранная «ё» сменилась бы в нём на «е» */
+function searchNorm(s){ return String(s||'').toLowerCase().replace(/ё/g,'е'); }
 function secQInput(v){ SEC_Q=(v||'').trim().toLowerCase(); SEC_SHOWN=SEC_PAGE; renderCardList(); }
 /* фасеты фильтра строятся по данным раздела: у каждой категории — свои (у оружия по типу,
    у брони по типу, у магпредметов по редкости и т.д.) + общие «Источник» и «Правила» */
@@ -6405,7 +6408,7 @@ function renderCards(){
 function secHay(e){
   const st=e.updatedAt||0;
   if(e.__hayAt===st && e.__hay!==undefined) return e.__hay;
-  const s=(e.title+' '+(e.kicker||'')+' '+(e.body||'')+' '+((e.tags||[]).join(' '))).toLowerCase();
+  const s=searchNorm(e.title+' '+(e.kicker||'')+' '+(e.body||'')+' '+((e.tags||[]).join(' ')));
   try{ Object.defineProperty(e,'__hay',{value:s,writable:true,configurable:true,enumerable:false});
        Object.defineProperty(e,'__hayAt',{value:st,writable:true,configurable:true,enumerable:false}); }
   catch(_){ return s; }
@@ -6422,7 +6425,7 @@ function renderCardList(){
   // локалью прогонялся по всем пяти тысячам карточек, и телефон вставал.
   // фасеты: внутри одного фасета — ИЛИ (совмещение позиций), между фасетами — И
   Object.keys(SEC_FILT).forEach(fk=>{ const sel=SEC_FILT[fk]; if(sel&&sel.length) list=list.filter(e=>sel.indexOf(itemFacetVal(e,fk))>=0); });
-  if(SEC_Q) list=list.filter(e=>secHay(e).includes(SEC_Q));
+  if(SEC_Q){ const q=searchNorm(SEC_Q); list=list.filter(e=>secHay(e).includes(q)); }
   // раздел с редкостью (магические предметы) сортируем по ступеням редкости, иначе — по алфавиту
   const byRar = list.some(e=>itemRarityInfo(e).key);
   list = list.slice().sort(byRar
@@ -6519,7 +6522,7 @@ function maMore(){ MA_SHOWN+=MA_PAGE*2; maRenderCards(); }
 function maRenderCards(){
   const el=document.getElementById('maCards'); if(!el) return;
   if(assimArchLocked()){ el.innerHTML=`<div class="ma-empty">Архив этого сеттинга пока закрыт</div>`; return; }
-  const q=MA_Q.toLowerCase();
+  const q=searchNorm(MA_Q);
   if(MA_CAT==='all' && !q){ el.innerHTML=`<div class="ma-empty">Выберите раздел слева<br>или начните поиск</div>`; return; }
   let list=ARCHIVE.filter(e=>{
     if(MA_CAT!=='all' && e.cat!==MA_CAT) return false;
@@ -6528,7 +6531,7 @@ function maRenderCards(){
     if(cd && cd.type==='story') return false;
     return true;
   });
-  if(q) list=list.filter(e=>(e.title+' '+(e.kicker||'')+' '+(e.body||'')+' '+(e.tags||[]).join(' ')).toLowerCase().includes(q));
+  if(q) list=list.filter(e=>secHay(e).includes(q));
   list=list.slice().sort((a,b)=>a.title.localeCompare(b.title,'ru'));
   if(!list.length){ el.innerHTML=`<div class="ma-empty">Ничего не найдено</div>`; return; }
   const total=list.length; if(total>MA_SHOWN) list=list.slice(0,MA_SHOWN);
@@ -7631,13 +7634,13 @@ function toggleSearchBar(e){ if(e) e.stopPropagation();
 // template, а не div: содержимое шаблона инертно — картинки не грузятся и их onerror не срабатывает
 function stripHtml(h){ const t=document.createElement('template'); t.innerHTML=h||''; return t.content.textContent||''; }
 function runSearch(q){
-  q=(q||'').trim().toLowerCase();
+  q=searchNorm(q).trim();
   SF_RES=[];
   if(q){
     // хронология — первой: архивных совпадений бывает 30, а показываем 14, и ветки хроники не доходили до списка
     ['legacy','neverland','assimilation','terra','skazki','gw'].forEach(camp=>['Приключения'].forEach(br=>{
       if(!hasChronoAccess(camp)) return;
-      const hay=(CHRONO_NAMES[camp]+' '+br+' '+stripHtml(CHRONO_DATA[camp+':'+br])).toLowerCase();
+      const hay=searchNorm(CHRONO_NAMES[camp]+' '+br+' '+stripHtml(CHRONO_DATA[camp+':'+br]));
       if(hay.includes(q)) SF_RES.push({b:'Хронология', ch:true, t:CHRONO_NAMES[camp]+' — '+br, camp, br});
     }));
     // ранний выход: собираем не больше 30 совпадений — на 5000+ карточках это экономит массу работы
@@ -7645,10 +7648,7 @@ function runSearch(q){
       const e=ARCHIVE[i];
       const cd=CATS.find(x=>x.id===e.cat);
       if(cd && cd.dev && !isDev()) continue;
-      if(e.title.toLowerCase().includes(q) ||
-         ((e.kicker||'')+' '+(e.body||'')+' '+(e.tags||[]).join(' ')).toLowerCase().includes(q)){
-        SF_RES.push({b:'Архив', ch:false, t:e.title, id:e.id});
-      }
+      if(secHay(e).includes(q)) SF_RES.push({b:'Архив', ch:false, t:e.title, id:e.id});
     }
   }
   const el=document.getElementById('sfResults');
@@ -8344,12 +8344,14 @@ function openSchedule(game){
   if(game && allowed.includes(game)) SCHED_GAME=game;
   if(!allowed.includes(SCHED_GAME)) SCHED_GAME=allowed[0];
   const chips=allowed.map(g=>`<button class="sp-cls${SCHED_GAME===g?' on':''}" onclick="openSchedule('${g}')">${esc(gameTitle(g))}</button>`).join('');
-  // игрок-ГМ ведёт только свои анонсы; разработчик видит все игры сеттинга
-  const list=myManagedGames(GAMES.filter(s=>s.game===SCHED_GAME));
+  // игрок-ГМ ведёт только свои анонсы; разработчик видит все игры сеттинга.
+  // По дате и с датой, как у игроков: без неё две игры в 19:00 в одном клубе не различить и «Игра сыграна» легко нажать не у той
+  const list=gamesByDate(myManagedGames(GAMES.filter(s=>s.game===SCHED_GAME)));
   const body=list.length ? list.map(s=>`
     <div class="gs-card">
       <div class="gs-title">${esc(s.title||'Сессия')}</div>
       <div class="gs-meta">
+        ${s.date?`<span>📅 ${esc(fmtGameDate(s.date))}</span>`:''}
         ${s.time?`<span>🕑 ${esc(s.time)}</span>`:''}
         ${s.loc?`<span>📍 ${esc(s.loc)}</span>`:''}
         ${s.price?`<span>💳 ${esc(s.price)}</span>`:''}
@@ -16148,11 +16150,11 @@ function trkAddManual(){
 }
 function trkSuggest(q){
   const el=document.getElementById('trk-sug'); if(!el) return;
-  q=(q||'').trim().toLowerCase();
+  q=searchNorm(q).trim();
   if(q.length<2){ el.innerHTML=''; return; }
   // сначала — уже созданные листы этого сеттинга (NPC и персонажи), потом бестиарий
-  const chars=(CHARS_ALL[CUR_PROJECT]||[]).filter(c=>c && !c.deleted && (c.name||'').toLowerCase().includes(q) && !TRK.list.some(x=>x.charId===c.id)).slice(0,6);
-  const hits=ARCHIVE.filter(c=>c.sub==='bestiary' && c.title.toLowerCase().includes(q)).slice(0,6);  // из архива сеттинга: в сказках классических чудищ нет
+  const chars=(CHARS_ALL[CUR_PROJECT]||[]).filter(c=>c && !c.deleted && searchNorm(c.name).includes(q) && !TRK.list.some(x=>x.charId===c.id)).slice(0,6);
+  const hits=ARCHIVE.filter(c=>c.sub==='bestiary' && searchNorm(c.title).includes(q)).slice(0,6);  // из архива сеттинга: в сказках классических чудищ нет
   // id листа пишет его владелец (строка comik:chars:<тег>) — в data-атрибут, а не в JS-строку обработчика
   el.innerHTML =
     chars.map(c=>`<button class="btn ghost sm" style="margin:6px 6px 0 0" data-id="${esc(c.id)}" onclick="trkAddChar(this.dataset.id)">👤 ${esc(c.name)}</button>`).join('') +
@@ -19701,12 +19703,17 @@ html.board-v2 #pdock .pd-tab:not([data-k]){display:none}          /* кореш�
   -webkit-backdrop-filter:blur(16px) saturate(1.25);backdrop-filter:blur(16px) saturate(1.25);
   border-radius:16px;padding:5px 7px;box-shadow:0 10px 30px rgba(0,0,0,.3)}
 .bv2-hl{justify-self:start}
-.bv2-hc{justify-self:center;padding-left:14px;min-width:0}
+/* средняя плашка — во всю свою колонку: колонка и так по содержимому, а когда места мало — сужается.
+   По центру узкой колонки плашка вылезала из неё под правый блок: «Ход ▸» и счётчик раунда не нажимались */
+.bv2-hc{justify-self:stretch;padding-left:14px;min-width:0}
 .bv2-hr{justify-self:end}
 .bv2-hud .tb-round{min-width:48px;padding:2px 4px}
 .bv2-hud .tb-round .n{font-size:1.3rem}
-.bv2-hud .tb-now{display:flex;flex-direction:column;align-items:flex-start;gap:2px;margin:0 6px 0 0;min-width:0}
-.bv2-hud .tb-now .who{font-size:1.02rem;max-width:34vw}
+/* предел 34vw — у всей «Сейчас ходит», а имя — не шире её (100%): в сжатой плашке оно кончается многоточием, а не под «Ход ▸».
+   Предел на самом имени (min(34vw,100%)) не годится: проценты при подсчёте ширины по содержимому не учитываются, плашка
+   растягивалась на всё длинное имя, и после многоточия оставалась пустота (у игрока на 760–1440 — до 180 px) */
+.bv2-hud .tb-now{display:flex;flex-direction:column;align-items:flex-start;gap:2px;margin:0 6px 0 0;min-width:0;max-width:34vw}
+.bv2-hud .tb-now .who{font-size:1.02rem;max-width:100%}
 .bv2-hud .tb-tbtn{width:38px;height:38px;border-radius:11px}
 .bv2-hud .tb-tbtn.main{width:auto;padding:0 16px;background:var(--red);color:#12130f;border-color:transparent;font-weight:700;font-family:var(--f-disp)}
 .bv2-hud .tb-sync{margin:0 6px 0 4px}
@@ -19823,23 +19830,22 @@ html.board-v2 #pdock .pd-tab:not([data-k]){display:none}          /* кореш�
   .bv2-hc{justify-self:stretch;padding-left:10px}
   .bv2-hud .tb-round{min-width:38px}
   .bv2-hud .tb-round .n{font-size:1.1rem}
-  .bv2-hud .tb-now{flex:1}
+  .bv2-hud .tb-now{flex:1;max-width:none}
   #trkBox .bv2-hud .tb-now{flex:1 1 auto;align-items:flex-start}
-  .bv2-hud .tb-now .who{font-size:.92rem;max-width:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .bv2-hud .tb-now .who{font-size:.92rem;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .bv2-hud .tb-tbtn{width:34px;height:34px}
   .bv2-hud .tb-tbtn.main{padding:0 11px;font-size:.86rem}
   .bv2-ib{min-width:30px;height:30px;padding:0 5px;font-size:.85rem}
   .bv2-zl{min-width:38px}
   .bv2-live{height:30px;padding:0 9px;font-size:.52rem}
-  /* у ГМа инструменты — вторым этажом во всю ширину */
-  .bv2.gm .bv2-hud{grid-template-columns:auto minmax(0,1fr)}
-  .bv2.gm .bv2-hr{grid-column:1 / -1;justify-self:stretch}
-  .bv2.gm .bv2-hr .bv2-zoom{margin-left:auto}
   /* у игрока справа — только масштаб и точка связи */
   .bv2:not(.gm) .bv2-zl{display:none}
   .bv2-strip{padding:22px 0 12px}
   .bv2-strip-in{gap:8px;padding:0 16px}
   .bv2-strip.over .bv2-strip-in{padding-right:84px}   /* справа — место под кнопку кубиков: последняя карточка из-под неё выезжает */
+  /* подсказка пустой доски: лента шириной по содержимому, строка не переносилась и уходила под маску справа.
+     72 — по 36 px с краёв, дальше затухания маски */
+  .bv2-empty{max-width:calc(100vw - 72px);box-sizing:border-box}
   .bv2-card{--cw:94px;border-radius:12px}
   .bv2-card.on-turn{transform:translateY(-8px) scale(1.04)}
   .bv2-ph .tb-ini{left:5px;top:5px;width:24px;height:24px;border-radius:7px}
@@ -19863,6 +19869,14 @@ html.board-v2 #pdock .pd-tab:not([data-k]){display:none}          /* кореш�
   .bv2-gm{grid-template-columns:1fr;margin:8px 15px 0}
   .bv2-gm .btn{letter-spacing:.04em;font-size:.84rem;padding-left:14px;padding-right:14px}
   html.board-v2 #trkBox > .trk-note,html.board-v2 #trkBox > .trk-guest{margin-left:15px;margin-right:15px}
+}
+/* у ГМа инструменты — вторым этажом во всю ширину. Не только на телефоне: до 1000 px в одну строку
+   правый блок оставлял имени пару букв */
+@media(max-width:999px){
+  .bv2.gm .bv2-hud{grid-template-columns:auto minmax(0,1fr)}
+  .bv2.gm .bv2-hr{grid-column:1 / -1;justify-self:stretch}
+  .bv2.gm .bv2-hr .bv2-zoom{margin-left:auto}
+  #trkBox .bv2.gm .bv2-hud .tb-now{flex:1 1 auto;max-width:none}
 }
 @media (prefers-reduced-motion:reduce){ .bv2-card,.bv2-mapbox{transition:none} .bv2-insp{animation:none} .bv2-live.on::before,.bv2-card.dying .bv2-ph::before{animation:none} }
 /* инспектор на широком экране: строка в два этажа — имя и хиты сверху, состояния снизу во всю
