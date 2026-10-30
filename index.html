@@ -7216,7 +7216,7 @@ function delChronoGame(){
 function announceChronoGame(){
   // хронология открыта разработчику всегда, а редактор ячейки — только в режиме ГМ: без этой проверки
   // openCellEditor молча выходил, и поверх новостей снова всплывал тот же редактор хронологии
-  if(!ADMIN){ toast('Анонс — в режиме Game Master: включите его в настройках'); return; }
+  if(!ADMIN){ toast('Анонс — в режиме ГМ: включите его в настройках'); return; }
   const e=chronoCollect(); if(!e) return; const g=e.g;
   if(!g.title){ toast('Укажи название игры'); return; }
   persistChronoGames();
@@ -8424,7 +8424,7 @@ function openSchedule(game){
       ${(s.players||[]).length?`<div class="gs-players">${s.players.map((p,i)=>`<span class="tag">${esc(p.name)}${p.charId?` · <button class="gs-charlink" onclick="openPlayer('${p.charId}')">${esc(p.charName||'персонаж')}</button>`:(p.charName?` · ${esc(p.charName)}`:'')} <button class="gs-kick" onclick="kickPlayer('${s.id}',${i})" title="Убрать игрока" aria-label="Убрать игрока">✕</button></span>`).join('')}</div>`:'<div class="opt">Записей пока нет</div>'}
       <div class="gs-act">
         <button class="btn ghost sm" onclick="openCellEditor('${s.id}')">Редактировать</button>
-        <button class="btn primary sm" onclick="gamePlayed(this.dataset.id,this)" data-id="${esc(s.id)}">Игра сыграна</button>
+        <button class="btn ghost sm" onclick="gamePlayed(this.dataset.id,this)" data-id="${esc(s.id)}">Игра сыграна</button>
       </div>
     </div>`).join('')
     : '<div class="empty" style="margin-top:14px">[ ПУСТО ] В этой игре нет анонсов.</div>';
@@ -8693,7 +8693,7 @@ function devToggleAdmin(){
   DEV_GM_OFF=!DEV_GM_OFF;                                       // разработчик выключает/включает свой режим ГМ
   try{ localStorage.setItem('comik:devgmoff', DEV_GM_OFF?'1':'0'); }catch(e){}
   refreshAdmin(); adminSideFX(); renderSettings();   // тумблер и бейдж в настройках — вместе с режимом
-  toast(ADMIN ? 'Game Master: включён' : 'Game Master: выключен');
+  toast(ADMIN ? 'Режим ГМ включён' : 'Режим ГМ выключен');
 }
 function admClick(){ openAccessModal(null,'account'); }
 /* меню «@» — то же окно входа, что и openAuth (раньше было два разных: без заголовка и кнопки столбиком —
