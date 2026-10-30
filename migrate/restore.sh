@@ -17,7 +17,8 @@
 #  Листы персонажей (comik:chars:<тег>) пишутся со свежей отметкой времени: иначе устройства игроков, где лист
 #  удалён или правился позже копии, по свежести снова перебили бы возвращённый лист; недостающие портреты листа
 #  (comik:img:<хэш>) возвращаются из той же копии. Аккаунты, удалённые самими игроками (10-30), не воскресают:
-#  их строки не пишутся, а следы в общих строках после записи убираются снова (RESTORE.md, раздел 13).
+#  их строки и портреты, на которые ссылались только эти строки, не пишутся, а следы в общих строках после записи
+#  убираются снова (RESTORE.md, раздел 13).
 #  Перед записью спрашивает «да» и сохраняет текущую таблицу в /root/kv-before-restore-<время>.json.gz.
 # ══════════════════════════════════════════════════════════════════
 set -euo pipefail
@@ -221,6 +222,22 @@ if key:
         print('  в копии нет ключа ' + key + ('. Похожие: ' + ', '.join(near) if near else ''))
         sys.exit(3)
     rows = one
+# портреты (comik:img:<хэш>), на которые в копии ссылались только строки удалённых: удалены вместе с аккаунтом, а уборка
+# после записи (komik_forget) их уже не найдёт — строк со ссылками нет. Ссылки в общих строках (доска, comik:chars:v1)
+# здесь считаются чужими: такие строки пишутся, и komik_forget сам снимет с них ссылку и удалит портрет
+refs = lambda v: set(re.findall(r'kvimg:([0-9a-f]{32})', json.dumps(v)))
+gone_refs = set().union(*(refs(r['value']) for r in allrows if gone_of(r['key'])))
+after = dict(cur); after.update((r['key'], r['value']) for r in rows)
+other_refs = set().union(*(refs(v) for k, v in after.items() if not k.startswith('comik:img:') and not gone_of(k)))
+lost = lambda k: k.startswith('comik:img:') and k[10:] in gone_refs and k[10:] not in other_refs and k not in cur
+if key and lost(key):
+    print('  портрет %s — из строк аккаунтов, удалённых самими игроками, и в базе на него никто не ссылается — не возвращаю'
+          ' (вернуть человека — migrate/RESTORE.md, раздел 13)' % key)
+    sys.exit(6)
+drop = [r['key'] for r in rows if lost(r['key'])]
+if drop:
+    rows = [r for r in rows if not lost(r['key'])]
+    print('  портреты удалённых аккаунтов не вернутся: %d' % len(drop))
 size = lambda v: len(json.dumps(v, ensure_ascii=False).encode())
 new = [r['key'] for r in rows if r['key'] not in cur]
 chg = [r['key'] for r in rows if r['key'] in cur and cur[r['key']] != r['value']]
@@ -236,8 +253,8 @@ else:
     print('  без изменений: %d; строки, которых в копии нет, останутся как есть' % same)
 # портреты листа (kvimg:<хэш>): их строки удаляются вместе с аккаунтом (10-30) — недостающие берём из той же копии
 if key.startswith('comik:chars:'):
-    refs = set(re.findall(r'kvimg:([0-9a-f]{32})', json.dumps(rows[0]['value'])))
-    imgs = [r for r in allrows if r['key'].startswith('comik:img:') and r['key'][10:] in refs and r['key'] not in cur]
+    mine = refs(rows[0]['value'])
+    imgs = [r for r in allrows if r['key'].startswith('comik:img:') and r['key'][10:] in mine and r['key'] not in cur]
     if imgs:
         rows = rows + imgs
         print('  портретов этих листов нет в базе: %d — вернутся из той же копии' % len(imgs))

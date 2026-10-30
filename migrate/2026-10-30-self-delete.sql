@@ -11,10 +11,12 @@
 --      проверяет вход, подтверждение (свой логин), что это не аккаунт команды и что пароль вводили не раньше
 --      10 минут назад (claim amr в токене); затем одной транзакцией:
 --        · свои строки comik:chars:<тег>, comik:bm:<тег>, push:sub:<тег>;
---        · портреты comik:img:<хэш>, на которые ссылались только его листы (на картинку из любой другой строки — нет);
+--        · портреты comik:img:<хэш>, на которые ссылались только его листы и карточки (на картинку из любой
+--          другой строки — нет);
 --        · свои записи на ещё не сыгранные игры (с отметкой gone[тег], чтобы старая вкладка не вернула запись),
---          тег ownTag со своих карточек на доске (версия доски rev + 1), себя из реестра логинов, свои листы
---          из замороженной comik:chars:v1, свои подписки из старой общей push:subs;
+--          со своих карточек на доске (с его тегом, а без тега — с id его листа, если тот ни за кем больше) — тег
+--          ownTag (карточка становится ничьей: «-») и портрет (версия доски rev + 1),
+--          себя из реестра логинов, свои листы из замороженной comik:chars:v1, свои подписки из старой общей push:subs;
 --        · аккаунт: auth.users (identities, sessions, mfa — каскадом), refresh_tokens без сессии — отдельно.
 --      Надгробия сыгранных игр, журнал доски, тексты архива и хроники не трогает. Журнал правок kv_history и
 --      ежедневные копии хранят прежнее ещё до 7 дней (сеть безопасности при угоне аккаунта).
@@ -54,7 +56,7 @@ language plpgsql volatile set search_path = '' as $$
 declare
   now_ms numeric := floor(extract(epoch from now()) * 1000);
   v jsonb; nv jsonb; gk text; gv jsonb; flat boolean;
-  cand text[];
+  cand text[]; ids text[] := '{}';
   n_rows int := 0; n_imgs int := 0;
 begin
   me := komik_priv.komik_ntag(me);
@@ -64,6 +66,13 @@ begin
   select coalesce(array_agg(m[1]), '{}') into cand
     from public.kv k, regexp_matches(k.value::text, 'kvimg:([0-9a-f]{32})', 'g') m
    where k.key in ('comik:chars:' || me, 'comik:bm:' || me);
+  -- id своих листов: карточку доски без тега (доска до 29.10 или ГМ без этого листа) страж отдаёт по id листа, которого
+  -- нет ни в чьей другой строке листов, — после удаления таким становится его id (ниже, перед доской)
+  select coalesce(array_agg(s->>'id'), '{}') into ids
+    from public.kv k,
+         jsonb_each(case when jsonb_typeof(k.value) = 'object' then k.value else '{}'::jsonb end) e(ek, ev),
+         jsonb_array_elements(case when jsonb_typeof(ev) = 'array' then ev else '[]'::jsonb end) s
+   where k.key = 'comik:chars:' || me and jsonb_typeof(s) = 'object' and coalesce(s->>'id', '') <> '';
 
   -- свои строки
   delete from public.kv where key in ('comik:chars:' || me, 'comik:bm:' || me, 'push:sub:' || me);
@@ -79,6 +88,8 @@ begin
                                  where jsonb_typeof(s) = 'object' and komik_priv.komik_ntag(s->>'owner') = me);
       cand := cand || coalesce((select array_agg(m[1]) from jsonb_array_elements(gv) s, regexp_matches(s::text, 'kvimg:([0-9a-f]{32})', 'g') m
                                  where jsonb_typeof(s) = 'object' and komik_priv.komik_ntag(s->>'owner') = me), '{}');
+      ids := ids || coalesce((select array_agg(s->>'id') from jsonb_array_elements(gv) s
+                               where jsonb_typeof(s) = 'object' and komik_priv.komik_ntag(s->>'owner') = me and coalesce(s->>'id', '') <> ''), '{}');
       nv := jsonb_set(nv, array[gk], (select coalesce(jsonb_agg(s order by i), '[]') from jsonb_array_elements(gv) with ordinality t(s, i)
                                        where not (jsonb_typeof(s) = 'object' and komik_priv.komik_ntag(s->>'owner') = me)));
     end loop;
@@ -107,16 +118,30 @@ begin
     if nv is distinct from v then update public.kv set value = nv where key = 'comik:games:v1'; end if;
   end if;
 
-  -- доска ходов: со своих карточек снимаем ownTag (карточки остаются у ГМа). Версия rev + 1 — иначе условная запись
-  -- ГМа (kvCasUpdate) по прежней версии вернула бы тег из его памяти
+  -- доска ходов: свои карточки остаются у ГМа, но ничьими — ownTag «-» (не тег и не пусто). Без тега карточку
+  -- присвоил бы по id листа любой, кто впишет этот id в свой лист: его листа больше нет, id ни за кем.
+  -- Свои — с его тегом и без тега (не враг) с id его листа, которого теперь нет ни в одной строке листов (как видит
+  -- страж, komik_ids_alone); id, которые есть и в чужой строке, — не его: так уходящий не запрёт чужие карточки.
+  -- Портрет с карточки снимаем — он тоже кандидат. Версия rev + 1 — иначе условная запись ГМа (kvCasUpdate)
+  -- по прежней версии вернула бы тег из его памяти
+  ids := array(select distinct i from unnest(ids) i where not exists (
+           select 1 from public.kv k where k.key like 'comik:chars:%' and jsonb_typeof(k.value) = 'object'
+              and jsonb_path_exists(k.value, '$.*[*] ? (@.id == $id)', jsonb_build_object('id', i))));
   select value into v from public.kv where key = 'comik:tracker:shared:v1' for update;
   if jsonb_typeof(v) = 'object' then
+    cand := cand || coalesce((select array_agg(m[1]) from jsonb_each(v) e(bk, bv),
+                                jsonb_array_elements(case when jsonb_typeof(bv->'list') = 'array' then bv->'list' else '[]'::jsonb end) c,
+                                regexp_matches(coalesce(c->>'ava', ''), 'kvimg:([0-9a-f]{32})', 'g') m
+                               where jsonb_typeof(c) = 'object' and (komik_priv.komik_ntag(c->>'ownTag') = me or (coalesce(c->>'ownTag', '') = ''
+                                     and c->'foe' is distinct from 'true'::jsonb and c->>'charId' = any(ids)))), '{}');
     nv := coalesce((select jsonb_object_agg(bk, case
         when jsonb_typeof(bv) = 'object' and jsonb_typeof(bv->'list') = 'array'
              and exists (select 1 from jsonb_array_elements(case when jsonb_typeof(bv->'list') = 'array' then bv->'list' else '[]'::jsonb end) c
-                          where jsonb_typeof(c) = 'object' and komik_priv.komik_ntag(c->>'ownTag') = me)
-        then jsonb_set(bv, '{list}', (select jsonb_agg(case when jsonb_typeof(c) = 'object' and komik_priv.komik_ntag(c->>'ownTag') = me
-                                                            then c - 'ownTag' else c end order by i)
+                          where jsonb_typeof(c) = 'object' and (komik_priv.komik_ntag(c->>'ownTag') = me or (coalesce(c->>'ownTag', '') = ''
+                                and c->'foe' is distinct from 'true'::jsonb and c->>'charId' = any(ids))))
+        then jsonb_set(bv, '{list}', (select jsonb_agg(case when jsonb_typeof(c) = 'object' and (komik_priv.komik_ntag(c->>'ownTag') = me
+                                                                 or (coalesce(c->>'ownTag', '') = '' and c->'foe' is distinct from 'true'::jsonb and c->>'charId' = any(ids)))
+                                                            then (c - 'ava') || '{"ownTag": "-"}'::jsonb else c end order by i)
                                         from jsonb_array_elements(bv->'list') with ordinality t(c, i)))
         else bv end)
       from jsonb_each(v) e(bk, bv)), '{}');

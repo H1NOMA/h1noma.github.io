@@ -291,13 +291,13 @@ def delete_me(tag, uid):
     now = int(time.time() * 1000)
     GONE[uid] = {'tag': tag, 'at': time.time()}
     pics = set(re.findall(r'kvimg:([0-9a-f]{32})', json.dumps(ROWS.get('comik:chars:' + tag))))
+    sheets = lambda row: [s for arr in (row.values() if isinstance(row, dict) else []) if isinstance(arr, list)
+                          for s in arr if isinstance(s, dict) and s.get('id')]
+    ids = {str(s['id']) for s in sheets(ROWS.get('comik:chars:' + tag))}
     n = 0
     for k in ('comik:chars:' + tag, 'comik:bm:' + tag, 'push:sub:' + tag):
         if ROWS.pop(k, None) is not None:
             n += 1
-    # портреты своих листов — если на них больше никто не ссылается
-    rest = json.dumps([v for k, v in ROWS.items() if not k.startswith('comik:img:')])
-    imgs = sum(1 for h in pics if 'kvimg:' + h not in rest and ROWS.pop('comik:img:' + h, None) is not None)
     # живые игры: своя запись снимается с отметкой gone[тег] — не раньше «сейчас» и строго новее записи
     games = ROWS.get('comik:games:v1')
     for s in games if isinstance(games, list) else []:
@@ -308,18 +308,26 @@ def delete_me(tag, uid):
             s['players'] = [p for p in s['players'] if not any(p is m for m in me)]
             s['gone'] = dict(s['gone'] if isinstance(s.get('gone'), dict) else {})
             s['gone'][tag] = max(now, 1 + int(max(max(num(p.get('upd')), num(p.get('at'))) for p in me)))
-    # доска: свой тег с карточек снимается, rev растёт — условная запись ГМа поверх старой версии не пройдёт
+    # доска: свои карточки (с его тегом; без тега — с id его листа, которого больше нет ни в одной строке листов)
+    # становятся ничьими (ownTag «-») и без портрета, rev растёт — условная запись ГМа поверх старой версии не пройдёт
+    ids -= {str(s['id']) for k, v in ROWS.items() if k.startswith('comik:chars:') for s in sheets(v)}
+    mine = lambda c: isinstance(c, dict) and (str(c.get('ownTag') or '').lower() == tag or (
+        not c.get('ownTag') and c.get('foe') is not True and str(c.get('charId') or '') in ids))
     board = ROWS.get('comik:tracker:shared:v1')
-    if isinstance(board, dict) and '"%s"' % tag in json.dumps(board).lower():
+    if isinstance(board, dict) and any(mine(c) for bv in board.values() if isinstance(bv, dict) and isinstance(bv.get('list'), list) for c in bv['list']):
         for bv in board.values():
             for c in bv.get('list') if isinstance(bv, dict) and isinstance(bv.get('list'), list) else []:
-                if isinstance(c, dict) and str(c.get('ownTag') or '').lower() == tag:
-                    del c['ownTag']
+                if mine(c):
+                    pics |= set(re.findall(r'kvimg:([0-9a-f]{32})', str(c.pop('ava', ''))))
+                    c['ownTag'] = '-'
         rev = str(board.get('rev') or '')
         board['rev'] = int(rev) + 1 if re.fullmatch(r'\d{1,15}', rev) else 1
     users = ROWS.get('comik:users:v1')
     if isinstance(users, list):
         ROWS['comik:users:v1'] = [u for u in users if not (isinstance(u, dict) and str(u.get('tag') or '').lower() == tag)]
+    # портреты своих листов и карточек — если на них больше никто не ссылается
+    rest = json.dumps([v for k, v in ROWS.items() if not k.startswith('comik:img:')])
+    imgs = sum(1 for h in pics if 'kvimg:' + h not in rest and ROWS.pop('comik:img:' + h, None) is not None)
     USERS.pop(tag + '@komikdnd.ru', None)
     return {'ok': True, 'tag': tag, 'rows': n, 'imgs': imgs}
 

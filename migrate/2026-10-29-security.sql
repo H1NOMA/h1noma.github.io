@@ -1,10 +1,12 @@
 -- ═══════════════════════════════════════════════════════════════════════════════
 --  КОМИК · 2026-10-29 · игрок меняет только своё, видит только своё; журнал правок
 --
---  Запуск:  push.sh применяет её сам — последней, в той же транзакции, что и остальные миграции.
---           Вручную: docker exec -i supabase-db psql -v ON_ERROR_STOP=1 -U postgres -d postgres < migrate/2026-10-29-security.sql
+--  Запуск:  push.sh применяет её сам — перед 10-30, в той же транзакции, что и остальные миграции.
+--           Вручную (проще — push.sh) — только вместе с 10-30: эта ставит версию API 3, и одна она спрячет у игроков
+--           «Удалить аккаунт» (10-30 возвращает 4):
+--           cat migrate/2026-10-29-security.sql migrate/2026-10-30-self-delete.sql | docker exec -i supabase-db psql -v ON_ERROR_STOP=1 -U postgres -d postgres
 --  Идемпотентно. Предыдущие миграции при каждом push.sh пересоздают свои (более слабые) версии kv_read,
---  devs_read и kv_player_cap — эта идёт последней и возвращает строгие.
+--  devs_read и kv_player_cap — эта идёт после них и возвращает строгие.
 --
 --  Дыры, которые закрывает (аудит 29.10.2026):
 --   1) Любой, кто сам зарегистрировался, переписывал общие строки целиком: расписание с записями всех
@@ -314,9 +316,12 @@ begin
         end loop;
         b := jsonb_set(b, '{mapPos}', mp);
       end if;
-      -- журнал доски: игрок дописывает свои действия (урон, броски), читает только ГМ
+      -- журнал доски: игрок дописывает свои действия (урон, броски), читает только ГМ. Новые записи «из будущего»
+      -- (дальше 10 минут — больше, чем расходятся часы) не берём: в хвосте 24 самых новых, и они вытеснили бы все
       if jsonb_typeof(nb->'log') = 'array' and jsonb_array_length(nb->'log') <= 40 then
-        b := jsonb_set(b, '{log}', komik_priv.komik_log_merge(ob->'log', nb->'log'));
+        b := jsonb_set(b, '{log}', komik_priv.komik_log_merge(ob->'log', (
+               select coalesce(jsonb_agg(x order by i), '[]') from jsonb_array_elements(nb->'log') with ordinality t(x, i)
+                where public.komik_num(x->'at') <= now_ms + 600000)));
       end if;
       if public.komik_num(nb->'at') is not null then b := b || jsonb_build_object('at', least(public.komik_num(nb->'at'), now_ms + 86400000)); end if;
     end if;
