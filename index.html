@@ -324,10 +324,20 @@
     .lock.full .project::after{content:"";position:absolute;top:6px;right:9px;width:6px;height:6px;border-radius:50%;
       background:var(--red-ink);box-shadow:0 0 8px rgba(var(--accent-rgb),.9);animation:lockDot .32s var(--spring) both}
     .lock.peek .project::after{opacity:0}
-    #view-news .masthead.hero-peek{position:fixed;left:12px;right:12px;z-index:30;margin:0;max-height:calc(100vh - 210px);overflow:auto;
-      overscroll-behavior:contain;transform-origin:50% 50%;
+    /* раскрытое приветствие — тот же блок сеттинга поверх ленты: фон и рамка у него свои, тень и отступы — тоже,
+       где сеттинг их задал (свитку NEVERLAND отступ сверху нужен под стержень). Прокручивается не блок, а его содержимое (.hp-in):
+       рамки сеттингов — на псевдоэлементах, прокрутка блока увезла бы их вместе с текстом и срезала стержни.
+       Раскладка — через #heroPeek, сильнее «[data-project] #view-news .masthead»: при равной специфичности те стоят ниже */
+    #view-news .masthead.hero-peek{margin:0;transform-origin:50% 50%;
       box-shadow:0 18px 50px rgba(0,0,0,.6),0 0 0 1px rgba(var(--accent-rgb),.22),0 0 34px rgba(var(--accent-rgb),.14)}
-    #view-news .masthead.hero-peek .hp-set{display:block;margin:14px auto 2px;padding:9px 18px;border-radius:999px;cursor:pointer;
+    /* верх — под пилюлей (--hp-t ставит скрипт), снизу — запас под календарь и стержень свитка */
+    #view-news #heroPeek{--hp-b:110px;position:fixed;top:var(--hp-t);left:12px;right:12px;z-index:30;display:flex;flex-direction:column;
+      max-height:calc(100vh - var(--hp-t) - var(--hp-b) - env(safe-area-inset-bottom));
+      max-height:calc(100dvh - var(--hp-t) - var(--hp-b) - env(safe-area-inset-bottom))}
+    /* с плашкой музыки «Ближайшая игра» стоит над ней */
+    html:has(#musicBar:not([hidden])) #view-news #heroPeek{--hp-b:176px}
+    #view-news #heroPeek .hp-in{flex:0 1 auto;min-height:0;overflow:auto;overscroll-behavior:contain}
+    #view-news .masthead.hero-peek .hp-set{flex:none;display:block;margin:14px auto 2px;padding:9px 18px;border-radius:999px;cursor:pointer;
       font-family:var(--f-mono);font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;color:var(--red-ink);
       background:rgba(var(--accent-rgb),.1);border:var(--hair) solid rgba(var(--accent-rgb),.45)}
   }
@@ -3452,13 +3462,14 @@
     #ngFloat .ngf-s .fg{stroke:var(--red-ink);transition:stroke-dasharray .42s var(--spring)}
     #ngFloat .ngf-s b{font-family:var(--f-mono);font-weight:500;font-size:.78rem;color:var(--txt)}
     #ngFloat .ngf-s.full b{color:var(--muted)}
-    /* пилюля и календарь — одной полосой: пилюля доходит до календаря, шов — тонкая черта */
-    #ngFloat.on{right:calc(12px + 58px);border-right:0;border-radius:999px 0 0 999px}
-    html:has(#ngFloat.on):not(:has(#projMenu.open)):not(.dr-open):not(.search-open) #calFab{border-radius:0 999px 999px 0;
+    /* пилюля и календарь — одной полосой: пилюля доходит до календаря, шов — тонкая черта. С плашкой музыки
+       рядом с календарём плашка, а пилюля над ней — обе остаются круглыми */
+    #musicBar[hidden]~#ngFloat.on{right:calc(12px + 58px);border-right:0;border-radius:999px 0 0 999px}
+    html:has(#ngFloat.on):not(:has(#projMenu.open,#musicBar:not([hidden]))):not(.dr-open):not(.search-open) #calFab{border-radius:0 999px 999px 0;
       background:var(--glass2);border-color:rgba(var(--accent-rgb),.42);border-left-color:rgba(255,255,255,.1);box-shadow:0 8px 24px rgba(0,0,0,.42)}
     .mirror-ui #ngFloat{left:calc(12px + 58px + 10px);right:12px}
-    .mirror-ui #ngFloat.on{left:calc(12px + 58px);right:12px;border-right:var(--hair) solid rgba(var(--accent-rgb),.42);border-left:0;border-radius:0 999px 999px 0}
-    html.mirror-ui:has(#ngFloat.on):not(:has(#projMenu.open)):not(.dr-open):not(.search-open) #calFab{border-radius:999px 0 0 999px;
+    .mirror-ui #musicBar[hidden]~#ngFloat.on{left:calc(12px + 58px);right:12px;border-right:var(--hair) solid rgba(var(--accent-rgb),.42);border-left:0;border-radius:0 999px 999px 0}
+    html.mirror-ui:has(#ngFloat.on):not(:has(#projMenu.open,#musicBar:not([hidden]))):not(.dr-open):not(.search-open) #calFab{border-radius:999px 0 0 999px;
       border-left-color:rgba(var(--accent-rgb),.42);border-right-color:rgba(255,255,255,.1)}
     /* пока пилюля снаружи, сама карточка невидима, но место держит — лента не прыгает */
     #nextGame.ngf-away{visibility:hidden}
@@ -17229,7 +17240,11 @@ boot();
       if(r.width) Object.assign(M, {pw:r.width, ph:r.height, pb:r.bottom, cx:r.left+r.width/2, cy:r.top+r.height/2});
     }
     const a=docPos(mh); M.mL=a.x; M.mT=a.y; M.mW=mh.offsetWidth; M.mH=mh.offsetHeight; M.span=M.mH*.75;
-    if(!mh.style.borderRadius) M.r0=parseFloat(getComputedStyle(mh).borderTopLeftRadius)||0;   // свой радиус (у сеттингов разный)
+    // свой радиус (у сеттингов разный) — без inline-радиуса впитывания: сеттинг меняют и при впитанном блоке
+    const ir=mh.style.getPropertyValue('border-radius');
+    if(ir) mh.style.removeProperty('border-radius');
+    M.r0=parseFloat(getComputedStyle(mh).borderTopLeftRadius)||0;
+    if(ir) mh.style.setProperty('border-radius', ir);
     if(!card.hidden && card.offsetHeight){ const b=docPos(card); M.nL=b.x; M.nT=b.y; M.nW=card.offsetWidth; M.nH=card.offsetHeight; }
     else M.nH=0;
     // короткая лента: до конца впитывания не докрутить — блок так и висел бы наполовину впитанным
@@ -17295,8 +17310,9 @@ boot();
   // что уже записано: то же значение не пишем повторно (лишняя запись — лишний пересчёт стиля в кадре)
   const last={};
   function put(el, k, v){ if(last[k]===v) return; last[k]=v; if(v) el.style.setProperty(k, v); else el.style.removeProperty(k); }
+  const ABS=['transform','opacity','visibility','border-radius','--absorb'];   // inline-свойства впитывания
   function clearMh(){
-    ['transform','opacity','visibility','border-radius','--absorb'].forEach(k=>put(mh, k, '')); put(lock, '--suck', '');
+    ABS.forEach(k=>put(mh, k, '')); put(lock, '--suck', '');
     mh.classList.remove('absorbing'); full(false);
   }
   // пилюля «помнит», что впитала: точка на ней, а тап раскрывает приветствие под шапкой (меню сеттингов —
@@ -17306,14 +17322,18 @@ boot();
   function peekOpen(){
     if(pk) return;
     const c=mh.cloneNode(true);
-    c.removeAttribute('style'); c.classList.remove('absorbing'); c.classList.add('hero-peek');
+    // снимаем только впитывание: арт сеттинга тоже стоит inline (applyGameHero)
+    ABS.forEach(k=>c.style.removeProperty(k)); c.classList.remove('absorbing'); c.classList.add('hero-peek');
     c.querySelectorAll('[id]').forEach(n=>n.removeAttribute('id'));
     c.querySelectorAll('.hero-edit').forEach(n=>n.remove());
+    const sc=document.createElement('div'); sc.className='hp-in';   // прокрутка — внутри, рамка сеттинга стоит
+    while(c.firstChild) sc.appendChild(c.firstChild);
+    c.appendChild(sc);
     c.id='heroPeek'; c.setAttribute('role','dialog'); c.setAttribute('aria-label','Приветствие');
     const b=document.createElement('button'); b.type='button'; b.className='hp-set'; b.textContent='Сменить сеттинг';
     b.addEventListener('click', e=>{ e.stopPropagation(); peekClose(); setTimeout(()=>{ if(typeof projMenuOpen==='function') projMenuOpen(); }, 60); });
     c.appendChild(b);
-    c.style.top=(M.pb+10)+'px';
+    c.style.setProperty('--hp-t', (M.pb+10)+'px');
     view.appendChild(c); pk=c; pkY=Y;
     lock.classList.add('peek');
     if(RM.matches || !c.animate) return;
@@ -17324,11 +17344,11 @@ boot();
     c.animate([{opacity:0},{opacity:1}], {duration:200, easing:'ease-out'});
   }
   const fromPill=r=>`translate3d(${(M.cx-r.left-r.width/2).toFixed(1)}px,${(M.cy-r.top-r.height/2).toFixed(1)}px,0) scale(${(M.pw/r.width).toFixed(3)},${(M.ph/r.height).toFixed(3)})`;
-  function peekClose(){
+  function peekClose(now){
     if(!pk) return;
     const c=pk; pk=null; lock.classList.remove('peek');
     if(pkA){ try{ pkA.cancel(); }catch(e){} pkA=null; }
-    if(RM.matches || !c.animate || !on){ c.remove(); return; }
+    if(now || RM.matches || !c.animate || !on){ c.remove(); return; }
     // упирается: сначала чуть подаётся наружу, потом сдаётся и уходит в пилюлю с разгоном
     const a=c.animate([{transform:'none', opacity:1, easing:'cubic-bezier(.3,0,.4,1)'},
       {transform:'scale(1.035)', opacity:1, offset:.24, easing:'cubic-bezier(.55,0,.85,.35)'},
@@ -17339,15 +17359,19 @@ boot();
   // обработчиков меню сеттингов на самой пилюле (в любом браузере, независимо от порядка на цели)
   let lpT=0, lpFired=false;
   document.addEventListener('click', e=>{
+    // клик отпускания после долгого нажатия приходит уже не в пилюлю: меню встало поверх неё
+    // (касание — в его пункт, мышь — в общего предка). Гасим его где угодно, иначе меню тут же закроется
+    if(lpFired){ lpFired=false; e.stopImmediatePropagation(); e.preventDefault(); return; }
     if(!lock.contains(e.target)) return;
-    if(lpFired){ lpFired=false; e.stopImmediatePropagation(); return; }
     if(!on || !lock.classList.contains('full')) return;
     e.stopImmediatePropagation(); e.preventDefault();
     if(pk) peekClose(); else peekOpen();
   }, true);
+  // где клика после удержания нет вовсе (Android), следующее касание или клавиша — уже не отпускание
+  ['pointerdown','keydown'].forEach(t=>document.addEventListener(t, ()=>{ lpFired=false; }, true));
   // долгое нажатие на пилюлю с впитанным приветствием — сразу меню сеттингов
   lock.addEventListener('pointerdown', ()=>{
-    lpFired=false; clearTimeout(lpT);
+    clearTimeout(lpT);
     if(!on || !lock.classList.contains('full')) return;
     lpT=setTimeout(()=>{ lpFired=true; peekClose(); if(typeof projMenuOpen==='function') projMenuOpen(); }, 480);
   });
@@ -17355,6 +17379,15 @@ boot();
   // тап мимо только закрывает — новость или кнопка под пальцем не срабатывают заодно
   document.addEventListener('click', e=>{ if(pk && !pk.contains(e.target) && !lock.contains(e.target)){ e.stopPropagation(); e.preventDefault(); peekClose(); } }, true);
   document.addEventListener('keydown', e=>{ if(pk && e.key==='Escape'){ e.stopPropagation(); peekClose(); } }, true);
+  // шторку тянут жестом — click нет, «тап мимо» не сработает; а у #appPane при ней transform, и fixed-копия
+  // уехала бы с полотном за верх экрана — убираем сразу. Смена сеттинга (и свайпом по пилюле): раскрытое
+  // уже чужое, а радиус и размеры — перемерить (ResizeObserver промолчит, если размер совпал)
+  let proj=R.getAttribute('data-project');
+  if(window.MutationObserver) new MutationObserver(()=>{
+    if(pk && R.classList.contains('dr-live')) peekClose(true);
+    const p=R.getAttribute('data-project');
+    if(p!==proj){ proj=p; peekClose(); dirty=true; kick(); }
+  }).observe(R, {attributes:true, attributeFilter:['class','data-project']});
   function gulp(){
     gulped=true;
     lock.classList.add('gulp'); clearTimeout(gT); gT=setTimeout(()=>lock.classList.remove('gulp'), 560);

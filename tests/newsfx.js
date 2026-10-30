@@ -1,7 +1,8 @@
 /* Мобильные новости: приветствие при прокрутке уходит в пилюлю сеттинга, «Ближайшая игра» становится
    плавающей пилюлей и возвращается в карточку. Телефон 390 (и 360/430), без анимаций, десктоп 1440 — без изменений.
+   Раскрытое приветствие — во всех сеттингах, в портретной и альбомной ориентации; долгое нажатие, шторка, смена сеттинга.
    node tests/newsfx.js [папка-для-кадров]   (стенд: строки kv подменяются — нужна ближайшая игра) */
-const { launch, openPage, mock, check, done } = require('./lib');
+const { launch, openPage, login, mock, check, done } = require('./lib');
 const SHOTS = process.argv[2] || '';
 
 const pad = n => String(n).padStart(2, '0');
@@ -93,17 +94,21 @@ async function phone(b, width, shots) {
   // перерисовка новостей (такт облака) не трогает пилюлю
   const same = await page.evaluate(() => { const f = document.getElementById('ngFloat'), k = f.querySelector('.ngf-k'); renderNews(); renderNews(); return f.querySelector('.ngf-k') === k && f.classList.contains('on'); });
   check(same, `${width}: renderNews не пересобирает пилюлю`);
-  // играет музыка: пилюля встаёт над плашкой, тост — над пилюлей
+  // играет музыка: пилюля встаёт над плашкой, тост — над пилюлей; полоса с календарём распадается — обе круглые
   if (width === 390) {
     const mus = await page.evaluate(() => new Promise(res => {
       const mb = document.getElementById('musicBar'); mb.hidden = false; toast('Проверка');
+      // скругление справа у пилюли и слева у календаря: 0 — склеены в полосу
+      const shape = () => { const f = getComputedStyle(document.getElementById('ngFloat')), c = getComputedStyle(document.getElementById('calFab'));
+        return [parseFloat(f.borderTopRightRadius), parseFloat(f.borderRightWidth), parseFloat(c.borderTopLeftRadius)]; };
       setTimeout(() => {   // тост выезжает снизу — меряем, когда встал
-        const f = document.getElementById('ngFloat').getBoundingClientRect(), t = document.getElementById('toast').getBoundingClientRect();
-        mb.hidden = true; const f2 = document.getElementById('ngFloat').getBoundingClientRect();
-        res({ up: f.bottom < f2.bottom - 60, toastAbove: t.bottom <= f.top });
+        const f = document.getElementById('ngFloat').getBoundingClientRect(), t = document.getElementById('toast').getBoundingClientRect(), s = shape();
+        mb.hidden = true; const f2 = document.getElementById('ngFloat').getBoundingClientRect(), s2 = shape();
+        res({ up: f.bottom < f2.bottom - 60, toastAbove: t.bottom <= f.top, round: s[0] > 20 && s[1] > 0 && s[2] > 20, glued: s2[0] === 0 && s2[1] === 0 && s2[2] === 0 });
       }, 500);
     }));
     check(mus.up && mus.toastAbove, `${width}: с плашкой музыки пилюля выше неё, тост выше пилюли (${JSON.stringify(mus)})`);
+    check(mus.round && mus.glued, `${width}: с плашкой музыки пилюля и календарь круглые, без неё — одной полосой (${JSON.stringify(mus)})`);
   }
   // тап — анонсы
   await page.click('#ngFloat');
@@ -149,12 +154,139 @@ async function phone(b, width, shots) {
   await ctx.close();
 }
 
+/* раскрытое приветствие (тап по пилюле, когда приветствие впитано): во всех сеттингах — как само приветствие
+   (арт, рамка), прокручивается внутри рамки, не вылезает ни на ленту, ни под календарь. Долгое нажатие — меню
+   сеттингов, отпускание его не закрывает; шторка жестом от края закрывает раскрытое; после смены сеттинга
+   скругление при впитывании начинается с радиуса нового сеттинга */
+const PROJS = ['classic', 'legacy', 'neverland', 'terra', 'assimilation', 'skazki', 'gw'];
+async function absorb(page) {
+  const g = await geo(page), full = g.mhTop - g.pb + g.mhH * .75;
+  for (let y = 0; y <= Math.min(g.max, full + 40); y += 30) await scrollTo(page, y);
+  await page.waitForTimeout(900);                   // пружина впитывания успокаивается
+  return page.evaluate(() => document.getElementById('projSwipe').classList.contains('full'));
+}
+const peekBox = page => page.evaluate(() => {
+  const pk = document.getElementById('heroPeek'); if (!pk) return null;
+  const mh = document.querySelector('#view-news .masthead'), sc = pk.querySelector('.hp-in'), bt = pk.querySelector('.hp-set');
+  const R = el => { const r = el.getBoundingClientRect(); return { t: r.top, b: r.bottom, l: r.left, r: r.right }; };
+  const cs = getComputedStyle(pk), ms = getComputedStyle(mh);
+  // рамка — псевдоэлементы сеттинга: у копии те же, что у приветствия, и не гаснут
+  const pseudo = (el, w) => { const s = getComputedStyle(el, w); return [s.content, s.borderTopWidth, s.borderTopColor, s.backgroundImage, s.boxShadow].join('|'); };
+  return { pk: R(pk), sc: sc && R(sc), bt: R(bt), pb: document.getElementById('projSwipe').getBoundingClientRect().bottom,
+    cal: R(document.getElementById('calFab')), vh: innerHeight, art: /url\(/.test(cs.backgroundImage) && cs.backgroundImage === ms.backgroundImage,
+    frame: pseudo(pk, '::before') === pseudo(mh, '::before') && pseudo(pk, '::after') === pseudo(mh, '::after')
+      && getComputedStyle(pk, '::before').opacity === '1' && getComputedStyle(pk, '::after').opacity === '1',
+    selfScroll: pk.scrollHeight - pk.clientHeight, scH: sc ? sc.scrollHeight - sc.clientHeight : -1, nl: document.documentElement.dataset.project === 'neverland' };
+});
+async function touch(cdp, page, pts, hold) {
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [pts[0]] });
+  for (const p of pts.slice(1)) { await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [p] }); await page.waitForTimeout(16); }
+  if (hold) await page.waitForTimeout(hold);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+}
+const center = async (page, sel) => { const r = await page.locator(sel).boundingBox(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; };
+const menuOpen = page => page.evaluate(() => document.getElementById('projMenu').classList.contains('open'));
+
+async function peek(b, shots) {
+  console.log('· телефон, раскрытое приветствие');
+  const { ctx, page, errs } = await openPage(b, { viewport: { width: 390, height: 844 }, project: 'classic', storage: QUIET });
+  await page.waitForFunction(() => !document.getElementById('splash'), null, { timeout: 15000 });
+  await login(page, 'hinoma');                        // команде видны все сеттинги
+  const cdp = await ctx.newCDPSession(page);
+  await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
+  // альбомная — с длинным приветствием ГМа: в рамку не влезает, прокручивается
+  for (const [w, h, long] of [[390, 844, false], [844, 390, true]]) {
+    await page.setViewportSize({ width: w, height: h });
+    for (const p of PROJS) {
+      await page.evaluate(([p, long]) => { setProject(p); go('news'); scrollTo(0, 0);
+        document.getElementById('newsFeed').style.minHeight = '3000px';   // лента длинная в любом сеттинге
+        if (long) document.getElementById('heroText').insertAdjacentText('beforeend', ' Длинное приветствие ГМа.'.repeat(30)); }, [p, long]);
+      await page.waitForTimeout(700);
+      const tag = `${w}×${h} ${p}`;
+      if (!await absorb(page)) { check(false, `${tag}: приветствие впиталось`); continue; }
+      await page.click('#projBtn');
+      await page.waitForTimeout(800);                 // пружина раскрытия — 620 мс
+      const r = await peekBox(page);
+      if (!r) { check(false, `${tag}: тап по пилюле раскрывает приветствие`); continue; }
+      if (shots) await page.screenshot({ path: `${shots}/newsfx-peek-${w}-${p}.png` });
+      const rod = r.nl ? 11 : 0;                      // стержни свитка торчат за блок
+      // сам блок не прокручивается: scrollHeight больше лишь на стержень (overflow у свитка visible)
+      const inside = !!r.sc && r.sc.t >= r.pk.t - .5 && r.sc.b <= r.pk.b + .5 && r.bt.t >= r.pk.t && r.bt.b <= r.pk.b && r.selfScroll <= rod + 1;
+      check(r.art && r.frame, `${tag}: раскрытое — с артом и рамкой сеттинга`);
+      check(inside && r.pk.t - rod >= r.pb && r.pk.b + rod <= r.cal.t - 4,
+        `${tag}: целиком в своей рамке, между пилюлей и календарём (${JSON.stringify(r)})`);
+      if (long) {
+        const s = await page.evaluate(() => { const pk = document.getElementById('heroPeek'), sc = pk.querySelector('.hp-in') || pk, t0 = pk.getBoundingClientRect().top, y0 = scrollY;
+          sc.scrollTop = 1e4; return { st: sc.scrollTop, moved: Math.abs(pk.getBoundingClientRect().top - t0), win: scrollY - y0 }; });
+        await page.waitForTimeout(200);
+        check(r.scH > 20 && s.st > 20 && s.moved < .5 && s.win === 0 && await page.evaluate(() => !!document.getElementById('heroPeek')),
+          `${tag}: длинное приветствие прокручивается внутри рамки (${JSON.stringify(s)})`);
+      }
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(500);
+    }
+  }
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.evaluate(() => { setProject('classic'); go('news'); scrollTo(0, 0); document.getElementById('newsFeed').style.minHeight = '3000px'; });
+  await page.waitForTimeout(700);
+  const cssR = await page.evaluate(() => parseFloat(getComputedStyle(document.querySelector('#view-news .masthead')).borderTopLeftRadius));
+  check(await absorb(page), 'приветствие «Классики» впиталось');
+  // долгое нажатие мышью: меню открылось, а клик при отпускании (уже над меню) его не закрыл
+  const pc = await center(page, '#projBtn');
+  await page.mouse.move(pc.x, pc.y); await page.mouse.down(); await page.waitForTimeout(700); await page.mouse.up();
+  await page.waitForTimeout(400);
+  // меню закрылось (ошибка) — дальше проверяем с открытым вручную; пункты выезжают по очереди
+  const reopen = async ok => { if (!ok) await page.evaluate(() => projMenuOpen()); await page.waitForTimeout(300); };
+  let lp = await menuOpen(page);
+  check(lp, 'долгое нажатие мышью: меню сеттингов открыто и после отпускания');
+  await reopen(lp);
+  await page.click('#projMenu .pm-item.cur');
+  await page.waitForTimeout(400);
+  check(!await menuOpen(page), 'следующий клик по пункту меню срабатывает');
+  // то же касанием; следующим касанием выбираем другой сеттинг — он не съеден
+  await touch(cdp, page, [pc], 700);
+  await page.waitForTimeout(400);
+  lp = await menuOpen(page);
+  check(lp, 'долгое нажатие пальцем: меню сеттингов открыто и после отпускания');
+  await reopen(lp);
+  await touch(cdp, page, [await center(page, '#projMenu .pm-legacy')], 60);
+  await page.waitForTimeout(900);
+  check(!await menuOpen(page) && await page.evaluate(() => CUR_PROJECT) === 'legacy', 'следующее касание выбирает сеттинг (LEGACY)');
+
+  // сеттинг сменили при впитанном приветствии: в начале впитывания радиус — свой (LEGACY), а не прошлый
+  await scrollTo(page, 0); await page.waitForTimeout(900);
+  const r0 = await page.evaluate(() => { const mh = document.querySelector('#view-news .masthead'); return mh.style.borderRadius ? -1 : parseFloat(getComputedStyle(mh).borderTopLeftRadius); });
+  const g = await geo(page);
+  await scrollTo(page, Math.round(g.mhTop - g.pb + 6)); await page.waitForTimeout(900);
+  const rs = await page.evaluate(() => document.querySelector('#view-news .masthead').style.borderRadius);
+  check(r0 > 0 && Math.abs(r0 - cssR) > 3 && Math.abs(parseFloat(rs) - r0) < 2,
+    `после смены сеттинга впитывание скругляется от его радиуса (${cssR}px → ${r0}px, в начале ${rs})`);
+
+  // шторка жестом от края: раскрытое закрывается сразу, а не уезжает с полотном; тап в шторке срабатывает
+  await scrollTo(page, 0);
+  check(await absorb(page), 'приветствие LEGACY впиталось');
+  await page.click('#projBtn'); await page.waitForTimeout(800);
+  check(!!(await peekBox(page)), 'тап по пилюле раскрыл приветствие');
+  const sw = []; for (let x = 6; x <= 286; x += 20) sw.push({ x, y: 600 });
+  await touch(cdp, page, sw);
+  await page.waitForTimeout(600);
+  check(await page.evaluate(() => !document.getElementById('heroPeek') && document.documentElement.classList.contains('dr-open')),
+    'жест шторки: раскрытое приветствие закрыто, шторка открыта');
+  await page.click('#sideDrawer [data-nav="news"]');
+  await page.waitForTimeout(700);
+  check(await page.evaluate(() => !document.documentElement.classList.contains('dr-open')), 'первый же тап в шторке срабатывает (она закрылась)');
+  check(errs.length === 0, 'раскрытое: ошибок в консоли нет' + (errs.length ? '\n    ' + [...new Set(errs)].slice(0, 6).join('\n    ') : ''));
+  await ctx.close();
+}
+
 (async () => {
   await mock('/__mock/rows', 'POST', [{ key: 'comik:games:v1', value: [GAME] }]);
   const b = await launch();
   await phone(b, 390, SHOTS);
   await phone(b, 360, '');
   await phone(b, 430, '');
+  await peek(b, SHOTS);
 
   console.log('· телефон 390, prefers-reduced-motion');
   {
