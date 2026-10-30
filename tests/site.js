@@ -144,6 +144,18 @@ const LONG = 'Арагорн сын Араторна из рода Исилду�
     await G.ctx.close();
   }
 
+  // «В эфире» и после первого нажатия «Завершить?» (красным): подпись длиннее, а правый блок панели на узком телефоне впритык
+  for (const w of [320, 360]) {
+    await page.setViewportSize({ width: w, height: 800 }); await page.waitForTimeout(200);
+    for (const arm of [false, true]) {
+      if (arm) await page.click('.bv2-live.on');
+      const r = await page.evaluate(() => { const hr = document.querySelector('.bv2-hr'), b = document.querySelector('.bv2-live');
+        return { t: b.textContent, sw: hr.scrollWidth, cw: hr.clientWidth, right: Math.round(hr.getBoundingClientRect().right), red: getComputedStyle(b).color === 'rgb(255, 90, 102)' }; });
+      check(r.sw <= r.cw + 1 && r.right <= w && r.red === arm, `эфир ${w} «${r.t}»: правый блок панели ${r.sw}/${r.cw}, край ${r.right} ≤ ${w}${arm ? ', красным' : ''}`);
+    }
+    await page.evaluate(() => { const b = document.querySelector('.bv2-live.on'); delete b.dataset.arm; b.textContent = 'В эфире'; });
+  }
+
   await live(false); await page.waitForTimeout(300);   // эфир гасим — выключение заодно очищает доску
   check(errs.length === 0, 'ГМ: ошибок в консоли нет' + (errs.length ? '\n    ' + errs.slice(0, 5).join('\n    ') : ''));
   await ctx.close();

@@ -209,6 +209,7 @@
   .set-prof .id{flex:1;min-width:0}
   .set-prof .id .n{font-family:var(--f-disp);font-weight:700;font-size:1.12rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .set-badge{display:inline-flex;align-items:center;gap:5px;margin-top:5px;font-family:var(--f-mono);font-size:.56rem;letter-spacing:.1em;text-transform:uppercase;color:var(--red-ink);background:rgba(var(--accent-rgb),.16);border:var(--hair) solid rgba(var(--accent-rgb),.4);border-radius:7px;padding:3px 8px}
+  .set-badge .bi{width:12px;height:12px}
   /* шапка профиля в настройках — целиком кнопка: аккаунтом управляют в карточке профиля */
   button.set-prof{width:100%;font:inherit;color:var(--txt);text-align:left;cursor:pointer}
   .set-prof .chev{color:var(--muted);flex:none}
@@ -577,6 +578,8 @@
   .players-bar .btn{width:100%}
   .add-row{display:flex;gap:10px;align-items:stretch}
   .add-row #addCharBtn{flex:1;min-width:0}
+  /* калькулятор — обычная кнопка: главная на экране одна («Добавить персонажа»), а срез угла у квадрата
+     читался как поломка */
   .players-bar .add-row .add-calc{flex:0 0 58px;width:58px;padding:0;display:inline-flex;align-items:center;justify-content:center}
   .add-calc svg{width:21px;height:21px}
   .fab:active{transform:scale(.9)}
@@ -1474,8 +1477,8 @@
   .tb-tool{border:var(--hair) solid var(--line2);background:var(--surface);color:var(--dim);font-family:var(--f-mono);font-size:.6875rem;letter-spacing:.04em;padding:9px 11px;border-radius:10px;cursor:pointer;min-height:38px}
   .tb-tool.on{color:var(--red-ink);border-color:rgba(var(--accent-rgb),.5);background:rgba(var(--accent-rgb),.1)}
   .tb-mass{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin-bottom:12px;padding:10px 12px;border:var(--hair) solid rgba(var(--accent-rgb),.5);border-radius:12px;background:rgba(var(--accent-rgb),.09)}
-  .tb-mass-n{font-family:var(--f-mono);font-size:.68rem;letter-spacing:.06em;color:var(--red-ink);margin-right:2px}
-  .tb-mass button{border:var(--hair) solid var(--line2);background:var(--surface);color:var(--dim);font-family:var(--f-mono);font-size:.68rem;padding:7px 10px;border-radius:9px;cursor:pointer}
+  .tb-mass-n{font-family:var(--f-mono);font-size:.6875rem;letter-spacing:.06em;color:var(--red-ink);margin-right:2px}
+  .tb-mass button{border:var(--hair) solid var(--line2);background:var(--surface);color:var(--dim);font-family:var(--f-mono);font-size:.6875rem;padding:7px 10px;border-radius:9px;cursor:pointer}
   .tb-mass button.dmg{color:var(--hp-low);border-color:rgba(217,86,78,.45)}
   .tb-mass button.heal{color:var(--hp-ok);border-color:rgba(120,196,107,.45)}
   .tb-mass button.del{color:#e79a94}
@@ -2608,8 +2611,9 @@
   /* действия инлайн-листа (PDF · JSON · Удалить) — одним рядом кнопок M; не влезли — переносятся */
   #playerEditor .isheet-acts{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
   #playerEditor .isheet-acts .btn{flex:1 1 auto;min-width:0}
-  /* вопрос «Удалить безвозвратно?» перед последним подтверждением */
-  .del-q{font-family:var(--f-mono);font-size:.78rem;color:var(--danger);align-self:center}
+  /* вопрос «Удалить безвозвратно?» — своей строкой над «Да, удалить» и «Отмена»: в одном ряду с ними на телефоне
+     «Отмена» уезжала одна на всю ширину под красной кнопкой */
+  .del-q{flex-basis:100%;font-family:var(--f-mono);font-size:.78rem;color:var(--danger)}
 
   /* toast */
   .toast{position:fixed;bottom:calc(var(--botnav-h) + 14px + env(safe-area-inset-bottom));left:0;right:0;margin:0 auto;width:fit-content;transform:translateY(16px) scale(.94);z-index:130;background:var(--glass2);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border:var(--hair) solid var(--line2);border-radius:999px;box-shadow:0 8px 28px rgba(0,0,0,.4);padding:9px 26px;color:var(--txt);font-family:var(--f-mono);font-weight:700;font-size:.82rem;letter-spacing:.02em;display:flex;align-items:center;gap:9px;opacity:0;pointer-events:none;transition:transform .35s var(--spring),opacity .25s;max-width:94vw}
@@ -2727,6 +2731,9 @@
     /* редактор-дашборд: секции сеткой в 2 колонки, на широком — в 3 */
     /* инлайн-редактор — со вкладками (как на мобилке), не сплошным полотном */
     #playerEditor{max-width:920px;margin:0 auto}
+    /* ряд PDF · JSON · Удалить — последний на странице, а «＋» и импорт стоят над подвалом справа: без запаса
+       они наезжали на «Удалить» */
+    #playerEditor .isheet-acts{margin-bottom:30px}
     /* без чёрной полоски-фона под кнопкой возврата и иконкой сохранения */
     #playerEditor .isheet-bar{position:static;background:none;padding:0}
     /* вкладки редактора — на всю строку, углы как у полей (менее скруглённые) */
@@ -4443,7 +4450,7 @@ if(/Android/i.test(navigator.userAgent||'')) d.classList.add('lite');}catch(e){}
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
           Добавить персонажа
         </button>
-        <button class="btn primary add-calc" id="statCalcBtn" onclick="openStatCalc()" aria-label="Калькулятор характеристик" title="Калькулятор характеристик">
+        <button class="btn ghost add-calc" id="statCalcBtn" onclick="openStatCalc()" aria-label="Калькулятор характеристик" title="Калькулятор характеристик">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="3" width="15" height="18" rx="3"/><path d="M8 7.5h8M8.5 12.5h.01M12 12.5h.01M15.5 12.5h.01M8.5 16h.01M12 16h.01M15.5 16h.01"/></svg>
         </button>
       </div>
@@ -12353,11 +12360,14 @@ function confirmDeleteInline(id){
   el.innerHTML = `<span class="del-q">Удалить безвозвратно?</span>
     <button class="btn danger fill sm" onclick="deleteInline('${id}')">Да, удалить</button>
     <button class="btn ghost sm" onclick="confirmDeleteInlineCancel('${id}')">Отмена</button>`;
+  // ряд стал выше, подвал сдвинулся без прокрутки — плавающие кнопки поднимаем заново, иначе встают на «Отмена»
+  try{ fabFooterClamp(); }catch(e){}
 }
 function confirmDeleteInlineCancel(id){
   const el=document.querySelector('#playerEditor .pacts'); if(!el) return;
   if(el.dataset.orig){ el.innerHTML=el.dataset.orig; delete el.dataset.orig; }
   else el.innerHTML=`<button class="btn danger sm" onclick="confirmDeleteInline('${id}')" title="Удалить персонажа">${bi('trash')}Удалить</button>`;
+  try{ fabFooterClamp(); }catch(e){}
 }
 async function deleteInline(id){
   const c=CHARS.find(x=>x.id===id); if(c && !canEdit(c)){ toast('Нет прав на удаление'); return; }
@@ -13294,7 +13304,7 @@ function renderSettings(){
   el.innerHTML = `<div class="set-page">
     <button class="set-prof" onclick="openProfileCard()">
       <span class="set-av" style="background:${profBg(SESSION)};color:${profInk(SESSION)}">${esc(profInitial(SESSION))}</span>
-      <span class="id"><span class="n">${esc(profName(SESSION))}</span>${isDev()?`<br><span class="set-badge">🎲 Game Master</span>`:`<br><span class="set-badge" style="color:var(--dim);background:var(--surface2);border-color:var(--line2)">@${esc(dispTag(SESSION))}</span>`}</span>
+      <span class="id"><span class="n">${esc(profName(SESSION))}</span>${isDev()?`<br><span class="set-badge">${bi('dice')}Game Master</span>`:`<br><span class="set-badge" style="color:var(--dim);background:var(--surface2);border-color:var(--line2)">@${esc(dispTag(SESSION))}</span>`}</span>
       ${CHEV}
     </button>
     ${gmRows?`<div class="set-grp">${gmRows}</div>`:''}
@@ -14669,8 +14679,9 @@ function trkRowHtml(x,o){
 /* верхняя панель боя */
 function trkCombatBar(o){
   o=o||{}; const round=parseInt(o.round,10)||1, view=trkViewMode(), gm=!!o.gm;   // раунд у игрока — из общего стола: в разметку только число
+  // за «◀» — невидимый U+FE0E: без него iPhone рисует треугольник эмодзи (синей плашкой)
   const nav=gm
-    ? `<button class="tb-tbtn" onclick="trkStep(-1)" aria-label="Назад">◀</button>
+    ? `<button class="tb-tbtn" onclick="trkStep(-1)" aria-label="Назад">◀︎</button>
        <div class="tb-now"><span class="cap">Сейчас ходит</span><span class="who">${esc(o.whoName||'—')}</span></div>
        <button class="tb-tbtn main" onclick="trkStep(1)">Ход ▸</button>`
     : `<div class="tb-now" style="margin:0 auto"><span class="cap">Сейчас ходит</span><span class="who">${esc(o.whoName||'—')}</span></div>`;
@@ -15360,7 +15371,7 @@ function trkStageHud(S){
       <button class="tb-round"${gm?' onclick="trkRoundReset()" title="Сбросить бой"':' disabled'}><span class="n">${parseInt(S.round,10)||1}</span><span class="l">раунд</span></button>
     </div>
     <div class="bv2-hc">
-      ${gm?`<button class="tb-tbtn" onclick="trkStep(-1)" aria-label="Назад">◀</button>`:''}
+      ${gm?`<button class="tb-tbtn" onclick="trkStep(-1)" aria-label="Назад">◀︎</button>`:''}
       <div class="tb-now"><span class="cap">Сейчас ходит</span><span class="who">${esc(S.whoName)}</span></div>
       ${gm?`<button class="tb-tbtn main" onclick="trkStep(1)">Ход ▸</button>`:''}
     </div>
@@ -16773,9 +16784,10 @@ function pushRenderOne(el){
   pushStatus().then(st=>{
     el.classList.toggle('on', st==='on');
     el.classList.toggle('disabled', st==='unsupported'||st==='denied');
-    // вторая строка — только когда включить нельзя
+    // вторая строка — только когда включить нельзя; на компьютере запрет стоит в браузере, а не в «телефоне»
     const note=document.getElementById('pushNote');
-    if(note){ const t = st==='denied'?'Запрещены в настройках телефона' : st==='unsupported'?'Недоступно на этом устройстве' : ''; note.textContent=t; note.hidden=!t; }
+    const where=(window.matchMedia && matchMedia('(pointer:coarse)').matches)?'телефона':'браузера';
+    if(note){ const t = st==='denied'?'Запрещены в настройках '+where : st==='unsupported'?'Недоступно на этом устройстве' : ''; note.textContent=t; note.hidden=!t; }
   });
 }
 /* открыть меню конкретной игры по id (по тапу на уведомление).
@@ -19762,6 +19774,10 @@ html.board-v2 #pdock .pd-tab:not([data-k]){display:none}          /* кореш�
 .bv2-live::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--line2)}
 .bv2-live.on{color:#9fdc95;border:var(--hair) solid rgba(132,201,122,.45);background:rgba(132,201,122,.1)}
 .bv2-live.on::before{background:#84c97a;box-shadow:0 0 0 3px rgba(132,201,122,.2);animation:bv2Pulse 1.8s ease-in-out infinite}
+/* «Завершить?» — второе нажатие очистит доску: опасным красным, а не зелёным эфира; точка эфира не нужна —
+   подпись длиннее «В эфире», а место в правом блоке на узком телефоне впритык */
+.bv2-live.on[data-arm]{color:var(--danger);border-color:rgba(var(--danger-rgb),.55);background:rgba(var(--danger-rgb),.12)}
+.bv2-live.on[data-arm]::before{display:none}
 @keyframes bv2Pulse{50%{box-shadow:0 0 0 6px rgba(132,201,122,0)}}
 /* ── лента карточек ── */
 .bv2-strip{position:absolute;left:0;right:0;bottom:0;z-index:3;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;
@@ -19874,7 +19890,7 @@ html.board-v2 #pdock .pd-tab:not([data-k]){display:none}          /* кореш�
   .bv2-live{height:30px;padding:0 9px;gap:6px}
   /* подпись в 11 px целиком («Показать игрокам») выталкивала масштаб и точку связи за край узкого телефона */
   @media(max-width:419px){ .bv2-live .lv-more{display:none} }
-  @media(max-width:359px){ .bv2.gm .bv2-hr{gap:3px} }
+  @media(max-width:359px){ .bv2.gm .bv2-hr{gap:3px} .bv2.gm .bv2-live{padding:0 7px} }
   /* у игрока справа — только масштаб и точка связи */
   .bv2:not(.gm) .bv2-zl{display:none}
   .bv2-strip{padding:22px 0 12px}
