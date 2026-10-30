@@ -40,6 +40,7 @@ LOG = []             # [{t, method, path, key, bytes, status}]
 FAIL = {'rate': 0.0, 'slow': 0, 'player_img': True, 'v3': True, 'v4': True}   # player_img: False — сервер без миграции 10-28; v3: False — без 10-29; v4: False — без удаления аккаунта
 GONE = {}            # uid → {tag, at}: удалённые аккаунты (komik_gone) — их токен ничего не пишет, логин занят GONE_DAYS
 GONE_DAYS = 90
+GONE_ERR = {'code': '42501', 'message': 'komik:gone', 'details': 'аккаунт удалён', 'hint': None}   # отказ триггера komik_kv_gone
 REAUTH_S = 600       # komik:reauth — пароль вводили не позже 10 минут назад
 PUBLIC_READ = {'comik:archive:v1', 'comik:news:v1', 'comik:chrono:v1', 'comik:hero:v1', 'comik:projects:v1', 'comik:games:v1',
                'comik:tracker:shared:v1', 'comik:users:v1', 'comik:coreover:v1', 'comik:corehid:v1'}
@@ -606,6 +607,8 @@ class H(SimpleHTTPRequestHandler):
                     return self.send_json(409, {'code': '23505', 'message': 'duplicate key value violates unique constraint "kv_pkey"'})
                 if tag is None or self.gone() or not can_write(tag, k, v, not exists):
                     self.note(k, 0, 403)
+                    if tag is not None and self.gone():
+                        return self.send_json(403, GONE_ERR)
                     return self.send_json(403 if tag is not None else 401, {'code': '42501', 'message': 'new row violates row-level security policy for table "kv"'})
                 ROWS[k] = v
                 done.append({'key': k, 'value': v})
@@ -640,7 +643,7 @@ class H(SimpleHTTPRequestHandler):
                     continue
                 if nk != k or self.gone() or not can_write(tag, k, nv, False):
                     self.note(k, 0, 403)
-                    return self.send_json(403, {'code': '42501', 'message': 'new row violates row-level security policy for table "kv"'})
+                    return self.send_json(403, GONE_ERR if self.gone() else {'code': '42501', 'message': 'new row violates row-level security policy for table "kv"'})
                 ROWS[k] = nv
                 changed.append({'key': k, 'value': nv})
         size = len(json.dumps(b, ensure_ascii=False).encode('utf-8'))
