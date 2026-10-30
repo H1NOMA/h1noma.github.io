@@ -1,6 +1,7 @@
 /* Доска ходов, расписание ГМа и поиск по архиву.
    Доска: верхняя панель ГМа ничего не перекрывает на 375–1920 (длинное имя, эфир выключен и включён), до 1000 px
-   инструменты — вторым этажом; подсказка пустой доски на телефоне помещается в ленту.
+   инструменты — вторым этажом; обрезанное имя — без пустоты после многоточия, у ГМа и у игрока (гость на живой доске);
+   подсказка пустой доски на телефоне помещается в ленту.
    Расписание ГМа — с датой и по дате. Поиск не различает «е» и «ё»: общий, в разделе, мини-архив, подсказки доски.
    node tests/site.js [папка-для-скриншотов] */
 const { launch, openPage, login, check, done, PHONE } = require('./lib');
@@ -92,12 +93,14 @@ const LONG = 'Арагорн сын Араторна из рода Исилду�
     const R = el => el.getBoundingClientRect();
     const hit = el => { const q = R(el); const t = document.elementFromPoint(q.left + q.width / 2, q.top + q.height / 2); return el.contains(t); };
     const hud = document.querySelector('.bv2-hud'), hl = hud.querySelector('.bv2-hl'), hc = hud.querySelector('.bv2-hc'), hr = hud.querySelector('.bv2-hr');
-    const btns = [...hc.querySelectorAll('button')], hod = btns[btns.length - 1], who = hc.querySelector('.who');
+    const btns = [...hc.querySelectorAll('button')], hod = btns[btns.length - 1], who = hc.querySelector('.who'), now = hc.querySelector('.tb-now');
     const over = (a, b) => { const p = R(a), q = R(b); return Math.max(0, Math.min(p.right, q.right) - Math.max(p.left, q.left)) > 1 && Math.max(0, Math.min(p.bottom, q.bottom) - Math.max(p.top, q.top)) > 1; };
     return { click: [hud.querySelector('.tb-round'), ...btns, ...hr.querySelectorAll('button')].every(hit),
              overlap: over(hl, hc) || over(hc, hr) || over(hl, hr),
              whoIn: R(who).right <= R(hod).left + 1 && R(who).right <= R(hc).right,
              cut: who.scrollWidth > who.clientWidth + 1, hcW: Math.round(R(hc).width),
+             // имя обрезано — плашка по нему: после многоточия нет пустоты (у ГМа на ≥1000 и у игрока)
+             tight: !(who.scrollWidth > who.clientWidth + 1) || R(now).right - R(who).right <= 2,
              two: R(hr).top >= R(hc).bottom - 1 };
   });
   for (const on of [false, true]) {
@@ -107,8 +110,9 @@ const LONG = 'Арагорн сын Араторна из рода Исилду�
       for (const n of [MID, LONG]) {
         await pick(n); await page.waitForTimeout(120);
         const p = await probe();
-        check(p.click && !p.overlap && p.whoIn, `${on ? 'эфир' : 'без эфира'} ${w} «${n.slice(0, 12)}…»: кнопки нажимаются, плашки не наезжают, имя не под «Ход ▸»`
-          + (p.click && !p.overlap && p.whoIn ? '' : ' ' + JSON.stringify(p)));
+        const ok = p.click && !p.overlap && p.whoIn && p.tight;
+        check(ok, `${on ? 'эфир' : 'без эфира'} ${w} «${n.slice(0, 12)}…»: кнопки нажимаются, плашки не наезжают, имя не под «Ход ▸»`
+          + (ok ? '' : ' ' + JSON.stringify(p)));
         if (w >= 760 && w < 1000) check(p.two, `${on ? 'эфир' : 'без эфира'} ${w}: инструменты ГМа — вторым этажом`);
         if (w >= 760 && w < 1000 && n === MID) check(!p.cut, `${on ? 'эфир' : 'без эфира'} ${w}: «${n}» целиком`);
         if (SHOTS && n === LONG && [880, 1000, 1180].includes(w)) await page.screenshot({ path: `${SHOTS}/hud-${on ? 'live' : 'off'}-${w}.png`, clip: { x: 0, y: 0, width: w, height: 220 } });
@@ -119,6 +123,26 @@ const LONG = 'Арагорн сын Араторна из рода Исилду�
   await page.setViewportSize({ width: 1440, height: 860 }); await pick('Огр'); await page.waitForTimeout(150);
   const wide = await probe();
   check(!wide.two && wide.hcW < 300, `1440 «Огр»: одна строка, средняя плашка по содержимому (${wide.hcW} px)`);
+
+  // игрок (гость) на живой доске: длинное имя обрезано по 34vw, а плашка — по имени, без пустоты после многоточия
+  console.log('· доска ходов: игрок');
+  await pick(LONG); await page.waitForTimeout(1500);
+  {
+    const G = await openPage(b, { viewport: { width: 760, height: 860 }, project: 'legacy', storage: { 'comik:cookies:ok': '1' } });
+    await G.page.evaluate(() => { setProject('legacy'); go('combat'); });
+    const seen = await G.page.waitForFunction(n => { const w = document.querySelector('.bv2-hud .who'); return w && w.textContent === n; }, LONG, { timeout: 20000 }).then(() => true, () => false);
+    check(seen, 'гость видит живую доску ГМа с ходом «' + LONG.slice(0, 12) + '…»');
+    for (const w of seen ? [760, 880, 1000, 1440] : []) {
+      await G.page.setViewportSize({ width: w, height: 860 }); await G.page.waitForTimeout(250);
+      const r = await G.page.evaluate(() => { const R = e => e.getBoundingClientRect(), hud = document.querySelector('.bv2-hud');
+        const hc = hud.querySelector('.bv2-hc'), hr = hud.querySelector('.bv2-hr'), who = hc.querySelector('.who'), now = hc.querySelector('.tb-now');
+        return { tail: Math.round(R(now).right - R(who).right), whoW: Math.round(R(who).width), max: Math.round(innerWidth * .34),
+                 apart: R(hc).right <= R(hr).left + 1 && R(hud.querySelector('.bv2-hl')).right <= R(hc).left + 1 }; });
+      check(r.tail <= 2 && r.whoW <= r.max + 1 && r.apart, `игрок ${w}: имя ≤ 34vw (${r.whoW}/${r.max}), после него пусто ${r.tail} px, плашки не наезжают`);
+    }
+    check(G.errs.length === 0, 'игрок: ошибок в консоли нет' + (G.errs.length ? '\n    ' + G.errs.slice(0, 5).join('\n    ') : ''));
+    await G.ctx.close();
+  }
 
   await live(false); await page.waitForTimeout(300);   // эфир гасим — выключение заодно очищает доску
   check(errs.length === 0, 'ГМ: ошибок в консоли нет' + (errs.length ? '\n    ' + errs.slice(0, 5).join('\n    ') : ''));

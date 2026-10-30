@@ -19592,8 +19592,11 @@ html.board-v2 #pdock .pd-tab:not([data-k]){display:none}          /* кореш�
 .bv2-hr{justify-self:end}
 .bv2-hud .tb-round{min-width:48px;padding:2px 4px}
 .bv2-hud .tb-round .n{font-size:1.3rem}
-.bv2-hud .tb-now{display:flex;flex-direction:column;align-items:flex-start;gap:2px;margin:0 6px 0 0;min-width:0}
-.bv2-hud .tb-now .who{font-size:1.02rem;max-width:min(34vw,100%)}   /* 100% — в сжатой плашке имя кончается многоточием, а не под «Ход ▸» */
+/* предел 34vw — у всей «Сейчас ходит», а имя — не шире её (100%): в сжатой плашке оно кончается многоточием, а не под «Ход ▸».
+   Предел на самом имени (min(34vw,100%)) не годится: проценты при подсчёте ширины по содержимому не учитываются, плашка
+   растягивалась на всё длинное имя, и после многоточия оставалась пустота (у игрока на 760–1440 — до 180 px) */
+.bv2-hud .tb-now{display:flex;flex-direction:column;align-items:flex-start;gap:2px;margin:0 6px 0 0;min-width:0;max-width:34vw}
+.bv2-hud .tb-now .who{font-size:1.02rem;max-width:100%}
 .bv2-hud .tb-tbtn{width:38px;height:38px;border-radius:11px}
 .bv2-hud .tb-tbtn.main{width:auto;padding:0 16px;background:var(--red);color:#12130f;border-color:transparent;font-weight:700;font-family:var(--f-disp)}
 .bv2-hud .tb-sync{margin:0 6px 0 4px}
@@ -19710,7 +19713,7 @@ html.board-v2 #pdock .pd-tab:not([data-k]){display:none}          /* кореш�
   .bv2-hc{justify-self:stretch;padding-left:10px}
   .bv2-hud .tb-round{min-width:38px}
   .bv2-hud .tb-round .n{font-size:1.1rem}
-  .bv2-hud .tb-now{flex:1}
+  .bv2-hud .tb-now{flex:1;max-width:none}
   #trkBox .bv2-hud .tb-now{flex:1 1 auto;align-items:flex-start}
   .bv2-hud .tb-now .who{font-size:.92rem;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .bv2-hud .tb-tbtn{width:34px;height:34px}
@@ -19756,8 +19759,7 @@ html.board-v2 #pdock .pd-tab:not([data-k]){display:none}          /* кореш�
   .bv2.gm .bv2-hud{grid-template-columns:auto minmax(0,1fr)}
   .bv2.gm .bv2-hr{grid-column:1 / -1;justify-self:stretch}
   .bv2.gm .bv2-hr .bv2-zoom{margin-left:auto}
-  #trkBox .bv2.gm .bv2-hud .tb-now{flex:1 1 auto}
-  .bv2.gm .bv2-hud .tb-now .who{max-width:100%}
+  #trkBox .bv2.gm .bv2-hud .tb-now{flex:1 1 auto;max-width:none}
 }
 @media (prefers-reduced-motion:reduce){ .bv2-card,.bv2-mapbox{transition:none} .bv2-insp{animation:none} .bv2-live.on::before,.bv2-card.dying .bv2-ph::before{animation:none} }
 /* инспектор на широком экране: строка в два этажа — имя и хиты сверху, состояния снизу во всю
