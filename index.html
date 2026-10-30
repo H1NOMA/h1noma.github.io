@@ -251,7 +251,7 @@
   .set-iconwrap{padding:4px 15px 15px;border-top:var(--hair) solid var(--line)}
   /* профиль-карточка: выбор цвета буквы */
   .prof-swatches{display:flex;flex-wrap:wrap;gap:10px;margin-top:6px}
-  .prof-sw{width:34px;height:34px;border-radius:50%;cursor:pointer;border:2px solid transparent;box-shadow:0 0 0 1px var(--line2)}
+  .prof-sw{width:34px;height:34px;border-radius:50%;cursor:pointer;border:2px solid transparent;box-shadow:0 0 0 1px var(--line2);padding:0}
   .prof-sw.on{border-color:#fff;box-shadow:0 0 0 2px var(--txt)}
   .pc-off{opacity:.35;pointer-events:none;filter:saturate(.5)}   /* ручной подбор цвета выключен при адаптации под сеттинг */
   /* согласие с условиями при регистрации */
@@ -267,9 +267,10 @@
   .pc-idn{min-width:0}
   .pc-idn .nm{font-family:var(--f-disp);font-weight:700;font-size:1.3rem;color:var(--txt);line-height:1.1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .pc-idn .lg{font-family:var(--f-mono);font-size:.76rem;color:var(--muted);margin-top:3px}
-  .pc-presets{display:flex;gap:9px;overflow:auto;padding:2px 0;scrollbar-width:none}
-  .pc-presets::-webkit-scrollbar{display:none}
-  .pc-preset{width:46px;height:46px;flex:none;border-radius:14px;display:flex;align-items:center;justify-content:center;font-family:var(--f-disp);font-weight:700;font-size:1.15rem;cursor:pointer;border:2px solid transparent}
+  /* сеткой по ширине карточки: лента со скрытой прокруткой прятала «+» (свои цвета) за краем — на телефоне целиком.
+     На десктопе все 11 встают в ряд, на телефоне — два ряда */
+  .pc-presets{display:grid;grid-template-columns:repeat(auto-fill,minmax(42px,1fr));gap:9px;padding:2px 0}
+  .pc-preset{aspect-ratio:1;border-radius:14px;display:flex;align-items:center;justify-content:center;font-family:var(--f-disp);font-weight:700;font-size:1.15rem;cursor:pointer;border:2px solid transparent;padding:0;line-height:1}
   .pc-preset.on{border-color:var(--red);box-shadow:0 0 0 3px var(--red-soft)}
   .pc-preset.more{border:var(--hair) dashed var(--line2);background:rgba(255,255,255,.02);color:var(--muted);font-size:1.4rem;font-weight:400}
   /* карточка профиля: аккаунт (закладки, уведомления, пароль, выход) и отдельно внизу — удаление */
@@ -2650,6 +2651,8 @@
     #bmBtn.bm-circle{position:fixed;top:11px;right:calc(var(--edge) + 40px + 10px + var(--search-w) + 8px);bottom:auto;left:auto;width:40px;height:40px;z-index:45;border-radius:50%;box-shadow:none;background:var(--surface2);border:var(--hair) solid var(--line2);backdrop-filter:none;-webkit-backdrop-filter:none}
     #bmBtn.bm-circle svg{width:19px;height:19px}
     #profBtn.prof-btn{position:fixed;top:11px;right:var(--edge);bottom:auto;left:auto;width:40px;height:40px;z-index:45}
+    /* шторки на этих ширинах нет, рейла ещё нет — профиль (и через него закладки) открывается отсюда */
+    @media(max-width:1179px){ #profBtn.prof-btn{display:flex} }
     /* музыка (ГМ) — плавающая рядом с кнопкой куба, внизу справа (сохраняет «стеклянный» вид из базового правила) */
     #musicToggle{right:calc(var(--edge) + 52px + 12px);bottom:calc(var(--edge) + var(--fabLift,0px));top:auto;left:auto;width:52px;height:52px}
     #musicToggle svg{width:22px;height:22px}
@@ -2928,6 +2931,7 @@
   /* квадратная аватарка профиля в шапке (мобилка — на месте бывшей кнопки музыки) */
   .prof-btn{width:38px;height:38px;border-radius:11px;flex:none;display:flex;align-items:center;justify-content:center;font-family:var(--f-disp);font-weight:700;font-size:1.02rem;color:#fff;background:var(--red);border:var(--hair) solid var(--line2);cursor:pointer;padding:0;line-height:1;order:6;overflow:hidden}
   .prof-btn:active{transform:scale(.94)}
+  #profBtn{display:none}   /* в шапке — только на 880–1179 (ниже); на телефоне аватар в шторке, с 1180 — в рейле */
   /* нижняя плашка «сейчас играет» — по центру, между бургером и поиском, не задевая угловые кнопки */
   .music-bar{position:fixed;left:12px;right:12px;transform:translateY(0);bottom:calc(14px + env(safe-area-inset-bottom));z-index:70;
     width:auto;display:flex;align-items:center;gap:10px;
@@ -4057,6 +4061,7 @@ addEventListener('beforeinstallprompt', function(e){ e.preventDefault(); DEFERRE
     <button class="hdr-search" id="hdrSearch" onclick="toggleSearchBar(event)" aria-label="Поиск">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5L17 17"/></svg>
     </button>
+    <button class="prof-btn" id="profBtn" onclick="openProfileCard()" aria-label="Войти">?</button>
 
   </div>
   <div class="proj-menu" id="projMenu" role="menu" aria-hidden="true"></div>
@@ -5173,6 +5178,7 @@ function supaMake(){
     auth: { persistSession:true, autoRefreshToken:true, detectSessionInUrl:false, lock: noLock },
     global: { fetch: cloudFetch }
   });
+  authWatch();
   return true;
 }
 /* Сервер облака временами не отвечает на новое соединение: 28.10 примерно каждое пятое рукопожатие
@@ -5268,7 +5274,7 @@ async function cloudGet(key){
 }
 async function cloudSet(key,val){
   const {error} = await supa.from('kv').upsert({key, value: val});
-  if(error) throw error;
+  if(error){ accGoneSeen(error); throw error; }
   return true;
 }
 // выборка всех строк с ключом по префиксу (для пер-юзерных листов comik:chars:<тег>)
@@ -5452,6 +5458,8 @@ async function sget(key, shared=SHARED){
    «отправим, когда связь вернётся» там, где связь ни при чём */
 let SSET_LAST_ERR='', SSET_NOPERM_AT=0;
 function cloudNoPerm(e){ const c=e&&(e.code||e.status); return c==='42501' || c===403 || c==='403' || /row-level security|permission denied/i.test(String((e&&e.message)||'')); }
+// отказ триггера komik_kv_gone: аккаунт удалён, а токен ещё жив (accGoneSeen вычищает устройство — «нет прав» не говорим)
+function cloudGone(e){ return /komik:gone/.test(String((e&&e.message)||'')); }
 /* SSET_LOCAL_OK — легла ли последняя запись на устройство. Квота localStorage кончилась — ssetLocal
    молча возвращает false, и обещать «сохранено локально» при сбое облака нельзя: правки нет нигде */
 let SSET_LOCAL_OK=true;
@@ -5471,7 +5479,7 @@ async function sset(key,val, shared=SHARED, quiet){
       SSET_LAST_ERR = cloudNoPerm(e) ? 'noperm' : 'net';
       if(!quiet){
         if(SSET_LAST_ERR!=='noperm') toast(SSET_LOCAL_OK ? '⚠ Облако недоступно — сохранено локально' : SSET_NOWHERE);
-        else if(Date.now()-SSET_NOPERM_AT>8000){ SSET_NOPERM_AT=Date.now(); toast('⚠ Нет прав на запись — в облако не сохранено'); }   // серия правок → один тост
+        else if(!cloudGone(e) && Date.now()-SSET_NOPERM_AT>8000){ SSET_NOPERM_AT=Date.now(); toast('⚠ Нет прав на запись — в облако не сохранено'); }   // серия правок → один тост
       }
     }
     return cloudOk;
@@ -5490,7 +5498,7 @@ async function cloudSetOnly(key,val,quiet){
     SSET_LAST_ERR=''; return r!==false;
   }catch(e){
     SSET_LAST_ERR = cloudNoPerm(e) ? 'noperm' : 'net';
-    if(!quiet && SSET_LAST_ERR==='noperm' && Date.now()-SSET_NOPERM_AT>8000){ SSET_NOPERM_AT=Date.now(); toast('⚠ Нет прав на запись — в облако не сохранено'); }
+    if(!quiet && SSET_LAST_ERR==='noperm' && !cloudGone(e) && Date.now()-SSET_NOPERM_AT>8000){ SSET_NOPERM_AT=Date.now(); toast('⚠ Нет прав на запись — в облако не сохранено'); }
     return false;
   }
 }
@@ -6198,17 +6206,20 @@ function updateOnboard(){
   let done=false; try{ done=!!localStorage.getItem('comik:onboard:done'); }catch(e){}
   if(SESSION || done){ el.hidden=true; return; }
   el.hidden=false;
+  // кнопки записи нет, пока в сеттинге нет анонса (updateNextGame) — не отсылаем к пустому месту
+  const su=document.getElementById('signupBtn');
+  const signup=(su && !su.hidden) ? 'кнопка «Записаться на игру» выше.' : 'кнопка «Записаться на игру» появится выше, когда Мастер анонсирует игру.';
   el.innerHTML=`<div class="ob-card">
     <button class="ob-x" onclick="obDismiss()" aria-label="Скрыть">✕</button>
     <div class="ob-title">С чего начать</div>
     <ol class="ob-steps">
       <li><b>Создай аккаунт</b> — персонажи и записи на игры привязаны к профилю.</li>
       <li><b>Собери персонажа</b> — калькулятор характеристик всё посчитает сам.</li>
-      <li><b>Запишись на игру</b> — кнопка «Записаться на игру» выше.</li>
+      <li><b>Запишись на игру</b> — ${signup}</li>
       <li><b>Включи уведомления</b> — в профиле (кнопка с буквой твоего имени), чтобы не пропустить новые игры.</li>
     </ol>
     <div class="row">
-      <button class="btn primary" onclick="openAccessModal(null,'account')">Создать аккаунт</button>
+      <button class="btn primary" onclick="openAuth('register')">Создать аккаунт</button>
       <button class="btn ghost" onclick="go('players');openStatCalc()">Калькулятор</button>
     </div></div>`;
   // новичку один раз подсвечиваем, что название сеттинга в шапке — переключатель
@@ -6964,7 +6975,7 @@ function openPolicy(overlay){
 
       <h3>Удаление аккаунта и персонажей</h3>
       <p>Аккаунт можно удалить самостоятельно в любой момент: откройте профиль (кнопка с первой буквой вашего имени) и выберите <b>«Удалить аккаунт»</b>. Отдельного персонажа можно удалить в его листе, не удаляя аккаунт.</p>
-      <p>При удалении аккаунта из облачной базы сразу удаляются учётная запись, все ваши персонажи и их портреты, закладки, подписка на уведомления и записи на предстоящие игры. Логин освобождается через 90 дней — после этого его сможет занять другой пользователь.</p>
+      <p>При удалении аккаунта из облачной базы сразу удаляются учётная запись, все ваши персонажи и их портреты, закладки, подписка на уведомления и записи на предстоящие игры. Остаются записи об уже сыгранных играх, а карточка персонажа на доске ходов мастера остаётся без портрета и без привязки к аккаунту. Логин освобождается через 90 дней — после этого его сможет занять другой пользователь.</p>
       <p><b>Удаление необратимо.</b> Резервные копии и журнал изменений для восстановления удалённых аккаунтов не используются; удалённые данные исчезают из них не позднее чем через 7 дней. Служебная копия списка учётных записей (только логины и хэши паролей) обновляется реже, но удалённые аккаунты из неё не восстанавливаются. Копии в браузерах других ваших устройств удалятся, если очистить в них данные сайта.</p>
 
       <h3>Изменения</h3>
@@ -7667,10 +7678,11 @@ function updateNextGame(){
   const s=list.find(g=>{ const d=gameDateOf(g); return !d || d>=today; });
   if(typeof ngFloatSync==='function') ngFloatSync(s||null);   // плавающая «Ближайшая игра» на телефоне (модуль в конце)
   const su=document.getElementById('signupBtn');
-  // нет запланированной ГМом кампании (или все уже прошли) → ни баннера, ни кнопки записи (пустота)
-  if(!s){ el.hidden=true; el.innerHTML=''; if(su) su.hidden=true; return; }
+  // нет запланированной ГМом кампании (или все уже прошли) → ни баннера, ни кнопки записи (пустота).
+  // Кнопка появилась или пропала — «С чего начать» гостя ссылается на неё, перерисовываем
+  if(su && su.hidden!==!s){ su.hidden=!s; updateOnboard(); }
+  if(!s){ el.hidden=true; el.innerHTML=''; return; }
   el.hidden=false;
-  if(su) su.hidden=false;
   el.innerHTML=`<div class="ng-card" onclick="openGameSignup()" role="button" tabindex="0" onkeydown="if(event.key==='Enter')openGameSignup()">
     <span class="ng-k">Ближайшая игра</span>
     <b>${esc(s.title||gameTitle(s.game))}</b>
@@ -8915,9 +8927,10 @@ function openProfileCard(){
   PROF_TMP={name:p.name||'', bg:(PROFILE_COLORS.indexOf(p.bg||p.color)>=0?(p.bg||p.color):''), ink:(INK_COLORS.indexOf(p.ink)>=0?p.ink:''), adapt:!!p.adapt};
   const m=document.getElementById('modal');
   const initial=esc(profInitial(SESSION));
-  const presetHtml=PROFILE_PRESETS.map(pr=>{
+  // пресеты, «+» и свотчи — кнопки: span с onclick не брал фокус, и с клавиатуры цвет было не выбрать
+  const presetHtml=PROFILE_PRESETS.map((pr,i)=>{
     const on=(!PROF_TMP.adapt && pr.bg===PROF_TMP.bg && pr.ink===PROF_TMP.ink);
-    return `<span class="pc-preset${on?' on':''}" data-bg="${pr.bg}" data-ink="${pr.ink}" style="background:${pr.bg};color:${pr.ink}" onclick="pcPreset('${pr.bg}','${pr.ink}')">${initial}</span>`;
+    return `<button type="button" class="pc-preset${on?' on':''}" data-bg="${pr.bg}" data-ink="${pr.ink}" style="background:${pr.bg};color:${pr.ink}" aria-label="Вариант ${i+1}" aria-pressed="${on}" onclick="pcPreset('${pr.bg}','${pr.ink}')">${initial}</button>`;
   }).join('');
   m.innerHTML=`<button class="x" onclick="closeModal()" aria-label="Закрыть">✕</button>
     <div class="top">${rune('character',24)}<span class="clabel">Профиль</span></div>
@@ -8926,15 +8939,15 @@ function openProfileCard(){
       <div class="pc-idn"><div class="nm" id="pcName">${esc(profName(SESSION)||dispTag(SESSION))}</div><div class="lg">@${esc(dispTag(SESSION))}</div></div>
     </div>
     <div class="field" style="margin-bottom:11px"><input id="pc-name" maxlength="40" placeholder="Имя" value="${esc(p.name||'')}" oninput="pcName(this.value)"></div>
-    <label class="pc-adapt-row" style="display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;background:rgba(0,0,0,.22);border:var(--hair) solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px">
+    <button type="button" class="pc-adapt-row" id="pcAdaptRow" role="switch" aria-checked="${PROF_TMP.adapt}" onclick="pcAdapt()" style="display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;cursor:pointer;background:rgba(0,0,0,.22);border:var(--hair) solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px;color:inherit;font:inherit;text-align:left">
       <span style="font-family:var(--f-disp);font-weight:600">Адаптировать под сеттинг</span>
-      <span class="set-sw${PROF_TMP.adapt?' on':''}" id="pcAdaptSw" onclick="pcAdapt()"></span>
-    </label>
-    <div id="pcManual"${PROF_TMP.adapt?' class="pc-off"':''}>
-      <div class="pc-presets">${presetHtml}<span class="pc-preset more" onclick="pcMore()" title="Свои цвета" aria-label="Свои цвета">+</span></div>
+      <span class="set-sw${PROF_TMP.adapt?' on':''}" id="pcAdaptSw"></span>
+    </button>
+    <div id="pcManual"${PROF_TMP.adapt?' class="pc-off" inert':''}>
+      <div class="pc-presets">${presetHtml}<button type="button" class="pc-preset more" onclick="pcMore()" title="Свои цвета" aria-label="Свои цвета" aria-expanded="false">+</button></div>
       <div id="pcCustom" hidden>
-        <div class="prof-swatches" style="margin-top:11px">${PROFILE_COLORS.map(c=>`<span class="prof-sw${c===PROF_TMP.bg?' on':''}" data-bg="${c}" style="background:${c}" onclick="pcBg('${c}')"></span>`).join('')}</div>
-        <div class="prof-swatches" style="margin-top:8px">${INK_COLORS.map(c=>`<span class="prof-sw${c===PROF_TMP.ink?' on':''}" data-ink="${c}" style="background:${c}" onclick="pcInk('${c}')"></span>`).join('')}</div>
+        <div class="prof-swatches" style="margin-top:11px">${PROFILE_COLORS.map((c,i)=>`<button type="button" class="prof-sw${c===PROF_TMP.bg?' on':''}" data-bg="${c}" style="background:${c}" aria-label="Фон ${i+1}" aria-pressed="${c===PROF_TMP.bg}" onclick="pcBg('${c}')"></button>`).join('')}</div>
+        <div class="prof-swatches" style="margin-top:8px">${INK_COLORS.map((c,i)=>`<button type="button" class="prof-sw${c===PROF_TMP.ink?' on':''}" data-ink="${c}" style="background:${c}" aria-label="Цвет буквы ${i+1}" aria-pressed="${c===PROF_TMP.ink}" onclick="pcInk('${c}')"></button>`).join('')}</div>
       </div>
     </div>
     <button class="btn primary" style="width:100%;margin-top:14px" onclick="pcSave()">Сохранить</button>
@@ -8962,17 +8975,21 @@ function pcName(v){ PROF_TMP.name=v; const init=((v.trim()||dispTag(SESSION)).ch
   document.querySelectorAll('.pc-preset[data-bg]').forEach(el=>{ el.textContent=init; }); }
 // подсветка активного пресета/свотчей по текущим bg+ink (при адаптации пресеты не выделяются)
 function pcSyncSel(){
-  document.querySelectorAll('.pc-preset[data-bg]').forEach(el=>el.classList.toggle('on', !PROF_TMP.adapt && el.dataset.bg===PROF_TMP.bg && el.dataset.ink===PROF_TMP.ink));
-  document.querySelectorAll('.prof-sw[data-bg]').forEach(s=>s.classList.toggle('on', s.dataset.bg===PROF_TMP.bg));
-  document.querySelectorAll('.prof-sw[data-ink]').forEach(s=>s.classList.toggle('on', s.dataset.ink===PROF_TMP.ink));
+  const on=(el,v)=>{ el.classList.toggle('on', v); el.setAttribute('aria-pressed', String(v)); };
+  document.querySelectorAll('.pc-preset[data-bg]').forEach(el=>on(el, !PROF_TMP.adapt && el.dataset.bg===PROF_TMP.bg && el.dataset.ink===PROF_TMP.ink));
+  document.querySelectorAll('.prof-sw[data-bg]').forEach(s=>on(s, s.dataset.bg===PROF_TMP.bg));
+  document.querySelectorAll('.prof-sw[data-ink]').forEach(s=>on(s, s.dataset.ink===PROF_TMP.ink));
 }
 function pcPreset(bg,ink){ PROF_TMP.bg=bg; PROF_TMP.ink=ink; pcAvApply(); pcSyncSel(); }
-function pcMore(){ const el=document.getElementById('pcCustom'); if(el) el.hidden=!el.hidden; }
+function pcMore(){ const el=document.getElementById('pcCustom'); if(!el) return; el.hidden=!el.hidden;
+  const b=document.querySelector('.pc-preset.more'); if(b) b.setAttribute('aria-expanded', String(!el.hidden)); }
 function pcBg(c){ PROF_TMP.bg=c; pcAvApply(); pcSyncSel(); }
 function pcInk(c){ PROF_TMP.ink=c; pcAvApply(); pcSyncSel(); }
 function pcAdapt(){ PROF_TMP.adapt=!PROF_TMP.adapt;
   const sw=document.getElementById('pcAdaptSw'); if(sw) sw.classList.toggle('on', PROF_TMP.adapt);
-  const man=document.getElementById('pcManual'); if(man) man.classList.toggle('pc-off', PROF_TMP.adapt);
+  const row=document.getElementById('pcAdaptRow'); if(row) row.setAttribute('aria-checked', String(PROF_TMP.adapt));
+  // выключенный ручной подбор — и мимо клавиатуры (pc-off гасит только мышь)
+  const man=document.getElementById('pcManual'); if(man){ man.classList.toggle('pc-off', PROF_TMP.adapt); man.inert=PROF_TMP.adapt; }
   pcAvApply(); pcSyncSel(); }
 function pcSave(){ profSet(SESSION, {name:(PROF_TMP.name||'').trim(), bg:PROF_TMP.bg, ink:PROF_TMP.ink, color:PROF_TMP.bg, adapt:PROF_TMP.adapt}); closeModal(); if(typeof renderAvatarBtn==='function') renderAvatarBtn(); const vs=document.getElementById('view-settings'); if(vs && vs.classList.contains('active')) renderSettings(); toast('Профиль сохранён'); }
 /* ошибка входа по паролю — человеческими словами. Сеть: supabase-js отдаёт статус 0 (или 5xx от шлюза) */
@@ -9038,7 +9055,7 @@ function openAccDelete(){
   document.getElementById('modal2').innerHTML=`<button class="x" onclick="closeOverlay()" aria-label="Закрыть">✕</button>
     <div class="top">${rune('character',24)}<span class="clabel">@${esc(dispTag(SESSION))}</span></div>
     <h2>Удалить аккаунт</h2>
-    <p class="ad-what">Удалятся аккаунт, все персонажи и их портреты, закладки, уведомления и записи на предстоящие игры. <b>Это необратимо.</b> Логин освободится через 90 дней.</p>
+    <p class="ad-what">Удалятся аккаунт, все персонажи и их портреты, закладки, уведомления и записи на предстоящие игры. Записи сыгранных игр останутся, карточка на доске ходов мастера — без портрета и привязки к аккаунту. <b>Это необратимо.</b> Логин освободится через 90 дней.</p>
     <div class="field" id="ad-f-tag"><label>Логин для подтверждения</label>
       <input id="ad-tag" maxlength="32" placeholder="${esc(dispTag(SESSION))}" autocapitalize="off" autocomplete="off" spellcheck="false" oninput="accDelCheck()"></div>
     <div class="field" id="ad-f-pass"><label>Пароль</label>
@@ -9055,6 +9072,10 @@ function accDelCheck(){
   const b=pf('adGo'); if(b) b.disabled=!ok || ACC_DEL;
   const f=pf('ad-f-pass'); if(f) f.classList.remove('invalid');
   return ok;
+}
+// аккаунта на сервере уже нет: токен удалённого /user отбивает с user_not_found (сеть или живой аккаунт — false)
+async function accIsGone(){
+  try{ const u=await authTimeout(supa.auth.getUser(), 6000); return !!(u && u.error && u.error.code==='user_not_found'); }catch(e){ return false; }
 }
 async function accDelete(){
   const tag=currentTag();
@@ -9079,6 +9100,9 @@ async function accDelete(){
       }
     }
   }catch(e){ err='Облако не отвечает — попробуйте ещё раз'; }   // authTimeout: ответа нет
+  // ответа нет или пароль «не подошёл» — аккаунт мог уже удалиться: ответ на удаление потерялся или удалили
+  // с другого устройства. Раньше оставался «вход» в несуществующий аккаунт, а повтор писал «Неверный пароль»
+  if(err && /^(Облако не отвечает|Неверный пароль|Войдите в аккаунт заново)/.test(err) && await accIsGone()) err='';
   if(err){
     ACC_DEL=false;
     if(err==='Неверный пароль') accFieldErr('ad-f-pass', err);
@@ -9093,12 +9117,26 @@ async function accDelete(){
   closeOverlay(); closeModal();
   toast('Аккаунт удалён');
 }
+/* Запись отбита триггером komik_kv_gone: аккаунт удалён с другого устройства (или ответ на своё удаление не дошёл),
+   а его токен ещё жив. Раньше сайт оставался «вошедшим» и на каждую правку говорил «Нет прав на запись» */
+let ACC_GONE_SEEN=false;
+function accGoneSeen(e){
+  const tag=currentTag();
+  if(!cloudGone(e) || !tag || ACC_DEL || ACC_GONE_SEEN) return;   // своё удаление (ACC_DEL) доводит accDelete
+  ACC_GONE_SEEN=true;
+  setTimeout(async ()=>{
+    try{ if(currentTag()===tag && !ACC_DEL){ await accGoneLocal(tag); closeOverlay(); closeModal(); toast('Аккаунт удалён'); } }
+    finally{ ACC_GONE_SEEN=false; }
+  }, 0);
+}
 /* Аккаунта в облаке больше нет — вычищаем его с устройства: сессию, свои листы и их зеркала, закладки,
    оформление профиля, пуш. Браузерную подписку снимаем без записи в облако: строки push:sub:<тег> уже нет */
 async function accGoneLocal(tag){
   try{ if(pushSupported()){ const reg=await withTimeout(navigator.serviceWorker.ready, 2500);
     const sub=reg && await reg.pushManager.getSubscription(); if(sub) await sub.unsubscribe(); } }catch(e){}
+  AUTH_LEAVING=true;
   if(supa){ try{ await authTimeout(supa.auth.signOut({ scope:'local' }), 5000); }catch(e){} }
+  AUTH_LEAVING=false;
   // открытый лист закрываем без записи (inlineDropForAuth дописал бы его)
   if(INLINE_ID){
     clearTimeout(INLINE_T); INLINE_ID=null; INLINE_BASE=INLINE_SNAP=null; INLINE_STALE=false; closeMiniArch(); closeStatCalc();
@@ -9175,7 +9213,7 @@ function renderAcct(){
 function renderAvatarBtn(){
   const b=document.getElementById('profBtn'); if(!b) return;
   if(SESSION){ b.textContent=profInitial(SESSION); b.style.background=profBg(SESSION); b.style.color=profInk(SESSION); b.title='Профиль · '+dispTag(SESSION); b.setAttribute('aria-label','Профиль'); }
-  else { b.textContent='?'; b.style.background='var(--surface2)'; b.style.color='var(--muted)'; b.title='Войти'; b.setAttribute('aria-label','Войти'); }
+  else { b.textContent='?'; b.style.background='var(--surface2)'; b.style.color='var(--dim)'; b.title='Войти'; b.setAttribute('aria-label','Войти'); }   // --dim, как в шторке: --muted на круге не добирал контраста
 }
 function openAuth(mode){
   const reg = mode==='register';
@@ -9221,7 +9259,7 @@ async function doRegister(){
     // логин удалённого аккаунта сервер держит 90 дней: отказ его проверки GoTrue отдаёт как 500 «Database error
     // saving new user», а supabase-js текст ответа 500 теряет (сообщение «{}») — остаётся только код
     if(+res.error.status===500){ pf('au-f-tag').classList.add('invalid'); toast('Этот логин сейчас недоступен'); return; }
-    toast('Supabase: '+String(res.error.message||'ошибка регистрации')); return;
+    toast(accAuthErr(res.error)); return;   // сеть, шлюз, лимит попыток — человеческими словами, как при входе
   }
   // при выключенном подтверждении почты сессия приходит сразу; если нет — входим явно
   if(!res.data.session){
@@ -9239,10 +9277,8 @@ async function doLogin(){
   let res;
   try{ res = await authTimeout(supa.auth.signInWithPassword({ email:loginToEmail(tag), password:pass })); }
   catch(e){ toast('Облако не отвечает — попробуйте ещё раз'); return; }
-  if(res.error){
-    if(/invalid login credentials|invalid credentials|invalid email or password/i.test(String(res.error.message||''))){ toast('Неверный логин или пароль'); return; }
-    toast('Supabase: '+String(res.error.message||'ошибка входа')); return;
-  }
+  // supabase-js о сбое сети и шлюза не бросает, а отдаёт его в error — без перевода человек видел «Supabase: {}»
+  if(res.error){ const m=accAuthErr(res.error); toast(m==='Неверный пароль' ? 'Неверный логин или пароль' : m); return; }
   inlineDropForAuth().catch(()=>{});   // лист, открытый до входа, к новому аккаунту не относится
   SESSION=tag; await sset(KEY_SESSION, SESSION, false);
   usersRegister(tag);
@@ -9258,12 +9294,40 @@ async function logout(){
   // правки открытого листа и начатые записи листов (уход из раздела, «+1 зм») — в облако, пока сессия жива:
   // после signOut та же запись уйдёт анонимом, и RLS её отобьёт
   try{ await withTimeout(inlineDropForAuth().then(()=>CHARS_PERSIST_NEXT||CHARS_PERSIST), 5000); }catch(e){}
-  if(supa){ try{ await authTimeout(supa.auth.signOut()); }catch(e){} }
+  // только это устройство: без scope библиотека шлёт global, и сервер отзывал вход игрока на всех его устройствах
+  AUTH_LEAVING=true;
+  if(supa){ try{ await authTimeout(supa.auth.signOut({ scope:'local' })); }catch(e){} }
+  AUTH_LEAVING=false;
+  await authOutLocal();
+  toast('Вы вышли из аккаунта');
+}
+async function authOutLocal(){
   SESSION=null; await sset(KEY_SESSION, null, false);
   // закладки прошлого аккаунта лежат в его облаке — на общем устройстве гостю их не показываем
   BMARKS=[]; ssetLocal(KEY_BM, [], false); try{ localStorage.removeItem(KEY_BM_OWNER); }catch(e){} bmBtnSync();
   if(ADMIN_VIA_DEV){ ADMIN=false; ADMIN_VIA_DEV=false; adminSideFX(); }
-  renderAcct(); renderPlayers(); renderCats(); applyView(); updateDevUI(); renderSettings(); updateOnboard(); toast('Вы вышли из аккаунта');
+  renderAcct(); renderPlayers(); renderCats(); applyView(); updateDevUI(); renderSettings(); updateOnboard();
+}
+/* Сессию сняла сама библиотека: refresh-токен отозван (пароль сменили или аккаунт удалили на другом устройстве,
+   вышли в другой вкладке). Раньше сайт этого не замечал: «вошёл» до перезагрузки, а каждая запись — «Нет прав» */
+let AUTH_LEAVING=false;   // свой выход (logout, accGoneLocal): его SIGNED_OUT — не потеря сессии
+function authWatch(){
+  supa.auth.onAuthStateChange(ev=>{
+    if(ev!=='SIGNED_OUT' || AUTH_LEAVING || !SESSION) return;
+    const was=SESSION; setTimeout(()=>authLost(was), 0);   // в колбэке библиотеку не зовём: она ещё не закончила свой шаг
+  });
+}
+async function authLost(was, n){
+  // запуск ещё идёт — сессию при старте проверяет он сам (boot); ждём, чем кончится
+  if(!window.__bootReady){ if((n|0)<60) setTimeout(()=>authLost(was, (n|0)+1), 1000); return; }
+  if(SESSION!==was || AUTH_LEAVING) return;
+  let s=null; try{ const gs=await authTimeout(supa.auth.getSession(), 6000); s=gs && gs.data && gs.data.session; }catch(e){ return; }
+  if(s || SESSION!==was || AUTH_LEAVING) return;   // за это время вошли снова
+  // открытый лист сворачиваем, как при выходе: облако его уже не примет, но правки лягут на устройство и дойдут после входа
+  try{ await withTimeout(inlineDropForAuth(), 5000); }catch(e){}
+  if(SESSION!==was) return;
+  await authOutLocal();
+  toast('Сессия завершена — войдите снова', {action:{label:'Войти', fn:()=>openAccessModal(null,'account')}});
 }
 
 /* ====================== Игроки / персонажи ====================== */
@@ -13143,10 +13207,14 @@ function renderSettings(){
       <p class="appicon-note">На iOS, чтобы обновить иконку, выведите приложение на экран «Домой» заново.</p>
     </div>`;
   if(!SESSION){
+    // закладки гостя — на устройстве, профиля у него нет, а на 880–1179 нет ни шторки, ни рейла: вход в них здесь
     el.innerHTML = `<div class="set-page">
       <div class="set-prof" style="justify-content:center;gap:10px">
         <button class="btn primary" onclick="openAccessModal(null,'account')">Войти</button>
         <button class="btn ghost" onclick="openAccessModal(null,'account');setTimeout(toggleAuthMode,80)">Регистрация</button>
+      </div>
+      <div class="set-grp">
+        <button class="set-row" onclick="openBookmarks()"><span class="ri">🔖</span><span class="rl">Закладки</span>${CHEV}</button>
       </div>
       <div class="set-gt">Внешний вид</div>
       <div class="set-grp">
@@ -13601,12 +13669,13 @@ function restoreBackup(inp){
       if(Array.isArray(d.news)) NEWS=mergeById(NEWS, d.news);
       if(d.chrono) CHRONO_DATA=Object.assign({}, d.chrono, CHRONO_DATA);
       if(d.hero) HERO_EDITS=Object.assign({}, d.hero, HERO_EDITS);
-      if(Array.isArray(d.users)){ const tags=new Set(USERS.map(u=>normTag(u.tag))); d.users.forEach(u=>{ if(u && !tags.has(normTag(u.tag))) USERS.push(u); }); }
+      // реестр логинов из копии не берём: он вернул бы удалённые аккаунты (и старые хэши паролей) в публичную строку,
+      // а свой логин каждый дописывает сам при входе (usersRegister)
       // закладки: недостающие (по id и сеттингу) добавляем к своим — копия их хранит, значит и возвращает
       if(Array.isArray(d.bmarks)){ const has=new Set(BMARKS.map(b=>b&&(b.id+'|'+b.scope))); d.bmarks.forEach(b=>{ if(b && b.id && !has.has(b.id+'|'+b.scope)){ BMARKS.push(b); has.add(b.id+'|'+b.scope); } }); }
       bindGameData(); renderPlayers(); renderNews();
       // архив, хронологию и приветствия тоже сохраняем: слитые только в память, они пропадали при первой же синхронизации
-      await Promise.all([persistChars(), persistGames(), persistNews(), sset(KEY_USERS, USERS, true),
+      await Promise.all([persistChars(), persistGames(), persistNews(),
         persistArchive(), persistChrono(), sset(KEY_HERO, HERO_EDITS, true), sset(KEY_BM, BMARKS, false),
         (SESSION && supa) ? sset('comik:bm:'+currentTag(), BMARKS, true) : null]);
       toast('Копия восстановлена и слита с текущими данными');
