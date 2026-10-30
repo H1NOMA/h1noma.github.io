@@ -81,9 +81,10 @@ async function phone(b, width, shots) {
   await page.waitForTimeout(900);
   const fl = await page.evaluate(() => { const f = document.getElementById('ngFloat'), r = f.getBoundingClientRect(), c = document.getElementById('calFab').getBoundingClientRect();
     return { txt: f.textContent, aria: f.getAttribute('aria-hidden'), tab: f.tabIndex, op: +getComputedStyle(f).opacity, r: [r.left, r.top, r.width, r.height], c: [c.left, c.top, c.width, c.height], par: f.parentNode === document.body }; });
-  check(/Ближайшая/i.test(fl.txt) && /Короля-Лича/.test(fl.txt) && /4\/5/.test(fl.txt), `${width}: в пилюле метка, название и места (${fl.txt.replace(/\s+/g, ' ').trim()})`);
+  const fa = await page.evaluate(() => document.getElementById('ngFloat').getAttribute('aria-label'));
+  check(/(Сегодня|Завтра|Через \d+ д)/.test(fl.txt) && /Короля-Лича/.test(fl.txt) && /свободно 4 из 5/.test(fa), `${width}: в пилюле отсчёт, название и кольцо мест (${fl.txt.replace(/\s+/g, ' ').trim()} | ${fa})`);
   check(fl.aria === 'false' && fl.tab === 0 && fl.op > .99, `${width}: пилюля доступна (aria-hidden=false, tabindex 0, видна)`);
-  check(fl.par && Math.abs((fl.r[1] + fl.r[3]) - (fl.c[1] + fl.c[3])) < 1.5 && fl.r[0] + fl.r[2] < fl.c[0], `${width}: пилюля в body, в одну линию с календарём и левее него`);
+  check(fl.par && Math.abs((fl.r[1] + fl.r[3]) - (fl.c[1] + fl.c[3])) < 1.5 && Math.abs(fl.r[0] + fl.r[2] - fl.c[0]) < 1.5, `${width}: пилюля в body, одной полосой с календарём (стык к стыку)`);
   // глубже по ленте пилюля остаётся
   await scrollTo(page, g.max);
   s = await state(page);

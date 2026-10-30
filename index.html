@@ -320,7 +320,18 @@
     .lock::before{content:"";position:absolute;inset:-3px;border-radius:999px;pointer-events:none;opacity:0;
       border:1.5px solid rgba(var(--accent-rgb),.9);box-shadow:0 0 12px rgba(var(--accent-rgb),.55)}
     .lock.gulp::before{animation:lockGulp .52s cubic-bezier(.2,.75,.3,1)}
+    .lock.full .project{position:relative}
+    .lock.full .project::after{content:"";position:absolute;top:6px;right:9px;width:6px;height:6px;border-radius:50%;
+      background:var(--red-ink);box-shadow:0 0 8px rgba(var(--accent-rgb),.9);animation:lockDot .32s var(--spring) both}
+    .lock.peek .project::after{opacity:0}
+    #view-news .masthead.hero-peek{position:fixed;left:12px;right:12px;z-index:30;margin:0;max-height:calc(100vh - 210px);overflow:auto;
+      overscroll-behavior:contain;transform-origin:50% 50%;
+      box-shadow:0 18px 50px rgba(0,0,0,.6),0 0 0 1px rgba(var(--accent-rgb),.22),0 0 34px rgba(var(--accent-rgb),.14)}
+    #view-news .masthead.hero-peek .hp-set{display:block;margin:14px auto 2px;padding:9px 18px;border-radius:999px;cursor:pointer;
+      font-family:var(--f-mono);font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;color:var(--red-ink);
+      background:rgba(var(--accent-rgb),.1);border:var(--hair) solid rgba(var(--accent-rgb),.45)}
   }
+  @keyframes lockDot{0%{transform:scale(0)}100%{transform:scale(1)}}
   @keyframes lockGulp{0%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(1.2,1.75)}}
   /* узкие Android (360 px): разрядка поуже — длинные имена сеттингов влезают целиком */
   @media(max-width:374px){ .lock .project{letter-spacing:.12em} }
@@ -1842,6 +1853,8 @@
   /* телефон: приветствие уходит в пилюлю сеттинга (transform/opacity пишет прокрутка). Слой — только на время
      сжатия: блок большой, с фоновой картинкой, держать его отдельной текстурой постоянно накладно */
   #view-news .masthead.absorbing{will-change:transform,opacity}
+  /* углы рамки (срез, уголки сеттингов) на скругляющемся блоке торчали бы — гаснут с первых долей впитывания */
+  html #view-news .masthead.absorbing::before,html #view-news .masthead.absorbing::after{opacity:calc(1 - var(--absorb,0)*3)}
   #view-news .masthead h1{font-family:var(--f-disp);font-weight:700;text-transform:uppercase;letter-spacing:.04em;font-size:1.5rem;line-height:1.15;color:var(--red-ink);text-shadow:0 0 14px rgba(var(--accent-rgb),.3),1px 0 0 rgba(90,208,255,.14),-1px 0 0 rgba(var(--accent-rgb),.16)}
   #view-news .masthead p{font-family:'Rajdhani',var(--f-disp),sans-serif;font-weight:500;color:var(--dim);font-size:1.04rem;line-height:1.6;letter-spacing:.02em;background:rgba(0,0,0,.28);border:var(--hair) solid var(--line);border-left:2px solid rgba(var(--accent-rgb),.55);border-radius:10px;padding:12px 14px;margin-top:2px}
   /* ===== сквозные эффекты игр ===== */
@@ -3433,9 +3446,20 @@
     #ngFloat .ngf-k,#ngFloat .ngf-t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     #ngFloat .ngf-k{font-family:var(--f-mono);font-size:.56rem;letter-spacing:.12em;text-transform:uppercase;color:var(--red-ink);line-height:1.2}
     #ngFloat .ngf-t{font-family:var(--f-disp);font-weight:700;font-size:.9rem;line-height:1.2;color:var(--txt)}
-    #ngFloat .ngf-s{flex:none;display:flex;align-items:center;gap:4px;padding:5px 8px;border-radius:999px;
-      border:var(--hair) solid var(--line2);background:rgba(255,255,255,.05);font-family:var(--f-mono);font-size:.64rem;color:var(--dim)}
-    #ngFloat .ngf-s svg{width:11px;height:11px;opacity:.8}
+    #ngFloat .ngf-s{flex:none;position:relative;width:40px;height:40px;display:grid;place-items:center}
+    #ngFloat .ngf-s svg{position:absolute;inset:0;width:100%;height:100%;fill:none;stroke-width:3.2;stroke-linecap:round}
+    #ngFloat .ngf-s .tr{stroke:rgba(255,255,255,.12)}
+    #ngFloat .ngf-s .fg{stroke:var(--red-ink);transition:stroke-dasharray .42s var(--spring)}
+    #ngFloat .ngf-s b{font-family:var(--f-mono);font-weight:500;font-size:.78rem;color:var(--txt)}
+    #ngFloat .ngf-s.full b{color:var(--muted)}
+    /* пилюля и календарь — одной полосой: пилюля доходит до календаря, шов — тонкая черта */
+    #ngFloat.on{right:calc(12px + 58px);border-right:0;border-radius:999px 0 0 999px}
+    html:has(#ngFloat.on):not(:has(#projMenu.open)):not(.dr-open):not(.search-open) #calFab{border-radius:0 999px 999px 0;
+      background:var(--glass2);border-color:rgba(var(--accent-rgb),.42);border-left-color:rgba(255,255,255,.1);box-shadow:0 8px 24px rgba(0,0,0,.42)}
+    .mirror-ui #ngFloat{left:calc(12px + 58px + 10px);right:12px}
+    .mirror-ui #ngFloat.on{left:calc(12px + 58px);right:12px;border-right:var(--hair) solid rgba(var(--accent-rgb),.42);border-left:0;border-radius:0 999px 999px 0}
+    html.mirror-ui:has(#ngFloat.on):not(:has(#projMenu.open)):not(.dr-open):not(.search-open) #calFab{border-radius:999px 0 0 999px;
+      border-left-color:rgba(var(--accent-rgb),.42);border-right-color:rgba(255,255,255,.1)}
     /* пока пилюля снаружи, сама карточка невидима, но место держит — лента не прыгает */
     #nextGame.ngf-away{visibility:hidden}
   }
@@ -6181,7 +6205,7 @@ function updateOnboard(){
       <li><b>Создай аккаунт</b> — персонажи и записи на игры привязаны к профилю.</li>
       <li><b>Собери персонажа</b> — калькулятор характеристик всё посчитает сам.</li>
       <li><b>Запишись на игру</b> — кнопка «Записаться на игру» выше.</li>
-      <li><b>Включи уведомления</b> — в «Настройках», чтобы не пропустить новые игры.</li>
+      <li><b>Включи уведомления</b> — в профиле (кнопка с буквой твоего имени), чтобы не пропустить новые игры.</li>
     </ol>
     <div class="row">
       <button class="btn primary" onclick="openAccessModal(null,'account')">Создать аккаунт</button>
@@ -17180,7 +17204,7 @@ boot();
   const SPRING='cubic-bezier(.32,.72,0,1)';
   const MON=['ЯНВ','ФЕВ','МАР','АПР','МАЙ','ИЮН','ИЮЛ','АВГ','СЕН','ОКТ','НОЯ','ДЕК'];
   // кэш: пилюля — в координатах экрана (шапка липкая, её место постоянно), приветствие и карточка — в документе
-  const M={pw:0, pb:0, nH:0};
+  const M={pw:0, pb:0, nH:0, r0:16};
   let on=false, fx=false, dirty=true, settle=true, raf=0, Y=-1, P=-1, gulped=false, gT=0;
   let fl=null, flOn=false, flA=[], NG=null, NGsig='';
   const clamp01=v=>v<0?0:v>1?1:v;
@@ -17197,6 +17221,7 @@ boot();
       if(r.width) Object.assign(M, {pw:r.width, ph:r.height, pb:r.bottom, cx:r.left+r.width/2, cy:r.top+r.height/2});
     }
     const a=docPos(mh); M.mL=a.x; M.mT=a.y; M.mW=mh.offsetWidth; M.mH=mh.offsetHeight; M.span=M.mH*.75;
+    if(!mh.style.borderRadius) M.r0=parseFloat(getComputedStyle(mh).borderTopLeftRadius)||0;   // свой радиус (у сеттингов разный)
     if(!card.hidden && card.offsetHeight){ const b=docPos(card); M.nL=b.x; M.nT=b.y; M.nW=card.offsetWidth; M.nH=card.offsetHeight; }
     else M.nH=0;
     // короткая лента: до конца впитывания не докрутить — блок так и висел бы наполовину впитанным
@@ -17222,18 +17247,76 @@ boot();
       +`translateY(${hh}px) perspective(${(M.mH*1.6).toFixed(0)}px) rotateX(${tilt.toFixed(2)}deg) translateY(-${hh}px)`);
     put(mh, 'opacity', (1-sstep(.45,1,p)).toFixed(3));
     put(mh, 'visibility', p>=1 ? 'hidden' : '');
+    // и скругляется: видимый радиус растёт от своего до половины видимой высоты — к концу блок сам становится
+    // пилюлей. Радиус задан в своих (несжатых) пикселях, поэтому делим на масштаб по каждой оси отдельно
+    const sx=w/M.mW, sy=h/M.mH, rv=M.r0+(h/2-M.r0)*sstep(0,.8,p);
+    put(mh, 'border-radius', `${Math.min(rv/sx, M.mW/2).toFixed(1)}px / ${Math.min(rv/sy, M.mH/2).toFixed(1)}px`);
+    put(mh, '--absorb', p.toFixed(3));
     // кольцо разгорается по мере приближения и гаснет к «глотку»
     put(lock, '--suck', (sstep(0,.8,p)*(1-sstep(.9,1,p))).toFixed(3));
     if(p>=.98 && was>=0 && was<.98 && !gulped && !settle) gulp();
     if(p<.9) gulped=false;
+    full(p>=.98 || (p>=.9 && lock.classList.contains('full')));
   }
   // что уже записано: то же значение не пишем повторно (лишняя запись — лишний пересчёт стиля в кадре)
   const last={};
   function put(el, k, v){ if(last[k]===v) return; last[k]=v; if(v) el.style.setProperty(k, v); else el.style.removeProperty(k); }
   function clearMh(){
-    ['transform','opacity','visibility'].forEach(k=>put(mh, k, '')); put(lock, '--suck', '');
-    mh.classList.remove('absorbing');
+    ['transform','opacity','visibility','border-radius','--absorb'].forEach(k=>put(mh, k, '')); put(lock, '--suck', '');
+    mh.classList.remove('absorbing'); full(false);
   }
+  // пилюля «помнит», что впитала: точка на ней, а тап раскрывает приветствие под шапкой (меню сеттингов —
+  // кнопкой в раскрытом приветствии или долгим нажатием)
+  function full(v){ if(lock.classList.contains('full')!==v){ lock.classList.toggle('full', v); if(!v) peekClose(); } }
+  let pk=null, pkY=0, pkA=null;
+  function peekOpen(){
+    if(pk) return;
+    const c=mh.cloneNode(true);
+    c.removeAttribute('style'); c.classList.remove('absorbing'); c.classList.add('hero-peek');
+    c.querySelectorAll('[id]').forEach(n=>n.removeAttribute('id'));
+    c.querySelectorAll('.hero-edit').forEach(n=>n.remove());
+    c.id='heroPeek'; c.setAttribute('role','dialog'); c.setAttribute('aria-label','Приветствие');
+    const b=document.createElement('button'); b.type='button'; b.className='hp-set'; b.textContent='Сменить сеттинг';
+    b.addEventListener('click', e=>{ e.stopPropagation(); peekClose(); setTimeout(()=>{ if(typeof projMenuOpen==='function') projMenuOpen(); }, 60); });
+    c.appendChild(b);
+    c.style.top=(M.pb+10)+'px';
+    view.appendChild(c); pk=c; pkY=Y;
+    lock.classList.add('peek');
+    if(RM.matches || !c.animate) return;
+    // вырастает из пилюли: тот же путь, что у впитывания, только обратно и разом
+    const r=c.getBoundingClientRect(), q=fromPill(r);
+    pkA=c.animate([{transform:q, opacity:0, borderRadius:'999px'},{transform:'none', opacity:1, borderRadius:getComputedStyle(c).borderRadius}],
+      {duration:420, easing:SPRING});
+  }
+  const fromPill=r=>`translate3d(${(M.cx-r.left-r.width/2).toFixed(1)}px,${(M.cy-r.top-r.height/2).toFixed(1)}px,0) scale(${(M.pw/r.width).toFixed(3)},${(M.ph/r.height).toFixed(3)})`;
+  function peekClose(){
+    if(!pk) return;
+    const c=pk; pk=null; lock.classList.remove('peek');
+    if(pkA){ try{ pkA.cancel(); }catch(e){} pkA=null; }
+    if(RM.matches || !c.animate || !on){ c.remove(); return; }
+    const a=c.animate([{transform:'none', opacity:1},{transform:fromPill(c.getBoundingClientRect()), opacity:0}], {duration:280, easing:'cubic-bezier(.4,0,.6,1)', fill:'forwards'});
+    a.onfinish=()=>c.remove();
+  }
+  // перехват тапа по пилюле, только пока приветствие внутри: в фазе захвата на документе — раньше
+  // обработчиков меню сеттингов на самой пилюле (в любом браузере, независимо от порядка на цели)
+  let lpT=0, lpFired=false;
+  document.addEventListener('click', e=>{
+    if(!lock.contains(e.target)) return;
+    if(lpFired){ lpFired=false; e.stopImmediatePropagation(); return; }
+    if(!on || !lock.classList.contains('full')) return;
+    e.stopImmediatePropagation(); e.preventDefault();
+    if(pk) peekClose(); else peekOpen();
+  }, true);
+  // долгое нажатие на пилюлю с впитанным приветствием — сразу меню сеттингов
+  lock.addEventListener('pointerdown', ()=>{
+    lpFired=false; clearTimeout(lpT);
+    if(!on || !lock.classList.contains('full')) return;
+    lpT=setTimeout(()=>{ lpFired=true; peekClose(); if(typeof projMenuOpen==='function') projMenuOpen(); }, 480);
+  });
+  ['pointerup','pointercancel','pointerleave'].forEach(t=>lock.addEventListener(t, ()=>clearTimeout(lpT)));
+  // тап мимо только закрывает — новость или кнопка под пальцем не срабатывают заодно
+  document.addEventListener('click', e=>{ if(pk && !pk.contains(e.target) && !lock.contains(e.target)){ e.stopPropagation(); e.preventDefault(); peekClose(); } }, true);
+  document.addEventListener('keydown', e=>{ if(pk && e.key==='Escape'){ e.stopPropagation(); peekClose(); } }, true);
   function gulp(){
     gulped=true;
     lock.classList.add('gulp'); clearTimeout(gT); gT=setTimeout(()=>lock.classList.remove('gulp'), 560);
@@ -17248,7 +17331,8 @@ boot();
     fl=document.createElement('button');
     fl.type='button'; fl.id='ngFloat'; fl.tabIndex=-1; fl.setAttribute('aria-hidden','true');
     fl.innerHTML='<span class="ngf-d"></span><span class="ngf-m"><span class="ngf-k"></span><span class="ngf-t"></span></span>'
-      +'<span class="ngf-s"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7z"/></svg><span></span></span>';
+      +'<span class="ngf-s"><svg viewBox="0 0 36 36" aria-hidden="true"><circle class="tr" cx="18" cy="18" r="15"/>'
+      +'<circle class="fg" cx="18" cy="18" r="15" transform="rotate(-90 18 18)"/></svg><b></b></span>';
     fl.addEventListener('click', ()=>{ if(typeof openGameSignup==='function') openGameSignup(); });
     // вне #appPane (у него transform при открытой шторке); после #musicBar и #scrim, но перед тостом — CSS
     // ловит их соседством «~», без классов на <html> (класс там — пересчёт стилей всего документа посреди прокрутки)
@@ -17267,17 +17351,26 @@ boot();
       d.innerHTML='<b></b><i></i>'; d.firstChild.textContent=dd; d.lastChild.textContent=MON[m-1]||'';
       if(s.date) wd=new Date(y,m-1,dd).toLocaleDateString('ru-RU',{weekday:'short'});
     } else d.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>';
-    const when=[wd, s.time].filter(Boolean).join(', ');
-    fl.querySelector('.ngf-k').textContent=when ? 'Ближайшая · '+when : 'Ближайшая игра';
+    // сколько осталось: «Сегодня», «Завтра», «Через 3 дня»; дальше месяца — день недели
+    let rel='';
+    if(iso){ const [y,m,dd]=iso.split('-').map(Number), [ty,tm,td]=calToday().split('-').map(Number);
+      const n=Math.round((Date.UTC(y,m-1,dd)-Date.UTC(ty,tm-1,td))/864e5);
+      rel=n<=0?'Сегодня':n===1?'Завтра':n<=30?'Через '+n+' '+(n%10===1&&n%100!==11?'день':n%10>=2&&n%10<=4&&(n%100<10||n%100>=20)?'дня':'дней'):wd; }
+    const when=[rel, s.time].filter(Boolean).join(' · ');
+    fl.querySelector('.ngf-k').textContent=when || 'Ближайшая игра';
     fl.querySelector('.ngf-t').textContent=title;
-    const se=fl.querySelector('.ngf-s');
-    se.hidden=!s.seats; se.lastChild.textContent=s.seats ? seatsLeft(s)+'/'+s.seats : '';
-    fl.setAttribute('aria-label', 'Ближайшая игра: '+[title, iso?fmtGameDate(iso,{day:'numeric',month:'long'}):'', s.time].filter(Boolean).join(', '));
+    // кольцо — занятые места, в центре — сколько свободно; мест нет — кольцо замкнуто
+    const se=fl.querySelector('.ngf-s'), tot=parseInt(s.seats,10)||0, free=tot?seatsLeft(s):0;
+    se.hidden=!tot;
+    if(tot){ const C=94.25; se.querySelector('.fg').setAttribute('stroke-dasharray', (C*(tot-free)/tot).toFixed(2)+' '+C);
+      se.querySelector('b').textContent=free; se.classList.toggle('full', !free); }
+    fl.setAttribute('aria-label', 'Ближайшая игра: '+[title, iso?fmtGameDate(iso,{day:'numeric',month:'long'}):'', s.time,
+      tot?('свободно '+free+' из '+tot):''].filter(Boolean).join(', '));
   }
   // зовёт updateNextGame на каждом рендере новостей (и на каждом такте облака) — перерисовываем только по сути
   window.ngFloatSync=function(s){
     NG=s||null;
-    const sig=NG ? [NG.id, NG.game, NG.date, NG.time, NG.title, NG.seats, seatsLeft(NG)].join('|') : '';
+    const sig=NG ? [NG.id, NG.game, NG.date, NG.time, NG.title, NG.seats, seatsLeft(NG), calToday()].join('|') : '';
     if(sig!==NGsig){ NGsig=sig; paint(); }
     if(!NG && flOn) setFloat(false, false);
   };
@@ -17349,7 +17442,7 @@ boot();
     if(!on) return;
     if(dirty) measure();
     const y=Math.max(0, window.scrollY||0);          // отскок iOS — не меньше нуля
-    if(y!==Y){ Y=y; absorb(); floatTick(); }
+    if(y!==Y){ Y=y; absorb(); floatTick(); if(pk && Math.abs(Y-pkY)>36) peekClose(); }
     settle=false;
   }
   function kick(){ Y=-1; if(on && !raf) raf=requestAnimationFrame(frame); }
@@ -17363,6 +17456,7 @@ boot();
     if(on){ dirty=true; settle=true; addEventListener('scroll', onScroll, {passive:true}); kick(); return; }
     removeEventListener('scroll', onScroll);
     if(raf){ cancelAnimationFrame(raf); raf=0; }
+    if(pk){ pk.remove(); pk=null; lock.classList.remove('peek'); }
     clearMh(); P=-1; Y=-1; flOn=false;
     card.classList.remove('ngf-away');
     if(fl){ stopFly(fl); fl.remove(); fl=null; }
