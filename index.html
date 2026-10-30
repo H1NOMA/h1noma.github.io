@@ -303,6 +303,18 @@
     background:rgba(255,255,255,.045);box-shadow:0 1px 6px rgba(0,0,0,.22)}
   .lock .project:active{opacity:.6}
   .lock .project.menu-open{opacity:0;pointer-events:none}
+  /* телефон, новости: приветствие уходит в пилюлю — вокруг неё разгорается кольцо. Сила — --suck от прокрутки:
+     переменная стоит на .lock, а не на <html>, иначе каждый кадр пересчитывал бы стили всего документа.
+     В конце — «глоток»: кольцо расходится волной (transform самой .lock занят центровкой — трогаем только псевдоэлементы) */
+  @media(max-width:879px){
+    .lock::after{content:"";position:absolute;inset:-3px;z-index:-1;border-radius:999px;pointer-events:none;
+      opacity:var(--suck,0);will-change:opacity;
+      box-shadow:0 0 0 1px rgba(var(--accent-rgb),.75),0 0 14px 2px rgba(var(--accent-rgb),.5),0 0 40px 10px rgba(var(--accent-rgb),.2)}
+    .lock::before{content:"";position:absolute;inset:-3px;border-radius:999px;pointer-events:none;opacity:0;
+      border:1.5px solid rgba(var(--accent-rgb),.9);box-shadow:0 0 12px rgba(var(--accent-rgb),.55)}
+    .lock.gulp::before{animation:lockGulp .52s cubic-bezier(.2,.75,.3,1)}
+  }
+  @keyframes lockGulp{0%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(1.2,1.75)}}
   /* узкие Android (360 px): разрядка поуже — длинные имена сеттингов влезают целиком */
   @media(max-width:374px){ .lock .project{letter-spacing:.12em} }
   /* значок версии «V 2.0» — набросок карандашом, заезжает на правый нижний угол пилюли сеттинга:
@@ -1816,6 +1828,9 @@
     border:var(--hair) solid var(--line2);border-radius:16px;padding:20px 18px 16px 18px;overflow:hidden}
   #view-news .masthead::before{left:0;top:0;bottom:0;border-radius:0}
   #view-news .masthead::after{content:"";position:absolute;top:-1px;right:-1px;width:22px;height:22px;background:linear-gradient(225deg,var(--bg) 0 49%,rgba(var(--accent-rgb),.55) 49% calc(49% + 1.5px),transparent calc(49% + 1.5px))}
+  /* телефон: приветствие уходит в пилюлю сеттинга (transform/opacity пишет прокрутка). Слой — только на время
+     сжатия: блок большой, с фоновой картинкой, держать его отдельной текстурой постоянно накладно */
+  #view-news .masthead.absorbing{will-change:transform,opacity}
   #view-news .masthead h1{font-family:var(--f-disp);font-weight:700;text-transform:uppercase;letter-spacing:.04em;font-size:1.5rem;line-height:1.15;color:var(--red-ink);text-shadow:0 0 14px rgba(var(--accent-rgb),.3),1px 0 0 rgba(90,208,255,.14),-1px 0 0 rgba(var(--accent-rgb),.16)}
   #view-news .masthead p{font-family:'Rajdhani',var(--f-disp),sans-serif;font-weight:500;color:var(--dim);font-size:1.04rem;line-height:1.6;letter-spacing:.02em;background:rgba(0,0,0,.28);border:var(--hair) solid var(--line);border-left:2px solid rgba(var(--accent-rgb),.55);border-radius:10px;padding:12px 14px;margin-top:2px}
   /* ===== сквозные эффекты игр ===== */
@@ -3372,6 +3387,48 @@
   .ng-card .ng-k{font-family:var(--f-mono);font-size:.62rem;letter-spacing:.2em;color:var(--red-ink);text-transform:uppercase}
   .ng-card b{font-family:var(--f-disp);font-size:1rem;color:var(--txt)}
   .ng-card .ng-meta{font-family:var(--f-mono);font-size:.72rem;color:var(--muted)}
+  /* телефон: карточка ушла под шапку — «Ближайшая игра» едет за пользователем стеклянной пилюлей внизу,
+     в одну линию с календарём (#calFab). Элемент создаёт скрипт и только на телефоне в «Новостях».
+     Появление и уход — FLIP из места карточки (WAAPI, transform/opacity); здесь — покой и скрытие */
+  @media(max-width:879px){
+    #ngFloat{position:fixed;left:12px;right:calc(12px + 58px + 10px);bottom:calc(12px + env(safe-area-inset-bottom));z-index:60;
+      height:58px;margin:0;padding:0 9px 0 8px;display:flex;align-items:center;gap:10px;overflow:hidden;
+      border:var(--hair) solid rgba(var(--accent-rgb),.42);border-radius:999px;
+      background:var(--glass2);backdrop-filter:blur(28px) saturate(180%);-webkit-backdrop-filter:blur(28px) saturate(180%);
+      box-shadow:0 8px 24px rgba(0,0,0,.42),0 0 22px rgba(var(--accent-rgb),.13),0 0 0 .5px rgba(255,255,255,.05) inset;
+      color:var(--txt);font:inherit;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent;
+      opacity:0;visibility:hidden;pointer-events:none}
+    #ngFloat.on{opacity:1;visibility:visible;pointer-events:auto;transition:opacity .18s,scale .14s var(--spring)}
+    #ngFloat.on:active{scale:.965}
+    html:not(.view-news) #ngFloat{display:none}
+    /* шторка, поиск, меню, модалки и выбор сеттинга — пилюля уходит вместе с остальными плавающими кнопками */
+    .dr-open #ngFloat.on,.search-open #ngFloat.on,.nav-open #ngFloat.on,#scrim.open~#ngFloat.on,#scrim2.open~#ngFloat.on{opacity:0;pointer-events:none}
+    /* :has — отдельным правилом: браузер без него выбросил бы весь список селекторов вместе с ним */
+    html:has(#projMenu.open) #ngFloat.on{opacity:0;pointer-events:none}
+    /* играет музыка — плашка занимает ту же полосу, пилюля встаёт над ней, тост — над пилюлей */
+    #musicBar:not([hidden])~#ngFloat{bottom:calc(80px + env(safe-area-inset-bottom))}
+    #musicBar:not([hidden])~#ngFloat.on~.toast{bottom:calc(146px + env(safe-area-inset-bottom))}
+    /* блик по стеклу, когда пилюля встала на место */
+    #ngFloat::after{content:"";position:absolute;inset:0;pointer-events:none;transform:translateX(-110%);
+      background:linear-gradient(105deg,transparent 35%,rgba(255,255,255,.13) 50%,transparent 65%)}
+    #ngFloat.arrive::after{animation:ngfGlint 1s .32s cubic-bezier(.4,0,.2,1) both}
+    #ngFloat .ngf-d{flex:none;width:42px;height:42px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;
+      background:radial-gradient(circle at 50% 28%,rgba(var(--accent-rgb),.3),rgba(var(--accent-rgb),.08) 72%);
+      border:var(--hair) solid rgba(var(--accent-rgb),.6);box-shadow:0 0 14px rgba(var(--accent-rgb),.22);color:var(--red-ink)}
+    #ngFloat .ngf-d b{font-family:var(--f-disp);font-weight:700;font-size:1.06rem;line-height:1}
+    #ngFloat .ngf-d i{font-style:normal;font-family:var(--f-mono);font-size:.48rem;letter-spacing:.14em;line-height:1;margin-top:3px;color:var(--dim)}
+    #ngFloat .ngf-d svg{width:20px;height:20px}
+    #ngFloat .ngf-m{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+    #ngFloat .ngf-k,#ngFloat .ngf-t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    #ngFloat .ngf-k{font-family:var(--f-mono);font-size:.56rem;letter-spacing:.12em;text-transform:uppercase;color:var(--red-ink);line-height:1.2}
+    #ngFloat .ngf-t{font-family:var(--f-disp);font-weight:700;font-size:.9rem;line-height:1.2;color:var(--txt)}
+    #ngFloat .ngf-s{flex:none;display:flex;align-items:center;gap:4px;padding:5px 8px;border-radius:999px;
+      border:var(--hair) solid var(--line2);background:rgba(255,255,255,.05);font-family:var(--f-mono);font-size:.64rem;color:var(--dim)}
+    #ngFloat .ngf-s svg{width:11px;height:11px;opacity:.8}
+    /* пока пилюля снаружи, сама карточка невидима, но место держит — лента не прыгает */
+    #nextGame.ngf-away{visibility:hidden}
+  }
+  @keyframes ngfGlint{to{transform:translateX(110%)}}
   /* печать листа персонажа: классический бланк D&D — на экране скрыт, в печати только он */
   #printSheet{display:none}
   @media print{
@@ -7543,6 +7600,7 @@ function updateNextGame(){
   // прошедшие, но не закрытые ГМом игры «ближайшими» не считаем — иначе баннер зовёт
   // записаться на вчера, а календарь рядом пишет «ничего не запланировано»
   const s=list.find(g=>{ const d=gameDateOf(g); return !d || d>=today; });
+  if(typeof ngFloatSync==='function') ngFloatSync(s||null);   // плавающая «Ближайшая игра» на телефоне (модуль в конце)
   const su=document.getElementById('signupBtn');
   // нет запланированной ГМом кампании (или все уже прошли) → ни баннера, ни кнопки записи (пустота)
   if(!s){ el.hidden=true; el.innerHTML=''; if(su) su.hidden=true; return; }
@@ -16854,6 +16912,224 @@ boot();
   (function wait(){ if(document.getElementById('splash')) setTimeout(wait, 400); else setTimeout(show, 700); })();
 })();
 
+</script>
+
+<script>
+/* ═══ Новости на телефоне: приветствие уходит в кнопку сеттинга, «Ближайшая игра» — плавающей пилюлей ═══
+   Всё зависит только от прокрутки окна и считается раз в кадр: в кадре — scrollY и запись transform/opacity,
+   размеры берутся из кэша (ResizeObserver, поворот, смена сеттинга), а не меряются заново.
+   Приветствие не держится у шапки встречным сдвигом, а сжимается к центру пилюли: на iOS прокрутка идёт
+   в своём потоке и JS отстаёт от неё на кадр — удерживаемый на месте блок дрожал бы на всю величину отставания,
+   а движущийся вместе с лентой и сжимающийся этого не показывает. */
+(function(){
+  const R=document.documentElement;
+  const view=document.getElementById('view-news'), mh=view && view.querySelector('.masthead'),
+        card=document.getElementById('nextGame'), lock=document.getElementById('projSwipe'),
+        bar=document.querySelector('header .bar');
+  if(!mh || !card || !lock || !window.matchMedia) return;
+  const MQ=matchMedia('(max-width:879px)'), RM=matchMedia('(prefers-reduced-motion: reduce)');
+  const SPRING='cubic-bezier(.32,.72,0,1)';
+  const MON=['ЯНВ','ФЕВ','МАР','АПР','МАЙ','ИЮН','ИЮЛ','АВГ','СЕН','ОКТ','НОЯ','ДЕК'];
+  // кэш: пилюля — в координатах экрана (шапка липкая, её место постоянно), приветствие и карточка — в документе
+  const M={pw:0, pb:0, nH:0};
+  let on=false, fx=false, dirty=true, settle=true, raf=0, Y=-1, P=-1, gulped=false, gT=0;
+  let fl=null, flOn=false, flA=[], NG=null, NGsig='';
+  const clamp01=v=>v<0?0:v>1?1:v;
+  const sstep=(a,b,v)=>{ v=clamp01((v-a)/(b-a)); return v*v*(3-2*v); };
+  // место в документе без transform: впитывание двигает сам блок, getBoundingClientRect видел бы уже сдвинутый
+  function docPos(el){ let x=0, y=0; for(let n=el; n; n=n.offsetParent){ x+=n.offsetLeft; y+=n.offsetTop; } return {x, y}; }
+
+  function measure(){
+    dirty=false;
+    // при открытой шторке полотно уехало transform'ом — пилюлю меряем только в покое (.lock сам не анимируется,
+    // в отличие от #projBtn со сдвигом при смене сеттинга, — поэтому меряем его)
+    if(!R.classList.contains('dr-open')){
+      const r=lock.getBoundingClientRect();
+      if(r.width) Object.assign(M, {pw:r.width, ph:r.height, pb:r.bottom, cx:r.left+r.width/2, cy:r.top+r.height/2});
+    }
+    const a=docPos(mh); M.mL=a.x; M.mT=a.y; M.mW=mh.offsetWidth; M.mH=mh.offsetHeight; M.span=M.mH*.75;
+    if(!card.hidden && card.offsetHeight){ const b=docPos(card); M.nL=b.x; M.nT=b.y; M.nW=card.offsetWidth; M.nH=card.offsetHeight; }
+    else M.nH=0;
+    // короткая лента: до конца впитывания не докрутить — блок так и висел бы наполовину впитанным
+    fx=!RM.matches && M.mH>0 && M.pw>0 && (R.scrollHeight-innerHeight) >= (M.mT+M.span-M.pb);
+    Y=-1; P=-1;
+  }
+
+  /* p: 0 — верх приветствия коснулся низа пилюли, 1 — впитано (через 3/4 его высоты прокрутки) */
+  function absorb(){
+    const p=fx ? Math.round(clamp01((M.pb-(M.mT-Y))/M.span)*1000)/1000 : 0;
+    if(p===P) return;
+    const was=P; P=p;
+    if(p<=0){ clearMh(); return; }
+    const t=M.mT-Y;                                  // где верх блока был бы без эффекта
+    // по ширине сужается раньше, по высоте — с ускорением; цель чуть меньше пилюли — уходит под неё целиком
+    const ex=Math.pow(p,1.15), ey=Math.pow(p,2.1);
+    const w=M.mW+(M.pw*.55-M.mW)*ex, h=M.mH+(M.ph*.45-M.mH)*ey;
+    const dx=(M.cx-(M.mL+M.mW/2))*ex, dy=(M.cy-(t+M.mH/2))*ey;
+    // и запрокидывается вокруг нижнего края: верх уходит вглубь и сужается — блок затягивает в пилюлю воронкой
+    const tilt=48*Math.pow(p,1.1), hh=(M.mH/2).toFixed(1);
+    mh.classList.toggle('absorbing', p<1);
+    put(mh, 'transform', `translate3d(${dx.toFixed(1)}px,${dy.toFixed(1)}px,0) scale(${(w/M.mW).toFixed(4)},${(h/M.mH).toFixed(4)}) `
+      +`translateY(${hh}px) perspective(${(M.mH*1.6).toFixed(0)}px) rotateX(${tilt.toFixed(2)}deg) translateY(-${hh}px)`);
+    put(mh, 'opacity', (1-sstep(.45,1,p)).toFixed(3));
+    put(mh, 'visibility', p>=1 ? 'hidden' : '');
+    // кольцо разгорается по мере приближения и гаснет к «глотку»
+    put(lock, '--suck', (sstep(0,.8,p)*(1-sstep(.9,1,p))).toFixed(3));
+    if(p>=.98 && was>=0 && was<.98 && !gulped && !settle) gulp();
+    if(p<.9) gulped=false;
+  }
+  // что уже записано: то же значение не пишем повторно (лишняя запись — лишний пересчёт стиля в кадре)
+  const last={};
+  function put(el, k, v){ if(last[k]===v) return; last[k]=v; if(v) el.style.setProperty(k, v); else el.style.removeProperty(k); }
+  function clearMh(){
+    ['transform','opacity','visibility'].forEach(k=>put(mh, k, '')); put(lock, '--suck', '');
+    mh.classList.remove('absorbing');
+  }
+  function gulp(){
+    gulped=true;
+    lock.classList.add('gulp'); clearTimeout(gT); gT=setTimeout(()=>lock.classList.remove('gulp'), 560);
+    // пилюля «сглатывает» — свойством scale, а не transform: transform у неё занят сдвигом при смене сеттинга
+    const pb=document.getElementById('projBtn');
+    try{ if(pb && pb.animate) pb.animate([{scale:'1'},{scale:'1.08',offset:.3},{scale:'.97',offset:.62},{scale:'1'}], {duration:480, easing:'ease-out'}); }catch(e){}
+  }
+
+  /* ── плавающая «Ближайшая игра» ── */
+  function floatEl(){
+    if(fl) return fl;
+    fl=document.createElement('button');
+    fl.type='button'; fl.id='ngFloat'; fl.tabIndex=-1; fl.setAttribute('aria-hidden','true');
+    fl.innerHTML='<span class="ngf-d"></span><span class="ngf-m"><span class="ngf-k"></span><span class="ngf-t"></span></span>'
+      +'<span class="ngf-s"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7z"/></svg><span></span></span>';
+    fl.addEventListener('click', ()=>{ if(typeof openGameSignup==='function') openGameSignup(); });
+    // вне #appPane (у него transform при открытой шторке); после #musicBar и #scrim, но перед тостом — CSS
+    // ловит их соседством «~», без классов на <html> (класс там — пересчёт стилей всего документа посреди прокрутки)
+    const ts=document.getElementById('toast');
+    if(ts && ts.parentNode===document.body) document.body.insertBefore(fl, ts); else document.body.appendChild(fl);
+    NGsig=''; paint();
+    return fl;
+  }
+  function paint(){
+    if(!fl || !NG) return;
+    const s=NG, iso=gameDateOf(s)||'', title=s.title||gameTitle(s.game);
+    const d=fl.querySelector('.ngf-d');
+    let wd='';
+    if(iso){
+      const [y,m,dd]=iso.split('-').map(Number);
+      d.innerHTML='<b></b><i></i>'; d.firstChild.textContent=dd; d.lastChild.textContent=MON[m-1]||'';
+      if(s.date) wd=new Date(y,m-1,dd).toLocaleDateString('ru-RU',{weekday:'short'});
+    } else d.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>';
+    const when=[wd, s.time].filter(Boolean).join(', ');
+    fl.querySelector('.ngf-k').textContent=when ? 'Ближайшая · '+when : 'Ближайшая игра';
+    fl.querySelector('.ngf-t').textContent=title;
+    const se=fl.querySelector('.ngf-s');
+    se.hidden=!s.seats; se.lastChild.textContent=s.seats ? seatsLeft(s)+'/'+s.seats : '';
+    fl.setAttribute('aria-label', 'Ближайшая игра: '+[title, iso?fmtGameDate(iso,{day:'numeric',month:'long'}):'', s.time].filter(Boolean).join(', '));
+  }
+  // зовёт updateNextGame на каждом рендере новостей (и на каждом такте облака) — перерисовываем только по сути
+  window.ngFloatSync=function(s){
+    NG=s||null;
+    const sig=NG ? [NG.id, NG.game, NG.date, NG.time, NG.title, NG.seats, seatsLeft(NG)].join('|') : '';
+    if(sig!==NGsig){ NGsig=sig; paint(); }
+    if(!NG && flOn) setFloat(false, false);
+  };
+  function floatTick(){
+    if(!NG || !M.nH){ if(flOn) setFloat(false, false); return; }
+    const cb=M.nT+M.nH-Y;                            // низ карточки на экране
+    // запас в обе стороны: на самой границе пилюля не мигает
+    if(!flOn && cb<M.pb-4) setFloat(true, !settle);
+    else if(flOn && cb>M.pb+24) setFloat(false, !settle);
+  }
+  // переход пилюли: сдвиг центра и масштаб относительно её места + прозрачность
+  const tfOf=q=>`translate3d(${q.dx.toFixed(1)}px,${q.dy.toFixed(1)}px,0) scale(${q.sx.toFixed(3)},${q.sy.toFixed(3)})`;
+  // карточка, верх которой на экране в ct, — в координатах пилюли (fr — место пилюли без переходов)
+  const cardQ=(fr, ct)=>({dx:M.nL+M.nW/2-fr.left-fr.width/2, dy:ct+M.nH/2-fr.top-fr.height/2, sx:M.nW/fr.width, sy:M.nH/fr.height});
+  let tw=0, twS=null;
+  // остановить переход; вернуть, где пилюля сейчас (null — стояла на месте)
+  function stopFly(f){
+    let cur=null;
+    if(tw){ cancelAnimationFrame(tw); tw=0; cur=twS; }
+    else if(flA.length){
+      const cs=getComputedStyle(f);
+      try{ const m=new DOMMatrixReadOnly(cs.transform==='none' ? undefined : cs.transform); cur={dx:m.e, dy:m.f, sx:m.a, sy:m.d, o:+cs.opacity}; }catch(e){}
+    }
+    flA.forEach(a=>a.cancel()); flA=[]; twS=null;
+    f.style.removeProperty('transform'); f.style.removeProperty('opacity'); f.style.removeProperty('transition');
+    return cur;
+  }
+  function setFloat(v, anim){
+    flOn=v;
+    const f=floatEl();
+    card.classList.toggle('ngf-away', v);
+    f.setAttribute('aria-hidden', v?'false':'true'); f.tabIndex=v?0:-1;
+    if(!v && document.activeElement===f) f.blur();
+    // прерванный переход продолжаем с того места, где пилюля сейчас, а не рывком из начала
+    const cur=stopFly(f);
+    anim=anim && !RM.matches && !!f.animate;
+    if(v){ f.classList.add('on'); if(anim && !cur) f.classList.add('arrive'); }
+    if(!anim){ if(!v) f.classList.remove('on','arrive'); return; }
+    const fr=f.getBoundingClientRect();
+    if(v){
+      // FLIP из прямоугольника карточки — там, где она ушла под шапку (после рывка — не выше этого места)
+      const q=cur || Object.assign(cardQ(fr, Math.max(M.nT-Y, M.pb-4-M.nH)), {o:.2});
+      const a=f.animate([{transform:tfOf(q)},{transform:'none'}], {duration:640, easing:SPRING});
+      flA=[a, f.animate([{opacity:q.o},{opacity:1}], {duration:260, easing:'ease-out'})];
+      a.onfinish=()=>{ if(flA[0]===a) flA=[]; };
+      return;
+    }
+    // обратно — в карточку. Её место во время полёта едет вместе с прокруткой, поэтому цель пересчитывается
+    // каждый кадр (короткий JS-переход, только transform/opacity); карточка проявляется, когда пилюля почти села
+    if(card.animate) card.animate([{opacity:0},{opacity:1}], {duration:240, delay:130, easing:'ease-out', fill:'backwards'});
+    const from=cur || {dx:0, dy:0, sx:1, sy:1, o:1}, t0=performance.now();
+    f.style.transition='none';
+    const step=now=>{
+      const q=clamp01((now-t0)/560), e=1-Math.pow(1-q,5);
+      const to=cardQ(fr, M.nT-Math.max(0, window.scrollY||0));
+      twS={dx:from.dx+(to.dx-from.dx)*e, dy:from.dy+(to.dy-from.dy)*e, sx:from.sx+(to.sx-from.sx)*e, sy:from.sy+(to.sy-from.sy)*e,
+           o:from.o*(1-sstep(.22,.52,q))};
+      f.style.transform=tfOf(twS); f.style.opacity=twS.o.toFixed(3);
+      if(q<1){ tw=requestAnimationFrame(step); return; }
+      tw=0; twS=null; f.classList.remove('on','arrive');
+      f.style.removeProperty('transform'); f.style.removeProperty('opacity'); f.style.removeProperty('transition');
+    };
+    tw=requestAnimationFrame(step);
+  }
+
+  /* ── кадр и включение ── */
+  function frame(){
+    raf=0;
+    if(!on) return;
+    if(dirty) measure();
+    const y=Math.max(0, window.scrollY||0);          // отскок iOS — не меньше нуля
+    if(y!==Y){ Y=y; absorb(); floatTick(); }
+    settle=false;
+  }
+  function kick(){ Y=-1; if(on && !raf) raf=requestAnimationFrame(frame); }
+  function onScroll(){ if(!raf) raf=requestAnimationFrame(frame); }
+  // работает только на телефоне и только в «Новостях»; без анимаций (reduced motion) приветствие
+  // прокручивается как обычно, а пилюля появляется и уходит сразу
+  function sync(){
+    const want=MQ.matches && R.classList.contains('view-news');
+    if(want===on){ if(on){ dirty=true; settle=true; kick(); } return; }
+    on=want;
+    if(on){ dirty=true; settle=true; addEventListener('scroll', onScroll, {passive:true}); kick(); return; }
+    removeEventListener('scroll', onScroll);
+    if(raf){ cancelAnimationFrame(raf); raf=0; }
+    clearMh(); P=-1; Y=-1; flOn=false;
+    card.classList.remove('ngf-away');
+    if(fl){ stopFly(fl); fl.remove(); fl=null; }
+  }
+  const later=fn=>()=>{ dirty=true; fn&&fn(); kick(); };
+  // размеры: новое приветствие, смена сеттинга, появление игры, шрифты, подгрузка ленты (проверка «короткой ленты»)
+  if(window.ResizeObserver){ try{ const ro=new ResizeObserver(later()); [mh, card, lock, bar, view].forEach(e=>{ if(e) ro.observe(e); }); }catch(e){} }
+  addEventListener('resize', later(), {passive:true});
+  addEventListener('orientationchange', ()=>setTimeout(later(()=>{ settle=true; }), 260));
+  addEventListener('pageshow', later());
+  addEventListener('load', later());
+  document.addEventListener('komik-view-change', sync);
+  [MQ, RM].forEach(q=>{ try{ q.addEventListener('change', sync); }catch(e){ try{ q.addListener(sync); }catch(_){} } });
+  sync();
+  try{ updateNextGame(); }catch(e){}                  // первый рендер новостей прошёл до этого модуля
+})();
 </script>
 
 <script>
