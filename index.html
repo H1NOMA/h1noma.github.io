@@ -7698,7 +7698,7 @@ function updateNextGame(){
   el.innerHTML=`<div class="ng-card" onclick="openGameSignup()" role="button" tabindex="0" onkeydown="if(event.key==='Enter')openGameSignup()">
     <span class="ng-k">Ближайшая игра</span>
     <b>${esc(s.title||gameTitle(s.game))}</b>
-    <span class="ng-meta">${[s.date?fmtGameDate(s.date):'', s.time, s.loc, 'мест '+seatsLeft(s)+'/'+(s.seats||'—')].filter(Boolean).map(esc).join(' · ')}</span>
+    <span class="ng-meta">${[s.date?fmtGameDate(s.date):'', s.time, s.loc, (s.seats?'свободно '+seatsLeft(s)+' из '+s.seats:'')].filter(Boolean).map(esc).join(' · ')}</span>
   </div>`;
 }
 function renderNews(){
@@ -8095,7 +8095,7 @@ function calShift(dm){ calInit(); CAL.m+=dm; if(CAL.m<0){ CAL.m=11; CAL.y--; } i
 function calPick(iso){ CAL.sel = (CAL.sel===iso) ? null : iso; calRefresh(); }
 function calGameRow(s, withDate){
   const col=CAL_COLORS[s.game]||'#fff', d=gameDateOf(s);
-  const meta=[withDate&&d?fmtGameDate(d):'', s.time, s.loc, 'мест '+seatsLeft(s)+'/'+(s.seats||'—')].filter(Boolean).map(esc).join(' · ');
+  const meta=[withDate&&d?fmtGameDate(d):'', s.time, s.loc, s.seats?'свободно '+seatsLeft(s)+' из '+s.seats:''].filter(Boolean).map(esc).join(' · ');
   return `<button type="button" class="cal-game" style="--c:${col}" onclick="openGameBrief('${s.id}')">
     <span class="cal-game-set">${esc(gameTitle(s.game))}</span>
     <span class="cal-game-t">${esc(s.title||'Сессия')}</span>
@@ -8226,7 +8226,7 @@ function gsCardHtml(s, past){
       ${s.time?`<span>🕑 ${esc(s.time)}</span>`:''}
       ${s.loc?`<span>📍 ${esc(s.loc)}</span>`:''}
       ${s.price?`<span>💳 ${esc(s.price)}</span>`:''}
-      <span>Места: ${(s.players||[]).length}/${esc(String(s.seats||0))}</span>
+      <span>Свободно: ${seatsLeft(s)} из ${esc(String(s.seats||0))}</span>
     </div>
     ${players?`<div class="gs-players">${players}</div>`:''}
     <div class="gs-act">${act}</div>
@@ -8355,7 +8355,7 @@ function openSchedule(game){
         ${s.time?`<span>🕑 ${esc(s.time)}</span>`:''}
         ${s.loc?`<span>📍 ${esc(s.loc)}</span>`:''}
         ${s.price?`<span>💳 ${esc(s.price)}</span>`:''}
-        <span>Места: ${(s.players||[]).length}/${esc(String(s.seats||0))}</span>
+        <span>Свободно: ${seatsLeft(s)} из ${esc(String(s.seats||0))}</span>
       </div>
       ${(s.players||[]).length?`<div class="gs-players">${s.players.map((p,i)=>`<span class="tag">${esc(p.name)}${p.charId?` · <button class="gs-charlink" onclick="openPlayer('${p.charId}')">${esc(p.charName||'персонаж')}</button>`:(p.charName?` · ${esc(p.charName)}`:'')} <button class="gs-kick" onclick="kickPlayer('${s.id}',${i})" title="Убрать">✕</button></span>`).join('')}</div>`:'<div class="opt">Записей пока нет</div>'}
       <div class="gs-act">
@@ -12315,12 +12315,15 @@ async function closeInlineSheet(){
 }
 function confirmDeleteInline(id){
   const el=document.querySelector('#playerEditor .pacts'); if(!el) return;
+  if(!el.dataset.orig) el.dataset.orig=el.innerHTML;   // «Отмена» вернёт ряд целиком (PDF, JSON), а не одну кнопку удаления
   el.innerHTML = `<span style="font-family:var(--f-mono);font-size:.78rem;color:var(--red-ink);align-self:center">Удалить безвозвратно?</span>
     <button class="btn danger" onclick="deleteInline('${id}')">Да, удалить</button>
     <button class="btn ghost" onclick="confirmDeleteInlineCancel('${id}')">Отмена</button>`;
 }
 function confirmDeleteInlineCancel(id){
-  const el=document.querySelector('#playerEditor .pacts'); if(el) el.innerHTML=`<button class="btn danger" onclick="confirmDeleteInline('${id}')">Удалить персонажа</button>`;
+  const el=document.querySelector('#playerEditor .pacts'); if(!el) return;
+  if(el.dataset.orig){ el.innerHTML=el.dataset.orig; delete el.dataset.orig; }
+  else el.innerHTML=`<button class="btn danger" onclick="confirmDeleteInline('${id}')">Удалить персонажа</button>`;
 }
 async function deleteInline(id){
   const c=CHARS.find(x=>x.id===id); if(c && !canEdit(c)){ toast('Нет прав на удаление'); return; }
