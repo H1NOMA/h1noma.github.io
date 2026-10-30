@@ -123,6 +123,7 @@ async function phone(b, width, shots) {
   s = await state(page);
   check(s.tf && +s.op > 0 && s.vis !== 'hidden', `${width}: на обратном ходе приветствие выходит из пилюли`);
   await scrollTo(page, 0);
+  await page.waitForTimeout(900);                   // пружина возвращает блок и успокаивается
   s = await state(page);
   check(!s.tf && !s.op && !s.vis && !s.suck, `${width}: в начале страницы inline-стили сняты (${s.tf}|${s.op}|${s.vis}|${s.suck})`);
   if (shots) await page.screenshot({ path: `${shots}/newsfx-${width}-z.png` });

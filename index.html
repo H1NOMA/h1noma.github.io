@@ -17202,10 +17202,18 @@ boot();
   if(!mh || !card || !lock || !window.matchMedia) return;
   const MQ=matchMedia('(max-width:879px)'), RM=matchMedia('(prefers-reduced-motion: reduce)');
   const SPRING='cubic-bezier(.32,.72,0,1)';
+  // пружина для раскрытия: затухающее колебание (ζ≈.62), разложенное в easing linear(); старый браузер — кривая без перелёта
+  const SPR_MS=620, SPR_EASE=(()=>{
+    try{ if(!CSS.supports('animation-timing-function','linear(0, 1)')) return SPRING; }catch(e){ return SPRING; }
+    const z=.62, w=4.6/(z*SPR_MS/1000), wd=w*Math.sqrt(1-z*z), pts=[];
+    for(let i=0;i<=40;i++){ const t=i/40*SPR_MS/1000;
+      pts.push((1-Math.exp(-z*w*t)*(Math.cos(wd*t)+z*w/wd*Math.sin(wd*t))).toFixed(4)); }
+    pts[40]='1'; return 'linear('+pts.join(',')+')';
+  })();
   const MON=['ЯНВ','ФЕВ','МАР','АПР','МАЙ','ИЮН','ИЮЛ','АВГ','СЕН','ОКТ','НОЯ','ДЕК'];
   // кэш: пилюля — в координатах экрана (шапка липкая, её место постоянно), приветствие и карточка — в документе
   const M={pw:0, pb:0, nH:0, r0:16};
-  let on=false, fx=false, dirty=true, settle=true, raf=0, Y=-1, P=-1, gulped=false, gT=0;
+  let on=false, fx=false, dirty=true, settle=true, raf=0, Y=-1, P=-1, PR=-1, gulped=false, gT=0;
   let fl=null, flOn=false, flA=[], NG=null, NGsig='';
   const clamp01=v=>v<0?0:v>1?1:v;
   const sstep=(a,b,v)=>{ v=clamp01((v-a)/(b-a)); return v*v*(3-2*v); };
@@ -17226,15 +17234,40 @@ boot();
     else M.nH=0;
     // короткая лента: до конца впитывания не докрутить — блок так и висел бы наполовину впитанным
     fx=!RM.matches && M.mH>0 && M.pw>0 && (R.scrollHeight-innerHeight) >= (M.mT+M.span-M.pb);
-    Y=-1; P=-1;
+    Y=-1; P=-1; PR=-1;
   }
 
-  /* p: 0 — верх приветствия коснулся низа пилюли, 1 — впитано (через 3/4 его высоты прокрутки) */
-  function absorb(){
-    const p=fx ? Math.round(clamp01((M.pb-(M.mT-Y))/M.span)*1000)/1000 : 0;
-    if(p===P) return;
-    const was=P; P=p;
-    if(p<=0){ clearMh(); return; }
+  /* p: 0 — верх приветствия коснулся низа пилюли, 1 — впитано (через 3/4 его высоты прокрутки).
+     Сопротивление, как у резинки на iOS: пока прокрутка не прошла порог RES, блок показывает лишь часть пути
+     (упирается, кольцо при этом уже разгорается — его тянут); за порогом «срывается», и видимый прогресс
+     догоняет прокрутку пружиной — с разгоном и лёгким перелётом. Назад — тоже пружиной: у самого верха блок
+     чуть «надувается» и опадает. Пружина — полуявный Эйлер по времени кадра; кадры идут, пока она не успокоится */
+  const RES=.34, KS=230, CS=2*Math.sqrt(230)*.58;
+  let pv=0, pvel=0, rel=false, tPrev=0;
+  function absorb(now){
+    const raw=fx ? clamp01((M.pb-(M.mT-Y))/M.span) : 0;
+    if(!rel && raw>=RES) rel=true; else if(rel && raw<RES*.55) rel=false;
+    const tg=(RM.matches || rel) ? raw : RES*.42*(1-Math.exp(-3*raw/RES))/(1-Math.exp(-3));
+    let busy=false;
+    if(RM.matches || settle || !now){ pv=tg; pvel=0; }
+    else{
+      const dt=Math.min(.034, Math.max(.004, ((now-tPrev)||16)/1000));
+      for(let i=0;i<3;i++){ const h=dt/3, a=KS*(tg-pv)-CS*pvel; pvel+=a*h; pv+=pvel*h; }
+      if(Math.abs(tg-pv)<.0012 && Math.abs(pvel)<.012){ pv=tg; pvel=0; } else busy=true;
+    }
+    tPrev=now||0;
+    draw(Math.round(pv*1000)/1000, raw);
+    return busy;
+  }
+  function draw(p, raw){
+    if(p===P && raw===PR) return;
+    const was=P; P=p; PR=raw;
+    if(p<=0 && p>-.004){ clearMh(); return; }
+    if(p<0){
+      // отскок у верха: блок на миг больше своего и тут же опадает
+      clearMh(); put(mh, 'transform', `scale(${(1+Math.min(.08, -p*.6)).toFixed(4)})`); return;
+    }
+    p=Math.min(p, 1.06);                             // перелёт за пилюлю — чуть глубже, без выворачивания
     const t=M.mT-Y;                                  // где верх блока был бы без эффекта
     // по ширине сужается раньше, по высоте — с ускорением; цель чуть меньше пилюли — уходит под неё целиком
     const ex=Math.pow(p,1.15), ey=Math.pow(p,2.1);
@@ -17246,14 +17279,15 @@ boot();
     put(mh, 'transform', `translate3d(${dx.toFixed(1)}px,${dy.toFixed(1)}px,0) scale(${(w/M.mW).toFixed(4)},${(h/M.mH).toFixed(4)}) `
       +`translateY(${hh}px) perspective(${(M.mH*1.6).toFixed(0)}px) rotateX(${tilt.toFixed(2)}deg) translateY(-${hh}px)`);
     put(mh, 'opacity', (1-sstep(.45,1,p)).toFixed(3));
-    put(mh, 'visibility', p>=1 ? 'hidden' : '');
+    put(mh, 'visibility', p>=1.02 || (p>=1 && raw>=1) ? 'hidden' : '');
     // и скругляется: видимый радиус растёт от своего до половины видимой высоты — к концу блок сам становится
     // пилюлей. Радиус задан в своих (несжатых) пикселях, поэтому делим на масштаб по каждой оси отдельно
     const sx=w/M.mW, sy=h/M.mH, rv=M.r0+(h/2-M.r0)*sstep(0,.8,p);
     put(mh, 'border-radius', `${Math.min(rv/sx, M.mW/2).toFixed(1)}px / ${Math.min(rv/sy, M.mH/2).toFixed(1)}px`);
     put(mh, '--absorb', p.toFixed(3));
-    // кольцо разгорается по мере приближения и гаснет к «глотку»
-    put(lock, '--suck', (sstep(0,.8,p)*(1-sstep(.9,1,p))).toFixed(3));
+    // кольцо разгорается по натяжению (по прокрутке, а не по блоку — пока блок упирается, его уже тянут)
+    // и гаснет к «глотку»
+    put(lock, '--suck', (sstep(0,.6,raw)*(1-sstep(.9,1,p))).toFixed(3));
     if(p>=.98 && was>=0 && was<.98 && !gulped && !settle) gulp();
     if(p<.9) gulped=false;
     full(p>=.98 || (p>=.9 && lock.classList.contains('full')));
@@ -17283,10 +17317,11 @@ boot();
     view.appendChild(c); pk=c; pkY=Y;
     lock.classList.add('peek');
     if(RM.matches || !c.animate) return;
-    // вырастает из пилюли: тот же путь, что у впитывания, только обратно и разом
+    // вырастает из пилюли пружиной: чуть перелетает свой размер и оседает (как окна на iOS)
     const r=c.getBoundingClientRect(), q=fromPill(r);
-    pkA=c.animate([{transform:q, opacity:0, borderRadius:'999px'},{transform:'none', opacity:1, borderRadius:getComputedStyle(c).borderRadius}],
-      {duration:420, easing:SPRING});
+    pkA=c.animate([{transform:q, borderRadius:'999px'},{transform:'none', borderRadius:getComputedStyle(c).borderRadius}],
+      {duration:SPR_MS, easing:SPR_EASE});
+    c.animate([{opacity:0},{opacity:1}], {duration:200, easing:'ease-out'});
   }
   const fromPill=r=>`translate3d(${(M.cx-r.left-r.width/2).toFixed(1)}px,${(M.cy-r.top-r.height/2).toFixed(1)}px,0) scale(${(M.pw/r.width).toFixed(3)},${(M.ph/r.height).toFixed(3)})`;
   function peekClose(){
@@ -17294,7 +17329,10 @@ boot();
     const c=pk; pk=null; lock.classList.remove('peek');
     if(pkA){ try{ pkA.cancel(); }catch(e){} pkA=null; }
     if(RM.matches || !c.animate || !on){ c.remove(); return; }
-    const a=c.animate([{transform:'none', opacity:1},{transform:fromPill(c.getBoundingClientRect()), opacity:0}], {duration:280, easing:'cubic-bezier(.4,0,.6,1)', fill:'forwards'});
+    // упирается: сначала чуть подаётся наружу, потом сдаётся и уходит в пилюлю с разгоном
+    const a=c.animate([{transform:'none', opacity:1, easing:'cubic-bezier(.3,0,.4,1)'},
+      {transform:'scale(1.035)', opacity:1, offset:.24, easing:'cubic-bezier(.55,0,.85,.35)'},
+      {transform:fromPill(c.getBoundingClientRect()), opacity:0}], {duration:400, fill:'forwards'});
     a.onfinish=()=>c.remove();
   }
   // перехват тапа по пилюле, только пока приветствие внутри: в фазе захвата на документе — раньше
@@ -17437,13 +17475,16 @@ boot();
   }
 
   /* ── кадр и включение ── */
-  function frame(){
+  function frame(now){
     raf=0;
     if(!on) return;
     if(dirty) measure();
     const y=Math.max(0, window.scrollY||0);          // отскок iOS — не меньше нуля
-    if(y!==Y){ Y=y; absorb(); floatTick(); if(pk && Math.abs(Y-pkY)>36) peekClose(); }
+    const moved=y!==Y; Y=y;
+    const busy=absorb(now);                          // пружина досчитывается и без прокрутки
+    if(moved){ floatTick(); if(pk && Math.abs(Y-pkY)>36) peekClose(); }
     settle=false;
+    if(busy) raf=requestAnimationFrame(frame);
   }
   function kick(){ Y=-1; if(on && !raf) raf=requestAnimationFrame(frame); }
   function onScroll(){ if(!raf) raf=requestAnimationFrame(frame); }
@@ -17457,7 +17498,7 @@ boot();
     removeEventListener('scroll', onScroll);
     if(raf){ cancelAnimationFrame(raf); raf=0; }
     if(pk){ pk.remove(); pk=null; lock.classList.remove('peek'); }
-    clearMh(); P=-1; Y=-1; flOn=false;
+    clearMh(); P=-1; PR=-1; Y=-1; pv=0; pvel=0; rel=false; flOn=false;
     card.classList.remove('ngf-away');
     if(fl){ stopFly(fl); fl.remove(); fl=null; }
   }
