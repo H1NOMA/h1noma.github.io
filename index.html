@@ -207,7 +207,9 @@
   .set-prof .id{flex:1;min-width:0}
   .set-prof .id .n{font-family:var(--f-disp);font-weight:700;font-size:1.12rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .set-badge{display:inline-flex;align-items:center;gap:5px;margin-top:5px;font-family:var(--f-mono);font-size:.56rem;letter-spacing:.1em;text-transform:uppercase;color:var(--red-ink);background:rgba(var(--accent-rgb),.16);border:var(--hair) solid rgba(var(--accent-rgb),.4);border-radius:7px;padding:3px 8px}
-  .set-out{font-family:var(--f-mono);font-size:.62rem;letter-spacing:.06em;text-transform:uppercase;color:var(--dim);background:var(--surface2);border:var(--hair) solid var(--line2);border-radius:10px;padding:8px 12px;cursor:pointer;flex:none}
+  /* шапка профиля в настройках — целиком кнопка: аккаунтом управляют в карточке профиля */
+  button.set-prof{width:100%;font:inherit;color:var(--txt);text-align:left;cursor:pointer}
+  .set-prof .chev{color:var(--muted);flex:none}
   .set-gt{font-family:var(--f-mono);font-size:.62rem;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin:0 4px 8px;padding-top:4px}
   .set-grp{background:var(--surface);border:var(--hair) solid var(--line);border-radius:16px;overflow:hidden;margin-bottom:20px}
   .set-row{display:flex;align-items:center;gap:13px;padding:14px 15px;cursor:pointer;color:var(--txt);background:none;border:none;width:100%;text-align:left;font:inherit}
@@ -270,8 +272,13 @@
   .pc-preset{width:46px;height:46px;flex:none;border-radius:14px;display:flex;align-items:center;justify-content:center;font-family:var(--f-disp);font-weight:700;font-size:1.15rem;cursor:pointer;border:2px solid transparent}
   .pc-preset.on{border-color:var(--red);box-shadow:0 0 0 3px var(--red-soft)}
   .pc-preset.more{border:var(--hair) dashed var(--line2);background:rgba(255,255,255,.02);color:var(--muted);font-size:1.4rem;font-weight:400}
-  .pc-link{display:block;width:100%;text-align:center;margin-top:12px;background:none;border:none;cursor:pointer;font-family:var(--f-mono);font-size:.74rem;letter-spacing:.03em;color:var(--muted)}
-  .pc-link span{border-bottom:1px dashed var(--line2);padding-bottom:2px}
+  /* карточка профиля: аккаунт (закладки, уведомления, пароль, выход) и отдельно внизу — удаление */
+  .pc-acts{margin:18px 0 24px}
+  .pc-del{margin:0}
+  .pc-del .set-row{justify-content:center;color:var(--red-ink);font-family:var(--f-disp);font-weight:600;letter-spacing:.03em}
+  .ad-what{font-family:var(--f-body);color:var(--txt);line-height:1.55;font-size:.92rem;margin-bottom:16px}
+  .ad-what b{color:var(--red-ink)}
+  #adGo:disabled,#pwGo:disabled{opacity:.4;cursor:default;transform:none}
   @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}
     /* scroll-behavior — не переход и не анимация, звёздочка выше его не гасит */
     html{scroll-behavior:auto !important}}
@@ -5194,7 +5201,9 @@ async function cloudGetKeys(keys){
 /* Реестр логинов comik:users:v1 — справочный список без паролей, строку пишет любой вошедший.
    Раньше вход дописывал себя в ЛОКАЛЬНЫЙ список и заливал его целиком: при тайм-ауте чтения список был
    пуст — и реестр всех игроков затирался одним тегом (в бэкапах: 9 → 3 → 1). Теперь: перечитать облако,
-   дописать себя, записать только если облако ответило. Кривое значение строки (не массив) не роняет старт */
+   дописать себя, записать только если облако ответило. Кривое значение строки (не массив) не роняет старт.
+   Дописываем ТОЛЬКО себя: локальный список мог помнить удалённые аккаунты, и вход команды (её запись сервер
+   не проверяет) вернул бы их в реестр */
 function usersNorm(v){ return Array.isArray(v) ? v.filter(u=>u && typeof u==='object' && !Array.isArray(u) && typeof u.tag==='string' && u.tag.trim()) : []; }
 async function usersRegister(tag){
   tag=normTag(tag||''); if(!tag) return;
@@ -5202,10 +5211,10 @@ async function usersRegister(tag){
   if(!supa) return;
   let cur; try{ cur=await withTimeout(cloudGet(KEY_USERS), 8000); }catch(e){ return; }
   if(cur===undefined) return;                                // облако молчит — вслепую поверх чужих не пишем
-  const list=usersNorm(cur), had=list.length;
-  USERS.forEach(u=>{ const t=normTag(u.tag); if(t && !list.some(x=>normTag(x.tag)===t)) list.push({ tag:t, createdAt:+u.createdAt||Date.now() }); });
+  const list=usersNorm(cur), had=list.some(x=>normTag(x.tag)===tag);
+  if(!had){ const me=USERS.find(u=>normTag(u.tag)===tag); list.push({ tag, createdAt:+(me&&me.createdAt)||Date.now() }); }
   USERS=list;
-  if(list.length!==had || !Array.isArray(cur)) sset(KEY_USERS, list, true, true).catch(()=>{});
+  if(!had || !Array.isArray(cur)) sset(KEY_USERS, list, true, true).catch(()=>{});
 }
 // собрать все листы персонажей из облака: легаси-блоб comik:chars:v1 + все пер-юзерные comik:chars:<тег>
 // (keys — только эти строки: остальные не менялись, см. fetchCloudCharsChanged)
@@ -6833,26 +6842,54 @@ function openPolicy(overlay){
     <div class="top">${BM_SVG}<span class="clabel">Политика и условия</span></div>
     <h2>Политика и условия</h2>
     <div class="policy">
-      <p>КОМИК — объединение мастеров по настольным ролевым играм. Мы проводим игры, в том числе <b>на платной основе</b> (услуги по организации и проведению игровых сессий). Данные для рекламы мы не собираем.</p>
-      <h3>Какие данные мы храним</h3>
-      <p>Для работы аккаунта — ваш <b>логин</b> и пароль, а также то, что вы сами создаёте: персонажей, закладки, записи на игры.</p>
-      <h3>Чего мы НЕ спрашиваем на сайте</h3>
-      <p>Почту, телефон, настоящее имя и платёжные данные при регистрации <b>на сайте</b> не требуются. <b>Используйте вымышленные ник и пароль и не указывайте на сайте реальные личные данные</b> — ни свои, ни чужие.</p>
+      <p>КОМИК — объединение мастеров настольных ролевых игр. Здесь описано, по каким правилам работает сайт, какие данные он хранит, зачем и как долго. Данные для рекламы мы не собираем и никому не продаём.</p>
+
       <h3>Платные услуги</h3>
-      <p>Организация игр может оплачиваться. Договорённости об услуге и оплате происходят <b>вне сайта</b>. Оплата, если она есть, проходит напрямую выбранным способом; <b>платёжные реквизиты на сайте не вводятся и нами не хранятся</b>. Условия конкретной услуги согласуются с мастером до начала.</p>
+      <p>Мастера проекта проводят игровые сессии, в том числе <b>на платной основе</b> — это услуги по организации и проведению игр. Об услуге и оплате вы договариваетесь с мастером <b>вне сайта</b>; условия согласуются до начала игры. Оплата, если она есть, проходит напрямую выбранным способом: <b>платёжные данные на сайте не вводятся и не хранятся</b>. Предоплата, перенос и отмена описаны в «Условиях платных игр».</p>
+
+      <h3>Какие данные хранит сайт</h3>
+      <p><b>Учётная запись</b> — логин и пароль. Пароль хранится только в виде криптографического хэша: узнать его из базы нельзя.</p>
+      <p><b>Ваши материалы</b> — персонажи и их портреты, закладки, записи на игры.</p>
+      <p><b>Подписка на уведомления</b> — если вы их включили.</p>
+      <p>Эти данные нужны только для работы сайта: входа в аккаунт, синхронизации между устройствами, расписания и записи на игры, доски ходов и уведомлений. Мы не передаём их третьим лицам, кроме случаев, прямо предусмотренных законодательством Российской Федерации, и не используем для рекламы.</p>
+
+      <h3>Реальные личные данные не нужны</h3>
+      <p>Сайт устроен так, чтобы обходиться без сведений, по которым можно установить вашу личность. Для регистрации <b>не нужны</b> электронная почта, телефон, настоящее имя или платёжные данные.</p>
+      <p><b>Используйте вымышленные логин и пароль и не указывайте на сайте реальные личные данные — ни свои, ни чужие</b>: ни в листах персонажей, ни в других материалах. Если такие сведения всё же появятся на сайте, администрация вправе их удалить.</p>
+
       <h3>Пользовательский контент</h3>
-      <p>Имя, класс, уровень и портрет персонажа, а также записи на игры видны другим участникам; остальной лист персонажа — только вам и мастерам. Не публикуйте личную информацию.</p>
-      <p>За содержание листов персонажей и других материалов, которые размещают игроки, отвечает разместивший их игрок. Администрация проекта не несёт ответственности за такие материалы, в том числе за экстремистские и антивоенные высказывания в листах игроков.</p>
-      <p><b>Администрация вправе удалить лист персонажа и аккаунт игрока, если игрок нарушает правила сайта.</b></p>
+      <p>Часть сведений видна всем посетителям сайта: ваш логин, записи на игры и основные данные персонажа — имя персонажа и игрока, портрет, класс и подкласс, происхождение, уровень, а также показатели для доски ходов (хиты, класс доспеха, инициатива, скорость). Остальной лист — предыстория, снаряжение, заметки — видите только вы и команда проекта (мастера и администрация). Не публикуйте в листах личную информацию.</p>
+      <p>Материалы игроков появляются на сайте без предварительной проверки. <b>За содержание листов персонажей и других размещённых материалов отвечает игрок, который их разместил.</b> Администрация проекта не несёт ответственности за такие материалы, в том числе за экстремистские и антивоенные высказывания в листах игроков.</p>
+      <p>Не размещайте материалы, нарушающие законодательство Российской Федерации или права других людей. <b>Администрация вправе удалить лист персонажа и аккаунт игрока, если игрок нарушает правила сайта.</b></p>
+
+      <h3>Уведомления</h3>
+      <p>Если вы включите уведомления о новых играх, в облаке сохранится адрес подписки вашего браузера. Доставляет уведомления служба push-уведомлений, которую предоставляет разработчик браузера или операционной системы. Отключить уведомления можно в профиле — подписка при этом удаляется из облака — или в настройках браузера.</p>
+
       <h3>Cookie и хранилище браузера</h3>
-      <p>Сайт использует cookie и аналогичные технологии — локальное хранилище браузера, IndexedDB и кэш приложения. В них хранятся данные входа, ваши настройки, копии данных для работы без сети и уже загруженные изображения. Рекламных и аналитических cookie нет, третьим лицам эти данные не передаются. Отключить их можно в настройках браузера, но тогда вход и работа без сети будут недоступны.</p>
+      <p>Сайт использует cookie и аналогичные технологии — локальное хранилище браузера, IndexedDB и кэш приложения. В них хранятся данные для входа, ваши настройки (имя и цвет аватара в профиле хранятся только на вашем устройстве), копии данных для работы без сети, загруженные изображения и добавленные вами аудиофайлы.</p>
+      <p>Всё это нужно для работы сайта: рекламных и аналитических cookie нет, третьим лицам эти данные не передаются. Удалить или заблокировать их можно в настройках браузера, но тогда вход в аккаунт и работа без сети станут недоступны.</p>
+
       <h3>Технические данные</h3>
-      <p>Рекламных трекеров нет. Хостинг и облачный сервис могут фиксировать служебные логи в целях безопасности и работоспособности.</p>
-      <h3>Хранение и удаление</h3>
-      <p>Данные хранятся в облачной базе проекта. Вы можете попросить удалить свой аккаунт и персонажей — напишите администратору в Telegram: <b>@HINOMA</b>.</p>
+      <p>Рекламных и аналитических трекеров на сайте нет. Сервер и облачный сервис могут автоматически вести служебные журналы (IP-адрес, время и адрес запроса, сведения о браузере) — они используются только для защиты от атак и устранения сбоев.</p>
+      <p>Облачная база записывает, кто и когда изменил данные и каким было прежнее значение. Этот журнал доступен только команде проекта, нужен для отмены ошибочных правок и хранится до 7 дней.</p>
+
+      <h3>Хранение и защита</h3>
+      <p>Данные хранятся в облачной базе проекта на сервере в России. Каждый игрок может изменять только свои данные; полный доступ есть только у команды проекта.</p>
+      <p>Для защиты от сбоев сервер ежедневно создаёт <b>зашифрованные резервные копии</b>. Они хранятся на сервере проекта и во внешнем резервном хранилище <b>не дольше 7 дней</b>, после чего удаляются, и используются только для восстановления работы сайта.</p>
+
+      <h3>Удаление аккаунта и персонажей</h3>
+      <p>Аккаунт можно удалить самостоятельно в любой момент: откройте профиль (кнопка с первой буквой вашего имени) и выберите <b>«Удалить аккаунт»</b>. Отдельного персонажа можно удалить в его листе, не удаляя аккаунт.</p>
+      <p>При удалении аккаунта из облачной базы сразу удаляются учётная запись, все ваши персонажи и их портреты, закладки, подписка на уведомления и записи на предстоящие игры. Логин освобождается через 90 дней — после этого его сможет занять другой пользователь.</p>
+      <p><b>Удаление необратимо.</b> Резервные копии и журнал изменений для восстановления удалённых аккаунтов не используются; удалённые данные исчезают из них не позднее чем через 7 дней. Служебная копия списка учётных записей (только логины и хэши паролей) обновляется реже, но удалённые аккаунты из неё не восстанавливаются. Копии в браузерах других ваших устройств удалятся, если очистить в них данные сайта.</p>
+
       <h3>Изменения</h3>
-      <p>Условия могут дополняться; актуальная версия — на этой странице. Редакция от 29 октября 2026 г.</p>
-      <p class="muted" style="margin-top:14px">Продолжая пользоваться сайтом и создавая аккаунт, вы соглашаетесь с этими условиями.</p>
+      <p>Документ может обновляться — например, при появлении новых функций. Актуальная редакция всегда доступна на этой странице. Продолжая пользоваться сайтом после обновления, вы принимаете новую редакцию.</p>
+      <p>Редакция от 30 октября 2026 г.</p>
+
+      <h3>Контакты</h3>
+      <p>Вопросы по документу, жалобы на материалы пользователей и сообщения о нарушениях — администратору в Telegram: <b>@HINOMA</b>.</p>
+
+      <p class="muted" style="margin-top:14px">Создавая аккаунт и продолжая пользоваться сайтом, вы соглашаетесь с этой политикой и условиями.</p>
     </div>`;
   document.getElementById(overlay?'scrim2':'scrim').classList.add('open');
 }
@@ -8781,7 +8818,8 @@ function profBg(tag){ const p=profGet(tag); if(p.adapt) return 'var(--surface2)'
    норме 4.5). Фон сеттинга на том же круге даёт от 5.15 до 13.95. */
 function profInk(tag){ const p=profGet(tag); if(p.adapt) return 'var(--red-ink)'; return INK_COLORS.indexOf(p.ink)>=0?p.ink:'var(--bg)'; }
 function profInitial(tag){ return (profName(tag)||dispTag(tag||SESSION)||'?').charAt(0).toUpperCase()||'?'; }   // первая буква имени, если нет — логина
-/* карточка профиля: имя, оформление (фон + цвет буквы или адаптация под сеттинг), смена логина/пароля */
+/* карточка профиля: имя, оформление (фон + цвет буквы или адаптация под сеттинг), закладки, уведомления,
+   смена пароля, выход и удаление аккаунта */
 let PROF_TMP={name:'',bg:'',ink:'',adapt:false};
 function openProfileCard(){
   if(!SESSION){ openAccessModal(null,'account'); return; }
@@ -8814,8 +8852,19 @@ function openProfileCard(){
       </div>
     </div>
     <button class="btn primary" style="width:100%;margin-top:14px" onclick="pcSave()">Сохранить</button>
-    <button class="pc-link" onclick="editUserData()"><span>Изменить логин или пароль</span></button>`;
+    <div class="set-grp pc-acts">
+      <button class="set-row" onclick="openBookmarks()"><span class="ri">🔖</span><span class="rl">Закладки</span>${CHEV}</button>
+      <button class="set-row" onclick="pushToggle()"><span class="ri">🔔</span><span class="rl">Уведомления о новых играх<small id="pushNote">Пуш при анонсе сессии</small></span><span class="set-sw" id="pushBtn"></span></button>
+      <button class="set-row" onclick="openPassChange()"><span class="ri">🔒</span><span class="rl">Сменить пароль</span>${CHEV}</button>
+      <button class="set-row" onclick="editUserData()"><span class="ri">✏️</span><span class="rl">Сменить логин<small>Через администратора</small></span>${CHEV}</button>
+      <button class="set-row" onclick="closeModal();logout()"><span class="ri">🚪</span><span class="rl">Выйти</span></button>
+    </div>
+    <div class="set-grp pc-del" id="pcDel" hidden><button class="set-row" onclick="openAccDelete()">Удалить аккаунт</button></div>`;
   document.getElementById('scrim').classList.add('open');
+  if(typeof pushRenderBtn==='function') pushRenderBtn();
+  // удаление — только игроку и только если облако его умеет (API 4); у команды аккаунт привязан к правам сервера
+  const who=SESSION;
+  apiVersion().then(v=>{ const d=document.getElementById('pcDel'); if(d && SESSION===who && v>=4 && !isDev()) d.hidden=false; });
 }
 function pcAvApply(){ const av=document.getElementById('pcAv'); if(!av) return;
   // те же краски, что возьмёт аватар в шапке (profBg/profInk), — превью не должно врать
@@ -8840,6 +8889,157 @@ function pcAdapt(){ PROF_TMP.adapt=!PROF_TMP.adapt;
   const man=document.getElementById('pcManual'); if(man) man.classList.toggle('pc-off', PROF_TMP.adapt);
   pcAvApply(); pcSyncSel(); }
 function pcSave(){ profSet(SESSION, {name:(PROF_TMP.name||'').trim(), bg:PROF_TMP.bg, ink:PROF_TMP.ink, color:PROF_TMP.bg, adapt:PROF_TMP.adapt}); closeModal(); if(typeof renderAvatarBtn==='function') renderAvatarBtn(); const vs=document.getElementById('view-settings'); if(vs && vs.classList.contains('active')) renderSettings(); toast('Профиль сохранён'); }
+/* ошибка входа по паролю — человеческими словами. Сеть: supabase-js отдаёт статус 0 (или 5xx от шлюза) */
+function accAuthErr(e){
+  const m=String((e&&e.message)||''), st=+(e&&e.status)||0;
+  if((e&&e.code)==='invalid_credentials' || /invalid login credentials|invalid credentials|invalid email or password/i.test(m)) return 'Неверный пароль';
+  if(st===429) return 'Слишком много попыток — подождите немного';
+  if(!st || st>=500) return 'Облако не отвечает — попробуйте ещё раз';
+  return 'Supabase: '+(m||'ошибка');
+}
+function accFieldErr(id, msg){ const f=document.getElementById(id); if(!f) return; const er=f.querySelector('.err'); if(er) er.textContent=msg; f.classList.add('invalid'); }
+/* смена пароля самим игроком: текущий пароль проверяем входом (он же даёт свежую сессию), потом updateUser */
+function openPassChange(){
+  if(!SESSION){ openAccessModal(null,'account'); return; }
+  document.getElementById('modal2').innerHTML=`<button class="x" onclick="closeOverlay()" aria-label="Закрыть">✕</button>
+    <div class="top">${rune('character',24)}<span class="clabel">@${esc(dispTag(SESSION))}</span></div>
+    <h2>Сменить пароль</h2>
+    <input type="text" autocomplete="username" value="${esc(dispTag(SESSION))}" hidden>
+    <div class="field" id="pw-f-cur"><label>Текущий пароль</label>
+      <input id="pw-cur" type="password" maxlength="100" autocomplete="current-password"><div class="err">Неверный пароль</div></div>
+    <div class="field" id="pw-f-new"><label>Новый пароль</label>
+      <input id="pw-new" type="password" maxlength="100" autocomplete="new-password"><div class="err">Минимум 8 символов</div></div>
+    <div class="field" id="pw-f-new2"><label>Повторите пароль</label>
+      <input id="pw-new2" type="password" maxlength="100" autocomplete="new-password" onkeydown="if(event.key==='Enter')passChange()"><div class="err">Пароли не совпадают</div></div>
+    <div class="pacts">
+      <button class="btn primary" id="pwGo" onclick="passChange()">Сохранить</button>
+      <button class="btn ghost" onclick="closeOverlay()">Отмена</button>
+    </div>`;
+  document.getElementById('scrim2').classList.add('open');
+  setTimeout(()=>{ const t=pf('pw-cur'); if(t) t.focus(); }, 60);
+}
+async function passChange(){
+  const tag=currentTag(), go=pf('pwGo'); if(!tag || !go || go.disabled) return;
+  const cur=pf('pw-cur').value, nw=pf('pw-new').value, nw2=pf('pw-new2').value;
+  ['pw-f-cur','pw-f-new','pw-f-new2'].forEach(id=>pf(id).classList.remove('invalid'));
+  if(!cur) accFieldErr('pw-f-cur', 'Введите текущий пароль');
+  // 8 — как на сервере (GOTRUE_PASSWORD_MIN_LENGTH), см. doRegister
+  if(nw.length<8) accFieldErr('pw-f-new', 'Минимум 8 символов');
+  else if(nw===cur) accFieldErr('pw-f-new', 'Совпадает с текущим');
+  else if(nw!==nw2) accFieldErr('pw-f-new2', 'Пароли не совпадают');
+  if(document.querySelector('#modal2 .field.invalid')) return;
+  if(!supa){ toast('Нет связи с облаком — попробуйте позже'); return; }
+  go.disabled=true;
+  try{
+    let si; try{ si=await authTimeout(supa.auth.signInWithPassword({ email:loginToEmail(tag), password:cur })); }catch(e){ si={error:{status:0}}; }
+    if(si.error){ const m=accAuthErr(si.error); if(m==='Неверный пароль') accFieldErr('pw-f-cur', m); else toast(m); return; }
+    let up; try{ up=await authTimeout(supa.auth.updateUser({ password:nw })); }catch(e){ up={error:{status:0}}; }
+    if(up.error){
+      const c=String(up.error.code||'');
+      if(c==='same_password') accFieldErr('pw-f-new', 'Совпадает с текущим');
+      else if(c==='weak_password') accFieldErr('pw-f-new', 'Слишком простой пароль');
+      else toast(accAuthErr(up.error));
+      return;
+    }
+    closeOverlay(); toast('Пароль изменён');
+  }finally{ go.disabled=false; }
+}
+/* Удаление аккаунта самим игроком (облако API 4, komik_delete_me). Пароль — заново: вход по нему и проверяет
+   пароль, и даёт свежую отметку входа, без которой сервер не удаляет (komik:reauth) */
+let ACC_DEL=false;   // идёт удаление: новые записи листов не начинаем — после удаления им некуда и незачем ложиться
+function openAccDelete(){
+  if(!SESSION || isDev()) return;
+  document.getElementById('modal2').innerHTML=`<button class="x" onclick="closeOverlay()" aria-label="Закрыть">✕</button>
+    <div class="top">${rune('character',24)}<span class="clabel">@${esc(dispTag(SESSION))}</span></div>
+    <h2>Удалить аккаунт</h2>
+    <p class="ad-what">Удалятся аккаунт, все персонажи и их портреты, закладки, уведомления и записи на предстоящие игры. <b>Это необратимо.</b> Логин освободится через 90 дней.</p>
+    <div class="field" id="ad-f-tag"><label>Логин для подтверждения</label>
+      <input id="ad-tag" maxlength="32" placeholder="${esc(dispTag(SESSION))}" autocapitalize="off" autocomplete="off" spellcheck="false" oninput="accDelCheck()"></div>
+    <div class="field" id="ad-f-pass"><label>Пароль</label>
+      <input id="ad-pass" type="password" maxlength="100" autocomplete="current-password" oninput="accDelCheck()" onkeydown="if(event.key==='Enter')accDelete()"><div class="err">Неверный пароль</div></div>
+    <div class="pacts">
+      <button class="btn danger" id="adGo" disabled onclick="accDelete()">Удалить навсегда</button>
+      <button class="btn ghost" onclick="closeOverlay()">Отмена</button>
+    </div>`;
+  document.getElementById('scrim2').classList.add('open');
+  setTimeout(()=>{ const t=pf('ad-tag'); if(t) t.focus(); }, 60);
+}
+function accDelCheck(){
+  const ok=!!currentTag() && normTag(pval('ad-tag'))===currentTag() && (pf('ad-pass')?.value||'').length>=8;
+  const b=pf('adGo'); if(b) b.disabled=!ok || ACC_DEL;
+  const f=pf('ad-f-pass'); if(f) f.classList.remove('invalid');
+  return ok;
+}
+async function accDelete(){
+  const tag=currentTag();
+  if(!tag || ACC_DEL || !accDelCheck() || isDev()) return;
+  if(!supa){ toast('Нет связи с облаком — попробуйте позже'); return; }
+  const pass=pf('ad-pass').value;
+  ACC_DEL=true; accDelCheck();
+  // отложенный автосейв листа снимаем, начатую запись дожидаемся: иначе она легла бы уже после удаления
+  clearTimeout(INLINE_T);
+  try{ await withTimeout(CHARS_PERSIST_NEXT||CHARS_PERSIST, 8000); }catch(e){}
+  let err='';
+  try{
+    const si=await authTimeout(supa.auth.signInWithPassword({ email:loginToEmail(tag), password:pass }));
+    if(si.error) err=accAuthErr(si.error);
+    else {
+      const r=await authTimeout(supa.rpc('komik_delete_me', { confirm:tag }));
+      if(r.error){
+        const c=(/komik:(\w+)/.exec(String(r.error.message||''))||[])[1];
+        err = c==='reauth' ? 'Неверный пароль' : c==='team' ? 'Аккаунт команды так удалить нельзя'
+          : c==='confirm' ? 'Логин не совпадает' : c==='auth' ? 'Войдите в аккаунт заново'
+          : (!r.status || r.status>=500) ? 'Облако не отвечает — попробуйте ещё раз' : 'Не удалось удалить аккаунт';
+      }
+    }
+  }catch(e){ err='Облако не отвечает — попробуйте ещё раз'; }   // authTimeout: ответа нет
+  if(err){
+    ACC_DEL=false;
+    if(err==='Неверный пароль') accFieldErr('ad-f-pass', err);
+    const b=pf('adGo'); if(b) b.disabled=false;
+    toast(err);
+    if(INLINE_ID) inlineAutosave(INLINE_ID, true);   // снятый автосейв листа — обратно
+    if(CHARS_DIRTY) persistChars(true).catch(()=>{});   // и придержанную запись
+    return;
+  }
+  await accGoneLocal(tag);
+  ACC_DEL=false;
+  closeOverlay(); closeModal();
+  toast('Аккаунт удалён');
+}
+/* Аккаунта в облаке больше нет — вычищаем его с устройства: сессию, свои листы и их зеркала, закладки,
+   оформление профиля, пуш. Браузерную подписку снимаем без записи в облако: строки push:sub:<тег> уже нет */
+async function accGoneLocal(tag){
+  try{ if(pushSupported()){ const reg=await withTimeout(navigator.serviceWorker.ready, 2500);
+    const sub=reg && await reg.pushManager.getSubscription(); if(sub) await sub.unsubscribe(); } }catch(e){}
+  if(supa){ try{ await authTimeout(supa.auth.signOut({ scope:'local' }), 5000); }catch(e){} }
+  // открытый лист закрываем без записи (inlineDropForAuth дописал бы его)
+  if(INLINE_ID){
+    clearTimeout(INLINE_T); INLINE_ID=null; INLINE_BASE=INLINE_SNAP=null; INLINE_STALE=false; closeMiniArch(); closeStatCalc();
+    const host=pf('playerEditor'); if(host){ host.hidden=true; host.innerHTML=''; host.style.cssText=''; }
+    const view=pf('view-players'); if(view) view.classList.remove('inline-open');
+  }
+  const mine=c=>!!c && normTag(c.owner||'')===tag;
+  // на месте: CHARS указывает на тот же массив сеттинга
+  ALL_GAMES.forEach(g=>{ const a=CHARS_ALL[g]; if(Array.isArray(a)) for(let i=a.length-1;i>=0;i--) if(mine(a[i])) a.splice(i,1); });
+  CHARS_DIRTY=false; CHARS_DIRTY_TOLD=false; delete CHARS_SEEN_AT['comik:chars:'+tag];
+  gamesDirty(false);
+  USERS=USERS.filter(u=>normTag(u&&u.tag)!==tag);
+  BMARKS=[];
+  try{
+    [KEY_SESSION, 'comik:chars:'+tag, 'comik:bm:'+tag, 'push:sub:'+tag].forEach(k=>localStorage.removeItem(k));
+    Object.keys(localStorage).forEach(k=>{ if(/^comik:(bmarks|push):/.test(k)) localStorage.removeItem(k); });
+    const pr=profAll(); delete pr[tag];
+    if(Object.keys(pr).length) localStorage.setItem('comik:profiles', JSON.stringify(pr)); else localStorage.removeItem('comik:profiles');
+    const lc=jsonSafe(localStorage.getItem(KEY_CHARS)||'null');
+    if(lc && typeof lc==='object'){ Object.keys(lc).forEach(g=>{ if(Array.isArray(lc[g])) lc[g]=lc[g].filter(c=>!mine(c)); }); localStorage.setItem(KEY_CHARS, JSON.stringify(lc)); }
+  }catch(e){}
+  try{ sessionStorage.removeItem('comik:openChar'); }catch(e){}
+  SESSION=null;
+  if(!hasLS) await ssetLocal(KEY_SESSION, null, false);
+  bmBtnSync();
+  renderAcct(); renderPlayers(); renderCats(); applyView(); updateDevUI(); renderSettings(); updateOnboard();
+}
 /* ---- Supabase Auth: логин ↔ технический e-mail; таймаут сетевых вызовов; обновление UI ---- */
 const AUTH_EMAIL_DOMAIN='komikdnd.ru';  // реальный домен проекта — Supabase принимает как валидный e-mail
 function loginToEmail(login){ return normTag(login)+'@'+AUTH_EMAIL_DOMAIN; }
@@ -8932,6 +9132,9 @@ async function doRegister(){
   catch(e){ toast('Облако не отвечает — попробуйте ещё раз'); return; }
   if(res.error){
     if(/registered|exists|already/i.test(String(res.error.message||''))){ pf('au-f-tag').classList.add('invalid'); toast('Такой логин уже занят'); return; }
+    // логин удалённого аккаунта сервер держит 90 дней: отказ его проверки GoTrue отдаёт как 500 «Database error
+    // saving new user», а supabase-js текст ответа 500 теряет (сообщение «{}») — остаётся только код
+    if(+res.error.status===500){ pf('au-f-tag').classList.add('invalid'); toast('Этот логин сейчас недоступен'); return; }
     toast('Supabase: '+String(res.error.message||'ошибка регистрации')); return;
   }
   // при выключенном подтверждении почты сессия приходит сразу; если нет — входим явно
@@ -8985,6 +9188,8 @@ let CHARS_DIRTY=false, CHARS_DIRTY_TOLD=false;   // лист не ушёл в о
    Теперь запись одна за раз, а всё, что пришло во время неё, догоняет одной следующей записью */
 let CHARS_PERSIST=null, CHARS_PERSIST_NEXT=null, CHARS_PERSIST_QUIET=true;
 function persistChars(retry){
+  // идёт удаление аккаунта (accDelete): запись дошлём, только если удаление не удалось
+  if(ACC_DEL){ CHARS_DIRTY=true; return Promise.resolve(false); }
   if(CHARS_PERSIST){
     CHARS_PERSIST_QUIET=CHARS_PERSIST_QUIET && !!retry;   // тихая досылка — только если тихими были все дождавшиеся
     return CHARS_PERSIST_NEXT || (CHARS_PERSIST_NEXT=CHARS_PERSIST.then(()=>{ const q=CHARS_PERSIST_QUIET; CHARS_PERSIST_NEXT=null; CHARS_PERSIST_QUIET=true; return persistChars(q); }));
@@ -9026,6 +9231,8 @@ async function persistCharsNow(retry){
       if(ALL_GAMES.some(g=>mine[g].some(c=>c._pub))){ CHARS_DIRTY=true; if(!retry) toast('Лист ещё загружается — правка не сохранена'); return false; }
       // портреты — в свои строки comik:img:<хэш> (лист худеет, а у других он перечитывается без картинок)
       try{ const items=[]; ALL_GAMES.forEach(g=>(mine[g]||[]).forEach(c=>{ if(c && c.ava) items.push({o:c, f:'ava'}); })); await imgOffload(items); }catch(e){}
+      // пока читали облако, аккаунт начали удалять или сменили: запись (и её зеркало на устройстве) не нужна
+      if(ACC_DEL || currentTag()!==tag){ CHARS_DIRTY=true; return false; }
       mine.at=Date.now();   // штамп записи: по нему фоновый тик у других решает, перечитывать ли строку (fetchCloudCharsChanged)
       const ok=await sset('comik:chars:'+tag, mine, true, !!retry);   // фоновая досылка — без тостов внутри sset
       CHARS_DIRTY=!ok;                                   // не дошло — дошлём при возврате сети / очередным фоновым тиком
@@ -12836,30 +13043,22 @@ function renderSettings(){
         <button class="set-row" onclick="shrinkCloudImages()"><span class="ri">🗜️</span><span class="rl">Сжать картинки<small>Фото новостей и карточек архива в облаке</small></span>${CHEV}</button>
         <input type="file" id="bkFile" accept="application/json" hidden onchange="restoreBackup(this)">
       </div>` : '';
+  // закладки, уведомления, пароль, выход и удаление аккаунта — в карточке профиля (тап по шапке)
   el.innerHTML = `<div class="set-page">
-    <div class="set-prof">
-      <button class="set-av" style="background:${profBg(SESSION)};color:${profInk(SESSION)}" onclick="openProfileCard()" aria-label="Профиль">${esc(profInitial(SESSION))}</button>
+    <button class="set-prof" onclick="openProfileCard()">
+      <span class="set-av" style="background:${profBg(SESSION)};color:${profInk(SESSION)}">${esc(profInitial(SESSION))}</span>
       <span class="id"><span class="n">${esc(profName(SESSION))}</span>${isDev()?`<br><span class="set-badge">🎲 Game Master</span>`:`<br><span class="set-badge" style="color:var(--dim);background:var(--surface2);border-color:var(--line2)">@${esc(dispTag(SESSION))}</span>`}</span>
-      <button class="set-out" onclick="logout()">Выйти</button>
-    </div>
-    <div class="set-grp">
-      <button class="set-row" onclick="openProfileCard()"><span class="ri">👤</span><span class="rl">Мой профиль<small>Имя, оформление</small></span>${CHEV}</button>
-      <button class="set-row" onclick="editUserData()"><span class="ri">🔒</span><span class="rl">Изменить логин/пароль<small>Через Game Master</small></span>${CHEV}</button>
-      ${gmRows}
-    </div>
+      ${CHEV}
+    </button>
+    ${gmRows?`<div class="set-grp">${gmRows}</div>`:''}
     <div class="set-gt">Внешний вид</div>
     <div class="set-grp">
       <button class="set-row" onclick="setToggleIcons()"><span class="ri">🎨</span><span class="rl">Иконка приложения</span><span class="set-iconprev" style="background-image:url(icon-${esc(cur)}-192.png)"></span>${CHEV}</button>
       ${iconGrid}
       <button class="set-row" onclick="openA11y()"><span class="ri">♿</span><span class="rl">Доступность</span>${CHEV}</button>
     </div>
-    <div class="set-gt">Уведомления</div>
-    <div class="set-grp">
-      <button class="set-row" onclick="pushToggle()"><span class="ri">🔔</span><span class="rl">Новые игры<small id="pushNote">Пуш при анонсе сессии</small></span><span class="set-sw" id="pushBtn"></span></button>
-    </div>
     ${dataGrp}
   </div>`;
-  if(typeof pushRenderBtn==='function') pushRenderBtn();
 }
 function setToggleIcons(){ const w=document.getElementById('setIconWrap'); if(!w) return; w.hidden=!w.hidden; const c=w.previousElementSibling&&w.previousElementSibling.querySelector('.chev'); if(c) c.classList.toggle('open',!w.hidden); }
 function editUserData(){ window.open('https://t.me/HINOMA','_blank','noopener'); }
@@ -16229,17 +16428,24 @@ async function pushToggle(){
 /* Где лежат подписки. С 29.10.2026 (миграция 10-29, komik_api_version ≥ 3) — у каждого своя строка
    push:sub:<тег>: её читает и пишет только владелец (и рассылка), чужие адреса никому не видны.
    Облако без этой миграции — по-старому, общая push:subs. null — не узнали (нет связи/не вошли) */
-let PUSH_V3=null;
 async function pushKey(){
-  const tag=currentTag()||'';
-  if(PUSH_V3===null && supa){
+  const tag=currentTag()||'', v=await apiVersion();
+  if(v===null) return null;
+  return v>=3 ? (/^[a-z0-9_]{4,32}$/.test(tag) ? 'push:sub:'+tag : null) : 'push:subs';
+}
+/* Версия облака (komik_api_version): 3 — миграция 10-29 (личные пуш-подписки), 4 — игрок сам удаляет аккаунт
+   (komik_delete_me). 0 — функции нет (старое облако), null — не узнали (нет связи): спросим в следующий раз.
+   Узнаём один раз за запуск; одновременные вопросы ждут один запрос */
+let API_VER=null, API_VER_Q=null;
+function apiVersion(){
+  if(API_VER!==null || !supa) return Promise.resolve(API_VER);
+  return API_VER_Q || (API_VER_Q=(async()=>{
     try{ const r=await withTimeout(supa.rpc('komik_api_version'), 8000);
-      if(r && !r.error) PUSH_V3=(+r.data||0)>=3;
-      else if(r && r.error && (r.status===404 || /PGRST202|42883/.test(String(r.error.code||'')))) PUSH_V3=false;   // функции нет — старое облако
+      if(r && !r.error) API_VER=+r.data||0;
+      else if(r && r.error && (r.status===404 || /PGRST202|42883/.test(String(r.error.code||'')))) API_VER=0;   // функции нет — старое облако
     }catch(e){}
-  }
-  if(PUSH_V3===null) return null;
-  return PUSH_V3 ? (/^[a-z0-9_]{4,32}$/.test(tag) ? 'push:sub:'+tag : null) : 'push:subs';
+    API_VER_Q=null; return API_VER;
+  })());
 }
 /* push:subs — один массив на всех: «прочитать → поправить → записать» у двух устройств сразу
    (ГМ просит стол включить уведомления) оставлял в облаке только последнего. Поэтому после записи
@@ -16308,14 +16514,14 @@ async function pushHeal(force){
     pushRenderBtn();
   }catch(e){}
 }
-/* кнопок две: переключатель в настройках (#pushBtn) и кнопка в меню аккаунта ([data-push]) — раньше у обеих
+/* кнопок две: переключатель в карточке профиля (#pushBtn) и кнопка в меню аккаунта ([data-push]) — раньше у обеих
    был id="pushBtn", и getElementById обновлял только первую, так что в меню состояние не показывалось */
 function pushRenderBtn(){
   document.querySelectorAll('#pushBtn,[data-push]').forEach(pushRenderOne);
 }
 function pushRenderOne(el){
   pushStatus().then(st=>{
-    if(el.classList.contains('set-sw')){   // новый вид: переключатель в настройках
+    if(el.classList.contains('set-sw')){   // новый вид: переключатель в карточке профиля
       el.classList.toggle('on', st==='on');
       el.classList.toggle('disabled', st==='unsupported'||st==='denied');
       const note=document.getElementById('pushNote');

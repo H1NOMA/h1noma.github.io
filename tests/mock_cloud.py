@@ -14,13 +14,17 @@
   · миграция 10-29 (по умолчанию включена, /__mock/fail {"v3": false} — сервер без неё): чтение белым списком
     (чужие листы — только витрина /rest/v1/kv_chars_pub), личные пуш-подписки push:sub:<тег>,
     rpc komik_api_version → 3. Санитайзер общих строк (игрок меняет только своё) стенд сам не повторяет;
+  · API 4 (по умолчанию включён, /__mock/fail {"v4": false} — сервер без него, версия 3): rpc komik_delete_me —
+    игрок сам удаляет аккаунт (свои строки, портреты без других ссылок, записи на игры, тег на доске, реестр,
+    пользователь); пароль нужен свежий (amr в токене), команде нельзя; запись токеном удалённого — 42501,
+    логин занят 90 дней;
   · --pg БАЗА — вместо имитации прав REST идёт в настоящий Postgres с миграциями (tests/sql/stand.sh): те же
     правила RLS, триггеры, витрина, санитайзер — запросы сайта переводятся в SQL и выполняются через psql от
     имени anon/authenticated с токеном, как это делает PostgREST;
-  · /auth/v1 — вход по паролю, регистрация (автоподтверждение), обновление токена, выход, user;
+  · /auth/v1 — вход по паролю, регистрация (автоподтверждение), обновление токена, выход, user, смена пароля;
   · /functions/v1/notify-game — отдаёт публичный ключ, рассылку только считает;
   · /__mock/rows (GET — все строки, POST — заменить), /__mock/log (GET — журнал, DELETE — очистить),
-    /__mock/fail (POST {"rate":0.2,"slow":300}) — обрывы и задержка для проверки устойчивости.
+    /__mock/fail (POST {"rate":0.2,"slow":300,"v3":true,"v4":true}) — обрывы, задержка, версия сервера.
 Сид — массив строк [{key, value}] (формат ежедневного бэкапа kv) или {rows:[…]}.
 """
 import argparse, base64, hashlib, json, os, random, re, subprocess, sys, threading, time, uuid
@@ -33,7 +37,10 @@ LOCK = threading.RLock()   # note() зовётся и под замком (от�
 ROWS = {}            # key → value (jsonb)
 USERS = {}           # email → {id, email, password}
 LOG = []             # [{t, method, path, key, bytes, status}]
-FAIL = {'rate': 0.0, 'slow': 0, 'player_img': True, 'v3': True}   # player_img: False — сервер без миграции 10-28; v3: False — без 10-29
+FAIL = {'rate': 0.0, 'slow': 0, 'player_img': True, 'v3': True, 'v4': True}   # player_img: False — сервер без миграции 10-28; v3: False — без 10-29; v4: False — без удаления аккаунта
+GONE = {}            # uid → {tag, at}: удалённые аккаунты (komik_gone) — их токен ничего не пишет, логин занят GONE_DAYS
+GONE_DAYS = 90
+REAUTH_S = 600       # komik:reauth — пароль вводили не позже 10 минут назад
 PUBLIC_READ = {'comik:archive:v1', 'comik:news:v1', 'comik:chrono:v1', 'comik:hero:v1', 'comik:projects:v1', 'comik:games:v1',
                'comik:tracker:shared:v1', 'comik:users:v1', 'comik:coreover:v1', 'comik:corehid:v1'}
 PUB_FIELDS = ['id', 'owner', 'alias', 'name', 'player', 'ava', 'role', 'subcls', 'origin', 'subrace', 'level', 'hp', 'ac', 'init',
@@ -267,6 +274,56 @@ def project(row, select):
     return out
 
 
+def num(v):
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def tag_gone(tag):
+    """логин удалённого аккаунта ещё не освободился (komik_email_guard)"""
+    return any(g['tag'] == tag and time.time() - g['at'] < GONE_DAYS * 86400 for g in GONE.values())
+
+
+def delete_me(tag, uid):
+    """komik_delete_me без базы — те же шаги, что у серверной функции. Зовётся под LOCK"""
+    now = int(time.time() * 1000)
+    GONE[uid] = {'tag': tag, 'at': time.time()}
+    pics = set(re.findall(r'kvimg:([0-9a-f]{32})', json.dumps(ROWS.get('comik:chars:' + tag))))
+    n = 0
+    for k in ('comik:chars:' + tag, 'comik:bm:' + tag, 'push:sub:' + tag):
+        if ROWS.pop(k, None) is not None:
+            n += 1
+    # портреты своих листов — если на них больше никто не ссылается
+    rest = json.dumps([v for k, v in ROWS.items() if not k.startswith('comik:img:')])
+    imgs = sum(1 for h in pics if 'kvimg:' + h not in rest and ROWS.pop('comik:img:' + h, None) is not None)
+    # живые игры: своя запись снимается с отметкой gone[тег] — не раньше «сейчас» и строго новее записи
+    games = ROWS.get('comik:games:v1')
+    for s in games if isinstance(games, list) else []:
+        if not isinstance(s, dict) or s.get('deleted') is True or not isinstance(s.get('players'), list):
+            continue
+        me = [p for p in s['players'] if isinstance(p, dict) and str(p.get('tag') or '').lower() == tag]
+        if me:
+            s['players'] = [p for p in s['players'] if not any(p is m for m in me)]
+            s['gone'] = dict(s['gone'] if isinstance(s.get('gone'), dict) else {})
+            s['gone'][tag] = max(now, 1 + int(max(max(num(p.get('upd')), num(p.get('at'))) for p in me)))
+    # доска: свой тег с карточек снимается, rev растёт — условная запись ГМа поверх старой версии не пройдёт
+    board = ROWS.get('comik:tracker:shared:v1')
+    if isinstance(board, dict) and '"%s"' % tag in json.dumps(board).lower():
+        for bv in board.values():
+            for c in bv.get('list') if isinstance(bv, dict) and isinstance(bv.get('list'), list) else []:
+                if isinstance(c, dict) and str(c.get('ownTag') or '').lower() == tag:
+                    del c['ownTag']
+        rev = str(board.get('rev') or '')
+        board['rev'] = int(rev) + 1 if re.fullmatch(r'\d{1,15}', rev) else 1
+    users = ROWS.get('comik:users:v1')
+    if isinstance(users, list):
+        ROWS['comik:users:v1'] = [u for u in users if not (isinstance(u, dict) and str(u.get('tag') or '').lower() == tag)]
+    USERS.pop(tag + '@komikdnd.ru', None)
+    return {'ok': True, 'tag': tag, 'rows': n, 'imgs': imgs}
+
+
 class H(SimpleHTTPRequestHandler):
     protocol_version = 'HTTP/1.1'
 
@@ -355,6 +412,10 @@ class H(SimpleHTTPRequestHandler):
             n = self.send_json(code, res)
         self.note(keyf, n, code)
 
+    def gone(self):
+        """токен удалённого аккаунта (триггер komik_kv_gone): запись — 42501"""
+        return self.claims().get('sub') in GONE
+
     def tag(self):
         tok = (self.headers.get('Authorization') or '').replace('Bearer ', '')
         p = jwt_payload(tok)
@@ -424,6 +485,7 @@ class H(SimpleHTTPRequestHandler):
             FAIL['rate'] = float(b.get('rate') or 0); FAIL['slow'] = int(b.get('slow') or 0)
             FAIL['player_img'] = b.get('player_img', True) is not False
             FAIL['v3'] = b.get('v3', True) is not False or bool(PG)   # настоящая база — всегда с 10-29
+            FAIL['v4'] = b.get('v4', True) is not False                 # а версию 4 стенд прячет и перед базой
             return self.send_json(200, dict(FAIL, pg=PG))
         if u.path == '/rest/v1/rpc/komik_api_version':
             self.body()
@@ -432,8 +494,10 @@ class H(SimpleHTTPRequestHandler):
                 return self.send_json(404, {'code': 'PGRST202', 'message': 'Could not find the function public.komik_api_version without parameters in the schema cache'})
             if PG:
                 out, err = pg_run('select public.komik_api_version()', self.claims())
-                return self.send_json(200, int(out)) if not err else self.pg_err(err)
-            return self.send_json(200, 3)
+                return self.send_json(200, int(out) if FAIL['v4'] else min(int(out), 3)) if not err else self.pg_err(err)
+            return self.send_json(200, 4 if FAIL['v4'] else 3)
+        if u.path == '/rest/v1/rpc/komik_delete_me':
+            return self.rpc_delete_me()
         if u.path.startswith('/rest/v1/'):
             if self.chaos(): return
             return self.rest_post(u)
@@ -443,6 +507,13 @@ class H(SimpleHTTPRequestHandler):
         if u.path.startswith('/functions/v1/'):
             self.body()
             return self.send_json(200, {'sent': 0})
+        return self.send_json(404, {'error': 'not found'})
+
+    def do_PUT(self):
+        u = urlsplit(self.path)
+        if u.path.startswith('/auth/v1/'):
+            if self.chaos(): return
+            return self.auth(u)
         return self.send_json(404, {'error': 'not found'})
 
     def do_PATCH(self):
@@ -466,7 +537,7 @@ class H(SimpleHTTPRequestHandler):
         self.send_response(204)
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Access-Control-Allow-Headers', '*')
-        self.send_header('Access-Control-Allow-Methods', 'GET,POST,PATCH,DELETE,OPTIONS')
+        self.send_header('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS')
         self.send_header('Content-Length', '0')
         self.end_headers()
 
@@ -525,7 +596,7 @@ class H(SimpleHTTPRequestHandler):
                 if exists and not upsert:
                     self.note(k, 0, 409)
                     return self.send_json(409, {'code': '23505', 'message': 'duplicate key value violates unique constraint "kv_pkey"'})
-                if tag is None or not can_write(tag, k, v, not exists):
+                if tag is None or self.gone() or not can_write(tag, k, v, not exists):
                     self.note(k, 0, 403)
                     return self.send_json(403 if tag is not None else 401, {'code': '42501', 'message': 'new row violates row-level security policy for table "kv"'})
                 ROWS[k] = v
@@ -559,7 +630,7 @@ class H(SimpleHTTPRequestHandler):
                     continue
                 if tag not in DEVS and player_cap(tag, k) is None and not (k == 'comik:projects:v1' and tag == 'hinoma'):
                     continue
-                if nk != k or not can_write(tag, k, nv, False):
+                if nk != k or self.gone() or not can_write(tag, k, nv, False):
                     self.note(k, 0, 403)
                     return self.send_json(403, {'code': '42501', 'message': 'new row violates row-level security policy for table "kv"'})
                 ROWS[k] = nv
@@ -571,10 +642,48 @@ class H(SimpleHTTPRequestHandler):
             return self.send_json(200, [project(r, select) for r in changed])
         return self.send_json(204, None)
 
+    def rpc_delete_me(self):
+        """komik_delete_me(confirm): ошибки — 42501 с текстом komik:<код>, как у серверной функции"""
+        b = self.body() or {}
+        if self.chaos(): return
+        if not FAIL['v3'] or not FAIL['v4']:
+            return self.send_json(404, {'code': 'PGRST202', 'message': 'Could not find the function public.komik_delete_me(confirm) in the schema cache'})
+        c = self.claims()
+        confirm = str(b.get('confirm') or '')
+        if PG:
+            out, err = pg_run('select public.komik_delete_me(%s)' % lit(confirm), c)
+            if err:
+                return self.pg_err(err)
+            res = json.loads(out)
+            with LOCK:
+                USERS.pop(str(res.get('tag') or '') + '@komikdnd.ru', None)
+                GONE[c.get('sub')] = {'tag': res.get('tag'), 'at': time.time()}
+            self.note('', 0, 200)
+            return self.send_json(200, res)
+        tag = self.tag()
+        fail = lambda code, msg: self.send_json(403, {'code': '42501', 'message': 'komik:%s %s' % (code, msg), 'details': None, 'hint': None})
+        if tag is None:   # анониму функция не выдана вовсе
+            return self.send_json(401, {'code': '42501', 'message': 'permission denied for function komik_delete_me'})
+        with LOCK:
+            if not tag or c.get('sub') in GONE or (c.get('email') or '').lower() not in USERS:
+                return fail('auth', 'нужно войти')
+            if confirm.strip().lower() != tag:
+                return fail('confirm', 'подтверждение не совпадает с логином')
+            if tag in DEVS:
+                return fail('team', 'аккаунт команды так не удаляется')
+            pw = [num(a.get('timestamp')) for a in c.get('amr') or [] if isinstance(a, dict) and a.get('method') == 'password']
+            if not pw or max(pw) < time.time() - REAUTH_S:
+                return fail('reauth', 'введите пароль ещё раз')
+            res = delete_me(tag, c.get('sub'))
+        self.note('', 0, 200)
+        return self.send_json(200, res)
+
     # ── Auth ──
     def session(self, user):
         now = int(time.time())
-        claims = {'sub': user['id'], 'email': user['email'], 'role': 'authenticated', 'aud': 'authenticated', 'exp': now + 3600, 'iat': now}
+        # amr — как у GoTrue: способ и время входа; обновление токена его не меняет (komik:reauth смотрит сюда)
+        claims = {'sub': user['id'], 'email': user['email'], 'role': 'authenticated', 'aud': 'authenticated', 'exp': now + 3600, 'iat': now,
+                  'aal': 'aal1', 'amr': [{'method': 'password', 'timestamp': int(user.get('pw_at') or now)}], 'session_id': user['id']}
         u = {'id': user['id'], 'aud': 'authenticated', 'role': 'authenticated', 'email': user['email'],
              'email_confirmed_at': '2026-01-01T00:00:00Z', 'app_metadata': {'provider': 'email'}, 'user_metadata': {},
              'created_at': '2026-01-01T00:00:00Z'}
@@ -591,8 +700,24 @@ class H(SimpleHTTPRequestHandler):
         if path == '/user' and self.command == 'GET':
             p = jwt_payload((self.headers.get('Authorization') or '').replace('Bearer ', ''))
             user = USERS.get((p.get('email') or '').lower())
+            if p.get('sub') in GONE:
+                return self.send_json(403, {'code': 403, 'error_code': 'user_not_found', 'msg': 'User from sub claim in JWT does not exist'})
             if not user or p.get('role') != 'authenticated':
                 return self.send_json(401, {'code': 401, 'msg': 'invalid JWT'})
+            return self.send_json(200, self.session(user)['user'])
+        if path == '/user' and self.command == 'PUT':
+            b = self.body() or {}
+            p = jwt_payload((self.headers.get('Authorization') or '').replace('Bearer ', ''))
+            user = USERS.get((p.get('email') or '').lower())
+            if not user or p.get('role') != 'authenticated' or p.get('sub') != user['id']:
+                return self.send_json(401, {'code': 401, 'msg': 'invalid JWT'})
+            if 'password' in b:
+                pw = str(b.get('password') or '')
+                if len(pw) < 8:
+                    return self.send_json(422, {'code': 422, 'error_code': 'weak_password', 'msg': 'Password should be at least 8 characters.', 'weak_password': {'reasons': ['length']}})
+                if pw == user['password']:
+                    return self.send_json(422, {'code': 422, 'error_code': 'same_password', 'msg': 'New password should be different from the old password.'})
+                user['password'] = pw
             return self.send_json(200, self.session(user)['user'])
         if path == '/logout':
             self.body()
@@ -602,6 +727,7 @@ class H(SimpleHTTPRequestHandler):
             user = USERS.get((b.get('email') or '').lower())
             if not user or user['password'] != b.get('password'):
                 return self.send_json(400, {'code': 400, 'error_code': 'invalid_credentials', 'msg': 'Invalid login credentials'})
+            user['pw_at'] = int(time.time())
             return self.send_json(200, self.session(user))
         if path == '/token' and q.get('grant_type') == 'refresh_token':
             rt = b.get('refresh_token') or ''
@@ -617,10 +743,19 @@ class H(SimpleHTTPRequestHandler):
                 return self.send_json(422, {'code': 422, 'error_code': 'weak_password', 'msg': 'Password should be at least 8 characters.'})
             if email in USERS:
                 return self.send_json(422, {'code': 422, 'error_code': 'user_already_exists', 'msg': 'User already registered'})
-            USERS[email] = {'id': user_id(email), 'email': email, 'password': b.get('password')}
+            # логин удалённого аккаунта занят 90 дней: отказ триггера на auth.users GoTrue отдаёт так
+            db_fail = {'code': 500, 'error_code': 'unexpected_failure', 'msg': 'Database error saving new user'}
+            if not PG and tag_gone(email.split('@')[0]):
+                return self.send_json(500, db_fail)
+            # id по почте — тот же у нового аккаунта с прежним логином: после 90 дней ему нужен свой
+            uid = user_id(email)
+            user = {'id': str(uuid.uuid4()) if uid in GONE else uid, 'email': email, 'password': b.get('password'), 'pw_at': int(time.time())}
             if PG:
-                pg_run('insert into auth.users (id, email) values (%s, %s) on conflict do nothing' % (lit(USERS[email]['id']), lit(email)))
-            return self.send_json(200, self.session(USERS[email]))
+                _, err = pg_run('insert into auth.users (id, email) values (%s, %s) on conflict do nothing' % (lit(user['id']), lit(email)))
+                if err:
+                    return self.send_json(500, db_fail)
+            USERS[email] = user
+            return self.send_json(200, self.session(user))
         return self.send_json(404, {'msg': 'not in mock: ' + path})
 
 
