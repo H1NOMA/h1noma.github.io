@@ -537,6 +537,10 @@
   .fab svg{width:26px;height:26px;stroke:#0b0b0e;fill:none;stroke-width:2.6;stroke-linecap:round}
   /* плитки персонажей: квадратная аватарка + подпись имени (как в архиве) */
   #players-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:start}
+  /* без пробелов: строки по 4 px (MAS_ROW), плитке masonry() ставит span по её высоте; колонки и отступ между ними —
+     из правил #players-list на каждом брейкпоинте. start обязателен: растянутая на свои строки плитка подросла бы,
+     а за ней и span — по кругу */
+  #players-list.mas{grid-auto-rows:4px;row-gap:0;align-items:start}
   .ptile{position:relative;background:var(--surface);border:var(--hair) solid var(--line2);border-radius:18px;overflow:hidden;cursor:pointer;text-align:center;transition:transform .18s var(--spring),border-color .15s,box-shadow .2s}
   /* разделитель «Листы игроков» в разделе Игрок у ГМа — на всю ширину сетки */
   .players-sep{grid-column:1/-1;font-family:var(--f-mono);font-size:.62rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:10px 0 2px;padding-top:10px;border-top:1px solid var(--line)}
@@ -9340,6 +9344,7 @@ function renderPlayers(){
            <span class="pl-empty-hint hint-mob">Нажмите «＋ Добавить персонажа» сверху; калькулятор характеристик — кнопка рядом с ней.</span>
            <span class="pl-empty-hint hint-desk">Нажмите <b>＋</b> в правом нижнем углу — начнём с калькулятора характеристик.</span></div>`
       : `<div class="empty">[ ЛИЧНЫЙ РАЗДЕЛ ]<br>войдите в аккаунт — здесь появятся ваши персонажи</div>`;
+    masonry(el, PL_MAS);   // плиток нет — обычная сетка, иначе заглушка сжалась бы в строку 4 px
     return;
   }
   const tileHtml=c=>{
@@ -9355,7 +9360,7 @@ function renderPlayers(){
   };
   el.innerHTML = visible.slice().sort((a,b)=>(a.name||'').localeCompare(b.name||'','ru')).map(tileHtml).join('')
     + (gmOthers.length?`<div class="players-sep">Листы игроков · ГМ</div>`+gmOthers.map(tileHtml).join(''):'');
-  kickLayout(el);
+  kickLayout(el); masonry(el, PL_MAS);
   inlineRefreshIfStale();   // листы перечитаны (тик, дозагрузка облака) — открытый лист тоже не должен отставать
 }
 
@@ -9376,11 +9381,49 @@ function ensurePlayersVisible(){
     try{
       if(view && view.classList.contains('active') && list && list.children.length && list.offsetHeight===0){
         const html=list.innerHTML; list.innerHTML=''; void list.offsetHeight; list.innerHTML=html;
-        kickLayout(view); kickLayout(list);
+        kickLayout(view); kickLayout(list); masonry(list, PL_MAS);   // узлы новые — заново под наблюдение
       }
     }catch(e){}
   }));
 }
+
+/* --- «кирпичная» раскладка: плитки разной высоты без пробелов между ними --- */
+// Колонки и отступ между ними остаются из CSS (брейкпоинты те же), строки — по MAS_ROW px: каждый ребёнок занимает
+// столько строк, сколько весит его высота с отступом. Авторазмещение grid без dense назад не возвращается: порядок —
+// слева направо, сверху вниз, следующая плитка встаёт в колонку, что освободилась раньше, а элемент с
+// grid-column:1/-1 (разделитель) — под самой длинной. Контейнеру нужно правило
+// <id>.mas{grid-auto-rows:4px;row-gap:0;align-items:start}, как у #players-list
+const MAS_ROW=4, MAS=new Map();   // контейнер → {sel, kids, ro}
+const PL_MAS='.ptile,.players-sep';
+function masonry(el, sel){
+  if(!el) return;
+  let m=MAS.get(el);
+  if(!m){ m={sel, kids:[], ro:window.ResizeObserver ? new ResizeObserver(()=>masonry(el)) : null}; MAS.set(el, m); }
+  if(sel) m.sel=sel;
+  const kids=[...el.children].filter(k=>k.matches(m.sel));
+  // список перерисован — следим за новыми детьми: перенос имени, догрузка шрифта, ширина колонки меняют высоту.
+  // Тех же заново не подписываем: observe() сразу шлёт отчёт, и колбэк крутился бы по кругу
+  if(m.ro && (kids.length!==m.kids.length || kids.some((k,i)=>k!==m.kids[i]))){ m.ro.disconnect(); kids.forEach(k=>m.ro.observe(k)); m.kids=kids; }
+  // мерить нечего или нельзя: неактивный раздел (content-visibility:hidden) и спрятанный под открытым листом
+  // список дают нули — пусть стоит обычная сетка, разложим, когда покажется (renderPlayers или отчёт наблюдателя)
+  const v=el.closest('.view');
+  if(!kids.length || (v && !v.classList.contains('active')) || !el.offsetWidth){
+    if(el.classList.contains('mas')){ el.classList.remove('mas'); kids.forEach(k=>{ k.style.gridRowEnd=''; }); }
+    return;
+  }
+  // сначала все чтения, потом все записи — один пересчёт раскладки, а не по плитке.
+  // offsetHeight, а не getBoundingClientRect: transform наведения и нажатия раскладку не трогает
+  const gap=parseFloat(getComputedStyle(el).columnGap)||0;
+  const spans=kids.map(k=>{ const s=getComputedStyle(k);
+    return Math.max(1, Math.ceil((k.offsetHeight+(parseFloat(s.marginTop)||0)+(parseFloat(s.marginBottom)||0)+gap)/MAS_ROW)); });
+  el.classList.add('mas');
+  kids.forEach((k,i)=>{ const s='span '+spans[i]; if(k.style.gridRowEnd!==s) k.style.gridRowEnd=s; });
+}
+// отступ сетки меняется на брейкпоинтах и без смены высоты плиток. Шрифт — подстраховка там, где нет наблюдателя:
+// не fonts.ready — он срабатывает один раз, а шрифт может догрузиться и позже; loadingdone — на каждую догрузку
+const masonryAll=()=>MAS.forEach((m,el)=>masonry(el));
+addEventListener('resize', masonryAll);
+try{ document.fonts.addEventListener('loadingdone', masonryAll); }catch(e){}
 
 
 /* ---------- Конфиг листа персонажа по играм ---------- */
