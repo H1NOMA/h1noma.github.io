@@ -1721,6 +1721,13 @@
   .kubik.kb-crit .kb-sp path:nth-child(4){animation-delay:.46s}
   @keyframes kbSpark{0%{opacity:0;transform:scale(.2)}40%{opacity:1;transform:scale(1.2)}100%{opacity:0;transform:scale(.6) rotate(40deg)}}
   .kubik.kb-fail .kb-drop{animation:kbDrop 1.3s .5s ease-in both}
+  .kubik .kb-dn{display:inline}
+  .kubik .kb-ring{opacity:0;transform-box:fill-box;transform-origin:center}
+  .kubik.kb-stamp .kb-ring{animation:kbRing .62s ease-out}
+  @keyframes kbRing{0%{opacity:.85;transform:scale(.4)}100%{opacity:0;transform:scale(1.9)}}
+  .kubik .kb-num{transform-box:fill-box;transform-origin:center}
+  .kubik.kb-stamp .kb-num{animation:kbStamp .5s cubic-bezier(.3,1.6,.5,1)}
+  @keyframes kbStamp{0%{transform:scale(1)}35%{transform:scale(1.45)}70%{transform:scale(.93)}100%{transform:scale(1)}}
   @keyframes kbDrop{0%{opacity:0}20%{opacity:1}100%{opacity:0;transform:translateY(16px)}}
   @media (prefers-reduced-motion:reduce){.kubik *{animation:none!important}}
   .pl-kub{width:92px;margin:0 auto 12px}
@@ -17376,8 +17383,9 @@ const KUB=(()=>{
     terra:`<circle cx="69" cy="56" r="7.5" fill="rgba(255,255,255,.08)" stroke="#e8dcbf" stroke-width="2"/><path d="M76 59c4 7 6 15 3 22" fill="none" stroke="#e8dcbf" stroke-width="1.2" stroke-dasharray="2 2.2"/>`,
     assimilation:`<path d="M41 50h38l-2 11H43z" fill="#ff3348" stroke="${K}" stroke-width="1.8" stroke-linejoin="round"/><path d="M46 55.5h28" stroke="#ffe0e4" stroke-width="2.2" stroke-linecap="round"/>`,
   };
-  const SVG=wide=>`<svg viewBox="${wide?'-90 -62 300 190':'-14 -18 148 140'}" aria-hidden="true" focusable="false">
+  const SVG=wide=>`<svg viewBox="${wide?'-100 -70 320 195':'-14 -18 148 140'}" aria-hidden="true" focusable="false">
     <ellipse class="kb-sh" cx="60" cy="113" rx="40" ry="5" fill="rgba(0,0,0,.5)"/>
+    <ellipse class="kb-ring" cx="60" cy="112" rx="46" ry="8" fill="none" stroke="var(--kc)" stroke-width="2.5"/>
     <text class="kb-zz" x="96" y="18" font-family="Exo 2,sans-serif" font-weight="800" font-size="15" fill="var(--kc)">z</text>
     <text class="kb-zz kb-z2" x="106" y="2" font-family="Exo 2,sans-serif" font-weight="800" font-size="11" fill="var(--kc)">z</text>
     <g class="kb-body">
@@ -17398,7 +17406,7 @@ const KUB=(()=>{
       <g class="kb-f kb-sad"><ellipse cx="51" cy="57" rx="3.6" ry="4.6" fill="#111"/><ellipse cx="69" cy="57" rx="3.6" ry="4.6" fill="#111"/>
         <path d="M45 50l9 2M75 50l-9 2M54 68c3-3.5 9-3.5 12 0" fill="none" stroke="#111" stroke-width="2.1" stroke-linecap="round"/></g>
       <g class="kb-f kb-zzf"><path d="M46 57c2 2.5 8 2.5 10 0M64 57c2 2.5 8 2.5 10 0" fill="none" stroke="#111" stroke-width="2.2" stroke-linecap="round"/><ellipse cx="60" cy="66" rx="2.6" ry="2" fill="#111"/></g>
-      <g class="kb-f kb-num"><text x="60" y="66" text-anchor="middle" font-family="Exo 2,sans-serif" font-weight="800" font-size="20" fill="#111"></text></g>
+      <g class="kb-f kb-num"><text class="kb-nh" x="60" y="66.9" text-anchor="middle" font-family="Exo 2,sans-serif" font-weight="700" font-size="19" fill="#fff" opacity=".3"></text><text class="kb-nt" x="60" y="66" text-anchor="middle" font-family="Exo 2,sans-serif" font-weight="700" font-size="19" fill="#000" opacity=".58"></text></g>
       <g class="kb-acc">${Object.entries(ACC).map(([k,v])=>`<g data-s="${k}">${v}</g>`).join('')}</g>
       <path class="kb-drop" d="M88 40c3 4 4 7 1 9-3 1-5-2-3-5z" fill="#8fd3ff" stroke="${K}" stroke-width="1.2"/>
     </g>
@@ -17416,7 +17424,8 @@ const KUB=(()=>{
   const UP={x:0,y:0,th:0};
   const all=new Set();
   function put(k,p){
-    k.b.setAttribute('transform',`translate(${p.x.toFixed(2)} ${p.y.toFixed(2)}) rotate(${p.th.toFixed(2)} 60 60)`);
+    const rc=p.rc||[60,60];
+    k.b.setAttribute('transform',`translate(${p.x.toFixed(2)} ${p.y.toFixed(2)}) rotate(${p.th.toFixed(2)} ${rc[0].toFixed(1)} ${rc[1].toFixed(1)})`);
     const lift=Math.max(0,-p.y);
     k.sh.setAttribute('cx',(60+p.x).toFixed(1)); k.sh.setAttribute('rx',(40-lift*.25).toFixed(1)); k.sh.setAttribute('opacity',Math.max(.25,1-lift/70).toFixed(2));
   }
@@ -17460,18 +17469,80 @@ const KUB=(()=>{
     // бросок: подлетает с кручением (на грани мелькают числа), падает на грань слева и докатывается
     // до середины вершина за вершиной; встаёт выпавшим числом к нам
     roll(k){
-      const n=parseInt(k.el.dataset.n,10)||1, sides=parseInt(k.el.dataset.sides,10)||20, tx=k.el.querySelector('.kb-num text');
-      face(k,'num'); tx.setAttribute('font-size', String(n).length>2?'15':'20');
-      let ms=0; tx.textContent=n;
-      if(!RM.matches){ const iv=setInterval(()=>{ ms+=70; tx.textContent=(ms>=1250 || !k.el.isConnected) ? n : 1+Math.floor(Math.random()*sides);
-        if(ms>=1250 || !k.el.isConnected) clearInterval(iv); }, 70); tx.textContent=1+Math.floor(Math.random()*sides); }
-      // сцена шириной 300 с серединой на месте кубика: падает на грань чуть левее, докатывается и встаёт точно в центр
+      const n=parseInt(k.el.dataset.n,10)||1, sides=parseInt(k.el.dataset.sides,10)||20, lab=dLabel(n,sides);
+      face(k,'num');
+      k.el.querySelectorAll('.kb-num text').forEach(t=>{ t.textContent=lab; t.setAttribute('font-size', lab.length>2?'15':'19'); });
+      // сцена с серединой на месте кубика: падает на грань чуть левее, докатывается и встаёт точно в центр
       const land=pv(10,-120,5), lp={x:land.x, y:land.y, th:-450};
-      run(k,[fly(UP,lp,62,560), fly(lp,lp,6,150), roll(10,-120,-60,5,320), roll(60,-120,-90,6,400,eout), shake(UP,2.5,200,18)]);
+      run(k,[fly(UP,lp,62,560), fly(lp,lp,6,150), roll(10,-120,-60,5,320), roll(60,-120,-90,6,400,eout)], ()=>stamp(k));
     },
   };
+  /* ── остальные кубы: своя форма у каждого. к4, к6, к12 — правильные многоугольники, катятся по граням
+     (поворот вокруг вершины на полу на 360°/n); к8 — ромб, к10 и к100 — «змей»: подлетают с кручением и
+     покачиваются на нижней вершине. Число — гравировкой на лицевой грани с самого начала броска ── */
+  const rad=d=>d*Math.PI/180;
+  function regular(n,R){ const cy=FL-R*Math.cos(Math.PI/n), v=[];
+    for(let i=0;i<n;i++){ const a=rad(90-180/n+i*360/n); v.push([60+R*Math.cos(a), cy+R*Math.sin(a)]); } return {v, c:[60,cy], R, n}; }
+  const KITE=[[60,10],[100,54],[60,110],[20,54]];
+  const DIE={4:{g:regular(3,54), fy:5, fs:21}, 6:{g:regular(4,52), fy:2, fs:24}, 12:{g:regular(5,52), fy:3, fs:20},
+    8:{kite:[[60,8],[104,59],[60,110],[16,59]], mid:59, fs:20}, 10:{kite:KITE, mid:62, fs:19, inner:1}, 100:{kite:KITE, mid:62, fs:16, inner:1}};
+  const dLabel=(n,sides)=>sides===100 ? (n===100?'00':String(n).padStart(2,'0')) : String(n);
+  const P2=a=>a.map(q=>q[0].toFixed(1)+','+q[1].toFixed(1)).join(' ');
+  const film=(a,o,w)=>`<polygon points="${P2(a)}" fill="${w?'#fff':'#000'}" opacity="${o.toFixed(2)}"/>`;
+  function dieBody(d){
+    let s='', f;
+    if(d.g){ const {v,c,n}=d.g, inn=v.map(q=>[c[0]+(q[0]-c[0])*.46, c[1]+(q[1]-c[1])*.46]);
+      s+=`<polygon points="${P2(v)}" fill="var(--kc)"/>`;
+      for(let i=0;i<n;i++){ const a=v[i], b=v[(i+1)%n], my=(a[1]+b[1])/2-c[1];
+        s+=film([a,b,inn[(i+1)%n],inn[i]], my>0 ? .18+my/260 : .22*Math.max(0,-my/50), my<=0); }
+      s+=`<polygon points="${P2(inn)}" fill="#fff" opacity=".14"/><polygon points="${P2(inn)}" fill="none" stroke="${K}" stroke-width="1.5" opacity=".55"/>`;
+      s+=v.map((q,i)=>`<path d="M${q[0].toFixed(1)} ${q[1].toFixed(1)}L${inn[i][0].toFixed(1)} ${inn[i][1].toFixed(1)}" stroke="${K}" stroke-width="1.4" opacity=".5"/>`).join('');
+      s+=`<polygon points="${P2(v)}" fill="none" stroke="${K}" stroke-width="3" stroke-linejoin="round"/>`;
+      f=[c[0], c[1]+(d.fy||0)];
+    } else { const [t,r,b,l]=d.kite, m=[60,d.mid];
+      s+=`<polygon points="${P2(d.kite)}" fill="var(--kc)"/>`+film([t,r,m],.2,1)+film([t,l,m],.32,1)+film([l,m,b],.3,0)+film([r,m,b],.45,0);
+      if(d.inner){ const y6=d.mid+6, y26=d.mid+26;
+        s+=`<polygon points="60,30 78,${y6} 60,${y26} 42,${y6}" fill="#fff" opacity=".16"/><path d="M60 10V30M20 54 42 ${y6}M100 54 78 ${y6}M60 110V${y26}M60 30 78 ${y6} 60 ${y26} 42 ${y6}Z" fill="none" stroke="${K}" stroke-width="1.4" opacity=".55"/>`;
+        f=[60,d.mid+8]; }
+      else { s+=`<path d="M16 59H104M60 8V110" stroke="${K}" stroke-width="1.4" opacity=".5"/>`; f=[60,64]; }
+      s+=`<polygon points="${P2(d.kite)}" fill="none" stroke="${K}" stroke-width="3" stroke-linejoin="round"/>`;
+    }
+    return {s,f};
+  }
+  const DSVG=(d,lab)=>{ const {s,f}=dieBody(d), fs=lab.length>2?d.fs-3:d.fs, y=(f[1]+fs*.36).toFixed(1);
+    return `<svg viewBox="-100 -70 320 195" aria-hidden="true" focusable="false">
+      <ellipse class="kb-sh" cx="60" cy="113" rx="40" ry="5" fill="rgba(0,0,0,.5)"/>
+      <ellipse class="kb-ring" cx="60" cy="112" rx="46" ry="8" fill="none" stroke="var(--kc)" stroke-width="2.5"/>
+      <g class="kb-body">${s}<g class="kb-num kb-dn"><text x="${f[0]}" y="${(+y+.9).toFixed(1)}" text-anchor="middle" font-family="Exo 2,sans-serif" font-weight="700" font-size="${fs}" fill="#fff" opacity=".3">${lab}</text>
+        <text x="${f[0]}" y="${y}" text-anchor="middle" font-family="Exo 2,sans-serif" font-weight="700" font-size="${fs}" fill="#000" opacity=".58">${lab}</text></g></g></svg>`; };
+  function dplan(d){
+    const segs=[];
+    if(d.g){ const {n,R,c}=d.g, a0=-90-180/n, a1=-90+180/n, step=360/n, edge=2*R*Math.sin(Math.PI/n), px0=60+R*Math.sin(Math.PI/n);
+      const pose=(px,a)=>({x:px+R*Math.cos(rad(a))-c[0], y:FL+R*Math.sin(rad(a))-c[1], th:(a-a0)-360, rc:c});
+      const land=pose(px0-edge,a0);
+      segs.push({ms:560, f:t=>({x:lerp(0,land.x,t), y:lerp(0,land.y,t)-4*58*t*(1-t), th:lerp(0,-360,t), rc:c})});
+      segs.push({ms:140, f:t=>({x:land.x, y:land.y-4*5*t*(1-t), th:-360, rc:c})});
+      segs.push({ms:440, f:t=>pose(px0, lerp(a0,a1,eout(t)))});
+      segs.push({ms:10, f:()=>({x:0, y:0, th:0, rc:c})});   // защёлкнуть поворот: рисунок симметричен на 360°/n — не видно
+    } else {
+      segs.push({ms:700, f:t=>({x:Math.sin(t*Math.PI)*-18, y:-4*64*t*(1-t), th:lerp(0,-720,eout(t))})});
+      segs.push({ms:160, f:t=>({x:0, y:-4*7*t*(1-t), th:0})});
+      segs.push({ms:520, f:t=>({x:0, y:0, th:Math.sin(t*Math.PI*3)*9*(1-t), rc:[60,110]})});
+    }
+    return segs;
+  }
+  // удар о стол: волна по полу и число «впечатывается»
+  function stamp(k){ k.el.classList.remove('kb-stamp'); void k.el.offsetWidth; k.el.classList.add('kb-stamp'); }
   function mount(el){
     if(el.dataset.kbOn) return; el.dataset.kbOn='1';
+    const sides=parseInt(el.dataset.sides,10)||20;
+    if(el.dataset.kub==='roll' && DIE[sides]){
+      const d=DIE[sides], n=parseInt(el.dataset.n,10)||1;
+      el.innerHTML=DSVG(d, dLabel(n,sides)); el.dataset.face='num';
+      const k={el, b:el.querySelector('.kb-body'), sh:el.querySelector('.kb-sh'), raf:0, to:0, proj:''};
+      all.add(k); put(k, d.g ? {x:0,y:0,th:0,rc:d.g.c} : UP);
+      run(k, dplan(d), ()=>stamp(k)); return;
+    }
     el.innerHTML=SVG(el.hasAttribute('data-wide'));
     const k={el, b:el.querySelector('.kb-body'), sh:el.querySelector('.kb-sh'), raf:0, to:0, proj:''};
     all.add(k); dress(k); put(k,UP);
