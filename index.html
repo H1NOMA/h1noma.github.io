@@ -3128,6 +3128,7 @@
   .tool-block{background:var(--surface);border:var(--hair) solid var(--line2);border-radius:var(--r-md);box-shadow:inset 0 .5px 0 rgba(255,255,255,.05);padding:16px;margin-bottom:16px}
   /* «простой»: доска не активна — эмблема d20 в цвете сеттинга и подпись */
   .trk-idle{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:46px 20px 42px;text-align:center}
+  .trk-kub{width:124px}
   .trk-emblem{width:96px;height:96px;color:var(--red-ink);filter:drop-shadow(0 0 16px rgba(var(--accent-rgb),.4))}
   .trk-idle-cap{font-family:var(--f-disp);font-weight:600;font-size:.95rem;letter-spacing:.1em;text-transform:uppercase;color:var(--red-ink)}
   /* подпись над чужой доской (своего персонажа на ней нет / не вошёл) — доска ниже только для чтения */
@@ -15164,14 +15165,15 @@ function renderTrackerCore(){
   if(!ADMIN || guestVp){
     const vp=guestVp||trkActiveForPlayer();
     if(!vp){
-      // доска не активна: вместо подсказки — эмблема (d20 в шестиграннике) под цвет сеттинга и подпись
+      // доска не активна: Кубик и подпись. Мастер не ведёт — спит на боку; облако ещё читается — дрожит;
+      // бой идёт в другом сеттинге — кивает. Та же подпись — разметку не трогаем, иначе он «просыпался» бы на каждом такте
       if(_tt) _tt.style.display='none';
-      box.innerHTML=`<div class="trk-idle">
-        <svg class="trk-emblem" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.05" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true">
-          <path d="M12 2l8.7 5v10L12 22l-8.7-5V7L12 2z"/>
-          <path d="M12 2v4.6M3.3 7l8.7-.4 8.7.4M12 6.6L5.6 16.4h12.8L12 6.6M3.3 17l2.3-.6M20.7 17l-2.3-.6M12 22l-6.4-5.6M12 22l6.4-5.6"/>
-        </svg>
-        <div class="trk-idle-cap">${trkIdleCaption()}</div>
+      const cap=trkIdleCaption(), kub=/облаку/.test(cap)?'shiver':(/^Идёт бой/.test(cap)?'hello':'sleep');
+      const was=box.querySelector(':scope > .trk-idle');
+      if(was && was.dataset.cap===cap) return;
+      box.innerHTML=`<div class="trk-idle" data-cap="${esc(cap)}">
+        <div class="kubik trk-kub" data-kub="${kub}"></div>
+        <div class="trk-idle-cap">${cap}</div>
       </div>`;
       return;
     }
