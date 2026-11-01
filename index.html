@@ -1702,6 +1702,35 @@
   .dc-total{font-family:var(--f-disp);font-weight:700;font-size:2.1rem;line-height:1;color:var(--red-ink);text-shadow:0 0 16px rgba(var(--accent-rgb),.55)}
   .dc-break{margin-top:7px;font-family:var(--f-mono);font-size:.64rem;letter-spacing:.05em;color:var(--dim);line-height:1.7;word-break:break-word}
   /* меню кубов открывается единой панелью (анимация на .dice-menu) */
+  /* Кубик — маскот (модуль KUB): цвет граней — акцент сеттинга, лицо и роспись переключаются классами */
+  .kubik{display:block;--kc:var(--red)}
+  .kubik svg{display:block;width:100%;height:auto;overflow:visible}
+  .kubik .kb-eye{transform-origin:center;transform-box:fill-box;animation:kbBlink 4.6s infinite}
+  @keyframes kbBlink{0%,92%,100%{transform:scaleY(1)}95%{transform:scaleY(.08)}}
+  .kubik .kb-f,.kubik .kb-dec>g,.kubik .kb-acc>g{display:none}
+  .kubik .kb-dec>g.on{display:inline}
+  .kubik:not([data-face="num"]):not([data-face="zz"]) .kb-acc>g.on{display:inline}
+  .kubik[data-face="ok"] .kb-ok,.kubik[data-face="joy"] .kb-joy,.kubik[data-face="sad"] .kb-sad,.kubik[data-face="zz"] .kb-zzf,.kubik[data-face="num"] .kb-num{display:inline}
+  .kubik .kb-zz,.kubik .kb-drop,.kubik .kb-sp path{opacity:0}
+  .kubik.kb-sleep .kb-zz{animation:kbZz 2.6s ease-in-out infinite}
+  .kubik.kb-sleep .kb-z2{animation-delay:.9s}
+  @keyframes kbZz{0%{opacity:0;transform:translate(0,0)}30%{opacity:1}100%{opacity:0;transform:translate(12px,-26px)}}
+  .kubik.kb-crit .kb-sp path{transform-origin:center;transform-box:fill-box;animation:kbSpark .9s .35s ease-out both}
+  .kubik.kb-crit .kb-sp path:nth-child(2){animation-delay:.42s}
+  .kubik.kb-crit .kb-sp path:nth-child(3){animation-delay:.5s}
+  .kubik.kb-crit .kb-sp path:nth-child(4){animation-delay:.46s}
+  @keyframes kbSpark{0%{opacity:0;transform:scale(.2)}40%{opacity:1;transform:scale(1.2)}100%{opacity:0;transform:scale(.6) rotate(40deg)}}
+  .kubik.kb-fail .kb-drop{animation:kbDrop 1.3s .5s ease-in both}
+  @keyframes kbDrop{0%{opacity:0}20%{opacity:1}100%{opacity:0;transform:translateY(16px)}}
+  @media (prefers-reduced-motion:reduce){.kubik *{animation:none!important}}
+  .pl-kub{width:92px;margin:0 auto 12px}
+  .ob-head{display:flex;align-items:center;gap:10px}
+  .ob-kub{width:46px;flex:none;margin:-6px 0 -4px -4px}
+  .dr-kub{width:86px}
+  .toast-kub{width:30px;flex:none;margin:-8px 0 -6px}
+  .toast.kub .ic{display:none}
+  .pill-kub{position:absolute;right:-16px;top:-20px;width:30px;pointer-events:none;z-index:3}
+  @media(min-width:880px){.pill-kub{display:none}}
   .dice-result{position:fixed;inset:0;z-index:120;display:none;align-items:center;justify-content:center;pointer-events:none}
   .dice-result.show{display:flex}
   .dr-wrap{pointer-events:auto;position:relative;display:flex;flex-direction:column;align-items:center;gap:12px;animation:dieIn .55s steps(2) both}
@@ -6262,7 +6291,7 @@ function updateOnboard(){
   // кнопки — в карточке, поэтому M: главная L на экране одна — «Записаться на игру»
   el.innerHTML=`<div class="ob-card">
     <button class="ob-x" onclick="obDismiss()" aria-label="Скрыть">✕</button>
-    <div class="ob-title">С чего начать</div>
+    <div class="ob-head"><div class="kubik ob-kub" data-kub="hello"></div><div class="ob-title">С чего начать</div></div>
     <ol class="ob-steps">
       <li><b>Создай аккаунт</b> — в нём персонажи и записи.</li>
       <li><b>Собери персонажа</b> — статы посчитает калькулятор.</li>
@@ -7732,6 +7761,11 @@ function updateNextGame(){
   // нет запланированной ГМом кампании (или все уже прошли) → ни баннера, ни кнопки записи (пустота).
   // Кнопка появилась или пропала — «С чего начать» гостя ссылается на неё, перерисовываем
   if(su && su.hidden!==!s){ su.hidden=!s; updateOnboard(); }
+  // в день игры из пилюли сеттинга выглядывает мини-Кубик (только телефон: на десктопе пилюля в строке меню)
+  const lk=document.getElementById('projSwipe'), pk=lk && lk.querySelector('.pill-kub');
+  const gameDay=!!(s && gameDateOf(s)===today && matchMedia('(max-width:879px)').matches);
+  if(gameDay && !pk && lk){ const k=document.createElement('div'); k.className='kubik pill-kub'; k.dataset.kub='hello'; lk.appendChild(k); }
+  else if(!gameDay && pk) pk.remove();
   if(!s){ el.hidden=true; el.innerHTML=''; return; }
   el.hidden=false;
   el.innerHTML=`<div class="ng-card" onclick="openGameSignup()" role="button" tabindex="0" onkeydown="if(event.key==='Enter')openGameSignup()">
@@ -9522,7 +9556,7 @@ function renderPlayers(){
     // поэтому пустой раздел обязан сам сказать, куда жать: иначе человек
     // видит чистый экран без единой зацепки.
     el.innerHTML = SESSION
-      ? `<div class="empty pl-empty">Персонажей пока нет
+      ? `<div class="empty pl-empty"><div class="kubik pl-kub" data-kub="sleep"></div>Персонажей пока нет
            <span class="pl-empty-hint hint-desk">Новый — кнопкой <b>＋</b> в правом нижнем углу</span></div>`
       : `<div class="empty">[ ЛИЧНЫЙ РАЗДЕЛ ]<br>войдите в аккаунт — здесь появятся ваши персонажи</div>`;
     masonry(el, PL_MAS);   // плиток нет — обычная сетка, иначе заглушка сжалась бы в строку 4 px
@@ -12696,6 +12730,7 @@ function renderAmbient(){
   host.innerHTML=html;
 }
 function setProject(id, silent, dir){
+  setTimeout(()=>{ try{ KUB.redress(); }catch(e){} });   // роспись граней Кубиков — под новый сеттинг
   if(!PROJECT_TITLES[id]) return;
   if(!projectVisible(id, true)) id=nearestVisibleProject(id, true);   // закрытый сеттинг — в ближайший открытый
   CUR_PROJECT=id;
@@ -16554,15 +16589,17 @@ function rollDice(n){
   if(typeof n==='string') return rollExpr(n);   // бросок по формуле: без анимации кубов в шапке, результат возвращаем вызвавшему
   const v=1+Math.floor(Math.random()*n);
   const crit=(n===20&&(v===1||v===20)) && CUR_PROJECT==='assimilation';
+  const nat=n===20&&(v===1||v===20);
   const r=document.getElementById('diceResult');
   r.innerHTML=`<div class="dr-wrap">
     <div class="dr-box d${n}"><svg class="dr-svg" viewBox="0 0 24 24">${DICE_SHAPES[n]}</svg><span class="dr-num${crit?' crit':''}">${v}</span></div>
+    ${nat?`<div class="kubik dr-kub" data-kub="${v===20?'crit':'fail'}"></div>`:''}
     </div>`;
   r.classList.add('show');
   const dm=document.getElementById('diceMenu'); if(dm) dm.classList.remove('open');
   const db=document.getElementById('diceBtn'); if(db) db.classList.remove('active');
   diceSync();
-  clearTimeout(diceT); diceT=setTimeout(()=>r.classList.remove('show'), crit?3000:2000);
+  clearTimeout(diceT); diceT=setTimeout(()=>{ r.classList.remove('show'); if(nat) r.innerHTML=''; }, (crit||nat)?3200:2000);
   trkLog('roll', trkActorName()+' бросает d'+n+' → '+v+(crit?' (крит!)':''));
   if(crit) triggerGlitch();
 }
@@ -16579,12 +16616,18 @@ let toastT, TOAST_ACT=null;
    кнопка живёт, пока виден тост (по умолчанию 6 с), следующий тост без действия её прячет */
 function toast(msg, opts){
   const t=document.getElementById('toast'); document.getElementById('toastMsg').textContent=msg;
+  // нет связи — вместо значка дрожит Кубик; в остальных тостах его нет (и кадров тоже)
+  const cloud=/Облако не отвечает/.test(String(msg)), kb=t.querySelector('.toast-kub');
+  if(cloud && !kb){ const s=document.createElement('span'); s.className='kubik toast-kub'; s.dataset.kub='shiver'; t.insertBefore(s, t.firstChild); }
+  else if(!cloud && kb) kb.remove();
+  t.classList.toggle('kub', cloud);
   const o=opts||{}, a=o.action; TOAST_ACT=(a && typeof a.fn==='function') ? a : null;
   const b=document.getElementById('toastAct');
   if(b){ b.hidden=!TOAST_ACT; if(TOAST_ACT){ b.textContent=a.label||'Отменить'; b.onclick=()=>{ const f=TOAST_ACT; TOAST_ACT=null; b.hidden=true; t.classList.remove('show','act'); clearTimeout(toastT); try{ f.fn(); }catch(e){ console.warn('toast action', e); } }; } }
   t.classList.toggle('act', !!TOAST_ACT);
   t.classList.add('show'); clearTimeout(toastT);
-  toastT=setTimeout(()=>{ t.classList.remove('show','act'); TOAST_ACT=null; if(b) b.hidden=true; }, o.ms || (TOAST_ACT?6000:2600));
+  toastT=setTimeout(()=>{ t.classList.remove('show','act'); TOAST_ACT=null; if(b) b.hidden=true;
+    setTimeout(()=>{ if(!t.classList.contains('show')){ const k=t.querySelector('.toast-kub'); if(k) k.remove(); t.classList.remove('kub'); } }, 400); }, o.ms || (TOAST_ACT?6000:2600));
 }
 
 /* ====================== Push-уведомления ======================
@@ -17291,6 +17334,139 @@ boot();
   (function wait(){ if(document.getElementById('splash')) setTimeout(wait, 400); else setTimeout(show, 700); })();
 })();
 
+</script>
+
+<script>
+/* ═══ Кубик — маскот сайта: живой к20 без рук и ног ═══
+   Всё, что он «чувствует», — движением самой кости: перекат по граням (поворот вокруг вершины, которой
+   касается пола), подскок, дрожь, падение на бок. Образ сеттинга — роспись граней, а не шляпа: катится вместе с ним.
+   Ставится сам: любой <div class="kubik" data-kub="sleep|crit|fail|hello|shiver|idle"> в разметке. */
+const KUB=(()=>{
+  const RM=matchMedia('(prefers-reduced-motion: reduce)');
+  const K='#0d0e11';
+  const P={t:[60,10],tr:[103.3,35],br:[103.3,85],b:[60,110],bl:[16.7,85],tl:[16.7,35],f1:[60,32],f2:[85,76],f3:[35,76]};
+  const pt=ks=>ks.map(k=>P[k].join(',')).join(' ');
+  // светотень граней: поверх заливки цветом сеттинга — чёрная или белая плёнка нужной плотности
+  const shade=(ks,o,w)=>`<polygon points="${pt(ks)}" fill="${w?'#fff':'#000'}" opacity="${o}"/>`;
+  const DEC={
+    classic:`<polygon points="60,10 103.3,35 103.3,85 60,110 16.7,85 16.7,35" fill="none" stroke="#fff3c4" stroke-width="1.6" stroke-linejoin="round"/>
+      <path d="m45.6 19.5 1.8 3.8 4.1.5-3 2.8.8 4.1-3.7-2-3.7 2 .8-4.1-3-2.8 4.1-.5z" fill="#fff3c4"/>
+      <circle cx="82.8" cy="47.7" r="1.6" fill="#fff3c4"/><circle cx="22.8" cy="65.3" r="1.3" fill="#fff3c4"/><circle cx="82.8" cy="90.3" r="1.3" fill="#fff3c4"/>`,
+    legacy:`<path d="M77 19a7 7 0 1 0 5 12 5.6 5.6 0 1 1-5-12z" fill="#efe8ff"/>
+      <g fill="#efe8ff"><circle cx="40" cy="25" r="1.4"/><circle cx="35" cy="50" r="1.1"/><circle cx="24" cy="68" r="1.4"/><circle cx="96" cy="64" r="1.1"/><circle cx="84" cy="92" r="1.4"/><circle cx="58" cy="90" r="1"/></g>`,
+    neverland:`<g stroke="#5a3d08" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".85">
+        <path d="M40 22l6 8 6-8M80 22v8l-5-3M33 44l8 6M37 52l4-10M79 42l7 10M86 42l-5 9M20 62l5 7 4-8M93 61l6 7M97 61l-3 9M35 86l5 7M58 84l4 6 4-6M80 87l6 5"/></g>
+      <circle cx="60" cy="18" r="4" fill="#b0283a" stroke="${K}" stroke-width="1.4"/><circle cx="58.8" cy="16.8" r="1.2" fill="#ff9aa6"/>`,
+    terra:`<g fill="#b98a3e" stroke="${K}" stroke-width="1.1"><circle cx="60" cy="15" r="2.4"/><circle cx="98.5" cy="37.5" r="2.4"/><circle cx="98.5" cy="82.5" r="2.4"/><circle cx="60" cy="105" r="2.4"/><circle cx="21.5" cy="82.5" r="2.4"/><circle cx="21.5" cy="37.5" r="2.4"/></g>
+      <path d="M30 64h12M30 68h9M84 64h8M86 68h6" stroke="#6e5326" stroke-width="1.4" opacity=".8"/>`,
+    assimilation:`<path d="M25 52h8l5 6M96 50h-8l-4 6M22 72h6l4 5M98 72h-6l-3 5M44 92h6l4-4M66 92h6l3-4M46 22h7M67 22h7l3 4" stroke="#ffd0d5" stroke-width="1.3" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".9"/>
+      <g fill="#ffd0d5"><circle cx="38" cy="58" r="1.5"/><circle cx="84" cy="56" r="1.5"/><circle cx="32" cy="77" r="1.5"/><circle cx="89" cy="77" r="1.5"/><circle cx="77" cy="26" r="1.5"/></g>`,
+    skazki:`<path d="M40 27c0-5 6-5 6 0s-6 5-6 9M75 27c0-5 6-5 6 0s-6 5-6 9M27 60c3-4 8-2 7 2M93 60c-3-4-8-2-7 2M33 90c3-4 8-2 7 2M83 90c-3-4-8-2-7 2" stroke="#f5c542" stroke-width="1.4" fill="none" stroke-linecap="round"/>
+      <g fill="#c8323a" stroke="${K}" stroke-width="1"><circle cx="43" cy="24" r="2.6"/><circle cx="78" cy="24" r="2.6"/><circle cx="31" cy="56" r="2.2"/><circle cx="89" cy="56" r="2.2"/><circle cx="37" cy="86" r="2.2"/><circle cx="79" cy="86" r="2.2"/><circle cx="60" cy="96" r="2.6"/></g>`,
+    gw:`<g fill="#1d2010" opacity=".75"><path d="M28 60l6 4 6-4v4l-6 4-6-4zM80 60l6 4 6-4v4l-6 4-6-4zM78 20l1.6 3.4 3.7.4-2.8 2.5.8 3.7-3.3-1.9-3.3 1.9.8-3.7-2.8-2.5 3.7-.4z"/>
+        <text x="43" y="30" font-family="Roboto Mono,monospace" font-weight="500" font-size="8">07</text></g>`,
+  };
+  // на лице — только когда оно смотрит на нас (в перекатах их нет)
+  const ACC={
+    terra:`<circle cx="69" cy="56" r="7.5" fill="rgba(255,255,255,.08)" stroke="#e8dcbf" stroke-width="2"/><path d="M76 59c4 7 6 15 3 22" fill="none" stroke="#e8dcbf" stroke-width="1.2" stroke-dasharray="2 2.2"/>`,
+    assimilation:`<path d="M41 50h38l-2 11H43z" fill="#ff3348" stroke="${K}" stroke-width="1.8" stroke-linejoin="round"/><path d="M46 55.5h28" stroke="#ffe0e4" stroke-width="2.2" stroke-linecap="round"/>`,
+  };
+  const SVG=`<svg viewBox="-14 -18 148 140" aria-hidden="true" focusable="false">
+    <ellipse class="kb-sh" cx="60" cy="113" rx="40" ry="5" fill="rgba(0,0,0,.5)"/>
+    <text class="kb-zz" x="96" y="18" font-family="Exo 2,sans-serif" font-weight="800" font-size="15" fill="var(--kc)">z</text>
+    <text class="kb-zz kb-z2" x="106" y="2" font-family="Exo 2,sans-serif" font-weight="800" font-size="11" fill="var(--kc)">z</text>
+    <g class="kb-body">
+      <polygon points="60,10 103.3,35 103.3,85 60,110 16.7,85 16.7,35" fill="var(--kc)"/>
+      ${shade(['t','tr','f1'],.12,1)}${shade(['t','tl','f1'],.3,1)}${shade(['tl','f1','f3'],.1,0)}${shade(['tr','f1','f2'],.24,0)}
+      ${shade(['tl','f3','bl'],.3,0)}${shade(['tr','f2','br'],.42,0)}${shade(['bl','f3','b'],.38,0)}${shade(['br','f2','b'],.5,0)}
+      ${shade(['f3','f2','b'],.28,0)}${shade(['f1','f2','f3'],.2,1)}
+      <path d="M16.7 35 60 32 103.3 35M16.7 35 35 76M103.3 35 85 76M16.7 85 35 76M103.3 85 85 76M35 76 60 110 85 76M60 10v22M60 32 85 76H35z" fill="none" stroke="${K}" stroke-width="1.6" stroke-linejoin="round" opacity=".5"/>
+      <g class="kb-dec">${Object.entries(DEC).map(([k,v])=>`<g data-s="${k}">${v}</g>`).join('')}</g>
+      <polygon points="60,10 103.3,35 103.3,85 60,110 16.7,85 16.7,35" fill="none" stroke="${K}" stroke-width="3" stroke-linejoin="round"/>
+      <g class="kb-f kb-ok"><ellipse class="kb-eye" cx="51" cy="56" rx="4.2" ry="5.4" fill="#111"/><ellipse class="kb-eye" cx="69" cy="56" rx="4.2" ry="5.4" fill="#111"/>
+        <circle cx="52.4" cy="54" r="1.5" fill="#fff"/><circle cx="70.4" cy="54" r="1.5" fill="#fff"/>
+        <path d="M54 64c3 3.5 9 3.5 12 0" fill="none" stroke="#111" stroke-width="2.2" stroke-linecap="round"/>
+        <ellipse cx="44" cy="64" rx="3.5" ry="2" fill="#ff7a8a" opacity=".55"/><ellipse cx="76" cy="64" rx="3.5" ry="2" fill="#ff7a8a" opacity=".55"/></g>
+      <g class="kb-f kb-joy"><path d="M46 57c2-4 8-4 10 0M64 57c2-4 8-4 10 0" fill="none" stroke="#111" stroke-width="2.4" stroke-linecap="round"/>
+        <path d="M52 63c2 7 14 7 16 0z" fill="#111"/><path d="M55 66c2 2 8 2 10 0" fill="none" stroke="#ff7a8a" stroke-width="2" stroke-linecap="round"/>
+        <ellipse cx="44" cy="63" rx="3.5" ry="2" fill="#ff7a8a" opacity=".7"/><ellipse cx="76" cy="63" rx="3.5" ry="2" fill="#ff7a8a" opacity=".7"/></g>
+      <g class="kb-f kb-sad"><ellipse cx="51" cy="57" rx="3.6" ry="4.6" fill="#111"/><ellipse cx="69" cy="57" rx="3.6" ry="4.6" fill="#111"/>
+        <path d="M45 50l9 2M75 50l-9 2M54 68c3-3.5 9-3.5 12 0" fill="none" stroke="#111" stroke-width="2.1" stroke-linecap="round"/></g>
+      <g class="kb-f kb-zzf"><path d="M46 57c2 2.5 8 2.5 10 0M64 57c2 2.5 8 2.5 10 0" fill="none" stroke="#111" stroke-width="2.2" stroke-linecap="round"/><ellipse cx="60" cy="66" rx="2.6" ry="2" fill="#111"/></g>
+      <g class="kb-f kb-num"><text x="60" y="66" text-anchor="middle" font-family="Exo 2,sans-serif" font-weight="800" font-size="20" fill="#111"></text></g>
+      <g class="kb-acc">${Object.entries(ACC).map(([k,v])=>`<g data-s="${k}">${v}</g>`).join('')}</g>
+      <path class="kb-drop" d="M88 40c3 4 4 7 1 9-3 1-5-2-3-5z" fill="#8fd3ff" stroke="${K}" stroke-width="1.2"/>
+    </g>
+    <g class="kb-sp" fill="var(--kc)" stroke="${K}" stroke-width="1.2"><path d="m6 10 2.6 6 6 2.6-6 2.6-2.6 6-2.6-6-6-2.6 6-2.6z"/><path d="m110 -6 2 4.6 4.6 2-4.6 2-2 4.6-2-4.6-4.6-2 4.6-2z"/>
+      <path d="m118 70 2 4.6 4.6 2-4.6 2-2 4.6-2-4.6-4.6-2 4.6-2z"/><path d="m0 74 1.8 4 4 1.8-4 1.8-1.8 4-1.8-4-4-1.8 4-1.8z"/></g></svg>`;
+
+  // перекат: центр — на окружности радиуса R вокруг вершины на полу; поворот = угол + 90° + 60° × номер вершины
+  const R=50, FL=110, C=60;
+  const pv=(px,a,k)=>{ const r=a*Math.PI/180; return {x:px+R*Math.cos(r)-C, y:FL+R*Math.sin(r)-C, th:a+90+60*k}; };
+  const lerp=(a,b,t)=>a+(b-a)*t, io=t=>t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2, ein=t=>t*t*t, eout=t=>1-Math.pow(1-t,3);
+  const roll=(px,a0,a1,k,ms,e=io)=>({ms, f:t=>pv(px,lerp(a0,a1,e(t)),k)});
+  const fly=(p0,p1,h,ms)=>({ms, f:t=>({x:lerp(p0.x,p1.x,t), y:lerp(p0.y,p1.y,t)-4*h*t*(1-t), th:lerp(p0.th,p1.th,t)})});
+  const shake=(p,amp,ms,hz=26)=>({ms, f:t=>({x:p.x+Math.sin(t*hz*1.7)*amp*.25*(1-t*.5), y:p.y, th:p.th+Math.sin(t*hz)*amp*(1-t*.6)})});
+  const hold=(p,ms)=>({ms, hold:true, f:()=>p});
+  const UP={x:0,y:0,th:0};
+  const all=new Set();
+  function put(k,p){
+    k.b.setAttribute('transform',`translate(${p.x.toFixed(2)} ${p.y.toFixed(2)}) rotate(${p.th.toFixed(2)} 60 60)`);
+    const lift=Math.max(0,-p.y);
+    k.sh.setAttribute('cx',(60+p.x).toFixed(1)); k.sh.setAttribute('rx',(40-lift*.25).toFixed(1)); k.sh.setAttribute('opacity',Math.max(.25,1-lift/70).toFixed(2));
+  }
+  function dress(k){
+    const id=(typeof CUR_PROJECT==='string' && DEC[CUR_PROJECT]) ? CUR_PROJECT : 'classic';
+    if(k.proj===id) return; k.proj=id;
+    k.el.querySelectorAll('.kb-dec > g, .kb-acc > g').forEach(g=>g.classList.toggle('on', g.dataset.s===id));
+  }
+  // кадры — только пока Кубик на странице; паузы — таймером, а не пустыми кадрами
+  function run(k,segs,done){
+    cancelAnimationFrame(k.raf); clearTimeout(k.to);
+    if(RM.matches){ put(k, segs[segs.length-1].f(1)); if(done) k.to=setTimeout(done, 1200); return; }
+    let i=0;
+    const next=()=>{
+      if(!k.el.isConnected){ all.delete(k); return; }
+      if(i>=segs.length){ if(done) done(); return; }
+      // не видно (свёрнутая вкладка, неактивный раздел, скрытый блок) — кадры не крутим, проверяем позже
+      const seen=!document.hidden && (k.el.checkVisibility ? k.el.checkVisibility({visibilityProperty:true}) : k.el.offsetWidth>0);
+      if(!seen){ k.to=setTimeout(next, 1200); return; }
+      const s=segs[i++]; dress(k);
+      if(s.hold){ put(k,s.f(1)); k.to=setTimeout(next, s.ms); return; }
+      const t0=performance.now();
+      const step=now=>{ const t=Math.min(1,(now-t0)/s.ms); put(k,s.f(t)); if(t<1) k.raf=requestAnimationFrame(step); else next(); };
+      k.raf=requestAnimationFrame(step);
+    };
+    next();
+  }
+  const face=(k,f,cls)=>{ k.el.dataset.face=f; k.el.classList.remove('kb-crit','kb-fail','kb-sleep'); if(cls){ void k.el.offsetWidth; k.el.classList.add(cls); } };
+  const A={
+    idle(k){ face(k,'ok'); const loop=()=>{ const d=Math.random()<.5?1:-1;
+      run(k,[hold(UP,2600+Math.random()*2600), roll(60,-90,-90+7*d,0,260), roll(60,-90+7*d,-90-3*d,0,300), roll(60,-90-3*d,-90,0,260)], loop); }; loop(); },
+    hello(k){ face(k,'joy'); const loop=()=>run(k,[roll(60,-90,-78,0,200), roll(60,-78,-102,0,340), roll(60,-102,-90,0,200), fly(UP,UP,10,260),
+      roll(60,-90,-82,0,160), roll(60,-82,-90,0,220), hold(UP,5200)], loop); loop(); },
+    sleep(k){ face(k,'zz','kb-sleep'); const lie=pv(60,-60,0);
+      const br=()=>run(k,[roll(60,-60,-62.5,0,1300), roll(60,-62.5,-60,0,1300)], br);
+      run(k,[roll(60,-90,-60,0,700), hold(lie,200)], br); },
+    crit(k){ face(k,'joy','kb-crit'); run(k,[hold(UP,120), fly(UP,{x:0,y:0,th:360},62,620), fly(UP,UP,12,220), fly(UP,UP,4,140), hold(UP,400)], ()=>A.idle(k)); },
+    fail(k){ face(k,'sad','kb-fail'); const side=pv(60,-120,0);
+      run(k,[shake(UP,4,260,30), roll(60,-90,-120,0,520,ein), shake(side,2.5,420,34), hold(side,900), roll(60,-120,-90,0,520), hold(UP,300)], ()=>A.idle(k)); },
+    shiver(k){ face(k,'sad'); const loop=()=>run(k,[shake(UP,5,900,40), hold(UP,1600)], loop); loop(); },
+  };
+  function mount(el){
+    if(el.dataset.kbOn) return; el.dataset.kbOn='1';
+    el.innerHTML=SVG;
+    const k={el, b:el.querySelector('.kb-body'), sh:el.querySelector('.kb-sh'), raf:0, to:0, proj:''};
+    all.add(k); dress(k); put(k,UP);
+    (A[el.dataset.kub]||A.idle)(k);
+  }
+  // разметку перерисовывают целиком (innerHTML) — новые Кубики подхватываем наблюдателем, ушедшие сами гасят кадры
+  let pend=0;
+  const scan=()=>{ pend=0; document.querySelectorAll('.kubik:not([data-kb-on])').forEach(mount); };
+  try{ new MutationObserver(()=>{ if(!pend) pend=requestAnimationFrame(scan); }).observe(document.body,{childList:true,subtree:true}); }catch(e){}
+  scan();
+  return { scan, redress:()=>all.forEach(k=>{ k.proj=''; dress(k); }) };
+})();
 </script>
 
 <script>
