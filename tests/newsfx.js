@@ -32,7 +32,9 @@ const state = page => page.evaluate(() => {
 const geo = page => page.evaluate(() => {
   const mh = document.querySelector('#view-news .masthead'), ng = document.getElementById('nextGame'), lock = document.getElementById('projSwipe');
   const top = el => { let y = 0; for (let n = el; n; n = n.offsetParent) y += n.offsetTop; return y; };
-  const pb = lock.getBoundingClientRect().bottom;
+  // приветствие касается не пилюли, а Кубика под ней (как в модуле: 0,7 его высоты от верха)
+  const lr = lock.getBoundingClientRect(), kb = lock.querySelector('.pill-kub');
+  const pb = kb && kb.offsetWidth ? Math.max(lr.bottom, lr.top + kb.offsetTop + (kb.offsetHeight || kb.offsetWidth) * .7) : lr.bottom;
   return { pb, mhTop: top(mh), mhH: mh.offsetHeight, ngBottom: top(ng) + ng.offsetHeight, max: document.documentElement.scrollHeight - innerHeight,
     gbcrOk: Math.abs(top(mh) - scrollY - mh.getBoundingClientRect().top) < 1.5 };
 });
@@ -65,6 +67,7 @@ async function phone(b, width, shots) {
   }
   check(seenMid, `${width}: есть промежуточные кадры (впитывается, а не исчезает разом)`);
   await scrollTo(page, Math.ceil(full) + 30);
+  await page.waitForTimeout(700);                   // пружина доводит блок до конца
   s = await state(page);
   check(+s.op === 0 && s.vis === 'hidden' && s.cvis === 'hidden', `${width}: при p≥1 приветствие скрыто (opacity ${s.op}, visibility ${s.cvis})`);
 

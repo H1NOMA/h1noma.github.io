@@ -1730,12 +1730,16 @@
   /* под броском — мягкое затемнение, чтобы Кубик и число не терялись на тексте ленты */
   .dice-result.show:has(.dr-kubwrap){background:radial-gradient(70% 50% at 50% 50%,rgba(6,7,10,.78),rgba(6,7,10,.5) 75%);animation:fade .2s}
   .dr-roll{width:min(94vw,460px)}
-  .dr-cap{font-family:var(--f-mono);font-size:.78rem;letter-spacing:.18em;text-transform:uppercase;color:var(--red-ink);text-shadow:0 0 12px rgba(var(--accent-rgb),.5)}
   .toast-kub{width:30px;flex:none;margin:-8px 0 -6px}
   .toast.kub .ic{display:none}
-  /* мини-Кубик висит на правом нижнем углу пилюли сеттинга (телефон); пока открыто меню сеттингов — прячется */
-  .pill-kub{position:absolute;right:-17px;bottom:-15px;width:30px;pointer-events:none;z-index:3;transition:opacity .18s}
-  .lock .project.menu-open~.pill-kub{opacity:0}
+  /* мини-Кубик — по центру под пилюлей сеттинга, снизу чуть наезжает на неё (телефон). Новости впитываются в него:
+     прокрутка пишет --kgrow (он слегка подрастает, «глотая» и «выплёвывая» приветствие). Открыто меню сеттингов —
+     плавно отходит вбок, наклоняется и смотрит на список */
+  .pill-kub{position:absolute;left:50%;top:calc(100% - 10px);width:30px;margin-left:-15px;pointer-events:none;z-index:3;
+    transform-origin:50% 0;transition:transform .5s cubic-bezier(.32,.72,0,1)}
+  .pill-kub svg{transform:scale(var(--kgrow,1));transform-origin:50% 30%}
+  .lock .project.menu-open~.pill-kub{transform:translate(132px,26px) rotate(-16deg) scale(1.12)}
+  .lock .project.menu-open~.pill-kub .kb-eye,.lock .project.menu-open~.pill-kub .kb-ok circle{translate:-2.4px .8px;transition:translate .3s .15s}
   @media(min-width:880px){.pill-kub{display:none}}
   .dice-result{position:fixed;inset:0;z-index:120;display:none;align-items:center;justify-content:center;pointer-events:none}
   .dice-result.show{display:flex}
@@ -16594,9 +16598,8 @@ function rollDice(n){
   const v=1+Math.floor(Math.random()*n);
   const crit=(n===20&&(v===1||v===20)) && CUR_PROJECT==='assimilation';
   const r=document.getElementById('diceResult');
-  // Кубик катится и встаёт выпавшим числом; под ним — какой куб бросали
-  r.innerHTML=`<div class="dr-wrap dr-kubwrap" aria-label="к${n}: ${v}"><div class="kubik dr-roll" data-wide data-kub="roll" data-n="${v}" data-sides="${n}"></div>
-    <div class="dr-cap">к${n}</div></div>`;
+  // Кубик катится и встаёт выпавшим числом
+  r.innerHTML=`<div class="dr-wrap dr-kubwrap" aria-label="к${n}: ${v}"><div class="kubik dr-roll" data-wide data-kub="roll" data-n="${v}" data-sides="${n}"></div></div>`;
   r.classList.add('show');
   const dm=document.getElementById('diceMenu'); if(dm) dm.classList.remove('open');
   const db=document.getElementById('diceBtn'); if(db) db.classList.remove('active');
@@ -17373,7 +17376,7 @@ const KUB=(()=>{
     terra:`<circle cx="69" cy="56" r="7.5" fill="rgba(255,255,255,.08)" stroke="#e8dcbf" stroke-width="2"/><path d="M76 59c4 7 6 15 3 22" fill="none" stroke="#e8dcbf" stroke-width="1.2" stroke-dasharray="2 2.2"/>`,
     assimilation:`<path d="M41 50h38l-2 11H43z" fill="#ff3348" stroke="${K}" stroke-width="1.8" stroke-linejoin="round"/><path d="M46 55.5h28" stroke="#ffe0e4" stroke-width="2.2" stroke-linecap="round"/>`,
   };
-  const SVG=wide=>`<svg viewBox="${wide?'-125 -62 300 190':'-14 -18 148 140'}" aria-hidden="true" focusable="false">
+  const SVG=wide=>`<svg viewBox="${wide?'-90 -62 300 190':'-14 -18 148 140'}" aria-hidden="true" focusable="false">
     <ellipse class="kb-sh" cx="60" cy="113" rx="40" ry="5" fill="rgba(0,0,0,.5)"/>
     <text class="kb-zz" x="96" y="18" font-family="Exo 2,sans-serif" font-weight="800" font-size="15" fill="var(--kc)">z</text>
     <text class="kb-zz kb-z2" x="106" y="2" font-family="Exo 2,sans-serif" font-weight="800" font-size="11" fill="var(--kc)">z</text>
@@ -17460,10 +17463,11 @@ const KUB=(()=>{
       const n=parseInt(k.el.dataset.n,10)||1, sides=parseInt(k.el.dataset.sides,10)||20, tx=k.el.querySelector('.kb-num text');
       face(k,'num'); tx.setAttribute('font-size', String(n).length>2?'15':'20');
       let ms=0; tx.textContent=n;
-      if(!RM.matches){ const iv=setInterval(()=>{ ms+=70; tx.textContent=(ms>=1500 || !k.el.isConnected) ? n : 1+Math.floor(Math.random()*sides);
-        if(ms>=1500 || !k.el.isConnected) clearInterval(iv); }, 70); tx.textContent=1+Math.floor(Math.random()*sides); }
-      const land=pv(-40,-120,4), lp={x:land.x, y:land.y, th:-150};
-      run(k,[fly(UP,lp,70,620), fly(lp,lp,7,160), roll(-40,-120,-60,4,300), roll(10,-120,-60,5,380), roll(60,-120,-90,6,420,eout), shake(UP,3,220,18)]);
+      if(!RM.matches){ const iv=setInterval(()=>{ ms+=70; tx.textContent=(ms>=1250 || !k.el.isConnected) ? n : 1+Math.floor(Math.random()*sides);
+        if(ms>=1250 || !k.el.isConnected) clearInterval(iv); }, 70); tx.textContent=1+Math.floor(Math.random()*sides); }
+      // сцена шириной 300 с серединой на месте кубика: падает на грань чуть левее, докатывается и встаёт точно в центр
+      const land=pv(10,-120,5), lp={x:land.x, y:land.y, th:-450};
+      run(k,[fly(UP,lp,62,560), fly(lp,lp,6,150), roll(10,-120,-60,5,320), roll(60,-120,-90,6,400,eout), shake(UP,2.5,200,18)]);
     },
   };
   function mount(el){
@@ -17522,6 +17526,10 @@ const KUB=(()=>{
     if(!R.classList.contains('dr-open')){
       const r=lock.getBoundingClientRect();
       if(r.width) Object.assign(M, {pw:r.width, ph:r.height, pb:r.bottom, cx:r.left+r.width/2, cy:r.top+r.height/2});
+      // приветствие уходит не в саму пилюлю, а в Кубика под ней (по offset — его подрастание замер не портит)
+      const kb=lock.querySelector('.pill-kub'); M.kub=null;
+      if(r.width && kb && kb.offsetWidth){ const kw=kb.offsetWidth, kh=kb.offsetHeight||kw; M.kub=kb;
+        Object.assign(M, {pw:kw*1.2, ph:kh*1.2, cx:r.left+kb.offsetLeft+kw/2, cy:r.top+kb.offsetTop+kh*.55, pb:Math.max(r.bottom, r.top+kb.offsetTop+kh*.7)}); }
     }
     const a=docPos(mh); M.mL=a.x; M.mT=a.y; M.mW=mh.offsetWidth; M.mH=mh.offsetHeight; M.span=M.mH*.75;
     // свой радиус (у сеттингов разный) — без inline-радиуса впитывания: сеттинг меняют и при впитанном блоке
@@ -17564,6 +17572,8 @@ const KUB=(()=>{
   function draw(p, raw, sp){
     if(p===P && raw===PR) return;
     const was=P; P=p; PR=raw;
+    // Кубик чуть подрастает на середине пути — «глотает» (вниз) и «выплёвывает» (вверх) приветствие
+    if(M.kub) put(M.kub, '--kgrow', p>0 && p<1 ? (1+.24*Math.sin(Math.PI*p)).toFixed(3) : '');
     if(p<=0 && p>-.004){ clearMh(); return; }
     // смаз движения: размытие растёт со скоростью пружины и гаснет, когда она успокаивается
     const mb=Math.min(7, (sp||0)*1.6);
