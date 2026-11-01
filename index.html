@@ -1726,10 +1726,16 @@
   .pl-kub{width:92px;margin:0 auto 12px}
   .ob-head{display:flex;align-items:center;gap:10px}
   .ob-kub{width:46px;flex:none;margin:-6px 0 -4px -4px}
-  .dr-kub{width:86px}
+  .dr-kubwrap{animation:none;gap:2px}
+  /* под броском — мягкое затемнение, чтобы Кубик и число не терялись на тексте ленты */
+  .dice-result.show:has(.dr-kubwrap){background:radial-gradient(70% 50% at 50% 50%,rgba(6,7,10,.78),rgba(6,7,10,.5) 75%);animation:fade .2s}
+  .dr-roll{width:min(94vw,460px)}
+  .dr-cap{font-family:var(--f-mono);font-size:.78rem;letter-spacing:.18em;text-transform:uppercase;color:var(--red-ink);text-shadow:0 0 12px rgba(var(--accent-rgb),.5)}
   .toast-kub{width:30px;flex:none;margin:-8px 0 -6px}
   .toast.kub .ic{display:none}
-  .pill-kub{position:absolute;right:-16px;top:-20px;width:30px;pointer-events:none;z-index:3}
+  /* мини-Кубик висит на правом нижнем углу пилюли сеттинга (телефон); пока открыто меню сеттингов — прячется */
+  .pill-kub{position:absolute;right:-17px;bottom:-15px;width:30px;pointer-events:none;z-index:3;transition:opacity .18s}
+  .lock .project.menu-open~.pill-kub{opacity:0}
   @media(min-width:880px){.pill-kub{display:none}}
   .dice-result{position:fixed;inset:0;z-index:120;display:none;align-items:center;justify-content:center;pointer-events:none}
   .dice-result.show{display:flex}
@@ -4097,6 +4103,7 @@ addEventListener('beforeinstallprompt', function(e){ e.preventDefault(); DEFERRE
     </button>
     <span class="lock" id="projSwipe" onclick="event.stopPropagation()">
       <span class="project" id="projBtn" role="button" tabindex="0" aria-label="Сменить кампанию">ASS<i>I</i>MILATION</span>
+      <span class="kubik pill-kub" data-kub="idle"></span>
     </span>
     <nav class="topnav">
       <button data-nav="news" class="active" onclick="go('news')">Новости</button>
@@ -7762,11 +7769,6 @@ function updateNextGame(){
   // нет запланированной ГМом кампании (или все уже прошли) → ни баннера, ни кнопки записи (пустота).
   // Кнопка появилась или пропала — «С чего начать» гостя ссылается на неё, перерисовываем
   if(su && su.hidden!==!s){ su.hidden=!s; updateOnboard(); }
-  // в день игры из пилюли сеттинга выглядывает мини-Кубик (только телефон: на десктопе пилюля в строке меню)
-  const lk=document.getElementById('projSwipe'), pk=lk && lk.querySelector('.pill-kub');
-  const gameDay=!!(s && gameDateOf(s)===today && matchMedia('(max-width:879px)').matches);
-  if(gameDay && !pk && lk){ const k=document.createElement('div'); k.className='kubik pill-kub'; k.dataset.kub='hello'; lk.appendChild(k); }
-  else if(!gameDay && pk) pk.remove();
   if(!s){ el.hidden=true; el.innerHTML=''; return; }
   el.hidden=false;
   el.innerHTML=`<div class="ng-card" onclick="openGameSignup()" role="button" tabindex="0" onkeydown="if(event.key==='Enter')openGameSignup()">
@@ -16591,17 +16593,15 @@ function rollDice(n){
   if(typeof n==='string') return rollExpr(n);   // бросок по формуле: без анимации кубов в шапке, результат возвращаем вызвавшему
   const v=1+Math.floor(Math.random()*n);
   const crit=(n===20&&(v===1||v===20)) && CUR_PROJECT==='assimilation';
-  const nat=n===20&&(v===1||v===20);
   const r=document.getElementById('diceResult');
-  r.innerHTML=`<div class="dr-wrap">
-    <div class="dr-box d${n}"><svg class="dr-svg" viewBox="0 0 24 24">${DICE_SHAPES[n]}</svg><span class="dr-num${crit?' crit':''}">${v}</span></div>
-    ${nat?`<div class="kubik dr-kub" data-kub="${v===20?'crit':'fail'}"></div>`:''}
-    </div>`;
+  // Кубик катится и встаёт выпавшим числом; под ним — какой куб бросали
+  r.innerHTML=`<div class="dr-wrap dr-kubwrap" aria-label="к${n}: ${v}"><div class="kubik dr-roll" data-wide data-kub="roll" data-n="${v}" data-sides="${n}"></div>
+    <div class="dr-cap">к${n}</div></div>`;
   r.classList.add('show');
   const dm=document.getElementById('diceMenu'); if(dm) dm.classList.remove('open');
   const db=document.getElementById('diceBtn'); if(db) db.classList.remove('active');
   diceSync();
-  clearTimeout(diceT); diceT=setTimeout(()=>{ r.classList.remove('show'); if(nat) r.innerHTML=''; }, (crit||nat)?3200:2000);
+  clearTimeout(diceT); diceT=setTimeout(()=>{ r.classList.remove('show'); r.innerHTML=''; }, 3700);
   trkLog('roll', trkActorName()+' бросает d'+n+' → '+v+(crit?' (крит!)':''));
   if(crit) triggerGlitch();
 }
@@ -17373,7 +17373,7 @@ const KUB=(()=>{
     terra:`<circle cx="69" cy="56" r="7.5" fill="rgba(255,255,255,.08)" stroke="#e8dcbf" stroke-width="2"/><path d="M76 59c4 7 6 15 3 22" fill="none" stroke="#e8dcbf" stroke-width="1.2" stroke-dasharray="2 2.2"/>`,
     assimilation:`<path d="M41 50h38l-2 11H43z" fill="#ff3348" stroke="${K}" stroke-width="1.8" stroke-linejoin="round"/><path d="M46 55.5h28" stroke="#ffe0e4" stroke-width="2.2" stroke-linecap="round"/>`,
   };
-  const SVG=`<svg viewBox="-14 -18 148 140" aria-hidden="true" focusable="false">
+  const SVG=wide=>`<svg viewBox="${wide?'-125 -62 300 190':'-14 -18 148 140'}" aria-hidden="true" focusable="false">
     <ellipse class="kb-sh" cx="60" cy="113" rx="40" ry="5" fill="rgba(0,0,0,.5)"/>
     <text class="kb-zz" x="96" y="18" font-family="Exo 2,sans-serif" font-weight="800" font-size="15" fill="var(--kc)">z</text>
     <text class="kb-zz kb-z2" x="106" y="2" font-family="Exo 2,sans-serif" font-weight="800" font-size="11" fill="var(--kc)">z</text>
@@ -17454,10 +17454,21 @@ const KUB=(()=>{
     fail(k){ face(k,'sad','kb-fail'); const side=pv(60,-120,0);
       run(k,[shake(UP,4,260,30), roll(60,-90,-120,0,520,ein), shake(side,2.5,420,34), hold(side,900), roll(60,-120,-90,0,520), hold(UP,300)], ()=>A.idle(k)); },
     shiver(k){ face(k,'sad'); const loop=()=>run(k,[shake(UP,5,900,40), hold(UP,1600)], loop); loop(); },
+    // бросок: подлетает с кручением (на грани мелькают числа), падает на грань слева и докатывается
+    // до середины вершина за вершиной; встаёт выпавшим числом к нам
+    roll(k){
+      const n=parseInt(k.el.dataset.n,10)||1, sides=parseInt(k.el.dataset.sides,10)||20, tx=k.el.querySelector('.kb-num text');
+      face(k,'num'); tx.setAttribute('font-size', String(n).length>2?'15':'20');
+      let ms=0; tx.textContent=n;
+      if(!RM.matches){ const iv=setInterval(()=>{ ms+=70; tx.textContent=(ms>=1500 || !k.el.isConnected) ? n : 1+Math.floor(Math.random()*sides);
+        if(ms>=1500 || !k.el.isConnected) clearInterval(iv); }, 70); tx.textContent=1+Math.floor(Math.random()*sides); }
+      const land=pv(-40,-120,4), lp={x:land.x, y:land.y, th:-150};
+      run(k,[fly(UP,lp,70,620), fly(lp,lp,7,160), roll(-40,-120,-60,4,300), roll(10,-120,-60,5,380), roll(60,-120,-90,6,420,eout), shake(UP,3,220,18)]);
+    },
   };
   function mount(el){
     if(el.dataset.kbOn) return; el.dataset.kbOn='1';
-    el.innerHTML=SVG;
+    el.innerHTML=SVG(el.hasAttribute('data-wide'));
     const k={el, b:el.querySelector('.kb-body'), sh:el.querySelector('.kb-sh'), raf:0, to:0, proj:''};
     all.add(k); dress(k); put(k,UP);
     (A[el.dataset.kub]||A.idle)(k);
