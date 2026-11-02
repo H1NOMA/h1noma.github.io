@@ -26,8 +26,8 @@
   addEventListener('orientationchange', function(){ setTimeout(fit,60); });
   addEventListener('resize', fit, {passive:true});
 }catch(e){}})();</script>
-<title>КОМИК — кодекс правил D&D</title>
-<meta name="description" content="КОМИК — кодекс правил кампаний студии: LEGACY, NEVERLAND, TERRA AETERNA.">
+<title>КОМИК</title>
+<meta name="description" content="КОМИК — настольные ролевые игры: LEGACY, NEVERLAND, TERRA AETERNA.">
 <link rel="preconnect" href="https://cloud.komikdnd.ru" crossorigin>
 <link rel="dns-prefetch" href="https://cloud.komikdnd.ru">
 <link rel="manifest" href="manifest.webmanifest">
@@ -37,7 +37,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="KOMIK">
+<meta name="apple-mobile-web-app-title" content="КОМИК">
 <!-- Шрифты вшиты локально (fonts/) — сайт открывается без VPN, без обращений к Google -->
 <link href="fonts.css" rel="stylesheet">
 <!-- Библиотека облака (supabase.js, ~200 КБ) начинает качаться сразу, не дожидаясь разбора 1,2 МБ HTML:
@@ -17503,8 +17503,8 @@ const KUB=(()=>{
       s+=`<polygon points="${P2(d.kite)}" fill="var(--kc)"/>`+film([t,r,m],.2,1)+film([t,l,m],.32,1)+film([l,m,b],.3,0)+film([r,m,b],.45,0);
       if(d.inner){ const y6=d.mid+6, y26=d.mid+26;
         s+=`<polygon points="60,30 78,${y6} 60,${y26} 42,${y6}" fill="#fff" opacity=".16"/><path d="M60 10V30M20 54 42 ${y6}M100 54 78 ${y6}M60 110V${y26}M60 30 78 ${y6} 60 ${y26} 42 ${y6}Z" fill="none" stroke="${K}" stroke-width="1.4" opacity=".55"/>`;
-        f=[60,d.mid+8]; }
-      else { s+=`<path d="M16 59H104M60 8V110" stroke="${K}" stroke-width="1.4" opacity=".5"/>`; f=[60,64]; }
+        f=[60,d.mid+2]; }
+      else { s+=`<path d="M16 59H40M80 59H104M60 8V38M60 80V110" stroke="${K}" stroke-width="1.4" opacity=".5"/>`; f=[60,59]; }   // к8: рёбра не заходят под число
       s+=`<polygon points="${P2(d.kite)}" fill="none" stroke="${K}" stroke-width="3" stroke-linejoin="round"/>`;
     }
     return {s,f};
