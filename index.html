@@ -17484,14 +17484,14 @@ const KUB=(()=>{
   function regular(n,R){ const cy=FL-R*Math.cos(Math.PI/n), v=[];
     for(let i=0;i<n;i++){ const a=rad(90-180/n+i*360/n); v.push([60+R*Math.cos(a), cy+R*Math.sin(a)]); } return {v, c:[60,cy], R, n}; }
   const KITE=[[60,10],[100,54],[60,110],[20,54]];
-  const DIE={4:{g:regular(3,54), fy:5, fs:21}, 6:{g:regular(4,52), fy:2, fs:24}, 12:{g:regular(5,52), fy:3, fs:20},
+  const DIE={4:{g:regular(3,54), fy:-2, fs:19}, 6:{g:regular(4,52), ins:.7, pips:1}, 12:{g:regular(5,52), fy:1, fs:20},
     8:{kite:[[60,8],[104,59],[60,110],[16,59]], mid:59, fs:20}, 10:{kite:KITE, mid:62, fs:19, inner:1}, 100:{kite:KITE, mid:62, fs:16, inner:1}};
   const dLabel=(n,sides)=>sides===100 ? (n===100?'00':String(n).padStart(2,'0')) : String(n);
   const P2=a=>a.map(q=>q[0].toFixed(1)+','+q[1].toFixed(1)).join(' ');
   const film=(a,o,w)=>`<polygon points="${P2(a)}" fill="${w?'#fff':'#000'}" opacity="${o.toFixed(2)}"/>`;
   function dieBody(d){
     let s='', f;
-    if(d.g){ const {v,c,n}=d.g, inn=v.map(q=>[c[0]+(q[0]-c[0])*.46, c[1]+(q[1]-c[1])*.46]);
+    if(d.g){ const {v,c,n}=d.g, ins=d.ins||.46, inn=v.map(q=>[c[0]+(q[0]-c[0])*ins, c[1]+(q[1]-c[1])*ins]);
       s+=`<polygon points="${P2(v)}" fill="var(--kc)"/>`;
       for(let i=0;i<n;i++){ const a=v[i], b=v[(i+1)%n], my=(a[1]+b[1])/2-c[1];
         s+=film([a,b,inn[(i+1)%n],inn[i]], my>0 ? .18+my/260 : .22*Math.max(0,-my/50), my<=0); }
@@ -17509,7 +17509,16 @@ const KUB=(()=>{
     }
     return {s,f};
   }
-  const DSVG=(d,lab)=>{ const {s,f}=dieBody(d), fs=lab.length>2?d.fs-3:d.fs, y=(f[1]+fs*.36).toFixed(1);
+  const PIPS={1:[[0,0]],2:[[-1,-1],[1,1]],3:[[-1,-1],[0,0],[1,1]],4:[[-1,-1],[1,-1],[-1,1],[1,1]],5:[[-1,-1],[1,-1],[0,0],[-1,1],[1,1]],6:[[-1,-1],[1,-1],[-1,0],[1,0],[-1,1],[1,1]]};
+  function pipsSvg(d,f,n){ const h=d.g.R*Math.SQRT1_2*d.ins*.56, r=d.g.R*.085;
+    return (PIPS[n]||PIPS[1]).map(([x,y])=>{ const cx=(f[0]+x*h).toFixed(1), cy=(f[1]+y*h).toFixed(1);
+      return `<circle cx="${cx}" cy="${(+cy+.8).toFixed(1)}" r="${r.toFixed(1)}" fill="#fff" opacity=".3"/><circle cx="${cx}" cy="${cy}" r="${r.toFixed(1)}" fill="#000" opacity=".6"/>`; }).join(''); }
+  const DSVG=(d,lab)=>{ const {s,f}=dieBody(d);
+    if(d.pips) return `<svg viewBox="-100 -70 320 195" aria-hidden="true" focusable="false">
+      <ellipse class="kb-sh" cx="60" cy="113" rx="40" ry="5" fill="rgba(0,0,0,.5)"/>
+      <ellipse class="kb-ring" cx="60" cy="112" rx="46" ry="8" fill="none" stroke="var(--kc)" stroke-width="2.5"/>
+      <g class="kb-body">${s}<g class="kb-num kb-dn">${pipsSvg(d,f,parseInt(lab,10))}</g></g></svg>`;
+    const fs=lab.length>2?d.fs-3:d.fs, y=(f[1]+fs*.36).toFixed(1);
     return `<svg viewBox="-100 -70 320 195" aria-hidden="true" focusable="false">
       <ellipse class="kb-sh" cx="60" cy="113" rx="40" ry="5" fill="rgba(0,0,0,.5)"/>
       <ellipse class="kb-ring" cx="60" cy="112" rx="46" ry="8" fill="none" stroke="var(--kc)" stroke-width="2.5"/>
@@ -17522,7 +17531,7 @@ const KUB=(()=>{
       const land=pose(px0-edge,a0);
       segs.push({ms:560, f:t=>({x:lerp(0,land.x,t), y:lerp(0,land.y,t)-4*58*t*(1-t), th:lerp(0,-360,t), rc:c})});
       segs.push({ms:140, f:t=>({x:land.x, y:land.y-4*5*t*(1-t), th:-360, rc:c})});
-      segs.push({ms:440, f:t=>pose(px0, lerp(a0,a1,eout(t)))});
+      segs.push({ms:440, f:t=>pose(px0-edge, lerp(a0,a1,eout(t)))});   // вокруг вершины, на которую упал: центр приходит ровно на место
       segs.push({ms:10, f:()=>({x:0, y:0, th:0, rc:c})});   // защёлкнуть поворот: рисунок симметричен на 360°/n — не видно
     } else {
       segs.push({ms:700, f:t=>({x:Math.sin(t*Math.PI)*-18, y:-4*64*t*(1-t), th:lerp(0,-720,eout(t))})});
