@@ -49,15 +49,19 @@ if [ "${1:-}" = ssh-keys ]; then
   # перевод строки Windows (\r) в конце ключа попадает в файл при вставке из PowerShell — убираем
   if [ -f "$AK" ] && grep -q $'\r' "$AK"; then sed -i 's/\r$//' "$AK"; fi
   # «правильный» ключ — тот, у которого ssh-keygen смог посчитать отпечаток (тип, base64 и длина — настоящие)
-  KEYS=""; N=0
+  KEYS=""; SUP=""; N=0
   if [ -f "$AK" ]; then
     while IFS= read -r line || [ -n "$line" ]; do
       case "$line" in ''|'#'*) continue ;; esac
-      if fp=$(ssh-keygen -l -f /dev/stdin <<< "$line" 2>/dev/null); then N=$((N + 1)); KEYS="$KEYS    $fp"$'\n'; fi
+      fp=$(ssh-keygen -l -f /dev/stdin <<< "$line" 2>/dev/null) || continue
+      # ключ поддержки хостинга (у FirstVDS — «supportAccessKey») не твой: с ним войдёт только хостинг
+      case "$line" in *[Ss]upport*) SUP="$SUP    $fp"$'\n'; continue ;; esac
+      N=$((N + 1)); KEYS="$KEYS    $fp"$'\n'
     done < "$AK"
   fi
+  if [ -n "${SUP:-}" ]; then echo "Ключ поддержки хостинга (не считается — с ним войдёшь не ты):"; printf '%s' "$SUP"; fi
   if [ "$N" = 0 ]; then
-    bad "в $AK нет ни одного ключа — выключать вход по паролю нельзя: сервер закрылся бы и от тебя"
+    bad "в $AK нет ни одного твоего ключа — выключать вход по паролю нельзя: сервер закрылся бы и от тебя"
     echo
     key_howto
     exit 1
