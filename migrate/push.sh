@@ -355,7 +355,7 @@ mkdir -p volumes/functions/notify-game
 # Явно заданная ветка (KOMIK_REF=…) — первой: сайт всегда отдаёт main, и проверить ветку до слияния иначе нельзя.
 # Маркер свежей версии проверяем у каждого источника: старая index.ts с одного не должна отменять другой.
 FN_TMP=$(mktemp)
-GH_URL="https://raw.githubusercontent.com/H1NOMA/h1noma.github.io/$REF/supabase/functions/notify-game/index.ts"
+GH_URL="https://raw.githubusercontent.com/H1NOMA/KOMIK/$REF/supabase/functions/notify-game/index.ts"
 SITE_URL="https://komikdnd.ru/supabase/functions/notify-game/index.ts"
 if [ -n "${KOMIK_REF:-}" ]; then FN_SRC="$GH_URL $SITE_URL"; else FN_SRC="$SITE_URL $GH_URL"; fi
 FN_OK=""
@@ -441,7 +441,7 @@ apply_migs(){ mig_sql "$@" | docker exec -i supabase-db psql -q -v ON_ERROR_STOP
 MIG_DIR=$(mktemp -d); MIG_ALL=1
 for MIG_NAME in $MIGS; do
   MIG="$MIG_DIR/$MIG_NAME"; MIG_OK=""
-  MIG_GH="https://raw.githubusercontent.com/H1NOMA/h1noma.github.io/$REF/migrate/$MIG_NAME"
+  MIG_GH="https://raw.githubusercontent.com/H1NOMA/KOMIK/$REF/migrate/$MIG_NAME"
   MIG_SITE="https://komikdnd.ru/migrate/$MIG_NAME"
   if [ -n "${KOMIK_REF:-}" ]; then MIG_SRC="$MIG_GH $MIG_SITE"; else MIG_SRC="$MIG_SITE $MIG_GH"; fi
   for u in $MIG_SRC; do
@@ -487,7 +487,7 @@ say "7/7 · Ежедневная зашифрованная копия базы"
 command -v gpg >/dev/null || apt-get install -yq gnupg >/dev/null
 PASS_NEW=""; [ -s "$BK_PASS" ] || PASS_NEW=1
 BK_TMP=$(mktemp); BK_OK=""
-BK_GH="https://raw.githubusercontent.com/H1NOMA/h1noma.github.io/$REF/migrate/backup.sh"
+BK_GH="https://raw.githubusercontent.com/H1NOMA/KOMIK/$REF/migrate/backup.sh"
 BK_SITE="https://komikdnd.ru/migrate/backup.sh"
 if [ -n "${KOMIK_REF:-}" ]; then BK_SRC="$BK_GH $BK_SITE"; else BK_SRC="$BK_SITE $BK_GH"; fi
 for u in $BK_SRC; do
@@ -502,7 +502,14 @@ if [ -n "$BK_OK" ]; then
   BK_IMPORTED=/root/.komik-backup-imported
   if [ ! -e "$BK_IMPORTED" ]; then
     OLD_BK=$(mktemp -d); IMP_OK=1
-    if GIT_TERMINAL_PROMPT=0 timeout 300 git clone -q --depth 1 --branch backups https://github.com/H1NOMA/h1noma.github.io.git "$OLD_BK/r" 2>/dev/null; then
+    # репозиторий закрытый: ветку backups читаем ключом сервера (site.sh deploy-key), без него — анонимно (пока открыт)
+    GH_KEY=/var/lib/komik-site/deploy_key
+    if [ -r "$GH_KEY" ]; then
+      GH_GIT="ssh://git@ssh.github.com:443/H1NOMA/KOMIK.git"; GH_KH=$(mktemp)
+      echo '[ssh.github.com]:443 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl' > "$GH_KH"
+      export GIT_SSH_COMMAND="ssh -i $GH_KEY -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$GH_KH -o ConnectTimeout=20"
+    else GH_GIT="https://github.com/H1NOMA/KOMIK.git"; fi
+    if GIT_TERMINAL_PROMPT=0 timeout 300 git clone -q --depth 1 --branch backups "$GH_GIT" "$OLD_BK/r" 2>/dev/null; then
       for f in "$OLD_BK"/r/backups/kv-*.json.gz; do
         [ -f "$f" ] || continue
         D=$(basename "$f" .json.gz); D=${D#kv-}

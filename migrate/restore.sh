@@ -26,7 +26,14 @@ say(){ printf '\n\033[1;32m══ %s\033[0m\n' "$*"; }
 warn(){ printf '\033[1;33m⚠ %s\033[0m\n' "$*"; }
 bad(){ printf '\033[1;31m✗ %s\033[0m\n' "$*"; }
 SB_DIR=/opt/supabase/docker
-REPO="${KOMIK_BACKUPS_REPO:-https://github.com/H1NOMA/h1noma.github.io}"
+# репозиторий закрытый: ветку backups читаем ключом сервера (site.sh deploy-key), без него — анонимно (пока открыт)
+GH_KEY=/var/lib/komik-site/deploy_key
+if [ -r "$GH_KEY" ]; then
+  GH_GIT="ssh://git@ssh.github.com:443/H1NOMA/KOMIK.git"; GH_KH=$(mktemp)
+  echo '[ssh.github.com]:443 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl' > "$GH_KH"
+  export GIT_SSH_COMMAND="ssh -i $GH_KEY -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$GH_KH -o ConnectTimeout=20"
+else GH_GIT="https://github.com/H1NOMA/KOMIK.git"; fi
+REPO="${KOMIK_BACKUPS_REPO:-$GH_GIT}"
 BK_WWW=/var/www/komik-backup          # зашифрованные копии этого сервера (migrate/backup.sh)
 BK_PASS=/root/.komik-backup-pass
 ME="bash <(curl -fsS https://komikdnd.ru/migrate/restore.sh)"

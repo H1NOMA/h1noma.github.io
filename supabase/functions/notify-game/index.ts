@@ -178,7 +178,7 @@ Deno.serve(async (req) => {
   // проверяет только анон-ключ в Authorization и не спотыкается о новые ключи проекта.
   const jwt = (req.headers.get("x-user-token") || "").replace(/^Bearer\s+/i, "");
   const { data: u } = jwt ? await supa.auth.getUser(jwt) : { data: null };
-  // только адрес вида <тег>@komikdnd.ru: регистрация открыта, и hinoma@gmail.com иначе прошёл бы как dev
+  // только адрес вида <тег>@komikdnd.ru: регистрация открыта, и hinoma@example.com иначе прошёл бы как dev
   const email = (u?.user?.email || "").toLowerCase();
   const m = /^([^@]+)@komikdnd\.ru$/.exec(email);
   const login = m ? m[1] : "";

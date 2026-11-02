@@ -24,9 +24,18 @@
 #  Песочница (без root, tests/README.md): KOMIK_SITE_BASE=… KOMIK_SITE_LIVE=… KOMIK_SITE_NOPRUNE=1 bash migrate/site-sync.sh
 # ══════════════════════════════════════════════════════════════════
 set -euo pipefail
-REPO="${KOMIK_SITE_REPO:-https://github.com/H1NOMA/h1noma.github.io.git}"
 BRANCH="${KOMIK_SITE_BRANCH:-main}"
 BASE="${KOMIK_SITE_BASE:-/var/lib/komik-site}"
+# репозиторий закрытый: читаем его ключом сервера — только на чтение (его кладёт site.sh deploy-key).
+# Ключа нет — анонимно по https (так читается только открытый репозиторий). Ключ GitHub закреплён:
+# подменить GitHub по дороге не выйдет (отпечаток SHA256:+DiY3wvvV6TuJJhbpZisF/zLDA0zPMSvHdkr4UvCOqU)
+GH_HOSTKEY='[ssh.github.com]:443 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl'
+KEY="$BASE/deploy_key"
+if [ -n "${KOMIK_SITE_REPO:-}" ]; then REPO=$KOMIK_SITE_REPO
+elif [ -r "$KEY" ]; then
+  REPO="ssh://git@ssh.github.com:443/H1NOMA/KOMIK.git"
+  export GIT_SSH_COMMAND="ssh -i $KEY -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$BASE/known_hosts -o ConnectTimeout=20"
+else REPO="https://github.com/H1NOMA/KOMIK.git"; fi
 LIVE="${KOMIK_SITE_LIVE:-$BASE/live}"
 # то, что отдаёт Caddy; синк его не трогает — кроме перехода со старой схемы (ниже)
 WEBROOT="${KOMIK_SITE_ROOT:-/var/www/komik}"
@@ -46,6 +55,8 @@ exec 9>"$BASE/lock"
 # прошлый запуск ещё идёт — выходим; force (его ждут site.sh и владелец) — ждёт его конца
 if [ "${1:-}" = force ]; then flock -w 900 9; else flock -n 9 || exit 0; fi
 [ -d "$GITD" ] || git init -q --bare "$GITD"
+if [ -n "${GIT_SSH_COMMAND:-}" ] && [ "$(cat "$BASE/known_hosts" 2>/dev/null)" != "$GH_HOSTKEY" ]; then
+  printf '%s\n' "$GH_HOSTKEY" > "$BASE/known_hosts"; fi
 
 SHA=$(timeout 60 git ls-remote "$REPO" "refs/heads/$BRANCH" 2>/dev/null | cut -f1) || SHA=""
 if [ ${#SHA} != 40 ]; then echo "GitHub не ответил — сайт остаётся прежним"; exit 0; fi

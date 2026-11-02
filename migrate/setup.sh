@@ -322,7 +322,7 @@ apply_migs(){ mig_sql "$@" | docker exec -i supabase-db psql -q -v ON_ERROR_STOP
 MIG_DIR=$(mktemp -d); MIG_ALL=1
 for MIG_NAME in $MIGS; do
   MIG_OK=""
-  MIG_GH="https://raw.githubusercontent.com/H1NOMA/h1noma.github.io/$REF/migrate/$MIG_NAME"
+  MIG_GH="https://raw.githubusercontent.com/H1NOMA/KOMIK/$REF/migrate/$MIG_NAME"
   MIG_SITE="https://komikdnd.ru/migrate/$MIG_NAME"
   if [ -n "${KOMIK_REF:-}" ]; then MIG_SRC="$MIG_GH $MIG_SITE"; else MIG_SRC="$MIG_SITE $MIG_GH"; fi
   for u in $MIG_SRC; do
@@ -374,10 +374,17 @@ if [ "$KVCNT" != 0 ]; then
   else warn "kv: не удалось посчитать строки — восстановление пропускаю (данные не трогаю). Если таблица пустая — запусти setup.sh ещё раз"; fi
 else
   BK_DIR=$(mktemp -d); KV_SRC=""
+  # репозиторий закрытый: ветку backups читаем ключом сервера (site.sh deploy-key), без него — анонимно (пока открыт)
+  GH_KEY=/var/lib/komik-site/deploy_key
+  if [ -r "$GH_KEY" ]; then
+    GH_GIT="ssh://git@ssh.github.com:443/H1NOMA/KOMIK.git"; GH_KH=$(mktemp)
+    echo '[ssh.github.com]:443 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl' > "$GH_KH"
+    export GIT_SSH_COMMAND="ssh -i $GH_KEY -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$GH_KH -o ConnectTimeout=20"
+  else GH_GIT="https://github.com/H1NOMA/KOMIK.git"; fi
   if [ -n "${KOMIK_KV_FILE:-}" ]; then
     if [ -f "$KOMIK_KV_FILE" ]; then KV_SRC="$KOMIK_KV_FILE"; echo "  копия: $KOMIK_KV_FILE"; else warn "файла $KOMIK_KV_FILE нет"; fi
-  elif git clone -q --depth 1 --filter=blob:none --no-checkout --branch backups \
-         https://github.com/H1NOMA/h1noma.github.io "$BK_DIR/bk" 2>/dev/null; then
+  elif GIT_TERMINAL_PROMPT=0 git clone -q --depth 1 --filter=blob:none --no-checkout --branch backups \
+         "$GH_GIT" "$BK_DIR/bk" 2>/dev/null; then
     # частичный клон: список файлов, а скачивается одна — самая свежая — копия (за один день .gpg — после .json.gz)
     LAST=$(git -C "$BK_DIR/bk" ls-tree --name-only HEAD backups/ | grep -E '^backups/kv-[0-9-]+\.json\.gz(\.gpg)?$' | sort | tail -1 || true)
     if [ -n "$LAST" ] && git -C "$BK_DIR/bk" show "HEAD:$LAST" > "$BK_DIR/$(basename "$LAST")" 2>/dev/null; then
@@ -487,8 +494,10 @@ rm -rf "$MIG_DIR"
 
 say "9/9 · Пуш-функция и Caddy"
 mkdir -p "$SB_DIR/volumes/functions/notify-game"
-if curl -sSf -o "$SB_DIR/volumes/functions/notify-game/index.ts" \
-     https://raw.githubusercontent.com/H1NOMA/h1noma.github.io/main/supabase/functions/notify-game/index.ts; then
+# с сайта; он ещё не здесь или молчит — с GitHub (только пока репозиторий открыт)
+if curl -sSf -o "$SB_DIR/volumes/functions/notify-game/index.ts" https://komikdnd.ru/supabase/functions/notify-game/index.ts \
+   || curl -sSf -o "$SB_DIR/volumes/functions/notify-game/index.ts" \
+     https://raw.githubusercontent.com/H1NOMA/KOMIK/main/supabase/functions/notify-game/index.ts; then
   echo "  notify-game скачана ✓"
 else warn "не смог скачать notify-game — пуши не заработают"; fi
 docker compose up -d functions >/dev/null 2>&1 || docker compose up -d

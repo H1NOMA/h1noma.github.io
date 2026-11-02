@@ -41,7 +41,7 @@
 * **Сайт обновляет не root**, а `komik-site`: пишет только в `/var/lib/komik-site`, `/root` и `/home` не видит,
   система для него только для чтения (`ProtectSystem=strict`, `NoNewPrivileges`, фильтр системных вызовов…).
   Синк себя не обновляет: раньше любой пуш в `main` через минуту исполнялся на сервере от root.
-* **Копии базы зашифрованы** и снимаются на сервере: ветка `backups` публичная, а в копиях — листы игроков, заметки
+* **Копии базы зашифрованы** и снимаются на сервере: ветка `backups` лежит на GitHub, а в копиях — листы игроков, заметки
   ГМа, пуш-подписки. Ключа облака в workflow больше нет. Старые открытые копии — `RESTORE.md`, раздел 11.
 * **Сервисный ключ** в `setup.sh` передаётся curl файлом заголовков, а не в аргументах (их видно в `ps`).
 
@@ -190,8 +190,8 @@ commit;
 
 **Дыра.** `my_tag()` брал часть e-mail до `@` и не смотрел домен, а регистрация открыта (сайт сам вызывает
 `signUp`, автоподтверждение включено, анон-ключ публичный). Любой мог завести через API аккаунт
-`hinoma@gmail.com` — и получить права разработчика на запись любого ключа `kv` (приветствие выводится как HTML →
-хранимый XSS у всех посетителей), или `roman@gmail.com` — запись в чужие листы. То же в функции `notify-game`:
+`hinoma@example.com` — и получить права разработчика на запись любого ключа `kv` (приветствие выводится как HTML →
+хранимый XSS у всех посетителей), или `roman@example.com` — запись в чужие листы. То же в функции `notify-game`:
 разослать пуш всем подписчикам мог «hinoma» с любого домена.
 
 **Что меняет.** `my_tag()` отдаёт тег только для адреса вида `<тег>@komikdnd.ru` (иначе пустая строка — у такого
@@ -210,7 +210,7 @@ curl -fsS https://komikdnd.ru/migrate/2026-09-25-email-domain.sql | docker exec 
 ```sql
 begin;
 set local role authenticated;
-set local request.jwt.claims = '{"role":"authenticated","email":"hinoma@gmail.com"}';
+set local request.jwt.claims = '{"role":"authenticated","email":"hinoma@example.com"}';
 select public.my_tag();                                              -- '' (пусто)
 update public.kv set value = value where key = 'comik:hero:v1';      -- UPDATE 0
 rollback;

@@ -85,14 +85,12 @@ bash <(curl -fsS https://komikdnd.ru/migrate/push.sh) check
 
 1. Купи новый VPS: Ubuntu 22.04 или 24.04, от 2 ГБ памяти. Запиши его IP.
 2. У регистратора домена (Timeweb → домен → DNS) поменяй запись `cloud.komikdnd.ru` (тип A) на новый IP.
-   **Сайт шёл с умершего сервера** (настроен `site.sh`)? Тогда сразу же верни сайт на GitHub Pages — он откроется
-   (пока без облака), и команды ниже, которые качаются с `komikdnd.ru`, заработают:
-   * запись A для `komikdnd.ru` (@) — четыре адреса GitHub: `185.199.108.153`, `185.199.109.153`,
-     `185.199.110.153`, `185.199.111.153` (адрес сервера из неё убери);
-   * запись `www` — CNAME `h1noma.github.io`.
-
-   Не хочешь ждать DNS — те же команды можно брать прямо с GitHub: вместо `https://komikdnd.ru/migrate/…`
-   пиши `https://raw.githubusercontent.com/H1NOMA/h1noma.github.io/main/migrate/…`.
+   **Сайт шёл с умершего сервера** (настроен `site.sh`)? Тогда команды ниже, которые качаются с `komikdnd.ru`,
+   не откроются. Репозиторий закрытый — на время переезда открой его (GitHub → KOMIK → Settings → Danger Zone →
+   Change visibility → Public; секретов в нём нет) и бери команды прямо с GitHub: вместо
+   `https://komikdnd.ru/migrate/…` пиши `https://raw.githubusercontent.com/H1NOMA/KOMIK/main/migrate/…`.
+   Когда сайт на новом сервере поставлен (`site.sh`), выполни там `site.sh deploy-key` — он покажет новый ключ
+   и скажет, куда его добавить, — и закрой репозиторий обратно.
 3. В PowerShell — положи сохранённые файлы на новый сервер (имена важны). Первая строка — если сервер
    переустановлен на том же адресе (или адрес тебе уже попадался): компьютер забудет старый «отпечаток»
    сервера, иначе `scp` и `ssh` откажут с «REMOTE HOST IDENTIFICATION HAS CHANGED» (ответ «not found» —
@@ -354,7 +352,7 @@ gpg --batch --pinentry-mode loopback --passphrase-file /root/.komik-backup-pass 
 ## 11. Убрать старые открытые копии с GitHub
 
 До 29.10.2026 ветка `backups` хранила копии **открытым текстом** (листы игроков, заметки ГМа, пуш-подписки), а
-репозиторий публичный. Перезапись ветки (её делает workflow) убирает их из ветки, но GitHub ещё долго отдаёт
+репозиторий был публичным (с 2.11.2026 он закрытый и называется KOMIK). Перезапись ветки (её делает workflow) убирает их из ветки, но GitHub ещё долго отдаёт
 старые коммиты по прямой ссылке (по SHA). Поэтому:
 
 1. Дождись, пока зашифрованные копии заработают: Actions → «Бэкап базы (зашифрованная копия kv)» — зелёный,
@@ -362,12 +360,12 @@ gpg --batch --pinentry-mode loopback --passphrase-file /root/.komik-backup-pass 
    Прежние открытые копии при этом не пропадают как точки возврата: `push.sh` при первом запуске перенёс их на сервер
    зашифрованными. Проверь, что `bash <(curl -fsS https://komikdnd.ru/migrate/restore.sh)` показывает и прошлые
    даты (до 29.10), — только после этого пиши в поддержку.
-2. Список старых коммитов ветки: на GitHub — `https://github.com/H1NOMA/h1noma.github.io/activity?ref=backups`
+2. Список старых коммитов ветки: на GitHub — `https://github.com/H1NOMA/KOMIK/activity?ref=backups`
    (там видны перезаписи ветки с прежними SHA). Не обязательно собирать все — достаточно написать «все прежние
    коммиты ветки backups».
 3. Запрос в поддержку GitHub: https://support.github.com/contact → тема **«Remove cached views / unreachable commits
    (sensitive data)»**. Текст, например:
-   > Repository: H1NOMA/h1noma.github.io (public). Branch `backups` contained database snapshots with personal data
+   > Repository: H1NOMA/KOMIK (formerly H1NOMA/h1noma.github.io, public until 2026-11-02). Branch `backups` contained database snapshots with personal data
    > (files `backups/kv-*.json.gz`) until 2026-10-29. The branch has been force-pushed and now contains only encrypted
    > files. Please remove cached views and garbage-collect the unreachable commits that contained `backups/kv-*.json.gz`
    > (all previous commits of branch `backups`, e.g. <SHA из пункта 2>).

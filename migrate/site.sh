@@ -9,6 +9,8 @@
 #    bash <(curl -fsS https://komikdnd.ru/migrate/site.sh)         — поставить/обновить; ждёт, пока DNS укажет сюда
 #    bash <(curl -fsS https://komikdnd.ru/migrate/site.sh) check   — проверить, всё ли работает
 #    bash <(curl -fsS https://komikdnd.ru/migrate/site.sh) off     — убрать сайт из Caddy (если DNS вернули на GitHub)
+#    bash <(curl -fsS https://komikdnd.ru/migrate/site.sh) deploy-key — ключ сервера для закрытого репозитория
+#         (только чтение): создаёт, показывает, ждёт, пока его добавят на GitHub, проверяет и ставит синк заново
 #    bash site.sh render <папка>  — только записать в папку блок Caddy и юниты, ничего не ставя (проверка, без root)
 #  Повторный запуск безопасен; он же переводит прежнюю установку (синк от root) на служебного пользователя.
 #  Что ставит: git, brotli, zstd, dnsutils; служебного пользователя komik-site (без шелла и sudo) — хозяина
@@ -28,6 +30,12 @@ LIVE="$BASE/live"                                   # её переключае�
 WEBROOT="${KOMIK_SITE_ROOT:-/var/www/komik}"        # её отдаёт Caddy: постоянная ссылка (root) → $LIVE
 SYNC="${KOMIK_SITE_SELF:-/usr/local/bin/komik-site-sync}"
 UNITS="${KOMIK_SYSTEMD_DIR:-/etc/systemd/system}"
+# закрытый репозиторий читаем ключом сервера (только чтение), без него — анонимно, пока репозиторий открыт.
+# Ключ GitHub закреплён (тот же, что в site-sync.sh): SHA256:+DiY3wvvV6TuJJhbpZisF/zLDA0zPMSvHdkr4UvCOqU
+KEY="$BASE/deploy_key"
+GH_SSH="ssh://git@ssh.github.com:443/H1NOMA/KOMIK.git"
+GH_HTTPS="https://github.com/H1NOMA/KOMIK.git"
+GH_HOSTKEY='[ssh.github.com]:443 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl'
 NS=ns1.timeweb.ru                 # DNS komikdnd.ru — у Timeweb: спрашиваем сам источник, без кэшей провайдера
 GH_IPS="185.199.108.153 185.199.109.153 185.199.110.153 185.199.111.153"
 ME="bash <(curl -fsS https://komikdnd.ru/migrate/site.sh)"
@@ -42,8 +50,8 @@ site_block(){ local www=$1
 # komik-site:begin — сайт КОМИК с этого сервера (migrate/site.sh). Руками не править: скрипт перезапишет
 $DOMAIN {
 	root * $WEBROOT
-	# служебные файлы (.github и т.п.) не отдаём
-	@hidden path /.*
+	# служебные файлы (.github и т.п.), тесты и описания не отдаём; скрипты и миграции нужны серверам — их отдаём
+	@hidden path /.* /tests /tests/* *.md
 	respond @hidden 404
 	header {
 		# браузер год ходит сюда только по https (без preload: из списка браузеров потом не выйти быстро)
@@ -177,6 +185,15 @@ caddy_apply(){ # caddy_apply <новый Caddyfile>: проверить, под�
 }
 https_ok(){ curl -sS --noproxy '*' -o /dev/null -w '%{http_code}' --max-time 15 --resolve "$1:443:127.0.0.1" "https://$1/sw.js" 2>/dev/null | grep -qx 200; }
 
+# коммит main на GitHub: ключом сервера от его пользователя (он и читает репозиторий), иначе анонимно
+gh_head(){
+  if [ -s "$KEY" ]; then
+    (cd "$BASE" && printf '%s\n' "$GH_HOSTKEY" > "$BASE/known_hosts.check" && timeout 40 runuser -u "$SITE_USER" -- env HOME="$BASE" \
+      GIT_SSH_COMMAND="ssh -i $KEY -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$BASE/known_hosts.check -o ConnectTimeout=20" \
+      git ls-remote "$GH_SSH" refs/heads/main 2>/dev/null | cut -f1) || true
+  else timeout 30 git ls-remote "$GH_HTTPS" refs/heads/main 2>/dev/null | cut -f1 || true; fi
+}
+
 check(){
   say "Проверка"
   local IP A GH LIVE_SHA U S=0
@@ -189,7 +206,8 @@ check(){
   if systemctl is-failed -q komik-site.service; then bad "последнее обновление упало: journalctl -u komik-site -n 20"; S=1; fi
   if [ "$(readlink "$WEBROOT" 2>/dev/null || true)" != "$LIVE" ]; then bad "$WEBROOT не ведёт на $LIVE — сайт перестанет обновляться: запусти $ME"; S=1; fi
   LIVE_SHA=$(basename "$(readlink -f "$WEBROOT" 2>/dev/null || echo нет)")
-  GH=$(timeout 30 git ls-remote "https://github.com/H1NOMA/h1noma.github.io.git" refs/heads/main 2>/dev/null | cut -f1 || true)
+  GH=$(gh_head)
+  if [ -s "$KEY" ]; then ok "ключ сервера для закрытого репозитория есть ($KEY.pub)"; fi
   if [ -n "$GH" ] && [ "$LIVE_SHA" = "$GH" ]; then ok "на сервере свежая версия сайта (${GH:0:7})"
   elif [ -z "$GH" ]; then warn "GitHub не ответил — версию не сверить (на сервере ${LIVE_SHA:0:7})"
   else warn "на сервере ${LIVE_SHA:0:7}, на GitHub ${GH:0:7} — обычно догоняет за минуту (journalctl -u komik-site -n 20)"; fi
@@ -208,6 +226,28 @@ check(){
 }
 
 if [ "${1:-}" = check ]; then check; exit 0; fi
+# ключ для закрытого репозитория: создать (от пользователя синка — секрет только у него), показать, дождаться,
+# пока владелец добавит его на GitHub, проверить; дальше — обычная установка, она поставит синк, читающий ключом
+if [ "${1:-}" = deploy-key ]; then
+  say "Ключ сервера для репозитория (только чтение)"
+  id -u "$SITE_USER" >/dev/null 2>&1 && [ -d "$BASE" ] || { bad "сайт ещё не поставлен — сначала: $ME"; exit 1; }
+  command -v ssh-keygen >/dev/null || apt-get install -yq openssh-client >/dev/null
+  chown "$SITE_USER:" "$BASE"
+  if [ ! -s "$KEY" ]; then
+    (cd "$BASE" && runuser -u "$SITE_USER" -- ssh-keygen -q -t ed25519 -N '' -C "komik-site@$(hostname)" -f "$KEY")
+    ok "ключ создан; секретная часть остаётся на сервере ($KEY)"
+  else ok "ключ уже есть"; fi
+  printf '\n  GitHub → репозиторий KOMIK → Settings → Deploy keys → Add deploy key\n'
+  printf '  Title: komik-site · Key — строка ниже целиком · «Allow write access» НЕ отмечать\n\n'
+  cat "$KEY.pub"; echo
+  for try in 1 2 3; do
+    read -r -p "Добавил ключ на GitHub? Enter — проверю доступ… " _ < /dev/tty
+    GH=$(gh_head)
+    if [ ${#GH} = 40 ]; then ok "GitHub пускает по ключу: main = ${GH:0:7}"; break; fi
+    bad "GitHub пока не пускает (ключ не добавлен в KOMIK, или репозиторий ещё называется по-старому)"
+    [ $try = 3 ] && { echo "Запусти ещё раз, когда добавишь: $ME deploy-key"; exit 1; }
+  done
+fi
 if [ "${1:-}" = off ]; then
   say "Убираю сайт из Caddy"
   T=$(mktemp); caddy_without_block > "$T"; caddy_apply "$T"
@@ -243,8 +283,11 @@ flock -w 900 "$BASE/lock" true 2>/dev/null || true
 
 say "3/5 · Синк и защита systemd"
 T=$(mktemp); SYNC_OK=""
-if curl -fsS --max-time 60 -o "$T" "https://raw.githubusercontent.com/H1NOMA/h1noma.github.io/$REF/migrate/site-sync.sh" \
-   || curl -fsS --max-time 60 -o "$T" "https://$DOMAIN/migrate/site-sync.sh"; then
+# с сайта (он отдал и этот скрипт); явно заданная ветка или сайт молчит — с GitHub (только пока репозиторий открыт)
+SYNC_SRC="https://$DOMAIN/migrate/site-sync.sh https://raw.githubusercontent.com/H1NOMA/KOMIK/$REF/migrate/site-sync.sh"
+if [ -n "${KOMIK_REF:-}" ]; then SYNC_SRC="https://raw.githubusercontent.com/H1NOMA/KOMIK/$REF/migrate/site-sync.sh https://$DOMAIN/migrate/site-sync.sh"; fi
+GOT=""; for u in $SYNC_SRC; do curl -fsS --max-time 60 -o "$T" "$u" && grep -q 'deploy_key' "$T" && { GOT=1; break; }; done
+if [ -n "$GOT" ]; then
   # хозяин — root: служебный пользователь свою программу поменять не может
   bash -n "$T" && grep -q 'komik-site-sync' "$T" && install -m 755 -o root -g root "$T" "$SYNC" && SYNC_OK=1
 fi
