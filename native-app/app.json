@@ -1,0 +1,61 @@
+{
+  "expo": {
+    "name": "КОМИК",
+    "slug": "komik",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "komik",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0c110d"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "ru.komikdnd.app",
+      "associatedDomains": [
+        "applinks:komikdnd.ru"
+      ],
+      "buildNumber": "1"
+    },
+    "android": {
+      "package": "ru.komikdnd.app",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "komikdnd.ru"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ],
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0c110d"
+      }
+    },
+    "icon": "./assets/icon.png",
+    "notification": {
+      "icon": "./assets/notification-icon.png",
+      "color": "#d3a84a"
+    },
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#d3a84a"
+        }
+      ]
+    ]
+  }
+}
