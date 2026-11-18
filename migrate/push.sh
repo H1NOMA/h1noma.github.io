@@ -31,7 +31,7 @@ BK_PASS=/root/.komik-backup-pass
 SITE_PUB="BJjgF7Dfj-PGEBho4AK_eec8YivMgnT5Oux8KdfLOx3sDcqpEBJ22tYzdsQ0fhx3S5IlRr-y3zTqsnOszzEpFI4"
 
 # ── Caddy для облака: наружу только API сайта, HSTS; стандартный «:80» убираем ──
-# ТОТ ЖЕ блок пишет setup.sh: правишь здесь — правь и там (tests/README.md сверяет их render).
+# ТОТ ЖЕ блок пишет setup.sh: правишь здесь — правь и там.
 # Путь сверяем «сырым» — таким, каким он уйдёт на шлюз: только /rest|auth|functions|realtime/v1/…, с учётом
 # регистра, без %-кодов, «.», «..» и «//». Иначе шлюз (Envoy) понял бы путь не так, как Caddy, и запрос вроде
 # /REST/v1/ или /x/..%2frest/v1/ ушёл бы мимо API — на Studio (корень /, полный доступ к базе)
@@ -94,7 +94,7 @@ caddy_apply(){ # caddy_apply <новый Caddyfile>: проверить, под�
     bad "Caddy не принял настройки — вернул прежние"; return 1
   fi
 }
-# для проверки (tests/README.md): каким станет Caddyfile — без root, ничего не меняя
+# для проверки: каким станет Caddyfile — без root, ничего не меняя
 if [ "${1:-}" = render ]; then caddy_cloud_new; exit 0; fi
 
 [ "$(id -u)" = 0 ] || { echo "Запусти от root: ssh root@<IP>"; exit 1; }

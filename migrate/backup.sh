@@ -19,7 +19,7 @@
 #   · заодно — уборка копий в /root старше недели (kv-before-restore-*, kv-before-push-*, auth-* кроме самой свежей),
 #     журнала правок kv_history (не дольше 7 дней) и следов аккаунтов, удалённых самими игроками (10-30).
 #  Расшифровать вручную — migrate/RESTORE.md, раздел 10.
-#  Песочница (без root и без docker; tests/README.md):
+#  Песочница (без root и без docker):
 #    KOMIK_BK_DIR=… KOMIK_BK_PASS=… KOMIK_BK_DUMP_CMD='cat kv.json' KOMIK_BK_NOPRUNE=1 bash migrate/backup.sh
 # ══════════════════════════════════════════════════════════════════
 set -euo pipefail

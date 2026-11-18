@@ -5,7 +5,7 @@
 const { launch, openPage, login, mock, rows, check, done } = require('./lib');
 
 (async () => {
-  if (!(await mock('/__mock/fail', 'POST', {})).pg) { console.log('пропущено: нужен стенд на настоящей базе (mock_cloud.py --pg, tests/README.md)'); return; }
+  if (!(await mock('/__mock/fail', 'POST', {})).pg) { console.log('пропущено: нужен стенд на настоящей базе (mock_cloud.py --pg)'); return; }
   const b = await launch();
   const seed = await mock('/__mock/rows');
   const now = Date.now(), r0 = Object.fromEntries(seed.map(r => [r.key, r.value]));

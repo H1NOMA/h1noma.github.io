@@ -21,7 +21,7 @@
 #     половину старой и половину новой версии. Хранятся текущая и предыдущая выкладки.
 #   GitHub недоступен или что-то упало — сайт остаётся прежним, в следующую минуту попробуем снова.
 #   Раз в сутки — уборка мусора git (копии в /root чистит komik-backup: сюда /root не виден).
-#  Песочница (без root, tests/README.md): KOMIK_SITE_BASE=… KOMIK_SITE_LIVE=… KOMIK_SITE_NOPRUNE=1 bash migrate/site-sync.sh
+#  Песочница (без root): KOMIK_SITE_BASE=… KOMIK_SITE_LIVE=… KOMIK_SITE_NOPRUNE=1 bash migrate/site-sync.sh
 # ══════════════════════════════════════════════════════════════════
 set -euo pipefail
 BRANCH="${KOMIK_SITE_BRANCH:-main}"

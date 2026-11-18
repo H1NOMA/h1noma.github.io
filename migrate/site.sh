@@ -150,7 +150,7 @@ WantedBy=timers.target
 EOF
 }
 
-# для проверки (tests/README.md): что запишется — без root и ничего не трогая
+# для проверки: что запишется — без root и ничего не трогая
 if [ "${1:-}" = render ]; then
   D="${2:?куда писать: site.sh render <папка>}"
   site_block 1 > "$D/komik-site.caddy"

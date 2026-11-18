@@ -20,7 +20,7 @@ say(){ printf '\n\033[1;32m══ %s\033[0m\n' "$*"; }
 warn(){ printf '\033[1;33m⚠ %s\033[0m\n' "$*"; }
 bad(){ printf '\033[1;31m✗ %s\033[0m\n' "$*"; }
 ok(){ printf '  %s ✓\n' "$*"; }
-# пути — переменными только для проверки в песочнице (tests/README.md); на сервере — как есть
+# пути — переменными только для проверки в песочнице; на сервере — как есть
 AK="${KOMIK_SSH_AUTHKEYS:-/root/.ssh/authorized_keys}"
 SSHD_CFG="${KOMIK_SSHD_CONFIG:-/etc/ssh/sshd_config}"
 DROPIN="${KOMIK_SSHD_DROPIN:-/etc/ssh/sshd_config.d/00-komik.conf}"
