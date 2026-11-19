@@ -1690,8 +1690,8 @@
   .inv-add input[type=number]{flex:0 0 62px;width:62px}
   .inv-add button{flex:0 0 auto;background:var(--red);color:#0b0b0e;border:none;border-radius:9px;padding:0 15px;font-family:var(--f-disp);font-weight:700;font-size:1rem;cursor:pointer}
   .ob-card{position:relative;border:var(--hair) solid var(--line2);border-radius:var(--r-md);background:var(--surface);padding:16px;margin:14px 0}
-  .ob-title{font-family:var(--f-mono);font-size:.72rem;letter-spacing:.18em;color:var(--red-ink);text-transform:uppercase;margin-bottom:10px}
-  .ob-steps{margin:0 0 12px 18px;display:flex;flex-direction:column;gap:7px;font-size:.86rem;color:var(--muted)}
+  .ob-title{margin:0;font-family:var(--f-mono);font-size:.78rem;font-weight:500;letter-spacing:.12em;color:var(--red-ink);text-transform:uppercase}
+  .ob-steps{margin:0 0 12px 18px;display:flex;flex-direction:column;gap:7px;font-size:.9rem;color:var(--dim)}
   .ob-steps b{color:var(--txt)}
   .ob-x{position:absolute;top:4px;right:4px;width:40px;height:40px;border-radius:50%;background:none;border:none;color:var(--dim);cursor:pointer;font-size:.9rem}
   /* две кнопки в ряд — только когда обе влезают: в узкой колонке новостей (1340–1599, открытый карман)
@@ -1731,8 +1731,9 @@
   @keyframes kbDrop{0%{opacity:0}20%{opacity:1}100%{opacity:0;transform:translateY(16px)}}
   @media (prefers-reduced-motion:reduce){.kubik *{animation:none!important}}
   .pl-kub{width:92px;margin:0 auto 12px}
-  .ob-head{display:flex;align-items:center;gap:10px}
-  .ob-kub{width:46px;flex:none;margin:-6px 0 -4px -4px}
+  .ob-head{display:flex;align-items:center;gap:10px;margin:-10px 28px 6px 0}
+  /* Внутри viewBox центр видимой кости чуть ниже центра самого SVG. */
+  .ob-kub{width:46px;flex:none;margin-left:-4px;position:relative;top:-2px}
   .dr-kubwrap{animation:none;gap:2px}
   /* под броском — мягкое затемнение, чтобы Кубик и число не терялись на тексте ленты */
   .dice-result.show:has(.dr-kubwrap){background:radial-gradient(70% 50% at 50% 50%,rgba(6,7,10,.78),rgba(6,7,10,.5) 75%);animation:fade .2s}
@@ -2485,7 +2486,7 @@
   .news-card .nbody{padding:13px 15px 12px}
   .news-card h3{overflow-wrap:anywhere;font-family:var(--f-disp);font-weight:600;font-size:1rem;line-height:1.3;color:var(--txt);margin:0 0 5px}
   .news-card p{overflow-wrap:anywhere;font-size:.86rem;line-height:1.5;color:var(--dim);margin:0 0 8px}
-  .news-card time{display:block;font-family:var(--f-mono);font-size:.62rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+  .news-card time{display:block;font-family:var(--f-mono);font-size:.75rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
   .news-full .nimg-full{margin:0 -18px 14px;overflow:hidden}
   @media(min-width:880px){.news-full .nimg-full{margin:0 -30px 14px}}
   .news-full .nimg-full img{width:100%;display:block;
@@ -6307,7 +6308,7 @@ function updateOnboard(){
   // кнопки — в карточке, поэтому M: главная L на экране одна — «Записаться на игру»
   el.innerHTML=`<div class="ob-card">
     <button class="ob-x" onclick="obDismiss()" aria-label="Скрыть">✕</button>
-    <div class="ob-head"><div class="kubik ob-kub" data-kub="hello"></div><div class="ob-title">С чего начать</div></div>
+    <div class="ob-head"><div class="kubik ob-kub" data-kub="hello"></div><h2 class="ob-title">С чего начать</h2></div>
     <ol class="ob-steps">
       <li><b>Создай аккаунт</b> — в нём персонажи и записи.</li>
       <li><b>Собери персонажа</b> — статы посчитает калькулятор.</li>
