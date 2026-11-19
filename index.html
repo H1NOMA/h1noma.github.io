@@ -93,7 +93,7 @@
   [data-project="gw"] body::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;background:
     radial-gradient(circle at 50% 40%, transparent 50%, rgba(0,0,0,.6) 100%),
     radial-gradient(120% 50% at 50% -10%, rgba(255,210,63,.07), transparent 60%)}
-  [data-project="gw"] .brand .komik,[data-project="gw"] .dr-logo{filter:sepia(1) saturate(2.6) hue-rotate(8deg) brightness(1.1) contrast(1.05) drop-shadow(0 0 8px rgba(255,210,63,.35))}
+  [data-project="gw"] .brand .komik{filter:sepia(1) saturate(2.6) hue-rotate(8deg) brightness(1.1) contrast(1.05) drop-shadow(0 0 8px rgba(255,210,63,.35))}
   [data-project="terra"]{
     --red:#e8dcbf; --red-dim:#cbbf9d; --red-soft:rgba(232,220,191,.2);
     --glow:rgba(232,220,191,.1); --accent-rgb:232,220,191;
@@ -3668,18 +3668,15 @@ html.dr-live body{overflow-x:clip}
 }
 
 .dr-top{padding:2px 20px 16px}
-/* логотип берём из уже готовой переменной --logo-url — картинка не дублируется в файле */
-.dr-logo{display:block;height:30px;width:100%;max-width:150px;
-  background:var(--logo-url) left center/contain no-repeat;
-  opacity:.95;transition:opacity .2s,transform .2s,filter .35s ease;
-  /* логотип подкрашивается под сеттинг теми же фильтрами, что и в подвале */
-  filter:drop-shadow(0 0 8px rgba(255,46,61,.28))}
-[data-project="classic"] .dr-logo{filter:sepia(1) saturate(1.9) hue-rotate(3deg) brightness(1.05) contrast(1.02) drop-shadow(0 0 8px rgba(211,168,74,.35))}
-[data-project="legacy"] .dr-logo{filter:grayscale(1) sepia(1) saturate(3) hue-rotate(208deg) brightness(1.22)}
-[data-project="neverland"] .dr-logo{filter:grayscale(1) sepia(1) saturate(2.4) hue-rotate(-12deg) brightness(1.42) contrast(1)}
-[data-project="terra"] .dr-logo{filter:sepia(.75) saturate(.9) brightness(.95) contrast(1.12)}
-[data-project="skazki"] .dr-logo{filter:grayscale(1) sepia(1) saturate(2.4) hue-rotate(58deg) brightness(1.18)}
-.dr-logo:hover{opacity:1;transform:translateY(-1px)}
+.dr-logo{display:block;height:36px;width:100%;max-width:150px;transition:transform .2s}
+.dr-logo::before{content:"";display:block;height:100%;background:var(--logo-url) left center/contain no-repeat}
+@supports (mask-image:url("")) or (-webkit-mask-image:url("")){
+  .dr-logo::before{background:var(--red);filter:brightness(.9);
+    -webkit-mask:var(--logo-url) left center/contain no-repeat;
+    mask:var(--logo-url) left center/contain no-repeat}
+  :root[data-a11y="contrast"] .dr-logo::before{filter:none}
+}
+.dr-logo:hover{transform:translateY(-1px)}
 .dr-list{flex:1;overflow-y:auto;overscroll-behavior:contain;padding:0 12px;display:flex;flex-direction:column;gap:2px}
 /* низ шторки: аватар слева, действие справа */
 .dr-bottom{padding:12px 8px 2px;margin:6px 12px 0;border-top:var(--hair) solid var(--line);
