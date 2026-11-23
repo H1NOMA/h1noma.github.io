@@ -2,7 +2,7 @@
    Сама страница — network-first: онлайн всегда свежий код, по таймауту (NAV_TIMEOUT) или без сети —
    копия из версионного кэша, прогретая при установке. Статика (шрифты, библиотека облака, данные,
    картинки) — stale-while-revalidate: мгновенно из кэша, а в фоне тихо перекачиваем свежую. */
-const CACHE = 'comik-v315';
+const CACHE = 'comik-v316';
 // Статика (шрифты, иконки, данные, фоны) живёт в ОТДЕЛЬНОМ кэше, который не сбрасывается при смене
 // версии: раньше каждое обновление кода стирало и шрифты с картинками, и на телефоне первый запуск
 // новой версии шёл без них, пока всё не перекачается заново. Обновляются они сами (stale-while-revalidate).
@@ -19,7 +19,7 @@ const STATIC = 'comik-static-v1';
 // Шрифты — только файлы, которые страница реально запрашивает (проверено по сетевым запросам во всех
 // темах и разделах): подмножества latin и cyrillic; latin-ext/cyrillic-ext, Chakra Petch 500 и
 // Rajdhani 600 не грузятся вовсе. Без них офлайн-старт открывался системным шрифтом.
-const PRECACHE = ['manifest.webmanifest', 'fonts.css?v=315', 'supabase.js', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png',
+const PRECACHE = ['manifest.webmanifest', 'fonts.css?v=316', 'supabase.js', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png',
   'img/logo-komik.png', 'img/badge-96.png', 'img/chrono-gw.jpg', 'img/team-1.jpg', 'img/team-2.jpg', 'img/team-3.jpg', 'img/team-4.jpg', 'img/team-5.jpg',
   'data/hero.json', 'data/chrono.json',
   ...['classic','terra','legacy','neverland','assimilation','komik','komikw','komikn'].map(k => 'manifest-' + k + '.webmanifest'),
@@ -129,6 +129,7 @@ self.addEventListener('fetch', e => {
         // браузера (GitHub Pages отдаёт index.html с max-age), и «обновить» первые минуты
         // возвращало ту же сборку. Условный запрос с ETag стоит один заголовок, а не мегабайт.
         const network = fetch(new Request(e.request.url, {cache:'no-cache', credentials:'same-origin', mode:'same-origin'})).then(async res => {
+          if(res.status>=500 && key===root.href) return (await fromCache()) || res;
           if (res && res.ok) {
             const prev = await cache.match(key).catch(() => null);
             const changed = !!prev && (prev.headers.get('etag') || prev.headers.get('content-length') || '') !==

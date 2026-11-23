@@ -39,7 +39,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="КОМИК">
 <!-- Шрифты вшиты локально (fonts/) — сайт открывается без VPN, без обращений к Google -->
-<link href="fonts.css?v=315" rel="stylesheet">
+<link href="fonts.css?v=316" rel="stylesheet">
 <!-- Библиотека облака (supabase.js, ~200 КБ) начинает качаться сразу, не дожидаясь разбора 1,2 МБ HTML:
      сама страница подключает её скриптом только на старте (supaLoadLib), и без preload она стартовала
      последней. Свой домен (CSP script-src 'self'), crossorigin не нужен; после fonts.css — чтобы не
@@ -585,6 +585,8 @@
   .players-sep{grid-column:1/-1;font-family:var(--f-mono);font-size:.62rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:10px 0 2px;padding-top:10px;border-top:1px solid var(--line)}
   .ptile:hover{transform:translateY(-2px);border-color:rgba(var(--accent-rgb),.5);box-shadow:0 10px 26px rgba(0,0,0,.35)}
   .ptile:active{transform:scale(.98)}
+  .ptile{padding:0;font:inherit;color:inherit}
+  .pt-name,.pt-sub{display:block}
   .ptile.mine{border-color:rgba(var(--accent-rgb),.4)}
   .pt-ava{position:relative;aspect-ratio:1/1;width:100%;overflow:hidden;background:var(--surface);display:flex;align-items:center;justify-content:center}
   /* карточка без фото — не тянем пустой квадрат под одну букву, делаем компактную полосу */
@@ -2478,6 +2480,9 @@
   .news-feed{display:flex;flex-direction:column;gap:12px;margin-top:16px}
   .news-card{background:var(--surface);border:var(--hair) solid var(--line);border-radius:16px;overflow:hidden;cursor:pointer;transition:transform .2s var(--spring)}
   .news-card:active{transform:scale(.985)}
+  .news-open{border:0;padding:0;background:transparent;font:inherit;color:inherit;text-align:inherit;cursor:pointer}
+  .news-open::after{content:"";position:absolute;inset:0}
+  .news-card:has(.news-open:focus-visible){outline:2px solid var(--red-ink);outline-offset:2px}
   .news-card .nimg{aspect-ratio:16/9;overflow:hidden;background:transparent}
   /* нижний край снимка растворяется в фоне карточки — картинка перетекает в задник */
   .news-card .nimg img{width:100%;height:100%;object-fit:cover;display:block;
@@ -3219,7 +3224,7 @@
   .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
   .cd{aspect-ratio:1;border:none;background:none;padding:0;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--muted);font-family:var(--f-mono);font-size:.82rem;position:relative;cursor:default}
   .cd i{font-style:normal;display:flex;align-items:center;justify-content:center;width:100%;height:100%;border-radius:50%}
-  .cd.past{opacity:.5}
+  .cd:not(.past):not(.has):not(.today){color:var(--dim)}
   .cd.today i{color:var(--red-ink);font-weight:700;box-shadow:inset 0 0 0 1px rgba(var(--accent-rgb),.55)}
   .cd.has{background:var(--ring);padding:2.5px;cursor:pointer;color:var(--txt);opacity:1}
   .cd.has i{background:var(--surface);font-weight:700}
@@ -3552,13 +3557,25 @@
   /* печать листа персонажа: классический бланк D&D — на экране скрыт, в печати только он */
   #printSheet{display:none}
   @media print{
-    /* критично: тёмный фон-градиент и сканлайны живут в body::before/::after (псевдоэлементы),
-       их не убирает body>*{display:none} — из-за них в PDF были чёрные квадраты. Гасим явно. */
-    html,body{background:#fff !important}
+    html,body{background:#fff !important;min-height:0}
+    body{--txt:#111;--dim:#333;--muted:#555;--red-ink:#222;--bg:#fff;--bg2:#fff;--surface:#fff;--surface2:#fff;--line:#bbb;--line2:#999}
     body::before,body::after{display:none !important;content:none !important;background:none !important}
-    body>*{display:none !important}
+    body:has(> #printSheet)>:not(#printSheet){display:none !important}
     /* плавающие элементы задаются классами (перебивают body>*) — гасим их явно */
-    #ambient,.glitch-overlay,.splash,.scrim,.vit-drawer,.ma-drawer,.botnav,.search-float,.dice-circle,.bm-circle,#importCircle,.music-bar,.dice-menu,.dice-calc,.fab-side,#notchBrand,.toast{display:none !important}
+    body:not(:has(> #printSheet))>:not(#appPane):not(.scrim){display:none !important}
+    html body #appPane{margin:0;padding:0;transform:none;box-shadow:none;min-height:0}
+    #appPane main,#appPane .view.active{min-height:0;padding:0}
+    #appPane .view:not(.active){display:none !important}
+    #view-world #secFilter{display:none}
+    #view-world .cat{aspect-ratio:auto;flex-direction:row;min-height:9mm;background:#fff;color:#111;box-shadow:none}
+    #view-world .cat .clab{font-size:9pt}
+    #view-world #deskDir .dd-grid{display:block;columns:2;column-gap:6mm}
+    #view-world #deskDir .dd-col{break-inside:avoid;margin:3mm 0}
+    #view-world #deskDir .dd-it{display:flex;width:100%;justify-content:space-between;background:#fff;color:#222;border:0;padding:1mm}
+    #appPane header,#appPane footer,#ambient,.glitch-overlay,.splash,.vit-drawer,.ma-drawer,.botnav,.search-float,.dice-circle,.bm-circle,#importCircle,.music-bar,.dice-menu,.dice-calc,.fab-side,#notchBrand,.toast{display:none !important}
+    body:has(.scrim.open) #appPane,body:has(#scrim2.open) #scrim{display:none !important}
+    .scrim.open,.scrim.open .modal{position:static;display:block;overflow:visible;max-height:none;animation:none;padding:0;backdrop-filter:none}
+    .scrim.open .modal>.x{display:none}
     #printSheet{display:block !important;background:#fff;color:#000;font-family:Georgia,'Times New Roman',serif;font-size:9.5pt;line-height:1.25;-webkit-print-color-adjust:exact;print-color-adjust:exact}
     #printSheet *{color:#000;background:transparent;box-shadow:none;text-shadow:none}
     /* многостраничный лист: каждая .psh-page — отдельная страница A4 */
@@ -6162,6 +6179,8 @@ async function boot(){
   renderAll();
   window.__bootReady=true;   // облачные данные слиты и отрисованы — заставку можно убирать
   updateDevUI();
+  if(history.state?.komikView) go(history.state.komikView,{fromHistory:true});
+  else history.replaceState({...history.state,komikView:'news'},'');
   if(typeof pushDeepLinkFromUrl==='function') pushDeepLinkFromUrl();   // открытие по ссылке из уведомления
   if(typeof pushHeal==='function') setTimeout(()=>pushHeal(), 4000);    // подписка на пуши чинит себя сама (ключ сервера, список рассылки)
   bmCloudSync();
@@ -6551,6 +6570,10 @@ function renderCardList(){
    из ARCHIVE/CATS активного сеттинга, так что панель всегда «своего» мира. */
 let MA_CAT='all', MA_SUB=null, MA_Q='', MA_SCROLL=0, MA_SHOWN=80, MA_DISMISSED=false;
 const MA_PAGE=80;
+const MA_WIDE=matchMedia('(min-width:1180px)');
+MA_WIDE.addEventListener('change',e=>{
+  if(!e.matches && document.querySelector('#miniArch.open')) closeMiniArch();
+});
 function openMiniArch(){
   const d=document.getElementById('miniArch'); if(!d) return;   // работает и на десктопе, и на мобилке
   maRender();
@@ -6608,7 +6631,7 @@ function maRenderCards(){
   const el=document.getElementById('maCards'); if(!el) return;
   if(assimArchLocked()){ el.innerHTML=`<div class="ma-empty">Архив этого сеттинга пока закрыт</div>`; return; }
   const q=searchNorm(MA_Q);
-  if(MA_CAT==='all' && !q){ el.innerHTML=`<div class="ma-empty">Выберите раздел слева<br>или начните поиск</div>`; return; }
+  if(MA_CAT==='all' && !q){ el.innerHTML=`<div class="ma-empty">Выберите раздел<br>или начните поиск</div>`; return; }
   let list=ARCHIVE.filter(e=>{
     if(MA_CAT!=='all' && e.cat!==MA_CAT) return false;
     if(MA_SUB && e.sub!==MA_SUB) return false;
@@ -7003,7 +7026,16 @@ function openBookmarks(){
     ${hidden>0?`<p class="note" style="margin-top:12px">Ещё ${hidden} закл. относятся к другим играм — переключи игру в шапке, чтобы увидеть их.</p>`:''}`;
   document.getElementById('scrim').classList.add('open');
 }
-function closeModal(){ closeVitrine(); document.getElementById('scrim').classList.remove('open'); try{ tickSoon(800); }catch(e){} }   // пока окно было открыто, фоновая синхронизация стояла
+function closeModal(){
+  closeVitrine();
+  document.getElementById('scrim').classList.remove('open');
+  if(newsOpener){
+    const button=document.querySelector('.news-open[data-id="'+CSS.escape(newsOpener.dataset.id)+'"]');
+    button?.focus({preventScroll:true});
+    newsOpener=null;
+  }
+  try{ tickSoon(800); }catch(e){}
+}
 function openTerms(overlay){
   document.getElementById(overlay?'modal2':'modal').innerHTML = `
     <button class="x" onclick="${overlay?'closeOverlay()':'closeModal()'}" aria-label="Закрыть">✕</button>
@@ -7803,18 +7835,20 @@ function renderNews(){
   w.dataset.newsSig=sig;
   if(!feed.length){ w.innerHTML=''; return; }   // без подсказки: пустая лента ничего не показывает
   w.innerHTML=feed.map(n=>`
-    <article class="news-card" onclick="openNews('${n.id}')">
+    <article class="news-card">
       ${n.img?`<div class="nimg">${imgTag(n.img)}</div>`:''}
       <div class="nbody">
-        <h3>${esc(n.title)}</h3>
+        <h3><button type="button" class="news-open" data-id="${esc(n.id)}" onclick="openNews(this.dataset.id,this)">${esc(n.title)}</button></h3>
         ${n.body?`<p>${esc(n.body.length>150?n.body.slice(0,150)+'…':n.body)}</p>`:''}
         <time>${fmtDate(n.date)}</time>
       </div>
     </article>`).join('');
 }
-function openNews(id){
+let newsOpener=null;
+function openNews(id,opener){
   const n=NEWS.find(x=>x.id===id); if(!n) return;
   const m=document.getElementById('modal');
+  newsOpener=opener||null;
   m.innerHTML=`<button class="x" onclick="closeModal()" aria-label="Закрыть">✕</button>
     <div class="news-full">
       ${n.img?`<div class="nimg-full">${imgTag(n.img)}</div>`:''}
@@ -7824,7 +7858,17 @@ function openNews(id){
       ${(typeof isDev==='function'&&isDev())?`<div class="chrono-tools"><button class="btn ghost" onclick="openNewsEditor('${n.id}')">Редактировать</button></div>`:''}
     </div>`;
   document.getElementById('scrim').classList.add('open');
+  m.querySelector('.x').focus({preventScroll:true});
 }
+document.addEventListener('keydown',e=>{
+  if(e.key!=='Tab' || !document.querySelector('#scrim.open .news-full') || document.querySelector('#scrim2.open')) return;
+  const buttons=document.querySelectorAll('#modal button:not(:disabled)');
+  const first=buttons[0], last=buttons[buttons.length-1];
+  if(!document.getElementById('modal').contains(document.activeElement) || document.activeElement===(e.shiftKey?first:last)){
+    e.preventDefault();
+    (e.shiftKey?last:first).focus();
+  }
+});
 let NEWS_IMG='';
 function openNewsEditor(id){
   if(!isDev()){ toast('Публиковать новости может только разработчик'); return; }
@@ -9579,11 +9623,11 @@ function renderPlayers(){
     const lock = isOwner(c) ? '' :
       `<span class="pt-lock" title="${c.owner?('владелец '+esc(dispTag(c.owner))):'под кодом'}">🔒</span>`;
     const ph = (c.name||'?').trim().charAt(0).toUpperCase()||'?';
-    return `<div class="ptile${isOwner(c)?' mine':''}" onclick="openInlineSheet('${esc(c.id)}', this)" title="${esc(c.name)}">
-      <div class="pt-ava">${c.ava?imgTag(c.ava):`<span class="pt-ph">${esc(ph)}</span>`}${lock}</div>
-      <div class="pt-name">${esc(c.name)}</div>
-      ${sub?`<div class="pt-sub">${sub}</div>`:''}
-    </div>`;
+    return `<button type="button" class="ptile${isOwner(c)?' mine':''}" data-char="${esc(c.id)}" onclick="openInlineSheet(this.dataset.char,this)" title="${esc(c.name)}">
+      <span class="pt-ava">${c.ava?imgTag(c.ava):`<span class="pt-ph">${esc(ph)}</span>`}${lock}</span>
+      <span class="pt-name">${esc(c.name)}</span>
+      ${sub?`<span class="pt-sub">${sub}</span>`:''}
+    </button>`;
   };
   el.innerHTML = visible.slice().sort((a,b)=>(a.name||'').localeCompare(b.name||'','ru')).map(tileHtml).join('')
     + (gmOthers.length?`<div class="players-sep">Листы игроков · ГМ</div>`+gmOthers.map(tileHtml).join(''):'');
@@ -12003,8 +12047,6 @@ function printSheet(id){
     return `<div class="psh-skill"><span class="sm">${m==null?'':10+m+lv*pb}</span> ${esc(n)}</div>`; }).join('');
   const invList=(c.inv||[]).filter(it=>it&&it.n);
   const invText=invList.map(it=>`• ${esc(it.n)}${it.q&&it.q>1?' ×'+it.q:''}`).join('\n');
-  let ps=document.getElementById('printSheet');
-  if(!ps){ ps=document.createElement('div'); ps.id='printSheet'; document.body.appendChild(ps); }
 
   // ─────────── СТРАНИЦА 1 · Основной лист ───────────
   const page1=`<div class="psh-page">
@@ -12067,6 +12109,7 @@ function printSheet(id){
   // ─────────── СТРАНИЦА 2 · Умения и личность ───────────
   const box=(title,val,extra)=> (val&&String(val).trim())?`<div class="psh-full"${extra||''}><div class="psh-feat">${esc(val)}</div><div class="b-t">${esc(title)}</div></div>`:'';
   const personaBoxes=[
+    box('Черты',(c.featsList||[]).map(featNorm).filter(f=>f.n).map(f=>f.n+' · ур. '+f.lvl).join('\n')),
     box(L.cfeats, c.cfeats||c.feats),
     box(L.rfeats, c.rfeats),
     box(L.tfeats, c.tfeats),
@@ -12116,9 +12159,16 @@ function printSheet(id){
     </div>`;
   }
 
+  clearPrintSheet();
+  const ps=document.createElement('div');
+  ps.id='printSheet';
   ps.innerHTML=page1+page2+page3;
-  window.print();
+  document.body.appendChild(ps);
+  try{ window.print(); }catch(e){ clearPrintSheet(); throw e; }
 }
+function clearPrintSheet(){ document.getElementById('printSheet')?.remove(); }
+window.addEventListener('afterprint',clearPrintSheet);
+window.addEventListener('pagehide',clearPrintSheet);
 
 /* деньги: инлайн-правка в просмотре листа */
 /* спасброски от смерти: клик по пипсу ставит/снимает */
@@ -12308,12 +12358,13 @@ function flushInlineSave(){
 }
 function openInlineSheet(id, tileEl, animate){
   if(!charIdOk(id)) return;   // id уходит в onclick кнопок листа (см. charIdOk)
+  const keyboardOpen=tileEl?.matches(':focus-visible');
   const c=CHARS.find(x=>x.id===id); if(!c||c.deleted) return;
   if(!canEdit(c)){ openPlayer(id); return; }   // не владелец — просмотр в модалке
   const host=document.getElementById('playerEditor'); if(!host) return;
   spInit('ep', c.spellcasting); featInit(c.featsList); hpRollsInit(c); AVA_TMP=c.ava||'';
   host.innerHTML = `<div class="isheet-bar">
-      <button class="btn ghost sm" onclick="closeInlineSheet()">← Персонажи</button>
+      <button class="btn ghost sm" onclick="closeInlineSheet(this.matches(':focus-visible'))">← Персонажи</button>
       <button class="btn ghost sm ma-toggle" onclick="toggleMiniArch()" title="Архив сеттинга"${assimArchLocked()?' hidden':''}>
         ${bi('book')}Архив
       </button>
@@ -12339,9 +12390,10 @@ function openInlineSheet(id, tileEl, animate){
   INLINE_ID=id; try{ sessionStorage.setItem('comik:openChar', id); }catch(e){}
   setInlineSaveState('saved');
   if(animate!==false) inlineExpandAnim(tileEl, host);
+  if(keyboardOpen) host.querySelector('.isheet-bar button').focus({preventScroll:true});
   try{ window.scrollTo(0,0); }catch(e){}
   // десктоп — архив выезжает сам в пустое поле; мобилка — только по кнопке «Архив» (он перекрывает лист)
-  if(!MA_DISMISSED && window.innerWidth>=1180 && !assimArchLocked()) openMiniArch();   // авто-раскрытие только на широком экране (на планшете/узком — по кнопке)
+  if(!MA_DISMISSED && MA_WIDE.matches && !assimArchLocked()) openMiniArch();
   else if(assimArchLocked()) closeMiniArch();
 }
 function inlineExpandAnim(tileEl, host){
@@ -12360,7 +12412,7 @@ function inlineExpandAnim(tileEl, host){
     setTimeout(()=>{ if(grid) grid.style.opacity=''; host.style.transition=''; host.style.transform=''; host.style.transformOrigin=''; }, 440);
   }catch(e){}
 }
-async function closeInlineSheet(){
+async function closeInlineSheet(restoreFocus=false){
   const id=INLINE_ID;
   clearTimeout(INLINE_T);
   const changed=id ? applyPlayerEdits(id, true) : null;
@@ -12368,7 +12420,12 @@ async function closeInlineSheet(){
   INLINE_ID=null; INLINE_BASE=INLINE_SNAP=null; INLINE_STALE=false; try{ sessionStorage.removeItem('comik:openChar'); }catch(e){}
   const host=document.getElementById('playerEditor');
   const view=document.getElementById('view-players');
-  const finish=()=>{ if(host){ host.hidden=true; host.innerHTML=''; host.style.cssText=''; } if(view) view.classList.remove('inline-open'); renderPlayers(); ensurePlayersVisible(); };
+  const finish=()=>{
+    if(host){ host.hidden=true; host.innerHTML=''; host.style.cssText=''; }
+    if(view) view.classList.remove('inline-open');
+    renderPlayers(); ensurePlayersVisible();
+    if(restoreFocus && view?.classList.contains('active')) view.querySelector('.ptile[data-char="'+CSS.escape(id)+'"]')?.focus();
+  };
   if(host){
     host.style.transition='transform .28s ease,opacity .24s ease'; host.style.transformOrigin='50% 60px';
     host.style.transform='scale(.6)'; host.style.opacity='0';
@@ -12865,16 +12922,21 @@ function toggleNavDrawer(e){ if(e) e.stopPropagation();
 }
 document.addEventListener('click', e=>{ const n=document.getElementById('botnav'); if(n && n.classList.contains('open') && !e.target.closest('#botnav')){ n.classList.remove('open'); document.documentElement.classList.remove('nav-open'); } });
 function go(view, opts){
+  if(!document.getElementById('view-'+view)?.classList.contains('view')) return;
+  clearPrintSheet();
   if(view==='music' && !(typeof isDev==='function' && isDev())){ toast('Раздел для разработчиков'); view='news'; }
   if(view==='music' && typeof renderMusicPage==='function') setTimeout(renderMusicPage,0);
   if(view==='worlds' && !(typeof projOwner==='function' && projOwner())){ toast('Раздел владельца'); view='news'; }
-  if(view==='world' && assimArchLocked()){ toast('Архив ASSIMILATION пока закрыт'); view='news'; }
   if(view==='chrono' && !hasChronoAccess()){ view='world'; }   // хронология — только разработчикам и не в «Классике»
-  // история вкладок для жеста «свайп вправо = назад» (кроме самого возврата)
+  if(view==='world' && assimArchLocked()){ toast('Архив ASSIMILATION пока закрыт'); view='news'; }
   const _pv=(document.querySelector('.view.active')||{id:''}).id.replace('view-','');
   if(_pv==='players' && view!=='players' && INLINE_ID) flushInlineSave();   // уходим с игроков — дописать правки
-  const _nh=(window.NAV_HIST=window.NAV_HIST||[]);
-  if(!(opts&&opts.noHist) && _pv && _pv!==view){ _nh.push(_pv); if(_nh.length>30) _nh.shift(); }
+  if(opts?.fromHistory){
+    if(history.state?.komikView!==view) history.replaceState({...history.state,komikView:view},'');
+  } else if(_pv && _pv!==view){
+    if(!history.state?.komikView) history.replaceState({...history.state,komikView:_pv},'');
+    history.pushState({...history.state,komikView:view},'');
+  }
   // сменили раздел — фоновая синхронизация подстраивает темп под то, что сейчас на экране
   try{ setTimeout(()=>document.dispatchEvent(new CustomEvent('komik-view-change',{detail:view})),0); }catch(e){}
   ['news','world','players','combat','settings','chrono','music','worlds'].forEach(v=>{
@@ -12918,7 +12980,13 @@ function go(view, opts){
    Раздел жестом НЕ меняется: тот же свайп открывает шторку, и раньше эти два
    действия срабатывали разом — казалось, что шторка сама уводит на другую вкладку.
    Смена раздела осталась только ручной: пункт шторки или верхнего меню. */
-window.NAV_HIST=window.NAV_HIST||[];
+window.addEventListener('popstate',e=>{
+  if(!e.state?.komikView) return;
+  if(document.querySelector('#scrim2.open')) closeOverlay();
+  if(document.querySelector('#scrim.open')) closeModal();
+  if(document.documentElement.classList.contains('dr-open')) closeNavDrawer();
+  go(e.state.komikView,{fromHistory:true});
+});
 function navBack(){
   const s2=document.getElementById('scrim2');
   if(s2 && s2.classList.contains('open')){ closeOverlay(); return true; }
@@ -16844,7 +16912,7 @@ function openGameDeep(gid, fresh){
 /* холодный старт: если открыли по ссылке ?g=<id> — открываем игру и чистим адрес.
    Зовётся из boot() после чтения игр из облака — поэтому fresh */
 function pushDeepLinkFromUrl(){
-  try{ const g=new URLSearchParams(location.search).get('g'); if(g){ openGameDeep(g, true); history.replaceState(null,'',location.pathname); } }catch(e){}
+  try{ const g=new URLSearchParams(location.search).get('g'); if(g){ openGameDeep(g, true); history.replaceState(history.state,'',location.pathname); } }catch(e){}
 }
 /* тап по уведомлению при уже открытом приложении — SW пришлёт сообщение */
 if('serviceWorker' in navigator){
@@ -18876,7 +18944,7 @@ function openInstallHelp(){
     var host=document.getElementById('deskDir');
     var landing=false;
     try{
-      landing = wide() && document.documentElement.classList.contains('view-world') &&
+      landing = (wide() || matchMedia('print').matches) && document.documentElement.classList.contains('view-world') &&
                 activeCat==='all' && !SEC_Q && !secFiltCount();
     }catch(e){ landing=false; }
     if(!landing){ if(host) host.remove(); return; }

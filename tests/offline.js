@@ -33,6 +33,16 @@ const { launch, BASE, PHONE, check, done } = require('./lib');
   await page.waitForFunction(() => { const i = document.querySelector('#modal .dos-img img'); return i && /^data:|^img\//.test(i.getAttribute('src') || ''); }, null, { timeout: 10000 }).catch(() => {});
   const shown = await page.evaluate(() => { const i = document.querySelector('#modal .dos-img img'); return i ? (i.getAttribute('src') || 'нет src').slice(0, 14) : 'нет img'; });
   check(/^data:image|^img\//.test(shown), 'без сети фото карточки показано: ' + shown);
+  await ctx.setOffline(false);
+  let failedRequests = 0;
+  await ctx.route(BASE + '/', route => {
+    if (!route.request().serviceWorker()) return route.continue();
+    failedRequests++;
+    return route.fulfill({ status: 503, contentType: 'text/plain', body: 'Maintenance' });
+  });
+  const fallback = await page.reload({ waitUntil: 'domcontentloaded' });
+  check(failedRequests > 0 && fallback.fromServiceWorker() && fallback.ok() && await page.title() === 'КОМИК',
+    'после ответа 503 воркер открывает сохранённую страницу');
   check(errs.length === 0, 'ошибок нет' + (errs.length ? ': ' + errs.slice(0, 3).join(' | ') : ''));
   await b.close();
   done();
