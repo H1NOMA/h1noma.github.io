@@ -9,7 +9,7 @@ async function launch() { return chromium.launch(); }
 
 /* новая «чистая» вкладка: своё хранилище, облако → стенд; errs — ошибки страницы и консоли */
 async function openPage(browser, opts = {}) {
-  const ctx = await browser.newContext({ viewport: opts.viewport || PHONE, serviceWorkers: opts.sw ? 'allow' : 'block' });
+  const ctx = await browser.newContext({ viewport: opts.viewport || PHONE, deviceScaleFactor: opts.deviceScaleFactor || 1, serviceWorkers: opts.sw ? 'allow' : 'block' });
   const cloud = JSON.stringify({ url: BASE, key: 'anon' });
   await ctx.addInitScript(([cloud, project, extra]) => {
     try {

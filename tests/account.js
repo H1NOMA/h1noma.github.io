@@ -40,12 +40,12 @@ async function register(page, tag, pass) {
     await login(page, 'testplayer');
     await hookToasts(page);
     await page.click('#drAva');
-    await page.waitForSelector('#modal .pc-acts', { timeout: 5000 });
-    const rowsTxt = await page.$$eval('#modal .pc-acts .set-row .rl', els => els.map(e => e.childNodes[0].textContent.trim()));
-    check(['Закладки', 'Уведомления', 'Пароль', 'Логин', 'Выйти'].every(t => rowsTxt.includes(t)), 'в профиле: закладки, уведомления, пароль, логин, выход (' + rowsTxt.join(', ') + ')');
+    await page.waitForSelector('#modal .pc-home', { timeout: 5000 });
+    const rowsTxt = await page.$$eval('#modal .pc-home .set-row .rl', els => els.map(e => e.childNodes[0].textContent.trim()));
+    check(['Мои закладки', 'Уведомления', 'Пароль', 'Логин', 'Выйти'].every(t => rowsTxt.includes(t)), 'в профиле: закладки, уведомления, пароль, логин, выход (' + rowsTxt.join(', ') + ')');
     check(await page.evaluate(() => !!document.querySelector('#modal #pushBtn.set-sw')), 'переключатель уведомлений — в профиле');
     check(await page.waitForFunction(() => { const d = document.getElementById('pcDel'); return d && !d.hidden; }, null, { timeout: 8000 }).then(() => true, () => false), '«Удалить аккаунт» есть (облако API 4)');
-    await page.click('#modal .pc-acts .set-row:has-text("Закладки")');
+    await page.click('#modal .pc-bookmarks');
     check(await page.waitForFunction(() => /Мои закладки/.test(document.getElementById('modal').textContent), null, { timeout: 3000 }).then(() => true, () => false), 'закладки открываются из профиля');
     await page.evaluate(() => closeModal());
     await page.evaluate(() => go('settings'));
@@ -54,9 +54,10 @@ async function register(page, tag, pass) {
     check(st.prof && !st.push && !/Выйти|Новые игры|Изменить логин|Мой профиль/.test(st.txt), 'в настройках — только шапка профиля, без перенесённых пунктов');
     check(/Иконка приложения/.test(st.txt) && /Доступность/.test(st.txt), 'иконка приложения и доступность — на месте');
     await page.click('#settingsPage button.set-prof');
-    check(await page.waitForSelector('#modal .pc-acts', { timeout: 3000 }).then(() => true, () => false), 'шапка в настройках открывает профиль');
+    check(await page.waitForSelector('#modal .pc-home', { timeout: 3000 }).then(() => true, () => false), 'шапка в настройках открывает профиль');
     const outs = []; page.on('request', q => { if (/\/auth\/v1\/logout/.test(q.url())) outs.push(q.url().replace(BASE, '')); });
     await page.evaluate(() => { window.__t = []; });
+    await page.click('#pcAccount > summary');
     await page.click('#modal .pc-acts .set-row:has-text("Выйти")');
     await page.waitForFunction(() => currentTag() === null, null, { timeout: 8000 }).catch(() => {});
     check(await page.evaluate(() => currentTag() === null && !document.getElementById('scrim').classList.contains('open')), '«Выйти» из профиля — выход, окно закрыто');
@@ -157,7 +158,7 @@ async function register(page, tag, pass) {
     await login(page, 'testplayer');
     check(await page.evaluate(() => document.getElementById('profBtn').textContent === profInitial(SESSION)), 'вошёл: на аватаре — буква имени');
     await page.click('#profBtn');
-    check(await page.waitForSelector('#modal .pc-acts .set-row:has-text("Закладки")', { timeout: 3000 }).then(() => true, () => false), 'аватар открывает профиль (там закладки)');
+    check(await page.waitForSelector('#modal .pc-bookmarks', { timeout: 3000 }).then(() => true, () => false), 'аватар открывает профиль (там закладки)');
     check(errs.length === 0, errLine(errs));
     await ctx.close();
   }
@@ -171,8 +172,9 @@ async function register(page, tag, pass) {
     check(!s.su && /появится выше, когда Мастер анонсирует игру/.test(s.t), `игр нет — кнопки записи нет, и шаг 3 к ней не отсылает («${s.t}»)`);
     await page.evaluate(() => { const now = Date.now(); GAMES.push({ id: 'gonb', game: CUR_PROJECT, title: 'Проверка', seats: 4, players: [], createdAt: now, updatedAt: now }); renderNews(); });
     s = await st();
-    check(s.su && /кнопка «Записаться на игру» выше\.$/.test(s.t), `игра есть — «кнопка выше» («${s.t}»)`);
+    check(s.su && /кнопка «Записаться на игру» выше\.$/i.test(s.t), `игра есть — «кнопка выше» («${s.t}»)`);
     await page.evaluate(() => { const h = document.getElementById('hintSpot'); if (h) h.remove(); });
+    await page.click('#onboardCard summary');
     await page.click('#onboardCard .btn.primary');
     check(await page.waitForFunction(() => { const p = document.getElementById('au-f-pass2'); return !!p && !p.hidden && !!document.getElementById('au-agree'); }, null, { timeout: 3000 }).then(() => true, () => false), '«Создать аккаунт» открывает регистрацию (повтор пароля и согласие)');
     check(errs.length === 0, errLine(errs));
@@ -184,6 +186,7 @@ async function register(page, tag, pass) {
     const { page, ctx, errs } = await openPage(b);
     await login(page, 'testplayer');
     await page.evaluate(() => openProfileCard());
+    await page.click('#pcLook > summary');
     await page.waitForSelector('#modal .pc-presets');
     check(await page.evaluate(() => { const box = document.querySelector('#modal .pc-presets').getBoundingClientRect(), m = document.querySelector('#modal .pc-preset.more').getBoundingClientRect(); return m.width > 30 && m.left >= box.left && m.right <= box.right + 0.5; }), '«+ Свои цвета» целиком в карточке');
     check(await page.evaluate(() => document.querySelectorAll('#modal .pc-presets button, #modal .prof-swatches button').length === PROFILE_PRESETS.length + 1 + PROFILE_COLORS.length + INK_COLORS.length), 'пресеты, «+» и свотчи — кнопки');
@@ -253,6 +256,7 @@ async function register(page, tag, pass) {
 
     // смена пароля
     await page.evaluate(() => openProfileCard());
+    await page.click('#pcAccount > summary');
     await page.click('#modal .pc-acts .set-row:has-text("Пароль")');
     await page.waitForSelector('#modal2 #pw-cur', { timeout: 3000 });
     await page.fill('#pw-cur', P1); await page.fill('#pw-new', P2); await page.fill('#pw-new2', P2 + 'x');
@@ -299,6 +303,7 @@ async function register(page, tag, pass) {
     // окно удаления: кнопка — только при совпавшем логине и пароле от 8 символов
     await page.evaluate(() => openProfileCard());
     await page.waitForFunction(() => { const d = document.getElementById('pcDel'); return d && !d.hidden; }, null, { timeout: 8000 });
+    await page.click('#pcAccount > summary');
     await page.click('#pcDel .set-row');
     await page.waitForSelector('#modal2 #ad-tag', { timeout: 3000 });
     check(/карточка на доске ходов мастера — без портрета/.test(await page.textContent('#modal2 .ad-what')), 'окно удаления честно говорит, что остаётся (карточка на доске ходов)');
@@ -397,6 +402,7 @@ async function register(page, tag, pass) {
     await A.page.route('**/rest/v1/rpc/komik_delete_me', async route => { await route.fetch(); await route.abort(); });
     await A.page.evaluate(() => openProfileCard());
     await A.page.waitForFunction(() => { const d = document.getElementById('pcDel'); return d && !d.hidden; }, null, { timeout: 8000 });
+    await A.page.click('#pcAccount > summary');
     await A.page.click('#pcDel .set-row');
     await A.page.waitForSelector('#modal2 #ad-tag', { timeout: 3000 });
     await A.page.fill('#ad-tag', tag); await A.page.fill('#ad-pass', P);
