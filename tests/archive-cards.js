@@ -21,11 +21,53 @@ async function card(page,game,id,overlay=false) {
   await entry.waitFor();
   return entry;
 }
+async function checkOpenText(details,label) {
+  await details.locator(':scope > summary').click();
+  const gaps=await details.evaluate(box=>{
+    const textLines=[];
+    for(const paragraph of box.querySelectorAll('.ar-prose p')){
+      const range=document.createRange();
+      range.selectNodeContents(paragraph);
+      for(const r of range.getClientRects())if(r.width&&r.height)textLines.push(r);
+    }
+    if(!box.open||!textLines.length)return null;
+    const frame=box.getBoundingClientRect(),heading=box.querySelector('summary').getBoundingClientRect();
+    return {
+      left:Math.min(...textLines.map(r=>r.left-frame.left)),
+      right:Math.min(...textLines.map(r=>frame.right-r.right)),
+      top:Math.min(...textLines.map(r=>r.top-heading.bottom)),
+      bottom:Math.min(...textLines.map(r=>frame.bottom-r.bottom))
+    };
+  });
+  assert(gaps,label+' — раскрытый текст виден');
+  assert(gaps.left>=8&&gaps.right>=8&&gaps.bottom>=8&&gaps.top>=-1,label+' — отступы текста в пикселях '+JSON.stringify(gaps));
+}
+async function verifyDisclosureLayout(page,width) {
+  const barbarian=await card(page,'classic','srd-varvar');
+  assert.equal(await barbarian.evaluate(el=>el.closest('#readerBody,#modal').id),width===DESK.width?'readerBody':'modal');
+  const attack=barbarian.locator('details.sec').filter({has:page.locator('summary',{hasText:'Безрассудная атака'})});
+  await checkOpenText(attack,'Варвар, Безрассудная атака, '+width);
+
+  const wizard=await card(page,'classic','srd-volshebnik',true);
+  assert.equal(await wizard.evaluate(el=>el.closest('#modal2').id),'modal2');
+  const feature=wizard.locator('details.sec').filter({has:page.locator('summary',{hasText:'Использование заклинаний'})}).first();
+  await checkOpenText(feature,'Волшебник поверх карточки, '+width);
+  const scroll=await wizard.locator('.lvl-wrap').evaluate(el=>{
+    const wrap=el.getBoundingClientRect(),card=el.closest('.ar-card'),frame=card.getBoundingClientRect();
+    el.scrollLeft=el.scrollWidth;
+    return {fits:wrap.left>=frame.left-1&&wrap.right<=frame.right+1&&card.scrollWidth<=card.clientWidth+1,
+      wide:el.scrollWidth>el.clientWidth+1,moved:el.scrollLeft>0};
+  });
+  assert(scroll.fits,'Таблица ячеек волшебника должна оставаться в карточке, '+width);
+  if(width<=PHONE.width)assert(scroll.wide&&scroll.moved,'Широкая таблица должна прокручиваться внутри карточки, '+width);
+  await page.evaluate(()=>{closeOverlay();closeModal();});
+}
 async function verifyCards(page) {
   await page.evaluate(()=>{setProject('classic');return parseBestiary();});
   await page.waitForFunction(()=>ARCHIVE.some(x=>x.id==='srd-goblin'));
   for(const size of [DESK,PHONE,{width:320,height:700}]) {
     await page.setViewportSize(size);
+    await verifyDisclosureLayout(page,size.width);
     const carpet=await card(page,'classic','srd-kover-samolet');
     for(const [weight,speed] of [[200,'80 футов'],[201,'40 футов'],[400,'40 футов'],[401,'Не поднимет']]){
       await carpet.locator('input[data-ar=load]').fill(String(weight));
@@ -38,13 +80,14 @@ async function verifyCards(page) {
     assert.match(await ice.locator('tbody').textContent(),/ПромахБез урона10к6 холодом/);
     assert(await ice.evaluate(e=>e.scrollWidth<=e.clientWidth+1));
     if(process.env.TEST_EVIDENCE && size.width===390)await page.screenshot({animations:'disabled',path:path.join(process.env.TEST_EVIDENCE,'archive-spell-phone.png')});
+    await checkOpenText(ice.locator('details.ar-details').filter({has:page.getByText('Полный текст заклинания',{exact:true})}),'Полный текст заклинания, '+size.width);
     const goblin=await card(page,'classic','srd-goblin');
     await goblin.locator('[data-ar=damage]').selectOption('dice');
     assert.equal(await goblin.locator('.ar-attacks tbody tr').count(),2);
     assert.match(await goblin.locator('.ar-attacks tbody').textContent(),/1к6\+2/);
     assert.match(await goblin.locator('.ar-stats').textContent(),/15.*7.*30.*1\/4/);
     if(process.env.TEST_EVIDENCE && size.width===1440)await page.screenshot({animations:'disabled',path:path.join(process.env.TEST_EVIDENCE,'archive-goblin-desktop.png')});
-    await goblin.getByText('Полный текст атак',{exact:true}).click();
+    await checkOpenText(goblin.locator('details.ar-details').filter({has:page.getByText('Полный текст атак',{exact:true})}),'Текст атак существа, '+size.width);
     assert.match(await goblin.locator('details[open]').innerText(),/Скимитар/);
     await page.evaluate(()=>closeModal());
   }
@@ -106,6 +149,11 @@ async function verifyCards(page) {
       return (ARCHIVE.find(e=>e.srcbook==='HB')||ARCHIVE[0]).id;
     },game);
     assert(await (await card(page,game,id)).locator('h2').first().isVisible());
+    const modal=page.locator('#scrim.open');
+    if(await modal.count()){
+      await modal.getByRole('button',{name:'Закрыть',exact:true}).click();
+      await modal.waitFor({state:'hidden'});
+    }
   }
   console.log('Карточки на 320, 390 и 1440 px. Таблиц в доступных разделах классики:',counters.count);
 }
@@ -113,13 +161,14 @@ async function sync(player,gm) {
   const id='archive-check-pc', spell='sp-ice-knife', beast='srd-goblin';
   await player.evaluate(async([id,spell])=>{
     setProject('classic'); const now=Date.now();
-    CHARS_ALL.classic.push({id,name:'Кира',owner:currentTag(),hp:'12',ac:'13',level:1,createdAt:now,updatedAt:now,
+    CHARS_ALL.classic.push({id,name:'Кира',owner:currentTag(),role:'Волшебник',cfeats:'Использование заклинаний',hp:'12',ac:'13',level:1,createdAt:now,updatedAt:now,
       slots:{'1':{max:2,used:0}},spellcasting:{cls:['Волшебник'],lvls:{'Волшебник':1},known:[spell],prep:[spell]}});
     bindGameData(); await persistChars();
   },[id,spell]);
   const sheet=async()=>((await rows())['comik:chars:testplayer']?.classic||[]).find(x=>x.id===id);
   await until(async()=>(await sheet())?.spellcasting?.known?.includes(spell),'лист игрока не дошёл до стенда');
   const initial=await sheet();
+  await gm.bringToFront();
   await gm.evaluate(async()=>{setProject('classic');await parseBestiary();go('combat');});
   await until(async()=>gm.evaluate(async id=>{await cloudTickOnce();return CHARS_ALL.classic.some(x=>x.id===id);},id),'мастер не получил персонажа');
   await gm.waitForFunction(()=>ARCHIVE.some(e=>e.id==='srd-goblin'));
@@ -128,7 +177,11 @@ async function sync(player,gm) {
   await until(async()=>{const b=await board();return b?.active&&b.list.some(x=>x.charId===id)&&b.list.some(x=>x.srcId===beast&&x.hp===7);},'мастер не опубликовал состав');
   await player.evaluate(()=>{go('combat');return trkLiveCatchup(true);});
   await until(async()=>player.evaluate(async id=>{await trkFetchShared(true);return playerMyCard(trkActiveForPlayer())?.charId===id;},id),'игрок не увидел свой стол');
-  await player.evaluate(id=>{go('players');openInlineSheet(id,null,false);},id);
+  await player.evaluate(id=>{go('players');openPlayer(id);},id);
+  await player.locator('#modal').getByRole('button',{name:/Использование заклинаний/}).click();
+  const openedFeature=player.locator('#modal2 [data-entry="srd-volshebnik"] details.sec[open]').filter({has:player.locator('summary',{hasText:'Использование заклинаний'})});
+  await openedFeature.locator('.ar-prose p').first().waitFor();
+  await player.evaluate(id=>{closeOverlay();closeModal();openInlineSheet(id,null,false);},id);
   const link=player.locator('#playerEditor [onclick*="sp-ice-knife"][onclick*="openModal"]').first();
   await link.evaluate(el=>el.click());
   const overlay=player.locator('#modal2 .ar-card[data-entry="'+spell+'"]');

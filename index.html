@@ -4046,14 +4046,19 @@ html.is-web .app-cta:not([hidden]){display:flex}
 .ar-card .dos-row .v{margin:4px 0 0;font-size:.9rem;color:var(--txt);white-space:pre-line}
 .ar-card .body{margin-top:14px;white-space:normal}
 .ar-card .ar-prose p,.ar-card .ar-area p,.ar-card .body>p{color:var(--txt);font-size:.92rem;line-height:1.58;white-space:normal;margin:0 0 .7em}
-.ar-prose p:last-child,.ar-area p:last-child{margin-bottom:0}
+.ar-card .ar-prose p:last-child,.ar-card .ar-area p:last-child{margin-bottom:0}
 .ar-prose,.ar-list{min-width:0}
 .ar-card .sec{min-width:0}
 .ar-card .sec h4,.ar-widget h3{margin:0 0 9px;color:var(--txt)}
 .ar-card .sec h4{font-size:.95rem}
 .ar-card .sec summary,.ar-details summary{cursor:pointer;min-height:40px;align-content:center}
+.ar-card details.sec>.ar-prose{padding:0 13px 12px 28px;overflow-wrap:anywhere}
+.ar-card .sec-heading{flex:1 1 auto;min-width:0}
+.ar-card .sec-tag{max-width:45%;min-width:0;overflow-wrap:anywhere}
+.ar-card .abil-wrap{overflow-x:auto;overscroll-behavior-x:contain}
+.ar-card .abil-tbl :is(th,td){overflow-wrap:anywhere}
 .ar-card .ar-details{padding:0 12px;border:1px solid var(--line2);border-radius:9px;margin:10px 0;color:var(--txt);background:var(--bg2)}
-.ar-details[open]{padding-bottom:12px}
+.ar-card .ar-details[open]{padding-bottom:12px}
 .ar-details>summary{font-weight:600;font-size:.87rem}
 .ar-details>h4{margin:10px 0 5px}
 .ar-widget{margin:14px 0;padding:clamp(10px,2.8%,18px);border:1px solid var(--line2);border-radius:12px;background:var(--surface2)}
@@ -4071,7 +4076,7 @@ html.is-web .app-cta:not([hidden]){display:flex}
 .ar-table tbody tr:nth-child(even){background:rgba(127,127,127,.07)}
 .ar-table tr:last-child>*{border-bottom:0}
 .ar-card [hidden]{display:none!important}
-.ar-card :is(button,select,input,summary,.ar-scroll,.lvl-wrap):focus-visible{outline:2px solid var(--red-ink);outline-offset:-2px}
+.ar-card :is(button,select,input,summary,.ar-scroll,.lvl-wrap,.abil-wrap):focus-visible{outline:2px solid var(--red-ink);outline-offset:-2px}
 .ar-area{display:flex;align-items:center;gap:15px;margin:8px 0 12px}
 .ar-radius{position:relative;display:grid;place-items:center;flex:0 0 78px;aspect-ratio:1;border:1px dashed var(--red-ink);border-radius:50%;color:var(--red-ink);background:radial-gradient(circle,transparent 2%,color-mix(in srgb,var(--red-ink) 10%,transparent) 98%)}
 .ar-radius i{width:9px;height:9px;border-radius:50%;background:currentColor}
@@ -4104,7 +4109,7 @@ html.is-web .app-cta:not([hidden]){display:flex}
   .ar-area{gap:9px}
   .ar-radius{flex-basis:58px}
 }
-@media print{.ar-scroll,.ar-card .lvl-wrap{overflow:visible}.ar-card{container-type:normal}.ar-roll,.ar-pick{display:none}}
+@media print{.ar-scroll,.ar-card .lvl-wrap,.ar-card .abil-wrap{overflow:visible}.ar-card{container-type:normal}.ar-roll,.ar-pick{display:none}}
 </style>
 </head>
 <body>
@@ -7087,7 +7092,7 @@ function openModal(id, overlay){
   const archSecs=(A&&A.feats)||[];
   const mkSec=(x,tag)=>{
     const lvl=(x.h||'').match(/ · (\d+(?:-\d+)?) ур\./);
-    return `<details class="sec"${lvl?` data-ar-levels="${lvl[1]}"`:''}><summary>${esc(x.h)}${tag?`<span class="sec-tag">${esc(tag)}</span>`:''}</summary>${archiveView.prose(x.t,e,x.h)}</details>`;
+    return `<details class="sec"${lvl?` data-ar-levels="${lvl[1]}"`:''}><summary><span class="sec-heading">${esc(x.h)}</span>${tag?`<span class="sec-tag">${esc(tag)}</span>`:''}</summary>${archiveView.prose(x.t,e,x.h)}</details>`;
   };
   // однотипные умения («Воззвание · X», «Боевой стиль · X», «Приём · X»…) сводим
   // в единую секцию-таблицу; секции-фичи с уровнем («Метамагия · 3 ур.») не трогаем
@@ -7104,8 +7109,9 @@ function openModal(id, overlay){
       return {name:it.s.name, src:it.s.src, req:m?m[1].trim():'', desc:m?(it.x.t||'').slice(m[0].length):(it.x.t||'')};
     });
     const hasReq=rows.some(r=>r.req);
-    return `<details class="sec"><summary>${esc(ABIL_PL[grp]||grp)} <span class="sec-cnt">· ${rows.length}</span>${tag?`<span class="sec-tag">${esc(tag)}</span>`:''}</summary>
-      <div class="abil-wrap"><table class="abil-tbl${hasReq?' req3':''}">
+    const title=ABIL_PL[grp]||grp;
+    return `<details class="sec"><summary><span class="sec-heading">${esc(title)} <span class="sec-cnt">· ${rows.length}</span></span>${tag?`<span class="sec-tag">${esc(tag)}</span>`:''}</summary>
+      <div class="abil-wrap" tabindex="0" role="region" aria-label="${esc(title)}"><table class="abil-tbl${hasReq?' req3':''}">
         <thead><tr><th>Название</th>${hasReq?'<th>Требование</th>':''}<th>Описание</th></tr></thead>
         <tbody>${rows.map(r=>`<tr><td class="an">${esc(r.name)}${r.src?`<span class="abil-src">${esc(r.src)}</span>`:''}</td>${hasReq?`<td>${esc(r.req||'—')}</td>`:''}<td>${archiveView.prose(r.desc,e)}</td></tr>`).join('')}</tbody>
       </table></div></details>`;
