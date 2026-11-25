@@ -4032,6 +4032,80 @@ html.is-web .app-cta:not([hidden]){display:flex}
 @media(min-width:880px){.cookie-bar{left:auto;right:24px;bottom:24px;margin:0;max-width:430px}}
 @media print{.cookie-bar{display:none}}
 </style>
+<style>
+/* Общая читальня Архива: та же разметка в боковой панели, модальном окне и поверх листа. */
+.ar-card{min-width:0;container-type:inline-size;--ar-fill:var(--surface2);overflow-wrap:anywhere}
+.ar-card .top{padding-inline-end:70px}
+.ar-card .dos-sheet{margin-top:12px;padding:clamp(12px,3%,20px);box-shadow:none}
+.ar-card .dos-head{align-items:center}
+.ar-card .dos-img{margin:0;transform:none;box-shadow:none;max-width:32%}
+.ar-card .dos-kick{letter-spacing:.12em}
+.ar-card .dos-rows,.ar-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,135px),1fr));gap:1px;margin:14px 0 0;border:1px solid var(--line2);border-radius:10px;overflow:hidden;background:var(--line)}
+.ar-card .dos-row{display:block;margin:0;background:var(--bg2);padding:10px 12px;border:0;min-width:0}
+.ar-card .dos-row .k{padding:0;letter-spacing:.055em;font-size:.65rem;line-height:1.4}
+.ar-card .dos-row .v{margin:4px 0 0;font-size:.9rem;color:var(--txt);white-space:pre-line}
+.ar-card .body{margin-top:14px;white-space:normal}
+.ar-card .ar-prose p,.ar-card .ar-area p,.ar-card .body>p{color:var(--txt);font-size:.92rem;line-height:1.58;white-space:normal;margin:0 0 .7em}
+.ar-prose p:last-child,.ar-area p:last-child{margin-bottom:0}
+.ar-prose,.ar-list{min-width:0}
+.ar-card .sec{min-width:0}
+.ar-card .sec h4,.ar-widget h3{margin:0 0 9px;color:var(--txt)}
+.ar-card .sec h4{font-size:.95rem}
+.ar-card .sec summary,.ar-details summary{cursor:pointer;min-height:40px;align-content:center}
+.ar-card .ar-details{padding:0 12px;border:1px solid var(--line2);border-radius:9px;margin:10px 0;color:var(--txt);background:var(--bg2)}
+.ar-details[open]{padding-bottom:12px}
+.ar-details>summary{font-weight:600;font-size:.87rem}
+.ar-details>h4{margin:10px 0 5px}
+.ar-widget{margin:14px 0;padding:clamp(10px,2.8%,18px);border:1px solid var(--line2);border-radius:12px;background:var(--surface2)}
+.ar-widget h3{font-family:var(--f-disp);font-size:1.2rem}
+.ar-result{display:block;margin:8px 0;color:var(--txt);line-height:1.55;font-weight:600}
+.ar-result:empty{display:none}
+.ar-pick{display:inline-flex;align-items:center;flex-wrap:wrap;gap:6px 12px;max-width:100%;font-size:.82rem;font-weight:600;color:var(--txt);margin:2px 12px 8px 0}
+.ar-pick select,.ar-pick input{max-width:100%;min-width:0;min-height:40px;padding:6px 10px;background:var(--bg2);color:var(--txt);border:1px solid var(--line2);border-radius:7px;font:inherit}
+.ar-pick input{width:7em}
+.ar-scroll{overflow-x:auto;max-width:100%;margin:9px 0;overscroll-behavior-x:contain;border:1px solid var(--line2);border-radius:8px}
+.ar-table{width:100%;border-collapse:collapse;font-size:.84rem;font-variant-numeric:tabular-nums;line-height:1.4}
+.ar-table th,.ar-table td{padding:8px 10px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line);color:var(--txt);overflow-wrap:normal;min-width:4.4em}
+.ar-table thead th{color:var(--red-ink);font-size:.72rem;background:var(--bg2);font-weight:600}
+.ar-table tbody th{font-weight:600}
+.ar-table tbody tr:nth-child(even){background:rgba(127,127,127,.07)}
+.ar-table tr:last-child>*{border-bottom:0}
+.ar-card [hidden]{display:none!important}
+.ar-card :is(button,select,input,summary,.ar-scroll,.lvl-wrap):focus-visible{outline:2px solid var(--red-ink);outline-offset:-2px}
+.ar-area{display:flex;align-items:center;gap:15px;margin:8px 0 12px}
+.ar-radius{position:relative;display:grid;place-items:center;flex:0 0 78px;aspect-ratio:1;border:1px dashed var(--red-ink);border-radius:50%;color:var(--red-ink);background:radial-gradient(circle,transparent 2%,color-mix(in srgb,var(--red-ink) 10%,transparent) 98%)}
+.ar-radius i{width:9px;height:9px;border-radius:50%;background:currentColor}
+.ar-radius i:after{content:'';position:absolute;top:50%;left:50%;right:0;border-top:1px solid currentColor}
+.ar-radius b{position:absolute;top:55%;font-family:var(--f-mono);font-size:.65rem}
+.ar-widget small{display:block;color:var(--dim);font-size:.78rem;line-height:1.45}
+.ar-roll{display:grid;grid-template-columns:repeat(auto-fit,minmax(40px,1fr));gap:5px;padding:0;margin:0 0 12px;border:0;min-width:0}
+.ar-roll legend{color:var(--txt);margin-bottom:8px;font-weight:600}
+.ar-injury{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,140px),1fr));gap:8px}
+.ar-injury>span{padding:10px;border-inline-start:2px solid var(--red-ink);background:var(--bg2)}
+.ar-injury small{display:block;font-size:.7rem;font-weight:400}
+.ar-injury b{display:block;margin-top:3px;font-size:.95rem}
+.ar-roll button{min-height:40px;border:1px solid var(--line2);background:var(--bg2);color:var(--txt);border-radius:6px;font:inherit;cursor:pointer}
+.ar-roll button[aria-pressed=true]{border-color:var(--red-ink);box-shadow:inset 0 -3px var(--red-ink);font-weight:700}
+.ar-list{padding-inline-start:1.2em;margin:.45em 0;color:var(--txt);line-height:1.55}
+.ar-list li::marker{color:var(--red-ink)}
+.ar-stats{margin:12px 0}
+.ar-card .ar-stats .v{font-family:var(--f-disp);font-size:1.12rem;font-weight:650}
+.ar-stats .v small{font-size:.72rem;line-height:1.3;font-weight:400;color:var(--dim)}
+.modal:has(>.ar-card){background:var(--bg2)}
+.ar-card[data-category=spells] .dos-rows{grid-template-columns:repeat(2,minmax(0,1fr))}
+.ar-card[data-sub=locations] .has-img .dos-head{position:relative;isolation:isolate;display:flex;align-items:flex-end;min-height:170px;padding:15px;border-radius:8px;overflow:hidden;background:#242323}
+.ar-card[data-sub=locations] .has-img .dos-head-main{z-index:1}
+.ar-card[data-sub=locations] .has-img .dos-img{position:absolute;inset:0;width:100%;height:100%;border:0;max-width:none;border-radius:0}
+.ar-card[data-sub=locations] .has-img .dos-img::after{position:absolute;content:'';inset:0;background:linear-gradient(0deg,rgba(8,9,12,.94),rgba(8,9,12,.03) 90%)}
+.ar-card[data-sub=locations] .has-img .dos-head h2,.ar-card[data-sub=locations] .has-img .dos-kick{color:white}
+@container (max-width:370px){
+  .ar-table td,.ar-table th{padding:7px;min-width:3.5em}
+  .ar-card .dos-img{width:70px;height:70px}
+  .ar-area{gap:9px}
+  .ar-radius{flex-basis:58px}
+}
+@media print{.ar-scroll,.ar-card .lvl-wrap{overflow:visible}.ar-card{container-type:normal}.ar-roll,.ar-pick{display:none}}
+</style>
 </head>
 <body>
 <script>/* сохранённый сеттинг — сразу, ещё до скриптов (по нему играет заставка). Закрытый владельцем
@@ -6512,7 +6586,8 @@ function renderCards(){
 function secHay(e){
   const st=e.updatedAt||0;
   if(e.__hayAt===st && e.__hay!==undefined) return e.__hay;
-  const s=searchNorm(e.title+' '+(e.kicker||'')+' '+(e.body||'')+' '+((e.tags||[]).join(' ')));
+  const aliases=(e.dossier||[]).filter(r=>r.k==='В каноне').map(r=>r.v);
+  const s=searchNorm([e.title,e.kicker||'',e.body||'',...(e.tags||[]),...aliases].join(' '));
   try{ Object.defineProperty(e,'__hay',{value:s,writable:true,configurable:true,enumerable:false});
        Object.defineProperty(e,'__hayAt',{value:st,writable:true,configurable:true,enumerable:false}); }
   catch(_){ return s; }
@@ -6701,17 +6776,269 @@ function bodyDupOfSections(e){
   const b=norm(e&&e.body); if(!b) return false;
   return (e.sections||[]).some(sc=>{ const t=norm(sc&&sc.t); return !!t && (t===b || t.startsWith(b) || (b.length>40 && t.indexOf(b)>=0)); });
 }
+function archiveReading(){
+  const changes = {
+    'srd-schit': [
+      ['+2 к КБ', '+2 к КД'],
+      ['Прибавляет 2 к Классу Доспеха.', 'Даёт +2 к КД.'],
+      ['Щит изготавливается из дерева или металла, и несётся одной рукой. Использование щита увеличивает КД на 2. Вы получаете преимущество только от одного щита одновременно.', 'Деревянный или металлический щит занимает одну руку и даёт +2 к КД. Бонусы от нескольких щитов не складываются.'],
+      ['Опционально: Щит', '\n\nВариант правила. Щит']
+    ],
+    'srd-schit-2': [['+5 к КБ', '+5 к КД']],
+    'srd-posoh-sily': [
+      ['Магический предмет · Легендарный','Магический предмет · Очень редкий'],
+      ['Требует настройки. +2 к КБ, атакам и спасброскам, хранит заряды мощных заклинаний.','Требует настройки. Пока вы держите посох, он даёт +2 к КД, спасброскам и броскам атаки заклинаниями.'],
+      ['Требуется (Волшебником, Колдуном, чародеем)','Требуется волшебнику, колдуну или чародею']
+    ],
+    'b-animated-wand': [['При уменьшении её очков здоровья до 0, волшебная палочка рассыплется в пыль и уничтожится.', 'Когда хиты палочки опускаются до 0, она рассыпается в пыль.']],
+    'b-otto': [['своего максимума количества очков здоровья','своего максимума хитов']],
+    'srd-zhrec': [['Уровеньжреца', 'Уровень жреца']],
+    'srd-charodey': [['Уровень ячейкизаклинаний', 'Уровень ячейки заклинаний'], ['Единицычародейства', 'Единицы чародейства']],
+    'srd-istoschenie-urovni': [['1 за долгий отдых','Один уровень после продолжительного отдыха с едой и питьём']],
+    'srd-teleportaciya': [
+      ['Ваша ознакомленность с местом назначения определяет, успешным ли будет перемещение.', 'Успех перемещения зависит от того, насколько хорошо вы знаете место назначения.'],
+      ['Ознакомленность', 'Знакомство с местом'], ['потайного склеп лича', 'потайного склепа лича'],
+      ['чьё местоположение и внешний облик вам известно', 'чьи местоположение и внешний облик вам известны']
+    ],
+    'b-swarm-of-scarabs': [['не может восстановить или получить временные очки жизни', 'не может восстанавливать хиты или получать временные хиты']],
+    'cmsafgip7': [['пешего пли верхового', 'пешего или верхового'], ['но 1 занимается', 'но и занимается'], ['подучает степень истощения', 'получает степень истощения'], ['раненную конечность','раненую конечность'],['По завершению продолжительного отдыха','По завершении продолжительного отдыха']],
+    'cmsxibx0x': [['Виды Травм и последствия','Травмы и последствия'], ['Все Травмы пронумерованы. Номер Травмы соответствует результату броска к20, нужному для её получения.\nТакже, тут показано, к какому увечью или травме может привести провал лечения данной Травмы.', 'Найдите результат броска к20. Для каждой травмы указано, к чему может привести неудачное лечение.']],
+    'srd-goblin': [['Гоблин может в каждом своём ходу бонусным действием совершать действие Засада или Отход.', 'В каждый свой ход гоблин может бонусным действием совершить Засаду или Отход.'], ['дистанция 80/320 фт., Попадание', 'дистанция 80/320 фт., одна цель. Попадание']]
+  };
+  function wording(id, value){
+    if(typeof value !== 'string' || !Object.hasOwn(changes,id)) return value;
+    for(const [from,to] of changes[id]) value=value.replaceAll(from,to);
+    return value;
+  }
+  // Старые синхронизированные записи получают те же точечные поправки только при чтении.
+  function edition(entry){
+    const published=!!entry.srcbook && entry.srcbook!=='HB';
+    if(!published&&!Object.hasOwn(changes,entry.id))return entry;
+    const fix=value=>{
+      value=wording(entry.id,value);
+      if(!published||typeof value!=='string')return value;
+      return value.replace(/([+]?\d+ к )КБ(?![а-яё])/gi,'$1КД')
+        .replace(/Класс брони:/g,'Класс Доспеха:')
+        .replace(/преуспеть спасброске/g,'преуспеть в спасброске')
+        .replace(/([Вв]) течении (?=\d|(?:минуты|хода|месяца|двух|одного|короткого|нескольких|неопределенного|этого)(?![а-яё]))/g,'$1 течение ')
+        .replace(/([Пп])о завершению (?=ремонта|отдыха)/g,'$1о завершении ')
+        .replace(/([Пп])о окончанию (?=работы|эффекта|короткого|продолжительного)/g,'$1о окончании ');
+    };
+    return {...entry,title:fix(entry.title),kicker:fix(entry.kicker),body:fix(entry.body),
+      dossier:(entry.dossier||[]).map(r=>({...r,k:fix(r.k),v:entry.id==='srd-posoh-sily'&&r.k==='Редкость'&&r.v==='Легендарный'?'Очень редкий':fix(r.v)})),
+      sections:(entry.sections||[]).map(r=>({...r,h:fix(r.h),t:fix(r.t)}))};
+  }
+  function table(cols,rows){
+    return `<div class="ar-scroll" tabindex="0" role="region" aria-label="${esc(cols.join(', '))}"><table class="ar-table"><thead><tr>${cols.map(s=>`<th scope="col">${esc(s)}</th>`).join('')}</tr></thead><tbody>${rows.map(row=>`<tr>${row.map((s,i)=>i?`<td>${esc(s)}</td>`:`<th scope="row">${esc(s)}</th>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+  }
+  function pick(label,options,mode){
+    return `<label class="ar-pick">${esc(label)} <select data-ar="${mode}">${options.map(([value,name])=>`<option value="${esc(value)}">${esc(name)}</option>`).join('')}</select></label>`;
+  }
+  function result(value){return `<output class="ar-result" aria-live="polite">${esc(value)}</output>`;}
+  function details(label,html){return `<details class="ar-details"><summary>${esc(label)}</summary>${html}</details>`;}
+  function dataTable(cols,rows,e,source){
+    if(e.id==='srd-istoschenie-urovni' && rows.length===6 && rows.every((r,i)=>r[0]===String(i+1)) && source.includes('эффекты накапливаются')){
+      return '<div class="ar-widget">'+pick('Уровень истощения',[['','Все уровни'],...rows.map(r=>[r[0],r[0]])],'exhaustion')+table(cols,rows)+result('')+'</div>';
+    }
+    if(e.id==='srd-kover-samolet' && cols.join('|')==='к100|Размер|Грузоподъёмность|Скорость полёта' && rows.every(r=>/^\d+ фнт\.$/.test(r[2]) && /^\d+ футов$/.test(r[3])) && source.includes('Ковёр может поднять в два раза больший вес, чем тот, что указан в таблице, но при нагрузке больше расчётной его скорость уменьшается вдвое.')){
+      return `<div class="ar-widget"><label class="ar-pick">Вес груза, фунты <input type="number" min="0" step="any" value="0" data-ar="load"></label>${table([...cols,'С грузом'],rows.map(r=>[...r,r[3]]))}${result('')}</div>`;
+    }
+    if(e.id==='srd-teleportaciya' && cols.length===5 && /знаком|знакомство/i.test(cols[0])){
+      return `<div class="ar-widget">${pick('Знакомство с местом',[['','Все варианты'],...rows.map((r,i)=>[i,r[0]])],'row')}${table(cols,rows)}</div>`;
+    }
+    return table(cols,rows);
+  }
+  function prose(value,e,heading=''){
+    const source=String(value||'');
+    if(!source.trim()) return '';
+    const lines=source.replace(/\r\n?/g,'\n').split('\n'), parts=[];
+    const cells=line=>line.trim().split(/\s+—\s+/);
+    let pending=[];
+    const flush=()=>{if(pending.length){parts.push(`<p>${pending.map(esc).join('<br>')}</p>`);pending=[];}};
+    for(let i=0;i<lines.length;){
+      const line=lines[i].trim();
+      if(!line){flush();i++;continue;}
+      const cols=cells(line);
+      // Только серии с короткой строкой заголовков и однородными соседними строками.
+      const level=e.id==='srd-istoschenie-urovni' && /^1\s+—\s+/.test(line);
+      if(level || (cols.length>1 && cols.length<=12 && cols.every(c=>c.length<=48) && !/^[\d•*−-]/.test(line) && !/[.!?]$/.test(line))){
+        const rows=[];let j=level?i:i+1;
+        while(j<lines.length){
+          const row=cells(lines[j]);if(row.length!==cols.length || (level && !/^[1-6]$/.test(row[0])))break;
+          rows.push(row);j++;
+        }
+        if(rows.length>=2){flush();parts.push(dataTable(level?['Уровень','Эффект']:cols,rows,e,source));i=j;continue;}
+      }
+      const order=/^(\d{1,2})[.)]\s+(.+)$/.exec(line);
+      if(order){
+        const items=[];let j=i,n=Number(order[1]);
+        while(j<lines.length){
+          const m=/^(\d{1,2})[.)]\s+(.+)$/.exec(lines[j].trim());if(!m||Number(m[1])!==n)break;
+          items.push('<li>'+esc(m[2])+'</li>');n++;j++;
+        }
+        if(items.length>1){flush();parts.push('<ol class="ar-list" start="'+Number(order[1])+'">'+items.join('')+'</ol>');i=j;continue;}
+      }
+      if(/^[•●]\s+/.test(line) || (['Опасности','Что искать'].includes(heading) && lines.length>1 && lines.every(l=>l.trim().length<=85))){
+        flush();const items=[], marked=/^[•●]\s+/.test(line);
+        while(i<lines.length && lines[i].trim() && (!marked || /^[•●]\s+/.test(lines[i].trim()))){
+          items.push(`<li>${esc(lines[i++].trim().replace(/^[•●]\s+/,''))}</li>`);
+          if(marked){
+            let j=i;while(j<lines.length&&!lines[j].trim())j++;
+            if(j<lines.length&&/^[•●]\s+/.test(lines[j].trim()))i=j;
+          }
+        }
+        parts.push(`<ul class="ar-list">${items.join('')}</ul>`);continue;
+      }
+      pending.push(line);i++;
+    }
+    flush();return `<div class="ar-prose">${parts.join('')}</div>`;
+  }
+  function injuries(e){
+    if(e.id!=='cmsxibx0x')return '';
+    const [head,...items]=e.dossier||[];
+    if(head?.k!=='к20 + Травма' || head.v!=='Соответствующее увечье при провале лечения' || items.length!==20)return '';
+    const rows=[];
+    for(const [i,r] of items.entries()){
+      const m=/^(\d+)\.\s+(.+)$/.exec(r.k);
+      if(!m || Number(m[1])!==i+1)return '';
+      // Названия травм и увечий в этой таблице — нарицательные. Авторские имена в новых строках сохраняются.
+      const normal=name=>name.replace(/ (Сотрясение|Глазница|Ухо|Лицевой|Порез|Шее|Рука|Кисть|Трахея|Почка|Лёгкое|Груди|Щека|Нога|Плеча|Ушиб|Руки|Лодыжки|Ноги|Ребра|Мозга|Глаза|Шрам|Крови|Локоть|Пальца|Руке|Внутренних|Органов|Лёгких|Колено|Сухожилие|Рёбра)(?![а-яё])/g,w=>w.toLowerCase());
+      rows.push([m[1],normal(m[2]),/^[-–—]+$/.test(r.v)||!r.v?'В карточке не указано':normal(String(r.v))]);
+    }
+    return `<section class="ar-widget"><fieldset class="ar-roll"><legend>Что выпало на к20?</legend>${rows.map(([n],i)=>`<button type="button" data-ar-roll="${n}" aria-pressed="${!i}">${n}</button>`).join('')}</fieldset><output class="ar-result ar-injury" aria-live="polite"><span><small>Травма</small><b>${esc(rows[0][1])}</b></span><span><small>При провале лечения</small><b>${esc(rows[0][2])}</b></span></output>${details('Все травмы и последствия',table(['к20','Травма','При провале лечения'],rows))}</section>`;
+  }
+  function ice(e){
+    if(e.id!=='sp-ice-knife')return '';
+    const first='Вы создаёте осколок льда и метаете его в одно существо, находящееся в пределах дистанции заклинания.\n\nСовершите по цели дальнобойную атаку заклинанием. При попадании цель получает 1к10 колющего урона. После этого, вне зависимости от попадания или промаха, осколок взрывается. Цель и все существа в пределах 5 футов от места взрыва осколка должны преуспеть в спасброске Ловкости, иначе получат 2к6 урона холодом.';
+    const higher='Если вы сотворяете это заклинание, используя ячейку 2 уровня или выше, то урон холодом увеличивается на 1к6 за каждый уровень ячейки выше 1.';
+    if(e.sections?.length!==2 || e.sections[0].t!==first || e.sections[1].t!==higher || !e.dossier?.some(r=>r.k==='Круг'&&r.v==='1'))return '';
+    return `<section class="ar-widget"><h3>Атака и взрыв</h3><div class="ar-area"><span class="ar-radius" aria-hidden="true"><i></i><b>5 фт.</b></span><p>При попадании или промахе осколок взрывается. Цель и каждое существо в пределах 5 футов от неё совершают спасбросок Ловкости.</p></div>${pick('Уровень ячейки',Array.from({length:9},(_,i)=>[i+1,i+1]),'slot')}${table(['Бросок атаки','Успешный спасбросок','Провал спасброска'],[['Попадание','1к10 колющего','1к10 колющего + 2к6 холодом'],['Промах','Без урона','2к6 холодом']])}<small>В таблице показан урон по основной цели при обычном попадании. Остальных существ в области может задеть только взрыв.</small></section>`;
+  }
+  function attacks(e){
+    if(e.sub!=='bestiary') return null;
+    const entries=[],mapped=new Set();
+    // Полное совпадение: дополнительные эффекты, условия и несколько видов урона остаются в полном описании.
+    const pattern=/^(Рукопашная|Дальнобойная) атака оружием:\s*([+−-]?\d+) к попаданию,\s*(?:досягаемость|дистанция)\s+([\d/]+ фт\.)[,.]?\s*(?:одна цель\.\s*)?Попадание:\s*(\d+) \(([\dкd+\s−-]+)\) ([а-яё]+ урона)\.$/i;
+    for(const sec of e.sections||[]){
+      if(!sec.h?.startsWith('Действие · '))continue;
+      const m=pattern.exec(sec.t);if(!m)continue;
+      entries.push([sec.h.slice('Действие · '.length),m[2],m[3],m[4],m[6],m[5]]);mapped.add(sec);
+    }
+    if(!entries.length)return null;
+    const html=`<section class="ar-widget ar-attacks"><h3>Атаки</h3>${pick('Урон',[['average','Среднее'],['dice','Кости']],'damage')}${table(['Атака','К попаданию','Дальность','Урон'],entries.map(r=>[...r.slice(0,3),r[3]+' '+r[4]]))}<template>${esc(JSON.stringify(entries.map(r=>[r[3],r[5],r[4]])))}</template>${details('Полный текст атак',[...mapped].map(s=>`<h4>${esc(s.h)}</h4>${prose(s.t,e)}`).join(''))}</section>`;
+    return {html,mapped};
+  }
+  function air(e){
+    if(e.id!=='as-vozduh'||!e.dossier?.some(r=>r.v==='Фильтр-маска: −2 ступени · имплант «Бриз»: −1 ступень'))return '';
+    const sections=e.sections||[];
+    if(sections.length!==5||!sections.every((s,i)=>s.h.startsWith((i+1)+' · ')))return '';
+    return `<section class="ar-widget">${pick('Воздух в локации',sections.map((s,i)=>[i+1,s.h]),'air')}${pick('Защита',[[0,'Без защиты'],[2,'Фильтр-маска'],[1,'Имплант «Бриз»']],'protection')}${result(sections[0].h+' · '+sections[0].t)}<template>${esc(JSON.stringify(sections.map(s=>s.h+' · '+s.t)))}</template></section>`;
+  }
+  function classFilter(e,rows){
+    if(e.cat!=='character'&&!['srd-multiclass-caster','phb-multiklassovyy-zaklinatel'].includes(e.id))return '';
+    if(!rows.length||!rows.every(r=>/^\d+$/.test(r[0])))return '';
+    return pick('Уровень',[['','Все уровни'],...rows.map(r=>[r[0],r[0]])],'level');
+  }
+  function narrative(e){
+    if(e.id==='cms2q5rxb' && e.body==='Островной город, что затянут смогом производств и шумом вольной толпы. Устои и правила материка не властны над здешними землями, и даже взор божеств не способен пробиться через облака отрешенного народа. Станет ли это место для тебя домом? Или же ты поднимешь войско против тех, кто однажды разрушил твою родину?' && ['Столица','Свободный совет'].every(v=>e.dossier?.some(r=>r.v===v))){
+      return '<p>Островная столица под властью Свободного совета. Над городом висит промышленный смог. Законы материка здесь не действуют.</p>'+details('Описание из Архива',prose(e.body,e));
+    }
+    return prose(e.body,e);
+  }
+  function compare(e){
+    if(e.cat!=='items'||!['armor','weapons','gear'].includes(e.sub)||!e.dossier?.length)return '';
+    const others=ARCHIVE.filter(x=>x.cat===e.cat&&x.sub===e.sub&&x.id!==e.id&&x.dossier?.length);
+    if(!others.length)return '';
+    others.sort((a,b)=>a.title.localeCompare(b.title,'ru'));
+    return details('Сравнить с другим предметом','<div class="ar-widget">'+pick('Предмет',[['','Выберите предмет'],...others.map(x=>[x.id,x.title])],'compare')+'<div data-ar-comparison></div></div>');
+  }
+  function handle(control){
+    const widget=control.closest('.ar-widget,.ar-card');if(!widget)return;
+    const rows=Array.from(widget.querySelectorAll('.ar-table tbody tr'));
+    const mode=control.dataset.ar;
+    if(mode==='compare'){
+      const target=widget.querySelector('[data-ar-comparison]');
+      const entries=[widget.closest('.ar-card').dataset.entry,control.value].map(id=>ARCHIVE.find(x=>x.id===id));
+      if(!entries.every(Boolean)){target.replaceChildren();return;}
+      const [a,b]=entries.map(edition);
+      const fields=new Set([...a.dossier,...b.dossier].map(r=>r.k));
+      const value=(x,k)=>x.dossier.filter(r=>r.k===k).map(r=>r.v).join(' · ')||'Нет данных';
+      target.innerHTML=table(['Параметр',a.title,b.title],[...fields].map(k=>[k,value(a,k),value(b,k)]));
+    }else if(control.hasAttribute('data-ar-roll')){
+      const n=Number(control.dataset.arRoll),row=rows[n-1];if(!row)return;
+      for(const b of widget.querySelectorAll('[data-ar-roll]'))b.setAttribute('aria-pressed',String(b===control));
+      const fields=widget.querySelectorAll('output b');fields[0].textContent=row.cells[1].textContent;fields[1].textContent=row.cells[2].textContent;
+    }else if(mode==='load'){
+      const load=control.valueAsNumber, valid=Number.isFinite(load)&&load>=0;
+      for(const row of rows){
+        const cap=parseInt(row.cells[2].textContent,10),speed=parseInt(row.cells[3].textContent,10);
+        row.cells[4].textContent=!valid?'…':load>cap*2?'Не поднимет':(load>cap?speed/2:speed)+' футов';
+      }
+      widget.querySelector('output').textContent=valid?'':'Введите вес от нуля.';
+    }else if(mode==='exhaustion'){
+      const level=Number(control.value);
+      rows.forEach((r,i)=>r.hidden=!!level&&i>=level);
+      widget.querySelector('output').textContent=level?'Показаны все эффекты, действующие на этом уровне.':'';
+    }else if(mode==='row'){
+      rows.forEach((r,i)=>r.hidden=control.value!==''&&String(i)!==control.value);
+    }else if(mode==='slot'){
+      const cold=(Number(control.value)+1)+'к6 холодом';
+      rows[0].cells[2].textContent='1к10 колющего + '+cold; rows[1].cells[2].textContent=cold;
+    }else if(mode==='damage'){
+      const data=JSON.parse(widget.querySelector('template').content.textContent);
+      rows.forEach((r,i)=>r.cells[3].textContent=data[i][control.value==='dice'?1:0]+' '+data[i][2]);
+    }else if(mode==='air'||mode==='protection'){
+      const values=JSON.parse(widget.querySelector('template').content.textContent);
+      const level=Number(widget.querySelector('[data-ar=air]').value)-Number(widget.querySelector('[data-ar=protection]').value);
+      widget.querySelector('output').textContent=values[Math.max(1,level)-1];
+    }else if(mode==='level'){
+      const level=Number(control.value);
+      for(const row of widget.querySelectorAll('.lvl-tbl tbody tr'))row.hidden=!!level&&Number(row.cells[0].textContent)!==level;
+      for(const sec of widget.querySelectorAll('[data-ar-levels]')){
+        const [lo,hi]=sec.dataset.arLevels.split('-').map(Number);sec.hidden=!!level&&(level<lo||level>(hi||lo));
+      }
+    }
+  }
+  document.addEventListener('click',ev=>{const button=ev.target.closest?.('[data-ar-roll]');if(button)handle(button);});
+  document.addEventListener('change',ev=>{if(ev.target.matches('[data-ar]'))handle(ev.target);});
+  document.addEventListener('input',ev=>{if(ev.target.matches('[data-ar="load"]'))handle(ev.target);});
+  return {edition,prose,details,injuries,ice,attacks,air,classFilter,narrative,compare};
+}
+const archiveView=archiveReading();
+
 function openModal(id, overlay){
   if(assimArchLocked()) return;
-  const e=ARCHIVE.find(x=>x.id===id); if(!e) return;
+  const source=ARCHIVE.find(x=>x.id===id); if(!source) return;
+  const e=archiveView.edition(source);
   const c=catById(e.cat), s=subById(e.cat,e.sub);
   const path = esc(c.label) + (s?` / ${esc(s.label)}`:'');
-  const badge = e.status==='official'?`<span class="badge official">Канон</span>`:`<span class="badge">Сообщество</span>`;
+  const settingRule=e.srcbook==='HB' || /Редакция КОМИК|под ASSIMILATION/i.test(e.src||'');
+  const badge = e.status==='official'?`<span class="badge official">${settingRule?'Материал сеттинга':'Канон'}</span>`:`<span class="badge">Сообщество</span>`;
   const tags=(e.tags||[]).map(t=>`<span class="tag">#${esc(t)}</span>`).join('');
   const who=e.author?`предложил(а): ${esc(e.author)} · `:'';
   // у бестиария характеристики уходят в статблок-сетку — из «строчного» досье их убираем
-  const rows=(e.dossier||[]).filter(r=>(r.k||r.v) && !(e.sub==='bestiary' && BEAST_STAT_DOS.has((r.k||'').trim()))).map(r=>`<div class="dos-row"><span class="k">${esc(r.k)}</span><span class="v">${esc(r.v)}</span></div>`).join('');
-  const isDossier = !!(e.img || e.kicker || rows);
+  const injuries=archiveView.injuries(e);
+  const attacks=archiveView.attacks(e);
+  const facts=list=>list.map(r=>`<div class="dos-row"><dt class="k">${esc(r.k)}</dt><dd class="v">${esc(r.v)}</dd></div>`).join('');
+  const dossier=(e.dossier||[]).filter(r=>r.k||r.v);
+  const beast=e.sub==='bestiary', spell=e.cat==='spells';
+  const spellFacts=new Set(['Время накладывания','Дистанция','Компоненты','Длительность']);
+  const extraFacts=dossier.filter(r=>beast?!BEAST_STAT_DOS.has((r.k||'').trim()):spell&&!spellFacts.has(r.k));
+  const rows=beast||injuries?'':facts(spell?dossier.filter(r=>spellFacts.has(r.k)):dossier);
+  let statBlock='',primaryStats='';
+  if(e.sub==='bestiary'){
+    const st=beastStat(e);
+    const primary=[['ac','КД'],['hp','Хиты'],['speed','Скорость'],['cr','Опасность']].filter(([k])=>st[k]!=null && st[k]!=='').map(([k,label])=>({k:label,v:st[k]}));
+    const original=dossier.filter(r=>BEAST_STAT_DOS.has((r.k||'').trim()));
+    const grid=deityStatHtml(e);
+    primaryStats=primary.length?`<dl class="ar-stats">${primary.map(r=>{
+      const parts=String(r.v).match(/^([^()]+?)(?:\s*\((.+)\))?$/);
+      return `<div class="dos-row"><dt class="k">${esc(r.k)}</dt><dd class="v">${esc(parts?parts[1]:r.v)}${parts?.[2]?` <small>(${esc(parts[2])})</small>`:''}</dd></div>`;
+    }).join('')}</dl>`:'';
+    const sourceFacts=original.length?archiveView.details('Параметры из досье',`<dl class="dos-rows">${facts(original)}</dl>`):'';
+    statBlock=grid||sourceFacts?archiveView.details('Характеристики и статблок',grid+sourceFacts):'';
+  }else if(e.sub==='deities'){statBlock=deityStatHtml(e);}
+  const isDossier = !!(e.img || e.kicker || rows || primaryStats);
   // архетипы из книг, заблокированных в текущей игре, не показываем (напр. TCE в TERRA)
   const archs = (e.archs||[]).filter(a=>e.srcOk || !srcBlocked(CUR_PROJECT, e.sub, a.src));
   // по умолчанию архетип НЕ выбран (-1): показываются только базовые умения класса;
@@ -6751,14 +7078,17 @@ function openModal(id, overlay){
       c[2] = (!c[2]||c[2]==='—') ? extra : c[2]+', '+extra;
       return c;
     });
-    tbl = `<div class="lvl-wrap"><table class="lvl-tbl">
+    tbl = archiveView.classFilter(e,rows)+`<div class="lvl-wrap" tabindex="0" role="region" aria-label="${esc(e.title)}"><table class="lvl-tbl">
       <thead>${grp}<tr>${e.table.cols.map(c=>`<th>${esc(c)}</th>`).join('')}</tr></thead>
       <tbody>${rows.map(r=>`<tr>${r.map((v,i)=>`<td${i===0?' class="lv"':''}>${esc(v)}</td>`).join('')}</tr>`).join('')}</tbody>
     </table></div>`;
   }
-  const baseSecs=(e.sections||[]);
+  const baseSecs=(e.sections||[]).filter(s=>!attacks?.mapped.has(s));
   const archSecs=(A&&A.feats)||[];
-  const mkSec=(x,tag)=>`<details class="sec"><summary>${esc(x.h)}${tag?`<span class="sec-tag">${esc(tag)}</span>`:''}</summary><p>${esc(x.t)}</p></details>`;
+  const mkSec=(x,tag)=>{
+    const lvl=(x.h||'').match(/ · (\d+(?:-\d+)?) ур\./);
+    return `<details class="sec"${lvl?` data-ar-levels="${lvl[1]}"`:''}><summary>${esc(x.h)}${tag?`<span class="sec-tag">${esc(tag)}</span>`:''}</summary>${archiveView.prose(x.t,e,x.h)}</details>`;
+  };
   // однотипные умения («Воззвание · X», «Боевой стиль · X», «Приём · X»…) сводим
   // в единую секцию-таблицу; секции-фичи с уровнем («Метамагия · 3 ур.») не трогаем
   const ABIL_PL={'Воззвание':'Воззвания','Боевой стиль':'Боевые стили','Приём':'Приёмы','Выстрел':'Выстрелы','Практика':'Практики'};
@@ -6777,7 +7107,7 @@ function openModal(id, overlay){
     return `<details class="sec"><summary>${esc(ABIL_PL[grp]||grp)} <span class="sec-cnt">· ${rows.length}</span>${tag?`<span class="sec-tag">${esc(tag)}</span>`:''}</summary>
       <div class="abil-wrap"><table class="abil-tbl${hasReq?' req3':''}">
         <thead><tr><th>Название</th>${hasReq?'<th>Требование</th>':''}<th>Описание</th></tr></thead>
-        <tbody>${rows.map(r=>`<tr><td class="an">${esc(r.name)}${r.src?`<span class="abil-src">${esc(r.src)}</span>`:''}</td>${hasReq?`<td>${esc(r.req||'—')}</td>`:''}<td>${esc(r.desc)}</td></tr>`).join('')}</tbody>
+        <tbody>${rows.map(r=>`<tr><td class="an">${esc(r.name)}${r.src?`<span class="abil-src">${esc(r.src)}</span>`:''}</td>${hasReq?`<td>${esc(r.req||'—')}</td>`:''}<td>${archiveView.prose(r.desc,e)}</td></tr>`).join('')}</tbody>
       </table></div></details>`;
   };
   const secList=(list,tag)=>{
@@ -6796,12 +7126,14 @@ function openModal(id, overlay){
   };
   const secs = e.table
     ? secList(baseSecs) + secList(archSecs, A&&A.name)
-    : baseSecs.map(x=>`<div class="sec"><h4>${esc(x.h)}</h4><p>${esc(x.t)}</p></div>`).join('');
+    : baseSecs.map(x=>`<section class="sec"><h4>${esc(x.h)}</h4>${archiveView.prose(x.t,e,x.h)}</section>`).join('');
+  const ice=archiveView.ice(e);
   const epi = e.epigraph ? `<blockquote class="epi">${esc(e.epigraph)}</blockquote>` : '';
   const showBody = !!e.body && !bodyDupOfSections(e);   // раздел важнее дублирующей подписи
   document.getElementById(overlay?'modal2':'modal').innerHTML = `
     <button class="x" onclick="${overlay?'closeOverlay()':'closeModal()'}" aria-label="Закрыть">✕</button>
     <button class="bm-btn${isBookmarked(e.id)?' on':''}" data-bm="${e.id}" onclick="toggleBookmark('${e.id}')" aria-label="В закладки" title="В закладки">${BM_SVG}</button>
+    <article class="ar-card" data-category="${esc(e.cat)}" data-sub="${esc(e.sub)}" data-entry="${esc(e.id)}">
     <div class="top">${cardIcon(e,24)}<span class="clabel">${path}</span></div>
     ${isDossier?`
     <div class="dossier${e.img?' has-img':''}">
@@ -6814,20 +7146,23 @@ function openModal(id, overlay){
           ${e.img?`<span class="dos-img">${imgTag(e.img)}</span>`:''}
         </div>
         ${epi}
-        ${rows?`<div class="dos-rows">${rows}</div>`:''}
-        ${showBody?`<div class="body" style="margin-top:12px">${esc(e.body)}</div>`:''}
+        ${primaryStats}${rows?`<dl class="dos-rows">${rows}</dl>`:''}
+        ${showBody&&!beast?`<div class="body">${archiveView.narrative(e)}</div>`:''}
       </div>
     </div>`:`
     <h2>${esc(e.title)}</h2>
     ${epi}
-    ${showBody?`<div class="body">${esc(e.body)}</div>`:''}`}
-    ${(e.sub==='deities'||e.sub==='bestiary')?deityStatHtml(e):''}
+    ${showBody&&!beast?`<div class="body">${archiveView.narrative(e)}</div>`:''}`}
+    ${attacks?.html||''}${ice}${injuries}${archiveView.air(e)}${archiveView.compare(e)}
+    ${beast?'':statBlock}
     ${archUI}
     ${subraceUI}
     ${tbl}
-    ${secs?`<div class="secs">${secs}</div>`:''}
+    ${secs?(ice?archiveView.details('Полный текст заклинания',`<div class="secs">${secs}</div>`):`<div class="secs">${secs}</div>`):''}
+    ${beast?statBlock:''}
+    ${extraFacts.length||(beast&&showBody)?archiveView.details(beast?'О существе':'Сведения о заклинании',(extraFacts.length?`<dl class="dos-rows">${facts(extraFacts)}</dl>`:'')+(beast&&showBody?archiveView.narrative(e):'')):''}
     <div class="foot">${badge}${tags}<span class="src">${who}${srcChip(e)}${esc(cleanSrc(e.src))}</span></div>
-    ${(isDev() && !overlay)?`<div class="chrono-tools"><button class="btn ghost" onclick="openCardEditor('${e.id}')">Редактировать</button></div>`:''}`;
+    ${(isDev() && !overlay)?`<div class="chrono-tools"><button class="btn ghost" onclick="openCardEditor('${e.id}')">Редактировать</button></div>`:''}</article>`;
   // другая карточка при уже открытой модалке — читаем с начала; перерисовка той же (pickArch) прокрутку не трогает
   if(!overlay){
     if(openModal._last!==id){ document.getElementById('modal').scrollTop=0; document.getElementById('scrim').scrollTop=0; }
