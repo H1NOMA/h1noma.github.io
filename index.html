@@ -1930,11 +1930,21 @@
   .dos-sheet::after{bottom:-2px;right:-2px;border-left:none;border-top:none;border-bottom-right-radius:6px}
   /* срез угла у основной кнопки */
   .btn.primary{clip-path:polygon(0 0,calc(100% - 13px) 0,100% 13px,100% 100%,0 100%);box-shadow:none;filter:drop-shadow(0 6px 14px rgba(var(--accent-rgb),.3))}
+  /* герой-блок архива */
+  #view-news .masthead:where(:not(.terra-welcome)){background:
+      repeating-linear-gradient(0deg,rgba(255,255,255,.015) 0 1px,transparent 1px 4px),
+      linear-gradient(180deg,rgba(var(--accent-rgb),.08),rgba(var(--accent-rgb),.02) 55%,transparent),
+      var(--surface);
+    border:var(--hair) solid var(--line2);border-radius:16px;padding:20px 18px 16px 18px;overflow:hidden}
+  #view-news .masthead:where(:not(.terra-welcome))::before{left:0;top:0;bottom:0;border-radius:0}
+  #view-news .masthead:where(:not(.terra-welcome))::after{content:"";position:absolute;top:-1px;right:-1px;width:22px;height:22px;background:linear-gradient(225deg,var(--bg) 0 49%,rgba(var(--accent-rgb),.55) 49% calc(49% + 1.5px),transparent calc(49% + 1.5px))}
   /* телефон: приветствие уходит в пилюлю сеттинга (transform/opacity пишет прокрутка). Слой — только на время
      сжатия: блок большой, с фоновой картинкой, держать его отдельной текстурой постоянно накладно */
   #view-news .masthead.absorbing{will-change:transform,opacity}
   /* углы рамки (срез, уголки сеттингов) на скругляющемся блоке торчали бы — гаснут с первых долей впитывания */
   html #view-news .masthead.absorbing::before,html #view-news .masthead.absorbing::after{opacity:calc(1 - var(--absorb,0)*3)}
+  #view-news .masthead:where(:not(.terra-welcome)) h1{font-family:var(--f-disp);font-weight:700;text-transform:uppercase;letter-spacing:.04em;font-size:1.5rem;line-height:1.15;color:var(--red-ink);text-shadow:0 0 14px rgba(var(--accent-rgb),.3),1px 0 0 rgba(90,208,255,.14),-1px 0 0 rgba(var(--accent-rgb),.16)}
+  #view-news .masthead:where(:not(.terra-welcome)) p{font-family:'Rajdhani',var(--f-disp),sans-serif;font-weight:500;color:var(--dim);font-size:1.04rem;line-height:1.6;letter-spacing:.02em;background:rgba(0,0,0,.28);border:var(--hair) solid var(--line);border-left:2px solid rgba(var(--accent-rgb),.55);border-radius:10px;padding:12px 14px;margin-top:2px}
   /* ===== сквозные эффекты игр ===== */
   .news-card{position:relative}
   /* киберпанк-детали выключены вне ASSIMILATION */
@@ -2002,10 +2012,25 @@
   .acc-tab.on{background:var(--surface);color:var(--red-ink);box-shadow:inset 0 0 0 1px rgba(var(--accent-rgb),.3)}
   /* ===== оформления игр ===== */
   /* LEGACY — лунно-таинственный */
+  [data-project="legacy"] #view-news .masthead{background:
+      radial-gradient(circle at 82% -10%, rgba(207,211,255,.16), transparent 42%),
+      linear-gradient(180deg, rgba(160,143,247,.07), transparent 60%),
+      var(--surface)}
+  [data-project="legacy"] #view-news .masthead h1{font-family:'Cinzel Decorative',serif;font-weight:900;text-transform:none;letter-spacing:.03em;font-size:1.35rem;text-shadow:0 0 26px rgba(160,143,247,.6)}
+  [data-project="legacy"] .masthead .rule{background:linear-gradient(90deg,var(--red),transparent);height:1px;width:120px;-webkit-mask-image:none;mask-image:none}
+  [data-project="legacy"] #view-news .masthead p{font-family:var(--f-body);border-left-style:solid}
   [data-project="legacy"] .news-card h3{font-family:'Cinzel Decorative',serif;font-weight:700;font-size:.94rem}
   [data-project="legacy"] .news-card{border-radius:18px}
 
   /* NEVERLAND — древний и богатый */
+  [data-project="neverland"] #view-news .masthead{background:
+      radial-gradient(circle at 50% 118%, rgba(232,192,82,.2), transparent 55%),
+      linear-gradient(180deg, rgba(232,192,82,.06), transparent 55%),
+      var(--surface);
+    border-color:rgba(232,192,82,.35)}
+  [data-project="neverland"] #view-news .masthead h1{font-family:'Uncial Antiqua',serif;font-weight:400;text-transform:none;letter-spacing:.04em;font-size:1.4rem;text-shadow:0 0 22px rgba(232,192,82,.55)}
+  [data-project="neverland"] .masthead .rule{height:5px;width:130px;background:linear-gradient(180deg,var(--red) 0 1px,transparent 1px 4px,var(--red) 4px 5px);-webkit-mask-image:linear-gradient(90deg,#000 70%,transparent);mask-image:linear-gradient(90deg,#000 70%,transparent)}
+  [data-project="neverland"] #view-news .masthead p{font-family:var(--f-body);border-left-style:double;border-left-width:4px}
   [data-project="neverland"] .news-card h3{font-family:'Uncial Antiqua',serif;font-weight:400;font-size:.96rem}
   [data-project="neverland"] .news-card{border-color:rgba(232,192,82,.25)}
 
@@ -2017,9 +2042,130 @@
   [hidden]{display:none !important}
   .hero-edit{position:absolute;top:10px;right:10px;z-index:3;width:34px;height:34px;border-radius:50%;border:var(--hair) solid var(--line2);background:var(--glass2);color:var(--dim);font-size:.85rem;cursor:pointer;display:flex;align-items:center;justify-content:center}
   .hero-edit:active{color:var(--red-ink)}
+  /* ==== приветствие: рамки в духе эпохи (кроме ASSIMILATION) ==== */
+  #view-news .masthead:where(:not(.terra-welcome)){position:relative;isolation:isolate}
+
+  /* --- LEGACY — лунная скрижаль из тёмного камня --- */
+  [data-project="legacy"] #view-news .masthead{
+    border:none;border-radius:16px;padding:30px 28px 28px;
+    background:
+      radial-gradient(120% 90% at 50% -20%, rgba(150,140,235,.14), transparent 60%),
+      linear-gradient(180deg,#181528 0%,#12101d 100%);
+    box-shadow:0 18px 40px rgba(0,0,0,.5), inset 0 1px 0 rgba(190,182,255,.14);}
+  /* гравированная двойная рамка + засечки-руны по углам.
+     width/height/background сбрасываем явно: иначе от общей красной полосы слева (.masthead:where(:not(.terra-welcome))::before, 3 px)
+     и уголка ASSIMILATION (::after, 22×22) наследуются размеры, и рамка становится полоской */
+  [data-project="legacy"] #view-news .masthead::before{content:"";position:absolute;inset:9px;width:auto;background:none;border:1px solid rgba(168,158,235,.28);border-radius:10px;
+    box-shadow:inset 0 0 0 4px rgba(0,0,0,.25), inset 0 0 22px rgba(120,110,200,.12);pointer-events:none;z-index:-1}
+  [data-project="legacy"] #view-news .masthead::after{content:"";position:absolute;inset:9px;width:auto;height:auto;pointer-events:none;z-index:-1;
+    background:
+      linear-gradient(rgba(190,182,255,.5),rgba(190,182,255,.5)) left 3px top -1px/16px 1px no-repeat,
+      linear-gradient(rgba(190,182,255,.5),rgba(190,182,255,.5)) left -1px top 3px/1px 16px no-repeat,
+      linear-gradient(rgba(190,182,255,.5),rgba(190,182,255,.5)) right 3px top -1px/16px 1px no-repeat,
+      linear-gradient(rgba(190,182,255,.5),rgba(190,182,255,.5)) right -1px top 3px/1px 16px no-repeat,
+      linear-gradient(rgba(190,182,255,.5),rgba(190,182,255,.5)) left 3px bottom -1px/16px 1px no-repeat,
+      linear-gradient(rgba(190,182,255,.5),rgba(190,182,255,.5)) left -1px bottom 3px/1px 16px no-repeat,
+      linear-gradient(rgba(190,182,255,.5),rgba(190,182,255,.5)) right 3px bottom -1px/16px 1px no-repeat,
+      linear-gradient(rgba(190,182,255,.5),rgba(190,182,255,.5)) right -1px bottom 3px/1px 16px no-repeat}
+  [data-project="legacy"] #view-news .masthead h1{color:#dcd8ff;text-shadow:0 0 18px rgba(150,140,235,.45)}
+  [data-project="legacy"] #view-news .masthead p{font-family:var(--f-body);color:#c7c3e0;background:none;border:none;padding:0;margin-top:4px}
+  [data-project="legacy"] #view-news .masthead .rule{height:1px;width:64%;margin:14px auto 12px;border:none;
+    background:linear-gradient(90deg,transparent,rgba(168,158,235,.8),transparent);box-shadow:0 0 12px rgba(150,140,235,.5);-webkit-mask-image:none;mask-image:none}
+
+  /* --- NEVERLAND — древний свиток пергамента --- */
+  [data-project="neverland"] #view-news .masthead{
+    border:none;border-radius:3px;padding:34px 30px;margin:16px 6px 0;overflow:visible;
+    background:
+      radial-gradient(120% 55% at 50% 0%, rgba(150,116,52,.4), transparent 60%),
+      radial-gradient(62% 100% at 0% 50%, rgba(96,72,30,.5), transparent 34%),
+      radial-gradient(62% 100% at 100% 50%, rgba(96,72,30,.5), transparent 34%),
+      linear-gradient(180deg,#3a2f18,#2c2211);
+    box-shadow:inset 0 0 60px rgba(0,0,0,.42), 0 16px 34px rgba(0,0,0,.5)}
+  [data-project="neverland"] #view-news .masthead>*{position:relative;z-index:1}
+  /* витые золотые стержни свитка сверху и снизу (width:auto и top/bottom:auto — не наследовать
+     полосу 3 px и верхний уголок от общих правил, иначе вместо стержней торчала палочка) */
+  [data-project="neverland"] #view-news .masthead::before,
+  [data-project="neverland"] #view-news .masthead::after{content:"";position:absolute;left:-8px;right:-8px;width:auto;height:20px;z-index:2;
+    background:linear-gradient(180deg,#ffe9a6 0%,#e0b452 44%,#a5761f 100%);
+    box-shadow:0 3px 9px rgba(0,0,0,.5), inset 0 2px 0 rgba(255,248,214,.85), inset 0 -3px 6px rgba(70,48,14,.55);
+    border-radius:11px/50%}
+  [data-project="neverland"] #view-news .masthead::before{top:-11px;bottom:auto}
+  [data-project="neverland"] #view-news .masthead::after{top:auto;bottom:-11px}
+  [data-project="neverland"] #view-news .masthead h1{color:#ffe6a0;text-shadow:0 1px 0 #000, 0 0 20px rgba(244,207,92,.45)}
+  [data-project="neverland"] #view-news .masthead p{font-family:var(--f-body);color:#e6d3a6;background:none;border:none;padding:0;margin-top:6px}
+  [data-project="neverland"] #view-news .masthead .rule{height:11px;width:66%;margin:14px auto;border:none;-webkit-mask-image:none;mask-image:none;
+    background:radial-gradient(circle at 50% 50%, rgba(255,220,120,.95) 0 2px, transparent 2.6px) 50%/15px 11px repeat-x,
+               linear-gradient(90deg,transparent,rgba(255,220,120,.6) 22% 78%,transparent) center/100% 1px no-repeat}
+
+
+  /* --- КЛАССИКА — обложка старинного фолианта: зелёная кожа, золотая двойная рамка с заклёпками --- */
+  [data-project="classic"] #view-news .masthead{
+    border:none;border-radius:7px;padding:32px 28px 28px;overflow:visible;
+    background:
+      radial-gradient(120% 82% at 50% -18%, rgba(211,168,74,.1), transparent 60%),
+      radial-gradient(60% 100% at 0% 50%, rgba(0,0,0,.35), transparent 40%),
+      radial-gradient(60% 100% at 100% 50%, rgba(0,0,0,.35), transparent 40%),
+      linear-gradient(180deg,#1b241a 0%,#121913 100%);
+    box-shadow:0 16px 38px rgba(0,0,0,.55), inset 0 1px 0 rgba(211,168,74,.16);}
+  /* золотая двойная рамка */
+  [data-project="classic"] #view-news .masthead::before{content:"";position:absolute;inset:8px;width:auto;height:auto;pointer-events:none;z-index:0;border-radius:4px;background:none;
+    border:1px solid rgba(211,168,74,.42);
+    box-shadow:inset 0 0 0 3px rgba(0,0,0,.3), inset 0 0 0 4px rgba(211,168,74,.16), inset 0 0 26px rgba(150,116,40,.14)}
+  [data-project="classic"] #view-news .masthead>*{position:relative;z-index:1}
+  /* золотые заклёпки по углам рамки */
+  [data-project="classic"] #view-news .masthead::after{content:"";position:absolute;inset:8px;width:auto;height:auto;top:8px;right:8px;pointer-events:none;z-index:2;
+    background:
+      radial-gradient(circle, rgba(240,206,120,.95) 0 2.3px, transparent 3px) left 3px top 3px/9px 9px no-repeat,
+      radial-gradient(circle, rgba(240,206,120,.95) 0 2.3px, transparent 3px) right 3px top 3px/9px 9px no-repeat,
+      radial-gradient(circle, rgba(240,206,120,.95) 0 2.3px, transparent 3px) right 3px bottom 3px/9px 9px no-repeat,
+      radial-gradient(circle, rgba(240,206,120,.95) 0 2.3px, transparent 3px) left 3px bottom 3px/9px 9px no-repeat}
+  [data-project="classic"] #view-news .masthead h1{color:#f0d38a;text-align:center;text-shadow:0 1px 0 rgba(0,0,0,.5), 0 0 18px rgba(211,168,74,.3)}
+  [data-project="classic"] #view-news .masthead p{font-family:var(--f-body);color:#d8d0bb;background:none;border:none;padding:0;margin-top:6px}
+  /* золотой разделитель с ромбом по центру */
+  [data-project="classic"] #view-news .masthead .rule{height:9px;width:60%;margin:14px auto 8px;border:none;-webkit-mask-image:none;mask-image:none;
+    background:
+      linear-gradient(90deg,transparent,rgba(211,168,74,.7) 20% 80%,transparent) center/100% 1px no-repeat,
+      linear-gradient(45deg,transparent 46%,rgba(240,206,120,.95) 46% 54%,transparent 54%) center/9px 9px no-repeat}
+
+  /* --- РУССКИЕ СКАЗКИ — теремное окно с резным наличником --- */
+  [data-project="skazki"] #view-news .masthead{
+    border:none;border-radius:10px;padding:36px 28px 28px;overflow:visible;
+    background:
+      radial-gradient(120% 70% at 50% -16%, rgba(231,193,100,.12), transparent 58%),
+      radial-gradient(60% 100% at 0% 50%, rgba(0,0,0,.34), transparent 40%),
+      radial-gradient(60% 100% at 100% 50%, rgba(0,0,0,.34), transparent 40%),
+      linear-gradient(180deg,#1d301c 0%,#111d12 100%);
+    box-shadow:0 16px 38px rgba(0,0,0,.55), inset 0 1px 0 rgba(231,193,100,.18)}
+  [data-project="skazki"] #view-news .masthead>*{position:relative;z-index:1}
+  /* резной наличник: двойная рамка берёзового золота поверх еловой доски */
+  [data-project="skazki"] #view-news .masthead::before{content:"";position:absolute;inset:8px;width:auto;height:auto;pointer-events:none;z-index:0;border-radius:6px;background:none;
+    border:1px solid rgba(231,193,100,.45);
+    box-shadow:inset 0 0 0 3px rgba(0,0,0,.3), inset 0 0 0 4px rgba(165,224,127,.2), inset 0 0 26px rgba(140,150,60,.12)}
+  /* городчатый верх — резные зубчики — и ромбы-солнышки по углам */
+  [data-project="skazki"] #view-news .masthead::after{content:"";position:absolute;inset:8px;width:auto;height:auto;pointer-events:none;z-index:2;
+    background:
+      linear-gradient(135deg, rgba(231,193,100,.55) 26%, transparent 26%) left top/12px 5px repeat-x,
+      linear-gradient(225deg, rgba(231,193,100,.55) 26%, transparent 26%) left top/12px 5px repeat-x,
+      linear-gradient(45deg,transparent 44%,rgba(240,220,140,.9) 44% 56%,transparent 56%) left 3px top 3px/9px 9px no-repeat,
+      linear-gradient(45deg,transparent 44%,rgba(240,220,140,.9) 44% 56%,transparent 56%) right 3px top 3px/9px 9px no-repeat,
+      linear-gradient(45deg,transparent 44%,rgba(240,220,140,.9) 44% 56%,transparent 56%) right 3px bottom 3px/9px 9px no-repeat,
+      linear-gradient(45deg,transparent 44%,rgba(240,220,140,.9) 44% 56%,transparent 56%) left 3px bottom 3px/9px 9px no-repeat}
+  [data-project="skazki"] #view-news .masthead h1{font-family:'Ruslan Display',Georgia,serif;font-weight:400;text-transform:none;letter-spacing:.05em;font-size:1.5rem;
+    color:#f4e2a4;text-align:center;text-shadow:0 2px 4px rgba(0,0,0,.85), 0 0 18px rgba(231,193,100,.4)}
+  [data-project="skazki"] #view-news .masthead p{font-family:var(--f-body);color:#eef4dc;background:none;border:none;padding:0;margin-top:6px;
+    text-shadow:0 1px 2px rgba(0,0,0,.85), 0 0 10px rgba(0,0,0,.6)}
+  /* вышитая тесьма: ряд ромбиков по золотой нити */
+  [data-project="skazki"] #view-news .masthead .rule{height:9px;width:62%;margin:14px auto 8px;border:none;-webkit-mask-image:none;mask-image:none;
+    background:
+      linear-gradient(90deg,transparent,rgba(165,224,127,.5) 16% 84%,transparent) center/100% 1px no-repeat,
+      linear-gradient(45deg,transparent 44%,rgba(240,220,140,.85) 44% 56%,transparent 56%) center/9px 9px repeat-x}
   [data-project="skazki"] .news-card h3{font-family:'Ruslan Display',Georgia,serif;font-weight:400;font-size:1rem;letter-spacing:.03em}
   [data-project="skazki"] .news-card{border-color:rgba(165,224,127,.26)}
 
+  [data-project="legacy"] #view-news .masthead h1,
+  [data-project="neverland"] #view-news .masthead h1{text-align:center}
+  [data-project="legacy"] #view-news .masthead .rule,
+  [data-project="neverland"] #view-news .masthead .rule{margin-left:auto;margin-right:auto}
   /* ---- таблица прогрессии класса ---- */
   .lvl-wrap{margin:16px 0 4px;overflow-x:auto;-webkit-overflow-scrolling:touch;border:var(--hair) solid var(--line2);border-radius:12px}
   .lvl-tbl{width:100%;border-collapse:collapse;font-size:.78rem;min-width:340px}
@@ -2820,7 +2966,7 @@
   .gs-meta{display:flex;flex-wrap:wrap;gap:6px 14px;font-family:var(--f-mono);font-size:.7rem;color:var(--muted);margin-bottom:8px}
   .gs-players{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:9px}
   .gs-players .tag{display:inline-flex;align-items:center;gap:6px}
-  /* аватарки записавшихся: фото персонажа или буква профиля */
+  /* Аватарки записавшихся: портрет персонажа или профильный к20. */
   .gs-ava{width:40px;height:40px;border-radius:12px;flex:none;display:flex;align-items:center;justify-content:center;font-family:var(--f-disp);font-weight:700;font-size:1.02rem;color:#fff;background:var(--red);border:var(--hair) solid var(--line2);cursor:pointer;padding:0;overflow:hidden;transition:transform .12s,border-color .12s}
   .gs-ava img{width:100%;height:100%;object-fit:cover;display:block}
   .gs-ava:hover{border-color:var(--red);transform:translateY(-1px)}
@@ -3946,12 +4092,17 @@ html.is-web .app-cta:not([hidden]){display:flex}
 /* Профиль и памятка используют размеры и цветовые переменные активного мира. */
 .pc-home{min-width:0;container-type:inline-size}
 .pc-home .top{padding-right:42px}
-.pc-home .pc-head{padding:12px 0 17px;border-bottom:1px solid var(--line2)}
-.pc-home .prof-av-big{border:3px double currentColor;box-shadow:none;border-radius:18px}
+#modal:has(>.pc-home){border:0;box-shadow:none}
+.pc-home .pc-head{padding:12px 0}
+.profile-die{display:block;width:100%;height:100%;pointer-events:none}
+:is(.prof-btn,.dr-ava,.prof-av-big,.set-av,.gs-ava):has(>.profile-die){padding:0;border:0;border-radius:0;background:transparent;box-shadow:none}
+.set-prof:has(.profile-die),.pc-home .set-grp{border:0;background:none;box-shadow:none}
+.pc-home .pc-preset[data-bg]{background:none;border:0;box-shadow:none;padding:4px;position:relative}
+.pc-home .pc-preset[data-bg].on::after{content:"";position:absolute;bottom:0;left:30%;right:30%;height:3px;border-radius:2px;background:var(--red-ink)}
 .pc-idn{min-width:0;overflow-wrap:anywhere}
 .pc-home .pc-idn .nm{font-size:clamp(1.25rem,5cqi,1.9rem);line-height:1.15}
 .pc-activity{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:10px;margin:15px 0}
-.pc-activity section{min-width:0;min-height:100px;background:var(--surface2);border:1px solid var(--line2);border-radius:10px;padding:14px}
+.pc-activity section{min-width:0;min-height:100px;padding:8px 0}
 .pc-activity h3{display:flex;align-items:center;gap:7px;margin:0 0 12px;font:600 1rem/1.3 var(--f-disp);color:var(--txt)}
 .pc-activity h3 svg{width:17px;height:17px;flex:none;color:var(--red-ink)}
 .pc-activity p,.pc-sheet-link small{font:.84rem/1.5 var(--f-body);color:var(--dim)}
@@ -3959,7 +4110,7 @@ html.is-web .app-cta:not([hidden]){display:flex}
 .pc-sheet-link{display:grid;gap:3px;padding:7px 0;overflow-wrap:anywhere}
 .pc-sheet-link span{font-weight:600}
 .pc-activity .pc-text-action,.pc-other summary{padding:8px 0;color:var(--red-ink);font:.8rem/1.4 var(--f-body);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
-.pc-home .pc-bookmarks,.pc-section{border:0;border-top:1px solid var(--line2);background:none;border-radius:0;width:100%}
+.pc-home .pc-bookmarks,.pc-section{border:0;background:none;border-radius:0;width:100%}
 .pc-home .pc-bookmarks{padding:12px 0}
 .pc-section>summary{cursor:pointer;font:600 .94rem/1.35 var(--f-disp);padding:13px 0;list-style:none}
 .pc-section>summary::-webkit-details-marker,.ob-guide>summary::-webkit-details-marker{display:none}
@@ -3979,8 +4130,24 @@ html.is-web .app-cta:not([hidden]){display:flex}
 .ob-content .ob-steps{line-height:1.55}
 .pc-home :is(button,input,summary):focus-visible,.ob-card :is(button,summary):focus-visible{outline:2px solid var(--red-ink);outline-offset:-2px}
 
+/* Декор приветствий рисуется поверх фона; геометрия текста и траектория кубика задаются существующей рамкой. */
+html[data-project]:where(:not([data-project=terra])) #view-news .welcome-frame{isolation:isolate;--hair:.5px;--wf-line:rgba(var(--accent-rgb),.52);--wf-shine:rgba(var(--accent-rgb),.82)}
+html[data-project]:where(:not([data-project=terra])) #view-news .welcome-frame::before{content:'';position:absolute;inset:7px;width:auto;height:auto;pointer-events:none;z-index:0;border:1px solid var(--wf-line);border-radius:3px;background:transparent;box-shadow:none;clip-path:none;transform:none}
+html[data-project]:where(:not([data-project=terra])) #view-news .welcome-frame::after{content:'';position:absolute;inset:6px;width:auto;height:auto;pointer-events:none;z-index:0;border:0;border-radius:0;box-shadow:none;clip-path:none;transform:none;background:
+ linear-gradient(var(--wf-shine),var(--wf-shine)) left top/18px 2px no-repeat,
+ linear-gradient(var(--wf-shine),var(--wf-shine)) left top/2px 18px no-repeat,
+ linear-gradient(var(--wf-shine),var(--wf-shine)) right bottom/18px 2px no-repeat,
+ linear-gradient(var(--wf-shine),var(--wf-shine)) right bottom/2px 18px no-repeat}
+html[data-project]:where(:not([data-project=terra])) #view-news .welcome-frame :is(h1,p){text-shadow:none}
+html[data-project]:where(:not([data-project=terra])) #view-news .welcome-frame .hero-edit{z-index:3}
+html[data-project=legacy] #view-news .welcome-frame::before{inset:8px 8px 8px 12px;border-radius:0 4px 4px 0;box-shadow:-4px 0 0 #514760,-5px 0 0 #b0a2c7}
+html[data-project=classic] #view-news .welcome-frame::before{box-shadow:inset 0 0 0 2px #18201b,inset 0 0 0 3px #74603d}
+html[data-project=neverland] #view-news .welcome-frame::before{inset:8px;border:3px double #a58a4a;border-radius:2px}
+html[data-project=skazki] #view-news .welcome-frame::before{inset:7px;border-color:#85966a;box-shadow:0 0 0 3px #362d23,0 0 0 4px #786344}
+html[data-project=gw] #view-news .welcome-frame::after{inset:6px;background:repeating-linear-gradient(135deg,#e8bc42 0 3px,transparent 3px 7px) right bottom/50px 5px no-repeat}
+html[data-project=assimilation] #view-news .welcome-frame::before{inset:7px;border-style:solid dashed;border-color:#974c51}
 </style>
-<link rel="stylesheet" href="welcome.css?v=320">
+<link rel="stylesheet" href="welcome.css?v=321">
 </head>
 <body>
 <script>/* сохранённый сеттинг — сразу, ещё до скриптов (по нему играет заставка). Закрытый владельцем
@@ -4385,11 +4552,9 @@ if(/Android/i.test(navigator.userAgent||'')) d.classList.add('lite');}catch(e){}
     <div class="news-side">
       <div class="masthead welcome-frame">
         <button class="hero-edit" id="heroEdit" hidden onclick="openHeroEditor()" aria-label="Редактировать приветствие">✎</button>
-        <div class="welcome-copy">
-          <h1 id="heroTitle">New day in New-Liberty!</h1>
-          <div class="rule" aria-hidden="true"></div>
-          <p id="heroText"></p>
-        </div>
+        <h1 id="heroTitle" style="color:var(--red-ink)">New day in New-Liberty!</h1>
+        <div class="rule"></div>
+        <p id="heroText"></p>
       </div>
       <div id="nextGame" hidden></div>
       <div class="signup-bar">
@@ -7320,7 +7485,7 @@ function openPolicy(overlay){
       <p>Для защиты от сбоев сервер ежедневно создаёт <b>зашифрованные резервные копии</b>. Они хранятся на сервере проекта и во внешнем резервном хранилище <b>не дольше 7 дней</b>, после чего удаляются, и используются только для восстановления работы сайта.</p>
 
       <h3>Удаление аккаунта и персонажей</h3>
-      <p>Аккаунт можно удалить самостоятельно в любой момент: откройте профиль (кнопка с первой буквой вашего имени) и выберите <b>«Удалить аккаунт»</b>. Отдельного персонажа можно удалить в его листе, не удаляя аккаунт.</p>
+      <p>Аккаунт можно удалить самостоятельно в любой момент. Откройте профиль кнопкой с двадцатигранником и выберите <b>«Настройки аккаунта» → «Удалить аккаунт»</b>. Отдельного персонажа можно удалить в его листе.</p>
       <p>При удалении аккаунта из облачной базы сразу удаляются учётная запись, все ваши персонажи и их портреты, закладки, подписка на уведомления и записи на предстоящие игры. Остаются записи об уже сыгранных играх, а карточка персонажа на доске ходов мастера остаётся без портрета и без привязки к аккаунту. Логин освобождается через 90 дней — после этого его сможет занять другой пользователь.</p>
       <p><b>Удаление необратимо.</b> Резервные копии и журнал изменений для восстановления удалённых аккаунтов не используются; удалённые данные исчезают из них не позднее чем через 7 дней. Служебная копия списка учётных записей (только логины и хэши паролей) обновляется реже, но удалённые аккаунты из неё не восстанавливаются. Копии в браузерах других ваших устройств удалятся, если очистить в них данные сайта.</p>
 
@@ -8551,8 +8716,7 @@ function gsAvaHtml(p, i, sid){
   const ch=p.charId?findCharAny(p.charId, p.tag):null;
   const photo=ch&&ch.ava;
   const {bg, ink}=gsColors(p);
-  const initial=esc((p.name||p.tag||'?').charAt(0).toUpperCase());
-  return `<button class="gs-ava" onclick="gsPlayerInfo('${sid}',${i})" title="${esc(p.name||'участник')}"${photo?'':` style="background:${bg};color:${ink}"`}>${photo?imgTag(photo):initial}</button>`;
+  return `<button class="gs-ava" onclick="gsPlayerInfo('${sid}',${i})" title="${esc(p.name||p.tag||'Участник')}"${photo?'':` style="--die-fill:${bg};color:${ink}"`}>${photo?imgTag(photo):profileDie()}</button>`;
 }
 function gsCardHtml(s, past){
   const left=seatsLeft(s), mine=myEntry(s), live=!!trkLiveBoardOfGame(s.id);
@@ -8660,11 +8824,10 @@ function gsPlayerInfo(sid, idx){
   const p=(s.players||[])[idx]; if(!p) return;
   const ch=p.charId?findCharAny(p.charId, p.tag):null;
   const photo=ch&&ch.ava; const {bg, ink}=gsColors(p);
-  const initial=esc((p.name||p.tag||'?').charAt(0).toUpperCase());
   const gm=canManageGame(s);
   document.getElementById('modal').innerHTML=`<button class="x" onclick="closeModal()" aria-label="Закрыть">✕</button>
     <div class="top">${rune('character',24)}<span class="clabel">Участник · ${esc(s.title||'сессия')}</span></div>
-    <div class="prof-av-big" style="background:${photo?'#12131a':bg};color:${ink};overflow:hidden;padding:0">${photo?imgTag(photo,'alt="" style="width:100%;height:100%;object-fit:cover"'):initial}</div>
+    <div class="prof-av-big" style="${photo?'background:#12131a':'--die-fill:'+bg};color:${ink};overflow:hidden;padding:0">${photo?imgTag(photo,'alt="" style="width:100%;height:100%;object-fit:cover"'):profileDie()}</div>
     <h2 style="text-align:center;margin-bottom:10px">${esc(p.name||'Участник')}</h2>
     <div class="field"><label>Персонаж</label><input value="${esc(p.charName||'— без персонажа —')}" disabled></div>
     <div class="pacts">
@@ -9242,10 +9405,10 @@ async function contentFileName(title, du, bytes){
 function normTag(t){ return String(t||'').trim().replace(/^@+/,'').toLowerCase(); }
 function validTag(t){ return /^[a-z0-9_]{4,32}$/.test(normTag(t)); }
 function dispTag(t){ return normTag(t); }
-/* ── Кастомные профили: имя + оформление аватарки (фон и цвет буквы) — на устройстве ── */
+/* Имя и цвета двадцатигранника хранятся на устройстве. */
 const PROFILE_COLORS=['#ff4757','#f0592a','#f5c542','#3ecf6a','#37a9e6','#5865f2','#b57bff','#ff6fae','#9d9dac','#e9e9f0'];
-const INK_COLORS=['#ffffff','#12131a','#191b23','#ff4757','#f5c542','#3ecf6a','#37a9e6','#b57bff'];   // #191b23 — буквы пресета «светлый»
-// готовые пары «фон + цвет буквы» для аватара — один ряд вместо двух палитр (охватывают все цвета фона)
+const INK_COLORS=['#ffffff','#12131a','#191b23','#ff4757','#f5c542','#3ecf6a','#37a9e6','#b57bff'];
+// Готовые сочетания цветов граней и рёбер.
 const PROFILE_PRESETS=[
   {bg:'#37a9e6',ink:'#ffffff'},{bg:'#ff4757',ink:'#ffffff'},{bg:'#f5c542',ink:'#12131a'},
   {bg:'#3ecf6a',ink:'#12131a'},{bg:'#b57bff',ink:'#ffffff'},{bg:'#5865f2',ink:'#ffffff'},
@@ -9257,13 +9420,27 @@ function profSet(tag, data){ try{ const all=profAll(); const k=normTag(tag||SESS
 function profName(tag){ const p=profGet(tag); return (p.name&&String(p.name).trim())||dispTag(tag||SESSION); }
 /* adapt=true — аватарка берёт цвета активного сеттинга (живые CSS-переменные, сами меняются при смене мира) */
 function profBg(tag){ const p=profGet(tag); if(p.adapt) return 'var(--surface2)'; const c=p.bg||p.color; return PROFILE_COLORS.indexOf(c)>=0?c:'var(--red)'; }   // legacy .color → фон
-/* Краска буквы. Свой пресет человека не трогаем — он выбрал его сам.
-   А вот умолчание «белым по акценту» читалось плохо во всех пяти сеттингах
-   (замер: 1.36 в терре и неверленде, 2.72 в легаси, 3.34 в ассимиляции при
-   норме 4.5). Фон сеттинга на том же круге даёт от 5.15 до 13.95. */
+/* Контрастные рёбра по умолчанию, с учётом сохранённой палитры. */
 function profInk(tag){ const p=profGet(tag); if(p.adapt) return 'var(--red-ink)'; return INK_COLORS.indexOf(p.ink)>=0?p.ink:'var(--bg)'; }
-function profInitial(tag){ return (profName(tag)||dispTag(tag||SESSION)||'?').charAt(0).toUpperCase()||'?'; }   // первая буква имени, если нет — логина
-/* карточка профиля: имя, оформление (фон + цвет буквы или адаптация под сеттинг), закладки, уведомления,
+function profileDie(){
+  return `<svg class="profile-die" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+    <path fill="var(--die-fill,var(--red))" d="M32 3 58 18v28L32 61 6 46V18Z"/>
+    <path fill="#fff" opacity=".22" d="m32 3 26 15-26-5L6 18Z"/>
+    <path fill="#fff" opacity=".12" d="m6 18 26-5-18 29Z"/>
+    <path fill="#000" opacity=".23" d="m58 18-8 24-18 19 26-15Z"/>
+    <path fill="#000" opacity=".14" d="m14 42 18 19 18-19Z"/>
+    <g fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round">
+      <path d="M32 3 58 18v28L32 61 6 46V18Z"/>
+      <path d="M32 3v10L6 18l8 24-8 4m8-4 18 19 18-19 8 4m-8-4 8-24-26-5-18 29h36L32 13"/>
+    </g></svg>`;
+}
+function paintProfileDie(el,tag){
+  if(!el.querySelector('.profile-die')) el.innerHTML=profileDie();
+  el.style.removeProperty('background');
+  el.style.setProperty('--die-fill',profBg(tag));
+  el.style.color=profInk(tag);
+}
+/* карточка профиля: имя, оформление кубика, закладки, уведомления,
    смена пароля, выход и удаление аккаунта */
 let PROF_TMP={name:'',bg:'',ink:'',adapt:false};
 function pcNextGame(){
@@ -9308,20 +9485,20 @@ async function pcOpenSheet(id){
 function openProfileCard(){
   if(!SESSION){ openAccessModal(null,'account'); return; }
   const p=profGet(SESSION);
-  // цвета не выбраны — оставляем пустыми (умолчание шапки: акцент сеттинга и буква цветом фона). Раньше сюда
+  // Если цвета не выбраны, грани берут акцент сеттинга, рёбра — цвет фона. Раньше сюда
   // подставлялись #ff4757/#ffffff, пресет подсвечивался выбранным, и «Сохранить» ради одного имени перекрашивал аватар
   PROF_TMP={name:p.name||'', bg:(PROFILE_COLORS.indexOf(p.bg||p.color)>=0?(p.bg||p.color):''), ink:(INK_COLORS.indexOf(p.ink)>=0?p.ink:''), adapt:!!p.adapt};
   const m=document.getElementById('modal');
-  const initial=esc(profInitial(SESSION));
+  const die=profileDie();
   // пресеты, «+» и свотчи — кнопки: span с onclick не брал фокус, и с клавиатуры цвет было не выбрать
   const presetHtml=PROFILE_PRESETS.map((pr,i)=>{
     const on=(!PROF_TMP.adapt && pr.bg===PROF_TMP.bg && pr.ink===PROF_TMP.ink);
-    return `<button type="button" class="pc-preset${on?' on':''}" data-bg="${pr.bg}" data-ink="${pr.ink}" style="background:${pr.bg};color:${pr.ink}" aria-label="Вариант ${i+1}" aria-pressed="${on}" onclick="pcPreset('${pr.bg}','${pr.ink}')">${initial}</button>`;
+    return `<button type="button" class="pc-preset${on?' on':''}" data-bg="${pr.bg}" data-ink="${pr.ink}" style="--die-fill:${pr.bg};color:${pr.ink}" aria-label="Вариант ${i+1}" aria-pressed="${on}" onclick="pcPreset('${pr.bg}','${pr.ink}')">${die}</button>`;
   }).join('');
   m.innerHTML=`<button class="x" onclick="closeModal()" aria-label="Закрыть">✕</button>
     <article class="pc-home"><div class="top">${rune('character',24)}<span class="clabel">Профиль · ${esc(gameTitle(CUR_PROJECT))}</span></div>
     <div class="pc-head">
-      <div class="prof-av-big" id="pcAv" style="background:${profBg(SESSION)};color:${profInk(SESSION)}">${initial}</div>
+      <div class="prof-av-big" id="pcAv" style="--die-fill:${profBg(SESSION)};color:${profInk(SESSION)}">${die}</div>
       <div class="pc-idn"><div class="nm" id="pcName">${esc(profName(SESSION)||dispTag(SESSION))}</div><div class="lg">@${esc(dispTag(SESSION))}</div></div>
     </div>
     <div class="pc-activity" id="pcActivity"></div>
@@ -9334,8 +9511,8 @@ function openProfileCard(){
     <div id="pcManual"${PROF_TMP.adapt?' class="pc-off" inert':''}>
       <div class="pc-presets">${presetHtml}<button type="button" class="pc-preset more" onclick="pcMore()" title="Свои цвета" aria-label="Свои цвета" aria-expanded="false">+</button></div>
       <div id="pcCustom" hidden>
-        <div class="prof-swatches" style="margin-top:11px">${PROFILE_COLORS.map((c,i)=>`<button type="button" class="prof-sw${c===PROF_TMP.bg?' on':''}" data-bg="${c}" style="background:${c}" aria-label="Фон ${i+1}" aria-pressed="${c===PROF_TMP.bg}" onclick="pcBg('${c}')"></button>`).join('')}</div>
-        <div class="prof-swatches" style="margin-top:8px">${INK_COLORS.map((c,i)=>`<button type="button" class="prof-sw${c===PROF_TMP.ink?' on':''}" data-ink="${c}" style="background:${c}" aria-label="Цвет буквы ${i+1}" aria-pressed="${c===PROF_TMP.ink}" onclick="pcInk('${c}')"></button>`).join('')}</div>
+        <div class="prof-swatches" style="margin-top:11px">${PROFILE_COLORS.map((c,i)=>`<button type="button" class="prof-sw${c===PROF_TMP.bg?' on':''}" data-bg="${c}" style="background:${c}" aria-label="Цвет граней ${i+1}" aria-pressed="${c===PROF_TMP.bg}" onclick="pcBg('${c}')"></button>`).join('')}</div>
+        <div class="prof-swatches" style="margin-top:8px">${INK_COLORS.map((c,i)=>`<button type="button" class="prof-sw${c===PROF_TMP.ink?' on':''}" data-ink="${c}" style="background:${c}" aria-label="Цвет рёбер ${i+1}" aria-pressed="${c===PROF_TMP.ink}" onclick="pcInk('${c}')"></button>`).join('')}</div>
       </div>
     </div>
     <button class="btn primary" style="width:100%;margin-top:14px" onclick="pcSave()">Сохранить</button></div></details>
@@ -9355,12 +9532,10 @@ function openProfileCard(){
 }
 function pcAvApply(){ const av=document.getElementById('pcAv'); if(!av) return;
   // те же краски, что возьмёт аватар в шапке (profBg/profInk), — превью не должно врать
-  av.style.background = PROF_TMP.adapt ? 'var(--surface2)' : (PROF_TMP.bg||'var(--red)');
+  av.style.setProperty('--die-fill',PROF_TMP.adapt ? 'var(--surface2)' : (PROF_TMP.bg||'var(--red)'));
   av.style.color = PROF_TMP.adapt ? 'var(--red-ink)' : (PROF_TMP.ink||'var(--bg)'); }
-function pcName(v){ PROF_TMP.name=v; const init=((v.trim()||dispTag(SESSION)).charAt(0)||'?').toUpperCase();
-  const av=document.getElementById('pcAv'); if(av) av.textContent=init;
-  const nm=document.getElementById('pcName'); if(nm) nm.textContent=(v.trim()||dispTag(SESSION));
-  document.querySelectorAll('.pc-preset[data-bg]').forEach(el=>{ el.textContent=init; }); }
+function pcName(v){ PROF_TMP.name=v;
+  const nm=document.getElementById('pcName'); if(nm) nm.textContent=v.trim()||dispTag(SESSION); }
 // подсветка активного пресета/свотчей по текущим bg+ink (при адаптации пресеты не выделяются)
 function pcSyncSel(){
   const on=(el,v)=>{ el.classList.toggle('on', v); el.setAttribute('aria-pressed', String(v)); };
@@ -9597,10 +9772,10 @@ function renderAcct(){
   }
   renderAvatarBtn();
 }
-/* квадратная аватарка в шапке: первая буква логина, цвет из профиля; тап → карточка профиля (или вход) */
+/* Кубик в шапке открывает профиль, гостевая кнопка открывает вход. */
 function renderAvatarBtn(){
   const b=document.getElementById('profBtn'); if(!b) return;
-  if(SESSION){ b.textContent=profInitial(SESSION); b.style.background=profBg(SESSION); b.style.color=profInk(SESSION); b.title='Профиль · '+dispTag(SESSION); b.setAttribute('aria-label','Профиль'); }
+  if(SESSION){ paintProfileDie(b,SESSION); b.title='Профиль · '+dispTag(SESSION); b.setAttribute('aria-label','Профиль'); }
   else { b.textContent='?'; b.style.background='var(--surface2)'; b.style.color='var(--dim)'; b.title='Войти'; b.setAttribute('aria-label','Войти'); }   // --dim, как в шторке: --muted на круге не добирал контраста
 }
 function openAuth(mode, hint){
@@ -12821,28 +12996,55 @@ const GAME_HERO={
 };
 const KEY_HERO='comik:hero:v1';
 let HERO_EDITS={};
+/* фоновые арты приветствий (вариант «фон рамки») — файлы img/hero-<сеттинг>.jpg
+   (раньше лежали base64 внутри страницы, +1 МБ к каждому её обновлению) */
+const HERO_IMGS={ legacy:'img/hero-legacy.jpg', neverland:'img/hero-neverland.jpg', assimilation:'img/hero-assimilation.jpg',
+  classic:'img/hero-classic.jpg', skazki:'img/hero-skazki.jpg', gw:'img/hero-gw.jpg' };
 function applyGameHero(){
   const g=GAME_HERO[CUR_PROJECT]||GAME_HERO.assimilation;
   const o=HERO_EDITS[CUR_PROJECT]||{};
   const t=document.getElementById('heroTitle'), p=document.getElementById('heroText');
   if(t) t.textContent = o.title || g.title;
+  const terra=CUR_PROJECT==='terra';
   if(p){
     p.innerHTML=sanitizeHTML(o.text || g.text);
-    if(CUR_PROJECT==='legacy' && !p.childElementCount){
-      const stanzas=p.textContent.split(/(\r?\n[ \t]*\r?\n)/);
-      if(stanzas.length>1)p.replaceChildren(...stanzas.map((text,i)=>{
-        if(i%2)return document.createTextNode(text);
-        const stanza=document.createElement('span'); stanza.className='welcome-stanza'; stanza.textContent=text;
-        return stanza;
-      }));
-    }
     // Вынос финальной строки типографский. Произвольный текст и разметка ведущего сохраняются.
     const last=p.lastChild, closing='Время выбрать сторону.';
-    if(CUR_PROJECT==='terra' && last?.nodeType===Node.TEXT_NODE && last.data.endsWith(closing)){
+    if(terra && last?.nodeType===Node.TEXT_NODE && last.data.endsWith(closing)){
       const tail=last.splitText(last.length-closing.length);
       const line=document.createElement('span'); line.className='welcome-ending';
       tail.replaceWith(line); line.appendChild(tail);
     }
+  }
+  const mh=document.querySelector('#view-news .masthead');
+  if(mh){
+    mh.classList.toggle('terra-welcome',terra);
+    const copy=mh.querySelector(':scope > .welcome-copy');
+    if(terra && !copy){
+      const wrap=document.createElement('div');
+      wrap.className='welcome-copy';
+      t.before(wrap);
+      wrap.append(t,mh.querySelector('.rule'),p);
+    }else if(!terra && copy){
+      copy.replaceWith(...copy.children);
+    }
+    t.style.color=terra?'':'var(--red-ink)';
+    const hi=HERO_IMGS[CUR_PROJECT];
+    if(hi){
+      // у луны LEGACY сюжет в верхней части кадра — кадрируем выше центра
+      const pos={legacy:'center 20%', classic:'center 30%', skazki:'center 26%', gw:'center 42%'}[CUR_PROJECT]||'center';
+      // «Классика» — тёпло-зелёная вуаль, чтобы золотая рамка и текст читались
+      const overlay={
+        classic:'linear-gradient(110deg,#101c15cf,#111d17bb 40%,#0d1611f2)',
+        legacy:'linear-gradient(180deg,#10132368,#16142bc9 32%,#171526ed 68%,#191622fa)',
+        neverland:'linear-gradient(150deg,#211810b8,#251c13dd 58%,#211911f5)',
+        assimilation:'linear-gradient(120deg,#14121bc9,#19141dbf 40%,#10131cf3)',
+        skazki:'linear-gradient(180deg,#08110a57,#091b0fbd 34%,#08150af0 75%)',
+        gw:'linear-gradient(180deg,#12120998,#13140fce 42%,#12120df5)'
+      }[CUR_PROJECT]||'linear-gradient(#121216b8,#15151be6)';
+      mh.style.backgroundImage=`${overlay}, url("${hi}")`;
+      mh.style.backgroundSize='cover'; mh.style.backgroundPosition=pos; mh.style.backgroundRepeat='';
+    } else { mh.style.backgroundImage=''; mh.style.backgroundSize=''; mh.style.backgroundPosition=''; mh.style.backgroundRepeat=''; }
   }
   // приветствие правит только разработчик — ни в одном сеттинге игроку-ГМ это недоступно
   const e=document.getElementById('heroEdit'); if(e) e.hidden = false;   // показ по режиму ГМ — через .is-gm (CSS)
@@ -13655,7 +13857,7 @@ function renderSettings(){
   // закладки, уведомления, пароль, выход и удаление аккаунта — в карточке профиля (тап по шапке)
   el.innerHTML = `<div class="set-page">
     <button class="set-prof" onclick="openProfileCard()">
-      <span class="set-av" style="background:${profBg(SESSION)};color:${profInk(SESSION)}">${esc(profInitial(SESSION))}</span>
+      <span class="set-av" style="--die-fill:${profBg(SESSION)};color:${profInk(SESSION)}">${profileDie()}</span>
       <span class="id"><span class="n">${esc(profName(SESSION))}</span>${isDev()?`<br><span class="set-badge">${bi('dice')}Game Master</span>`:`<br><span class="set-badge" style="color:var(--dim);background:var(--surface2);border-color:var(--line2)">@${esc(dispTag(SESSION))}</span>`}</span>
       ${CHEV}
     </button>
@@ -18029,7 +18231,7 @@ const KUB=(()=>{
   function peekOpen(){
     if(pk) return;
     const c=mh.cloneNode(true);
-    // Снимаем стили впитывания, чтобы раскрылась целая рамка.
+    // снимаем только впитывание: арт сеттинга тоже стоит inline (applyGameHero)
     ABS.forEach(k=>c.style.removeProperty(k)); c.classList.remove('absorbing'); c.classList.add('hero-peek');
     c.querySelectorAll('[id]').forEach(n=>n.removeAttribute('id'));
     c.querySelectorAll('.hero-edit').forEach(n=>n.remove());
@@ -18477,8 +18679,7 @@ const KUB=(()=>{
     var a=document.getElementById('drAva'); if(!a) return;
     try{
       if(typeof SESSION!=='undefined' && SESSION){
-        a.textContent=profInitial(SESSION); a.style.background=profBg(SESSION);
-        a.style.color=profInk(SESSION); a.title='Профиль · '+dispTag(SESSION);
+        paintProfileDie(a,SESSION); a.title='Профиль · '+dispTag(SESSION);
       } else { a.textContent='?'; a.style.background='var(--surface2)';
         // краска подписей на приподнятом круге не добирала до 4.5 (4.2 в терре)
         a.style.color='var(--dim)'; a.title='Войти'; }

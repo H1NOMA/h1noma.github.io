@@ -75,10 +75,27 @@ async function checkProfile(page) {
   await page.locator('#modal2 .x').click();
   await profile.locator('#pcLook summary').click();
   await profile.locator('#pc-name').fill('Лунный бард');
+  assert(await profile.locator('#pcAv svg.profile-die path').count() > 0);
+  assert.equal((await profile.locator('#pcAv').textContent()).trim(), '');
   await profile.locator('.pc-preset[data-bg]').first().click();
+  const fill = await profile.locator('.pc-preset[data-bg]').first().getAttribute('data-bg');
   await profile.getByRole('button', {name:'Сохранить'}).click();
   await page.evaluate(() => openProfileCard());
   assert.equal(await profile.locator('#pcName').innerText(), 'Лунный бард');
+  for (const id of ['pcAv', 'profBtn', 'drAva']) {
+    const avatar = page.locator('#' + id);
+    assert.equal(await avatar.locator('.profile-die').count(), 1);
+    assert.equal(await avatar.evaluate(el => el.style.getPropertyValue('--die-fill')), fill);
+    assert.equal(await avatar.evaluate(el => getComputedStyle(el).borderTopWidth), '0px');
+  }
+  assert.equal(await profile.locator('#pcActivity section').first().evaluate(el => getComputedStyle(el).borderTopWidth), '0px');
+  await page.evaluate(() => renderSettings());
+  assert.equal(await page.locator('#view-settings .set-av > svg.profile-die').count(), 1);
+  assert(await page.evaluate(() => {
+    const row=document.createElement('div');
+    row.innerHTML=gsAvaHtml({tag:currentTag(), name:profName(SESSION)}, 0, 'morning');
+    return !!row.querySelector('.gs-ava > svg.profile-die') && !row.textContent.trim();
+  }));
   assert.equal(await profile.locator('#pcActivity h3 svg:has(path)').count(), 2);
   if (process.env.TEST_EVIDENCE) {
     await page.waitForFunction(() => +getComputedStyle(document.getElementById('toast')).opacity === 0);

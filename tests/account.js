@@ -156,7 +156,7 @@ async function register(page, tag, pass) {
     check(await page.waitForFunction(() => /Мои закладки/.test(document.getElementById('modal').textContent) && document.querySelectorAll('#modal .bm-item').length === 1, null, { timeout: 3000 }).then(() => true, () => false), 'гость: «Настройки → Закладки» показывает его закладку');
     await page.evaluate(() => closeModal());
     await login(page, 'testplayer');
-    check(await page.evaluate(() => document.getElementById('profBtn').textContent === profInitial(SESSION)), 'вошёл: на аватаре — буква имени');
+    check(await page.locator('#profBtn .profile-die').count() === 1, 'после входа на аватаре появляется к20');
     await page.click('#profBtn');
     check(await page.waitForSelector('#modal .pc-bookmarks', { timeout: 3000 }).then(() => true, () => false), 'аватар открывает профиль (там закладки)');
     check(errs.length === 0, errLine(errs));
