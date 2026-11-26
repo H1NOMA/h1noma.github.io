@@ -1930,21 +1930,11 @@
   .dos-sheet::after{bottom:-2px;right:-2px;border-left:none;border-top:none;border-bottom-right-radius:6px}
   /* срез угла у основной кнопки */
   .btn.primary{clip-path:polygon(0 0,calc(100% - 13px) 0,100% 13px,100% 100%,0 100%);box-shadow:none;filter:drop-shadow(0 6px 14px rgba(var(--accent-rgb),.3))}
-  /* герой-блок архива */
-  #view-news .masthead{background:
-      repeating-linear-gradient(0deg,rgba(255,255,255,.015) 0 1px,transparent 1px 4px),
-      linear-gradient(180deg,rgba(var(--accent-rgb),.08),rgba(var(--accent-rgb),.02) 55%,transparent),
-      var(--surface);
-    border:var(--hair) solid var(--line2);border-radius:16px;padding:20px 18px 16px 18px;overflow:hidden}
-  #view-news .masthead::before{left:0;top:0;bottom:0;border-radius:0}
-  #view-news .masthead::after{content:"";position:absolute;top:-1px;right:-1px;width:22px;height:22px;background:linear-gradient(225deg,var(--bg) 0 49%,rgba(var(--accent-rgb),.55) 49% calc(49% + 1.5px),transparent calc(49% + 1.5px))}
   /* телефон: приветствие уходит в пилюлю сеттинга (transform/opacity пишет прокрутка). Слой — только на время
      сжатия: блок большой, с фоновой картинкой, держать его отдельной текстурой постоянно накладно */
   #view-news .masthead.absorbing{will-change:transform,opacity}
   /* углы рамки (срез, уголки сеттингов) на скругляющемся блоке торчали бы — гаснут с первых долей впитывания */
   html #view-news .masthead.absorbing::before,html #view-news .masthead.absorbing::after{opacity:calc(1 - var(--absorb,0)*3)}
-  #view-news .masthead h1{font-family:var(--f-disp);font-weight:700;text-transform:uppercase;letter-spacing:.04em;font-size:1.5rem;line-height:1.15;color:var(--red-ink);text-shadow:0 0 14px rgba(var(--accent-rgb),.3),1px 0 0 rgba(90,208,255,.14),-1px 0 0 rgba(var(--accent-rgb),.16)}
-  #view-news .masthead p{font-family:'Rajdhani',var(--f-disp),sans-serif;font-weight:500;color:var(--dim);font-size:1.04rem;line-height:1.6;letter-spacing:.02em;background:rgba(0,0,0,.28);border:var(--hair) solid var(--line);border-left:2px solid rgba(var(--accent-rgb),.55);border-radius:10px;padding:12px 14px;margin-top:2px}
   /* ===== сквозные эффекты игр ===== */
   .news-card{position:relative}
   /* киберпанк-детали выключены вне ASSIMILATION */
@@ -2012,36 +2002,14 @@
   .acc-tab.on{background:var(--surface);color:var(--red-ink);box-shadow:inset 0 0 0 1px rgba(var(--accent-rgb),.3)}
   /* ===== оформления игр ===== */
   /* LEGACY — лунно-таинственный */
-  [data-project="legacy"] #view-news .masthead{background:
-      radial-gradient(circle at 82% -10%, rgba(207,211,255,.16), transparent 42%),
-      linear-gradient(180deg, rgba(160,143,247,.07), transparent 60%),
-      var(--surface)}
-  [data-project="legacy"] #view-news .masthead h1{font-family:'Cinzel Decorative',serif;font-weight:900;text-transform:none;letter-spacing:.03em;font-size:1.35rem;text-shadow:0 0 26px rgba(160,143,247,.6)}
-  [data-project="legacy"] .masthead .rule{background:linear-gradient(90deg,var(--red),transparent);height:1px;width:120px;-webkit-mask-image:none;mask-image:none}
-  [data-project="legacy"] #view-news .masthead p{font-family:var(--f-body);border-left-style:solid}
   [data-project="legacy"] .news-card h3{font-family:'Cinzel Decorative',serif;font-weight:700;font-size:.94rem}
   [data-project="legacy"] .news-card{border-radius:18px}
 
   /* NEVERLAND — древний и богатый */
-  [data-project="neverland"] #view-news .masthead{background:
-      radial-gradient(circle at 50% 118%, rgba(232,192,82,.2), transparent 55%),
-      linear-gradient(180deg, rgba(232,192,82,.06), transparent 55%),
-      var(--surface);
-    border-color:rgba(232,192,82,.35)}
-  [data-project="neverland"] #view-news .masthead h1{font-family:'Uncial Antiqua',serif;font-weight:400;text-transform:none;letter-spacing:.04em;font-size:1.4rem;text-shadow:0 0 22px rgba(232,192,82,.55)}
-  [data-project="neverland"] .masthead .rule{height:5px;width:130px;background:linear-gradient(180deg,var(--red) 0 1px,transparent 1px 4px,var(--red) 4px 5px);-webkit-mask-image:linear-gradient(90deg,#000 70%,transparent);mask-image:linear-gradient(90deg,#000 70%,transparent)}
-  [data-project="neverland"] #view-news .masthead p{font-family:var(--f-body);border-left-style:double;border-left-width:4px}
   [data-project="neverland"] .news-card h3{font-family:'Uncial Antiqua',serif;font-weight:400;font-size:.96rem}
   [data-project="neverland"] .news-card{border-color:rgba(232,192,82,.25)}
 
   /* TERRA AETERNA — магический детектив начала XX века */
-  [data-project="terra"] #view-news .masthead{background:
-      repeating-linear-gradient(0deg, transparent 0 26px, rgba(216,208,191,.045) 26px 27px),
-      radial-gradient(circle at 12% -14%, rgba(239,232,214,.14), transparent 40%),
-      var(--surface)}
-  [data-project="terra"] #view-news .masthead h1{font-family:Georgia,'Times New Roman',serif;font-weight:700;text-transform:none;font-variant:small-caps;letter-spacing:.06em;font-size:1.45rem;text-shadow:0 0 18px rgba(216,208,191,.45)}
-  [data-project="terra"] .masthead .rule{height:1px;width:140px;background:none;border-top:1px dashed var(--red-dim);-webkit-mask-image:none;mask-image:none;opacity:.8}
-  [data-project="terra"] #view-news .masthead p{font-family:Georgia,'Times New Roman',serif;font-size:.98rem;font-style:italic;border-left-style:solid}
   [data-project="terra"] .news-card h3{font-family:Georgia,'Times New Roman',serif;font-variant:small-caps;font-size:1rem}
   [data-project="terra"] .news-card time{font-style:italic;text-transform:none;letter-spacing:.06em}
   [data-project="terra"] body::after{opacity:0}
@@ -2049,150 +2017,9 @@
   [hidden]{display:none !important}
   .hero-edit{position:absolute;top:10px;right:10px;z-index:3;width:34px;height:34px;border-radius:50%;border:var(--hair) solid var(--line2);background:var(--glass2);color:var(--dim);font-size:.85rem;cursor:pointer;display:flex;align-items:center;justify-content:center}
   .hero-edit:active{color:var(--red-ink)}
-  /* ==== приветствие: рамки в духе эпохи (кроме ASSIMILATION) ==== */
-  #view-news .masthead{position:relative;isolation:isolate}
-
-  /* --- LEGACY — лунная скрижаль из тёмного камня --- */
-  [data-project="legacy"] #view-news .masthead{
-    border:none;border-radius:16px;padding:30px 28px 28px;
-    background:
-      radial-gradient(120% 90% at 50% -20%, rgba(150,140,235,.14), transparent 60%),
-      linear-gradient(180deg,#181528 0%,#12101d 100%);
-    box-shadow:0 18px 40px rgba(0,0,0,.5), inset 0 1px 0 rgba(190,182,255,.14);}
-  /* гравированная двойная рамка + засечки-руны по углам.
-     width/height/background сбрасываем явно: иначе от общей красной полосы слева (.masthead::before, 3 px)
-     и уголка ASSIMILATION (::after, 22×22) наследуются размеры, и рамка становится полоской */
-  [data-project="legacy"] #view-news .masthead::before{content:"";position:absolute;inset:9px;width:auto;background:none;border:1px solid rgba(168,158,235,.28);border-radius:10px;
-    box-shadow:inset 0 0 0 4px rgba(0,0,0,.25), inset 0 0 22px rgba(120,110,200,.12);pointer-events:none;z-index:-1}
-  [data-project="legacy"] #view-news .masthead::after{content:"";position:absolute;inset:9px;width:auto;height:auto;pointer-events:none;z-index:-1;
-    background:
-      linear-gradient(rgba(190,182,255,.5),rgba(190,182,255,.5)) left 3px top -1px/16px 1px no-repeat,
-      linear-gradient(rgba(190,182,255,.5),rgba(190,182,255,.5)) left -1px top 3px/1px 16px no-repeat,
-      linear-gradient(rgba(190,182,255,.5),rgba(190,182,255,.5)) right 3px top -1px/16px 1px no-repeat,
-      linear-gradient(rgba(190,182,255,.5),rgba(190,182,255,.5)) right -1px top 3px/1px 16px no-repeat,
-      linear-gradient(rgba(190,182,255,.5),rgba(190,182,255,.5)) left 3px bottom -1px/16px 1px no-repeat,
-      linear-gradient(rgba(190,182,255,.5),rgba(190,182,255,.5)) left -1px bottom 3px/1px 16px no-repeat,
-      linear-gradient(rgba(190,182,255,.5),rgba(190,182,255,.5)) right 3px bottom -1px/16px 1px no-repeat,
-      linear-gradient(rgba(190,182,255,.5),rgba(190,182,255,.5)) right -1px bottom 3px/1px 16px no-repeat}
-  [data-project="legacy"] #view-news .masthead h1{color:#dcd8ff;text-shadow:0 0 18px rgba(150,140,235,.45)}
-  [data-project="legacy"] #view-news .masthead p{font-family:var(--f-body);color:#c7c3e0;background:none;border:none;padding:0;margin-top:4px}
-  [data-project="legacy"] #view-news .masthead .rule{height:1px;width:64%;margin:14px auto 12px;border:none;
-    background:linear-gradient(90deg,transparent,rgba(168,158,235,.8),transparent);box-shadow:0 0 12px rgba(150,140,235,.5);-webkit-mask-image:none;mask-image:none}
-
-  /* --- NEVERLAND — древний свиток пергамента --- */
-  [data-project="neverland"] #view-news .masthead{
-    border:none;border-radius:3px;padding:34px 30px;margin:16px 6px 0;overflow:visible;
-    background:
-      radial-gradient(120% 55% at 50% 0%, rgba(150,116,52,.4), transparent 60%),
-      radial-gradient(62% 100% at 0% 50%, rgba(96,72,30,.5), transparent 34%),
-      radial-gradient(62% 100% at 100% 50%, rgba(96,72,30,.5), transparent 34%),
-      linear-gradient(180deg,#3a2f18,#2c2211);
-    box-shadow:inset 0 0 60px rgba(0,0,0,.42), 0 16px 34px rgba(0,0,0,.5)}
-  [data-project="neverland"] #view-news .masthead>*{position:relative;z-index:1}
-  /* витые золотые стержни свитка сверху и снизу (width:auto и top/bottom:auto — не наследовать
-     полосу 3 px и верхний уголок от общих правил, иначе вместо стержней торчала палочка) */
-  [data-project="neverland"] #view-news .masthead::before,
-  [data-project="neverland"] #view-news .masthead::after{content:"";position:absolute;left:-8px;right:-8px;width:auto;height:20px;z-index:2;
-    background:linear-gradient(180deg,#ffe9a6 0%,#e0b452 44%,#a5761f 100%);
-    box-shadow:0 3px 9px rgba(0,0,0,.5), inset 0 2px 0 rgba(255,248,214,.85), inset 0 -3px 6px rgba(70,48,14,.55);
-    border-radius:11px/50%}
-  [data-project="neverland"] #view-news .masthead::before{top:-11px;bottom:auto}
-  [data-project="neverland"] #view-news .masthead::after{top:auto;bottom:-11px}
-  [data-project="neverland"] #view-news .masthead h1{color:#ffe6a0;text-shadow:0 1px 0 #000, 0 0 20px rgba(244,207,92,.45)}
-  [data-project="neverland"] #view-news .masthead p{font-family:var(--f-body);color:#e6d3a6;background:none;border:none;padding:0;margin-top:6px}
-  [data-project="neverland"] #view-news .masthead .rule{height:11px;width:66%;margin:14px auto;border:none;-webkit-mask-image:none;mask-image:none;
-    background:radial-gradient(circle at 50% 50%, rgba(255,220,120,.95) 0 2px, transparent 2.6px) 50%/15px 11px repeat-x,
-               linear-gradient(90deg,transparent,rgba(255,220,120,.6) 22% 78%,transparent) center/100% 1px no-repeat}
-
-  /* --- TERRA — письмо начала XX века --- */
-  [data-project="terra"] #view-news .masthead{
-    border:1px solid rgba(150,128,88,.4);border-radius:2px;padding:30px 30px 26px;
-    background:
-      repeating-linear-gradient(0deg, transparent 0 28px, rgba(150,128,88,.09) 28px 29px),
-      radial-gradient(circle at 100% 0%, rgba(20,13,5,.6), transparent 20%),
-      radial-gradient(circle at 0% 100%, rgba(20,13,5,.5), transparent 22%),
-      linear-gradient(180deg,#221d13,#1b160e);
-    box-shadow:0 12px 26px rgba(0,0,0,.45), inset 0 0 40px rgba(120,90,45,.06);}
-  /* обугленные углы: общие left:0 (::before) и top/right (::after) снимаем, иначе оба угла
-     садились в левый верхний; свечение полосы ASSIMILATION уголку тоже ни к чему */
-  [data-project="terra"] #view-news .masthead::before{content:"";position:absolute;top:-1px;right:-1px;left:auto;bottom:auto;width:46px;height:46px;pointer-events:none;z-index:2;box-shadow:none;
-    background:radial-gradient(circle at 100% 0%, rgba(10,6,2,.92), rgba(48,30,12,.5) 48%, transparent 70%)}
-  [data-project="terra"] #view-news .masthead::after{content:"";position:absolute;bottom:-1px;left:-1px;top:auto;right:auto;width:40px;height:40px;pointer-events:none;z-index:2;
-    background:radial-gradient(circle at 0% 100%, rgba(10,6,2,.88), rgba(48,30,12,.45) 48%, transparent 70%)}
-  [data-project="terra"] #view-news .masthead h1{color:#e6dcc4;text-shadow:0 1px 0 rgba(0,0,0,.5)}
-  [data-project="terra"] #view-news .masthead p{font-family:Georgia,'Times New Roman',serif;font-style:italic;color:#cabfa4;background:none;border:none;border-left:2px solid rgba(200,180,140,.45);padding:2px 0 2px 13px;margin-top:8px}
-  [data-project="terra"] #view-news .masthead .rule{height:1px;width:60%;margin:14px 0 4px;border:none;border-top:1px dashed rgba(200,180,140,.6);-webkit-mask-image:none;mask-image:none;background:none;opacity:.85}
-
-  /* --- КЛАССИКА — обложка старинного фолианта: зелёная кожа, золотая двойная рамка с заклёпками --- */
-  [data-project="classic"] #view-news .masthead{
-    border:none;border-radius:7px;padding:32px 28px 28px;overflow:visible;
-    background:
-      radial-gradient(120% 82% at 50% -18%, rgba(211,168,74,.1), transparent 60%),
-      radial-gradient(60% 100% at 0% 50%, rgba(0,0,0,.35), transparent 40%),
-      radial-gradient(60% 100% at 100% 50%, rgba(0,0,0,.35), transparent 40%),
-      linear-gradient(180deg,#1b241a 0%,#121913 100%);
-    box-shadow:0 16px 38px rgba(0,0,0,.55), inset 0 1px 0 rgba(211,168,74,.16);}
-  /* золотая двойная рамка */
-  [data-project="classic"] #view-news .masthead::before{content:"";position:absolute;inset:8px;width:auto;height:auto;pointer-events:none;z-index:0;border-radius:4px;background:none;
-    border:1px solid rgba(211,168,74,.42);
-    box-shadow:inset 0 0 0 3px rgba(0,0,0,.3), inset 0 0 0 4px rgba(211,168,74,.16), inset 0 0 26px rgba(150,116,40,.14)}
-  [data-project="classic"] #view-news .masthead>*{position:relative;z-index:1}
-  /* золотые заклёпки по углам рамки */
-  [data-project="classic"] #view-news .masthead::after{content:"";position:absolute;inset:8px;width:auto;height:auto;top:8px;right:8px;pointer-events:none;z-index:2;
-    background:
-      radial-gradient(circle, rgba(240,206,120,.95) 0 2.3px, transparent 3px) left 3px top 3px/9px 9px no-repeat,
-      radial-gradient(circle, rgba(240,206,120,.95) 0 2.3px, transparent 3px) right 3px top 3px/9px 9px no-repeat,
-      radial-gradient(circle, rgba(240,206,120,.95) 0 2.3px, transparent 3px) right 3px bottom 3px/9px 9px no-repeat,
-      radial-gradient(circle, rgba(240,206,120,.95) 0 2.3px, transparent 3px) left 3px bottom 3px/9px 9px no-repeat}
-  [data-project="classic"] #view-news .masthead h1{color:#f0d38a;text-align:center;text-shadow:0 1px 0 rgba(0,0,0,.5), 0 0 18px rgba(211,168,74,.3)}
-  [data-project="classic"] #view-news .masthead p{font-family:var(--f-body);color:#d8d0bb;background:none;border:none;padding:0;margin-top:6px}
-  /* золотой разделитель с ромбом по центру */
-  [data-project="classic"] #view-news .masthead .rule{height:9px;width:60%;margin:14px auto 8px;border:none;-webkit-mask-image:none;mask-image:none;
-    background:
-      linear-gradient(90deg,transparent,rgba(211,168,74,.7) 20% 80%,transparent) center/100% 1px no-repeat,
-      linear-gradient(45deg,transparent 46%,rgba(240,206,120,.95) 46% 54%,transparent 54%) center/9px 9px no-repeat}
-
-  /* --- РУССКИЕ СКАЗКИ — теремное окно с резным наличником --- */
-  [data-project="skazki"] #view-news .masthead{
-    border:none;border-radius:10px;padding:36px 28px 28px;overflow:visible;
-    background:
-      radial-gradient(120% 70% at 50% -16%, rgba(231,193,100,.12), transparent 58%),
-      radial-gradient(60% 100% at 0% 50%, rgba(0,0,0,.34), transparent 40%),
-      radial-gradient(60% 100% at 100% 50%, rgba(0,0,0,.34), transparent 40%),
-      linear-gradient(180deg,#1d301c 0%,#111d12 100%);
-    box-shadow:0 16px 38px rgba(0,0,0,.55), inset 0 1px 0 rgba(231,193,100,.18)}
-  [data-project="skazki"] #view-news .masthead>*{position:relative;z-index:1}
-  /* резной наличник: двойная рамка берёзового золота поверх еловой доски */
-  [data-project="skazki"] #view-news .masthead::before{content:"";position:absolute;inset:8px;width:auto;height:auto;pointer-events:none;z-index:0;border-radius:6px;background:none;
-    border:1px solid rgba(231,193,100,.45);
-    box-shadow:inset 0 0 0 3px rgba(0,0,0,.3), inset 0 0 0 4px rgba(165,224,127,.2), inset 0 0 26px rgba(140,150,60,.12)}
-  /* городчатый верх — резные зубчики — и ромбы-солнышки по углам */
-  [data-project="skazki"] #view-news .masthead::after{content:"";position:absolute;inset:8px;width:auto;height:auto;pointer-events:none;z-index:2;
-    background:
-      linear-gradient(135deg, rgba(231,193,100,.55) 26%, transparent 26%) left top/12px 5px repeat-x,
-      linear-gradient(225deg, rgba(231,193,100,.55) 26%, transparent 26%) left top/12px 5px repeat-x,
-      linear-gradient(45deg,transparent 44%,rgba(240,220,140,.9) 44% 56%,transparent 56%) left 3px top 3px/9px 9px no-repeat,
-      linear-gradient(45deg,transparent 44%,rgba(240,220,140,.9) 44% 56%,transparent 56%) right 3px top 3px/9px 9px no-repeat,
-      linear-gradient(45deg,transparent 44%,rgba(240,220,140,.9) 44% 56%,transparent 56%) right 3px bottom 3px/9px 9px no-repeat,
-      linear-gradient(45deg,transparent 44%,rgba(240,220,140,.9) 44% 56%,transparent 56%) left 3px bottom 3px/9px 9px no-repeat}
-  [data-project="skazki"] #view-news .masthead h1{font-family:'Ruslan Display',Georgia,serif;font-weight:400;text-transform:none;letter-spacing:.05em;font-size:1.5rem;
-    color:#f4e2a4;text-align:center;text-shadow:0 2px 4px rgba(0,0,0,.85), 0 0 18px rgba(231,193,100,.4)}
-  [data-project="skazki"] #view-news .masthead p{font-family:var(--f-body);color:#eef4dc;background:none;border:none;padding:0;margin-top:6px;
-    text-shadow:0 1px 2px rgba(0,0,0,.85), 0 0 10px rgba(0,0,0,.6)}
-  /* вышитая тесьма: ряд ромбиков по золотой нити */
-  [data-project="skazki"] #view-news .masthead .rule{height:9px;width:62%;margin:14px auto 8px;border:none;-webkit-mask-image:none;mask-image:none;
-    background:
-      linear-gradient(90deg,transparent,rgba(165,224,127,.5) 16% 84%,transparent) center/100% 1px no-repeat,
-      linear-gradient(45deg,transparent 44%,rgba(240,220,140,.85) 44% 56%,transparent 56%) center/9px 9px repeat-x}
   [data-project="skazki"] .news-card h3{font-family:'Ruslan Display',Georgia,serif;font-weight:400;font-size:1rem;letter-spacing:.03em}
   [data-project="skazki"] .news-card{border-color:rgba(165,224,127,.26)}
 
-  [data-project="legacy"] #view-news .masthead h1,
-  [data-project="neverland"] #view-news .masthead h1,
-  [data-project="terra"] #view-news .masthead h1{text-align:center}
-  [data-project="legacy"] #view-news .masthead .rule,
-  [data-project="neverland"] #view-news .masthead .rule,
-  [data-project="terra"] #view-news .masthead .rule{margin-left:auto;margin-right:auto}
   /* ---- таблица прогрессии класса ---- */
   .lvl-wrap{margin:16px 0 4px;overflow-x:auto;-webkit-overflow-scrolling:touch;border:var(--hair) solid var(--line2);border-radius:12px}
   .lvl-tbl{width:100%;border-collapse:collapse;font-size:.78rem;min-width:340px}
@@ -4152,32 +3979,8 @@ html.is-web .app-cta:not([hidden]){display:flex}
 .ob-content .ob-steps{line-height:1.55}
 .pc-home :is(button,input,summary):focus-visible,.ob-card :is(button,summary):focus-visible{outline:2px solid var(--red-ink);outline-offset:-2px}
 
-/* Декор приветствий рисуется поверх фона; геометрия текста и траектория кубика задаются существующей рамкой. */
-html[data-project] #view-news .welcome-frame{isolation:isolate;--hair:.5px;--wf-line:rgba(var(--accent-rgb),.52);--wf-shine:rgba(var(--accent-rgb),.82)}
-html[data-project] #view-news .welcome-frame::before{content:'';position:absolute;inset:7px;width:auto;height:auto;pointer-events:none;z-index:0;border:1px solid var(--wf-line);border-radius:3px;background:transparent;box-shadow:none;clip-path:none;transform:none}
-html[data-project] #view-news .welcome-frame::after{content:'';position:absolute;inset:6px;width:auto;height:auto;pointer-events:none;z-index:0;border:0;border-radius:0;box-shadow:none;clip-path:none;transform:none;background:
- linear-gradient(var(--wf-shine),var(--wf-shine)) left top/18px 2px no-repeat,
- linear-gradient(var(--wf-shine),var(--wf-shine)) left top/2px 18px no-repeat,
- linear-gradient(var(--wf-shine),var(--wf-shine)) right bottom/18px 2px no-repeat,
- linear-gradient(var(--wf-shine),var(--wf-shine)) right bottom/2px 18px no-repeat}
-html[data-project] #view-news .welcome-frame :is(h1,p){text-shadow:none}
-html[data-project] #view-news .welcome-frame .hero-edit{z-index:3}
-html[data-project=legacy] #view-news .welcome-frame::before{inset:8px 8px 8px 12px;border-radius:0 4px 4px 0;box-shadow:-4px 0 0 #514760,-5px 0 0 #b0a2c7}
-html[data-project=classic] #view-news .welcome-frame::before{box-shadow:inset 0 0 0 2px #18201b,inset 0 0 0 3px #74603d}
-html[data-project=neverland] #view-news .welcome-frame::before{inset:8px;border:3px double #a58a4a;border-radius:2px}
-html[data-project=skazki] #view-news .welcome-frame::before{inset:7px;border-color:#85966a;box-shadow:0 0 0 3px #362d23,0 0 0 4px #786344}
-html[data-project=gw] #view-news .welcome-frame::after{inset:6px;background:repeating-linear-gradient(135deg,#e8bc42 0 3px,transparent 3px 7px) right bottom/50px 5px no-repeat}
-html[data-project=assimilation] #view-news .welcome-frame::before{inset:7px;border-style:solid dashed;border-color:#974c51}
-html[data-project=terra] #view-news .welcome-frame{--red-ink:#673728;--wf-line:#a18b69;background-color:#ecdfc1;color:#382c21;border-radius:3px;box-shadow:inset 0 -3px #aa9674,0 5px 14px #0005}
-html[data-project=terra] #view-news .welcome-frame::before{inset:8px;border-color:#aa9678;border-radius:0}
-html[data-project=terra] #view-news .welcome-frame::after{inset:0;background:
- linear-gradient(45deg,transparent 47%,#937e59 49%,#c7b594 53%,#e9dcc2) right top/24px 24px no-repeat,
- radial-gradient(ellipse at 46% 42%,#9a4939 0 31%,#74352c 34% 44%,#ac5943 48% 54%,#77392e 58% 65%,transparent 69%) right 12px bottom 2px/18px 16px no-repeat}
-html[data-project=terra] #view-news .welcome-frame p{color:#392e26;border-left-color:#a9805f}
-html[data-project=terra] #view-news .welcome-frame .rule{border-color:#88684b}
-html[data-project=terra] #view-news .welcome-frame .hp-set{color:#4c2c24;background:#e6d4b1;border-color:#a78969}
-html[data-project=terra] #view-news .welcome-frame .hero-edit{color:#412921;background:#f3e7ce;border:1px solid #a78969}
 </style>
+<link rel="stylesheet" href="welcome.css?v=320">
 </head>
 <body>
 <script>/* сохранённый сеттинг — сразу, ещё до скриптов (по нему играет заставка). Закрытый владельцем
@@ -4582,9 +4385,11 @@ if(/Android/i.test(navigator.userAgent||'')) d.classList.add('lite');}catch(e){}
     <div class="news-side">
       <div class="masthead welcome-frame">
         <button class="hero-edit" id="heroEdit" hidden onclick="openHeroEditor()" aria-label="Редактировать приветствие">✎</button>
-        <h1 id="heroTitle" style="color:var(--red-ink)">New day in New-Liberty!</h1>
-        <div class="rule"></div>
-        <p id="heroText"></p>
+        <div class="welcome-copy">
+          <h1 id="heroTitle">New day in New-Liberty!</h1>
+          <div class="rule" aria-hidden="true"></div>
+          <p id="heroText"></p>
+        </div>
       </div>
       <div id="nextGame" hidden></div>
       <div class="signup-bar">
@@ -13016,35 +12821,28 @@ const GAME_HERO={
 };
 const KEY_HERO='comik:hero:v1';
 let HERO_EDITS={};
-/* фоновые арты приветствий (вариант «фон рамки») — файлы img/hero-<сеттинг>.jpg
-   (раньше лежали base64 внутри страницы, +1 МБ к каждому её обновлению) */
-const HERO_IMGS={ legacy:'img/hero-legacy.jpg', neverland:'img/hero-neverland.jpg', assimilation:'img/hero-assimilation.jpg',
-  terra:'img/hero-terra.jpg', classic:'img/hero-classic.jpg', skazki:'img/hero-skazki.jpg', gw:'img/hero-gw.jpg' };
 function applyGameHero(){
   const g=GAME_HERO[CUR_PROJECT]||GAME_HERO.assimilation;
   const o=HERO_EDITS[CUR_PROJECT]||{};
   const t=document.getElementById('heroTitle'), p=document.getElementById('heroText');
   if(t) t.textContent = o.title || g.title;
-  if(p) p.innerHTML = sanitizeHTML(o.text || g.text);   // текст из облака (comik:hero:v1) — через санитайзер, как хроника
-  const mh=document.querySelector('#view-news .masthead');
-  if(mh){
-    const hi=HERO_IMGS[CUR_PROJECT];
-    if(hi){
-      // у луны LEGACY и собора Терры сюжет в верхней части кадра — кадрируем выше центра
-      const pos={legacy:'center 20%', terra:'center 18%', classic:'center 30%', skazki:'center 26%', gw:'center 42%'}[CUR_PROJECT]||'center';
-      // «Классика» — тёпло-зелёная вуаль, чтобы золотая рамка и текст читались
-      const overlay={
-        classic:'linear-gradient(110deg,#101c15cf,#111d17bb 40%,#0d1611f2)',
-        legacy:'linear-gradient(180deg,#10132368,#16142bc9 32%,#171526ed 68%,#191622fa)',
-        terra:'linear-gradient(150deg,#f6ead3ef,#eee0c5f2 50%,#e5d5b9f5)',
-        neverland:'linear-gradient(150deg,#211810b8,#251c13dd 58%,#211911f5)',
-        assimilation:'linear-gradient(120deg,#14121bc9,#19141dbf 40%,#10131cf3)',
-        skazki:'linear-gradient(180deg,#08110a57,#091b0fbd 34%,#08150af0 75%)',
-        gw:'linear-gradient(180deg,#12120998,#13140fce 42%,#12120df5)'
-      }[CUR_PROJECT]||'linear-gradient(#121216b8,#15151be6)';
-      mh.style.backgroundImage=`${overlay}, url("${hi}")`;
-      mh.style.backgroundSize='cover'; mh.style.backgroundPosition=pos; mh.style.backgroundRepeat='';
-    } else { mh.style.backgroundImage=''; mh.style.backgroundSize=''; mh.style.backgroundPosition=''; mh.style.backgroundRepeat=''; }
+  if(p){
+    p.innerHTML=sanitizeHTML(o.text || g.text);
+    if(CUR_PROJECT==='legacy' && !p.childElementCount){
+      const stanzas=p.textContent.split(/(\r?\n[ \t]*\r?\n)/);
+      if(stanzas.length>1)p.replaceChildren(...stanzas.map((text,i)=>{
+        if(i%2)return document.createTextNode(text);
+        const stanza=document.createElement('span'); stanza.className='welcome-stanza'; stanza.textContent=text;
+        return stanza;
+      }));
+    }
+    // Вынос финальной строки типографский. Произвольный текст и разметка ведущего сохраняются.
+    const last=p.lastChild, closing='Время выбрать сторону.';
+    if(CUR_PROJECT==='terra' && last?.nodeType===Node.TEXT_NODE && last.data.endsWith(closing)){
+      const tail=last.splitText(last.length-closing.length);
+      const line=document.createElement('span'); line.className='welcome-ending';
+      tail.replaceWith(line); line.appendChild(tail);
+    }
   }
   // приветствие правит только разработчик — ни в одном сеттинге игроку-ГМ это недоступно
   const e=document.getElementById('heroEdit'); if(e) e.hidden = false;   // показ по режиму ГМ — через .is-gm (CSS)
@@ -18231,7 +18029,7 @@ const KUB=(()=>{
   function peekOpen(){
     if(pk) return;
     const c=mh.cloneNode(true);
-    // снимаем только впитывание: арт сеттинга тоже стоит inline (applyGameHero)
+    // Снимаем стили впитывания, чтобы раскрылась целая рамка.
     ABS.forEach(k=>c.style.removeProperty(k)); c.classList.remove('absorbing'); c.classList.add('hero-peek');
     c.querySelectorAll('[id]').forEach(n=>n.removeAttribute('id'));
     c.querySelectorAll('.hero-edit').forEach(n=>n.remove());

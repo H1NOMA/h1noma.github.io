@@ -1,0 +1,305 @@
+@font-face {
+  font-family: 'Cormorant Garamond';
+  font-style: normal;
+  font-weight: 500 600;
+  font-display: swap;
+  src: url(fonts/welcome/cormorant-garamond-500-cyrillic.woff2) format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+@font-face {
+  font-family: 'Cormorant Garamond';
+  font-style: normal;
+  font-weight: 500 600;
+  font-display: swap;
+  src: url(fonts/welcome/cormorant-garamond-500-latin.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'PT Serif';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url(fonts/welcome/pt-serif-400-cyrillic.woff2) format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+@font-face {
+  font-family: 'PT Serif';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url(fonts/welcome/pt-serif-400-latin.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'PT Serif';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url(fonts/welcome/pt-serif-700-cyrillic.woff2) format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+@font-face {
+  font-family: 'PT Serif';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url(fonts/welcome/pt-serif-700-latin.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Yeseva One';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url(fonts/welcome/yeseva-one-400-cyrillic.woff2) format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+@font-face {
+  font-family: 'Yeseva One';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url(fonts/welcome/yeseva-one-400-latin.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Terra Body';
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  src: url('fonts/welcome/terra-body.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Terra Title';
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  src: url('fonts/welcome/terra-title.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Spectral';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url(fonts/welcome/spectral-400-cyrillic.woff2) format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+@font-face {
+  font-family: 'Spectral';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url(fonts/welcome/spectral-400-latin.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* Приветствия новостей и их копия, которая раскрывается из кубика. */
+.news-side { container: welcome-column / inline-size; }
+:where(#view-news) .welcome-frame {
+  --wf-photo-width: min(100%, 760px);
+  --wf-photo-position: center top;
+  --wf-veil: linear-gradient(180deg, transparent 2%, transparent 19%, var(--wf-base) 61%);
+  --wf-inset: 19px;
+  --wf-heading-size: 1.55rem;
+  --wf-heading-weight: 600;
+  --wf-body-size: 1rem;
+  --wf-leading: 1.42;
+  --wf-title-align: left;
+  --wf-type: system-ui, sans-serif;
+  --wf-paper: var(--wf-base);
+  --red: var(--wf-accent);
+  --red-ink: var(--wf-accent);
+}
+#view-news .welcome-frame {
+  position: relative;
+  isolation: isolate;
+  container: welcome / inline-size;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  box-sizing: border-box;
+  padding: 0;
+  overflow: hidden;
+  color: var(--wf-ink);
+  background-color: var(--wf-base);
+  background-image: var(--wf-edge-wash, none), var(--wf-veil), var(--wf-image);
+  background-repeat: no-repeat;
+  background-origin: border-box;
+  background-size: var(--wf-edge-size, 100% 100%), 100% 100%, var(--wf-photo-width) auto;
+  background-position: var(--wf-edge-position, center), center, var(--wf-photo-position);
+  border: 1px solid var(--wf-edge);
+  border-radius: var(--wf-radius, 4px);
+  box-shadow: 0 8px 18px -12px #000b;
+}
+#view-news .welcome-frame::before, #view-news .welcome-frame::after {
+  content: ""; position: absolute; z-index: 1; pointer-events: none;
+  inset: 7px; width: auto; height: auto; border: 0; border-radius: 0; background: none; box-shadow: none;
+}
+#view-news .welcome-copy {
+  position: relative; z-index: 2; padding: 13px var(--wf-inset) 18px;
+  min-width: 0; overflow-wrap: anywhere;
+  background: linear-gradient(180deg, transparent, var(--wf-paper) 38px);
+}
+#view-news .welcome-frame h1 {
+  margin: 0; color: var(--wf-accent); font: var(--wf-heading-weight) var(--wf-heading-size)/1.08 var(--wf-heading);
+  text-align: var(--wf-title-align); text-transform: none; letter-spacing: var(--wf-tracking, 0);
+  text-wrap: balance; text-shadow: none;
+}
+#view-news .welcome-frame p {
+  max-width: none; padding: 0; margin: 0; border: 0; background: none; border-radius: 0;
+  color: var(--wf-ink); font: 400 var(--wf-body-size)/var(--wf-leading) var(--wf-type);
+  letter-spacing: normal; text-shadow: none;
+}
+#view-news .welcome-frame .rule {
+  margin: 9px 0; width: var(--wf-rule-width, 52px); height: 1px; border: 0;
+  background: var(--wf-accent); mask-image: none; opacity: .8;
+}
+#view-news .welcome-frame .hero-edit {
+  z-index: 4; background: var(--wf-base); border: 1px solid var(--wf-edge); color: var(--wf-accent);
+}
+
+/* Размеры прежних карточек на телефоне и в боковой колонке. min-height даёт
+   тексту ведущего и увеличенному шрифту столько места, сколько им нужно. */
+#view-news .news-side > .welcome-frame {
+  min-height: calc(var(--wf-desktop) + (300px - 100cqi) * var(--wf-desk-slope) + var(--wf-extra, 0px));
+}
+@media (max-width: 879px) {
+  #view-news .news-side > .welcome-frame {
+    min-height: calc(max(var(--wf-wide),
+      var(--wf-phone) + (360px - 100cqi) * var(--wf-wide-slope),
+      var(--wf-phone) + (360px - 100cqi) * var(--wf-narrow-slope)) + var(--wf-extra, 0px));
+  }
+}
+.is-gm #view-news .welcome-frame { --wf-extra: var(--wf-editor-room, 0px); }
+
+/* TERRA. Снимок с крыш, бумажная полоска и два оттиска одной машинки. */
+[data-project="terra"] .welcome-frame {
+  --wf-image: url('img/hero-terra-fog.jpg'); --wf-photo-width: min(100%, 473px);
+  --wf-veil: linear-gradient(180deg, transparent, #111e2512 24%, #13242db0 39%, #17262ef7 51%, #16242bf7);
+  --wf-base: #20323a; --wf-ink: #f8f4e9; --wf-accent: #e0d7bc; --wf-edge: #455254; --wf-radius: 2px;
+  --wf-heading: 'Terra Title', 'Courier New', monospace; --wf-type: 'Terra Body', 'Courier New', monospace;
+  --wf-heading-weight: 400; --wf-heading-size: clamp(24px, 7.7cqi, 29px); --wf-body-size: clamp(15.5px, 4.65cqi, 17px); --wf-leading: 1.27; --wf-tracking: -.055em;
+  --wf-phone: 465px; --wf-desktop: 540px; --wf-wide: 287px; --wf-narrow-slope: 1.786; --wf-wide-slope: .471; --wf-desk-slope: 1.25;
+}
+[data-project="terra"] #view-news .welcome-frame::before { inset: 9px 9px auto auto; width: 15px; height: 15px; border-top: 1px solid #bdb5a1; border-right: 1px solid #bdb5a1; }
+[data-project="terra"] #view-news .welcome-frame::after { inset: auto auto 9px 9px; width: 15px; height: 15px; border-inline-start: 1px solid #aca08d; border-bottom: 1px solid #aca08d; }
+[data-project="terra"] #view-news .welcome-copy { padding: 0 17px 19px 21px; background: none; }
+[data-project="terra"] #view-news .welcome-frame h1 { width: fit-content; max-width: 100%; margin: 0 0 13px -2px; padding: 5px 9px 4px; background: #e0d7bc; color: #2c3636; transform: rotate(-.65deg); line-height: 1.01; box-shadow: 2px 2px 0 #17262d88; }
+[data-project="terra"] #view-news .welcome-frame .rule { display: none; }
+[data-project="terra"] #view-news .welcome-frame p { letter-spacing: -.025em; text-shadow: 0 1px 2px #10191e; }
+.welcome-ending { display: block; margin-top: .48em; padding-left: 11px; border-left: 2px solid #c7b589; }
+@container welcome (max-width: 315px) {
+  [data-project="terra"] #view-news .welcome-copy { padding-inline: 17px; }
+}
+
+/* Классика. Городская ярмарка в золотом переплёте. */
+[data-project="classic"] .welcome-frame {
+  --wf-image: url('img/hero-classic.jpg'); --wf-photo-position: center calc(40px - 42cqi);
+  --wf-base: #18251d; --wf-ink: #f0e5cb; --wf-accent: #e5c982; --wf-edge: #897442; --wf-radius: 7px;
+  --wf-heading: 'PT Serif', Georgia, serif; --wf-type: 'PT Serif', Georgia, serif; --wf-heading-weight: 700;
+  --wf-heading-size: 1.36rem; --wf-title-align: center; --wf-inset: 20px; --wf-rule-width: 60%;
+  --wf-phone: 306px; --wf-desktop: 333px; --wf-wide: 198px; --wf-narrow-slope: .386; --wf-wide-slope: .286; --wf-desk-slope: .45; --wf-editor-room: 34px;
+}
+[data-project="classic"] #view-news .welcome-frame::after { inset: 5px; border: 1px solid #c1a460a3; border-radius: 3px; z-index: 3; }
+[data-project="classic"] #view-news .welcome-frame .rule { margin-inline: auto; background: linear-gradient(90deg,transparent,#ddbd73 35% 65%,transparent); }
+[data-project="classic"] #view-news .welcome-copy { background: linear-gradient(180deg,#18251dbd,#18251df5 32px); }
+
+/* LEGACY. Луна в верхнем поле, стихи на тёмном форзаце. */
+[data-project="legacy"] .welcome-frame {
+  --wf-image: url('img/hero-legacy.jpg'); --wf-photo-width: min(54%,200px); --wf-photo-position: right calc(44px - min(34cqi,134px));
+  --wf-edge-wash: linear-gradient(90deg,#191727 45%,transparent 71%);
+  --wf-veil: linear-gradient(180deg,transparent 12%,#19172744 28%,#191727 59%);
+  --wf-base: #191727; --wf-ink: #e4def1; --wf-accent: #d6c3fa; --wf-edge: #65567e; --wf-radius: 3px 12px 12px 3px;
+  --wf-heading: 'Cormorant Garamond', Georgia, serif; --wf-type: 'Cormorant Garamond', Georgia, serif;
+  --wf-heading-size: 1.73rem; --wf-body-size: 1.18rem; --wf-leading: 1.12; --wf-inset: 23px;
+  --wf-phone: 376px; --wf-desktop: 429px; --wf-wide: 270px; --wf-narrow-slope: 1.143; --wf-wide-slope: .2804; --wf-desk-slope: .8833;
+}
+[data-project="legacy"] #view-news .welcome-frame::after { inset: 6px 6px 6px 10px; border: 1px solid #9a8bb166; border-radius: 0 7px 7px 0; box-shadow: -3px 0 0 #32283f,-4px 0 0 #ac99bd; z-index: 3; }
+[data-project="legacy"] #view-news .welcome-copy { background: none; }
+[data-project="legacy"] #view-news .welcome-frame p { font-weight: 500; }
+.welcome-stanza { display: block; white-space: pre-line; }
+.welcome-stanza + .welcome-stanza { margin-top: .32em; }
+[data-project="legacy"] #view-news .welcome-frame h1 { max-width: 85%; }
+[data-project="legacy"] #view-news .welcome-frame .rule { width: 64%; background: linear-gradient(90deg,#d2b8ed,transparent); }
+
+/* NEVERLAND. Вид на крепость в рамке старого атласа. */
+[data-project="neverland"] .welcome-frame {
+  --wf-image: url('img/hero-neverland.jpg'); --wf-photo-position: center calc(54px - 52cqi);
+  --wf-base: #30281d; --wf-ink: #eee2bf; --wf-accent: #f1d481; --wf-edge: #9d834c; --wf-radius: 2px;
+  --wf-heading: 'Yeseva One', Georgia, serif; --wf-heading-weight: 400; --wf-type: 'Spectral', Georgia, serif;
+  --wf-heading-size: 1.48rem; --wf-body-size: 1.04rem; --wf-inset: 19px;
+  --wf-phone: 372px; --wf-desktop: 426px; --wf-wide: 266px; --wf-narrow-slope: 1.529; --wf-wide-slope: .2804; --wf-desk-slope: .9; --wf-editor-room: 34px;
+}
+[data-project="neverland"] #view-news .news-side > .welcome-frame { margin-inline: 6px; margin-top: 16px; }
+[data-project="neverland"] #view-news .welcome-frame::after { inset: 6px; border: 3px double #b9a67294; z-index: 3; }
+[data-project="neverland"] #view-news .welcome-frame .rule { width: 72px; height: 4px; border-block: 1px solid #dbbe75; background: none; }
+[data-project="neverland"] #view-news .welcome-copy { background: linear-gradient(180deg,#30281dc9,#30281d 46px); }
+
+/* ASSIMILATION. Дождливый город и тёмная панель терминала. */
+[data-project="assimilation"] .welcome-frame {
+  --wf-image: url('img/hero-assimilation.jpg'); --wf-photo-position: center calc(45px - 96cqi);
+  --wf-base: #17151f; --wf-ink: #ebe5ed; --wf-accent: #ff8894; --wf-edge: #733945; --wf-radius: 2px;
+  --wf-heading: 'Roboto Mono', monospace; --wf-type: 'Roboto Mono', monospace; --wf-heading-weight: 700;
+  --wf-heading-size: 1.26rem; --wf-body-size: .93rem; --wf-leading: 1.42;
+  --wf-phone: 338px; --wf-desktop: 418px; --wf-wide: 258px; --wf-narrow-slope: 1.529; --wf-wide-slope: .212; --wf-desk-slope: 1.333;
+}
+[data-project="assimilation"] #view-news .welcome-copy { margin: 0 8px 8px; padding: 11px 12px; border-left: 2px solid #ed6577; background: #17151feb; }
+[data-project="assimilation"] #view-news .welcome-frame .rule { width: 40px; height: 3px; background: repeating-linear-gradient(90deg,#ff7586 0 6px,transparent 6px 9px); }
+
+/* Русские сказки. Иллюстрированная страница в резной раме. */
+[data-project="skazki"] .welcome-frame {
+  --wf-image: url('img/hero-skazki.jpg'); --wf-photo-position: center calc(75px - 65cqi);
+  --wf-base: #1c2e22; --wf-ink: #ecedd8; --wf-accent: #e7d598; --wf-edge: #877244; --wf-radius: 9px;
+  --wf-heading: 'Ruslan Display', Georgia, serif; --wf-heading-weight: 400; --wf-type: Georgia, 'Times New Roman', serif;
+  --wf-heading-size: 1.52rem; --wf-body-size: 1.04rem; --wf-inset: 22px;
+  --wf-phone: 416px; --wf-desktop: 523px; --wf-wide: 282px; --wf-narrow-slope: 1.9143; --wf-wide-slope: .3545; --wf-desk-slope: 1.7833; --wf-editor-room: 34px;
+}
+[data-project="skazki"] #view-news .welcome-frame::after { inset: 5px; border: 1px solid #ac9663aa; border-radius: 4px; z-index: 3; }
+[data-project="skazki"] #view-news .welcome-frame .rule { width: 69px; height: 5px; background: repeating-linear-gradient(135deg,#c8ad65 0 3px,transparent 3px 7px); }
+[data-project="skazki"] #view-news .welcome-copy { background: linear-gradient(180deg,#1c2e22c9,#1c2e22 45px); }
+
+/* Galactic War. Эмблема целиком на жёлтом поле и титр боевой сводки. */
+[data-project="gw"] .welcome-frame {
+  --wf-image: url('img/hero-gw.jpg'); --wf-photo-width: 124px; --wf-photo-position: center 5px;
+  --wf-veil: linear-gradient(180deg,transparent 0 108px,#ecb544 135px,#28271f 136px);
+  --wf-edge-wash: radial-gradient(ellipse 86px 130px at 50% 56px,transparent 42%,#ecb544 81%);
+  --wf-edge-size: 100% 136px; --wf-edge-position: center top;
+  --wf-base: #ecb544; --wf-paper: #28271f; --wf-ink: #f6f1dc; --wf-accent: #ffda58; --wf-edge: #a78f42; --wf-radius: 2px;
+  --wf-heading: 'Exo 2', system-ui, sans-serif; --wf-type: 'Exo 2', system-ui, sans-serif; --wf-heading-weight: 900;
+  --wf-heading-size: 1.46rem; --wf-tracking: .045em; --wf-body-size: 1.02rem; --wf-inset: 18px;
+  --wf-phone: 392px; --wf-desktop: 445px; --wf-wide: 258px; --wf-narrow-slope: .7571; --wf-wide-slope: .3545; --wf-desk-slope: .8833;
+}
+[data-project="gw"] #view-news .welcome-copy { background: #28271f; border-top: 4px solid #e7bd43; }
+[data-project="gw"] #view-news .welcome-frame h1 { text-transform: uppercase; }
+[data-project="gw"] #view-news .welcome-frame .rule { width: 54px; height: 4px; background: repeating-linear-gradient(125deg,#ffda58 0 4px,transparent 4px 7px); }
+[data-project="gw"] #view-news .welcome-frame .hero-edit { color: #31291a; }
+
+/* В раскрытой рамке кнопка видна постоянно, длинное приветствие прокручивается. */
+#view-news #heroPeek { padding: 10px 0; justify-content: flex-start; }
+#view-news #heroPeek .hp-in { position: relative; z-index: 2; }
+#view-news #heroPeek .hp-in::before { content: ""; display: block; height: 55px; }
+#view-news #heroPeek .welcome-copy { margin: 0; padding: 6px 20px; background: var(--wf-paper); }
+#view-news #heroPeek .hp-set { position: relative; z-index: 3; color: var(--wf-accent); background: var(--wf-paper); }
+
+/* Планшет и телефон в альбомной ориентации: у карточки и её раскрытой копии
+   одинаковый кадр. На компьютере у новостей отдельная узкая колонка. */
+@media (min-width: 540px) and (max-width: 879px) {
+  #view-news .welcome-frame {
+    --wf-photo-width: min(42%, 352px); --wf-photo-position: left 32%;
+    --wf-veil: linear-gradient(90deg,transparent 22%,var(--wf-base) 44%); --wf-edge-wash: none;
+    justify-content: center;
+  }
+  #view-news .welcome-frame .welcome-copy, #view-news #heroPeek .welcome-copy { margin: 0 0 0 40%; padding: 14px 20px 14px 12px; }
+  #view-news #heroPeek .hp-in::before { display: none; }
+  [data-project="terra"] #view-news .welcome-frame { --wf-photo-position: left top; }
+  .welcome-stanza { white-space: normal; }
+  [data-project="gw"] #view-news .welcome-frame {
+    --wf-photo-width: min(28%,165px); --wf-photo-position: 7% center; --wf-veil: linear-gradient(90deg,transparent 30%,#28271f 41%);
+    --wf-edge-size: 36% 100%; --wf-edge-position: left center;
+    --wf-edge-wash: radial-gradient(ellipse 106px 135px at 50% 50%,transparent 52%,#ecb544 94%);
+  }
+  [data-project="gw"] #view-news .welcome-frame .welcome-copy { border: 0; }
+}
+html[data-a11y="contrast"] #view-news .welcome-frame { --wf-ink: #fff; --wf-accent: #ffe400; --wf-edge: #ccc; --wf-paper: #121212; }
+html[data-a11y="contrast"] #view-news .welcome-frame .welcome-copy { background: #121212; }

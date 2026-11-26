@@ -201,6 +201,7 @@ async function peek(b, shots) {
   await login(page, 'hinoma');                        // команде видны все сеттинги
   const cdp = await ctx.newCDPSession(page);
   await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
+  const headingFonts = new Set(), bodyFonts = new Set();
   // альбомная — с длинным приветствием ГМа: в рамку не влезает, прокручивается
   for (const [w, h, long] of [[390, 844, false], [844, 390, true]]) {
     await page.setViewportSize({ width: w, height: h });
@@ -210,6 +211,20 @@ async function peek(b, shots) {
         if (long) document.getElementById('heroText').insertAdjacentText('beforeend', ' Длинное приветствие ГМа.'.repeat(30)); }, [p, long]);
       await page.waitForTimeout(700);
       const tag = `${w}×${h} ${p}`;
+      if (!long) {
+        const art = await page.evaluate(async () => {
+          const card = document.querySelector('.news-side .welcome-frame');
+          const title = getComputedStyle(card.querySelector('h1')), body = getComputedStyle(card.querySelector('p'));
+          const family = title.fontFamily.split(',')[0];
+          const faces = await document.fonts.load(title.fontWeight + ' 20px ' + family, 'Ж');
+          const src = getComputedStyle(card).backgroundImage.match(/url\("([^"]+)"\)/)[1];
+          const image = new Image(); image.src = src; await image.decode();
+          return { heading: family, body: body.fontFamily.split(',')[0], loaded: faces.some(f => f.status === 'loaded'), file: new URL(src).pathname.split('/').pop() };
+        });
+        const expected = p === 'terra' ? 'hero-terra-fog.jpg' : 'hero-' + p + '.jpg';
+        check(art.loaded && art.file === expected, tag + ': кириллический шрифт и свой исходный арт загружены');
+        headingFonts.add(art.heading); bodyFonts.add(art.body);
+      }
       if (!await absorb(page)) { check(false, `${tag}: приветствие впиталось`); continue; }
       await page.click('#projBtn');
       await page.waitForTimeout(800);                 // пружина раскрытия — 620 мс
@@ -237,6 +252,7 @@ async function peek(b, shots) {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.evaluate(() => { setProject('classic'); go('news'); scrollTo(0, 0); document.getElementById('newsFeed').style.minHeight = '3000px'; });
   await page.waitForTimeout(700);
+  check(headingFonts.size === PROJS.length && bodyFonts.size === PROJS.length, 'у каждого мира своя гарнитура заголовка и основного текста');
   const cssR = await page.evaluate(() => parseFloat(getComputedStyle(document.querySelector('#view-news .masthead')).borderTopLeftRadius));
   check(await absorb(page), 'приветствие «Классики» впиталось');
   // долгое нажатие мышью: меню открылось, а клик при отпускании (уже над меню) его не закрыл
